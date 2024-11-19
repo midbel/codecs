@@ -14,6 +14,7 @@ import (
 )
 
 var (
+	errSyntax      = errors.New("syntax error")
 	errType        = errors.New("invalid type")
 	errZero        = errors.New("division by zero")
 	errDiscard     = errors.New("discard")
@@ -141,11 +142,11 @@ func (c *compiler) compile() (Expr, error) {
 		case c.is(opAlt):
 			c.next()
 			if c.done() {
-				return nil, fmt.Errorf("syntax error")
+				return nil, errSyntax
 			}
 		case c.done():
 		default:
-			return nil, fmt.Errorf("syntax error")
+			return nil, errSyntax
 		}
 	}
 	if len(alt.all) == 1 {
@@ -161,7 +162,7 @@ func (c *compiler) compileFilter(left Expr) (Expr, error) {
 		return nil, err
 	}
 	if !c.is(endPred) {
-		return nil, fmt.Errorf("syntax error: missing ']' after filter")
+		return nil, fmt.Errorf("%w: missing ']' after filter", errSyntax)
 	}
 	c.next()
 
@@ -256,15 +257,15 @@ func (c *compiler) compileCall(left Expr) (Expr, error) {
 		case c.is(opSeq):
 			c.next()
 			if c.is(endGrp) {
-				return nil, fmt.Errorf("syntax error")
+				return nil, errSyntax
 			}
 		case c.is(endGrp):
 		default:
-			return nil, fmt.Errorf("syntax error")
+			return nil, errSyntax
 		}
 	}
 	if !c.is(endGrp) {
-		return nil, fmt.Errorf("syntax error: missing closing ')'")
+		return nil, fmt.Errorf("%w: missing closing ')'", errSyntax)
 	}
 	c.next()
 	return createNoop(fn), nil
