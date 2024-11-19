@@ -4,71 +4,14 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
-	"os"
 	"slices"
 	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 )
-
-func main() {
-	flag.Parse()
-
-	r, err := os.Open(flag.Arg(0))
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	defer r.Close()
-
-	doc, err := NewParser(r).Parse()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
-	}
-	if err := doc.Write(os.Stdout); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(121)
-	}
-
-	var (
-		w  bytes.Buffer
-		ws = NewWriter(&w)
-	)
-
-	if path := flag.Arg(1); path != "" {
-		qs := ScanQuery(strings.NewReader(path))
-		for {
-			tok := qs.Scan()
-			fmt.Println(tok)
-			if tok.Type == EOF || tok.Type == Invalid {
-				break
-			}
-		}
-
-		expr, err := Compile(strings.NewReader(path))
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "compilation failed", err)
-			os.Exit(1)
-		}
-		list, err := expr.Next(doc.Root())
-		if err != nil {
-			fmt.Println(os.Stderr, err)
-			return
-		}
-		el := NewElement(LocalName("result"))
-		el.Nodes = list.Nodes()
-		if err := ws.Write(NewDocument(el)); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(21)
-		}
-		fmt.Println(w.String())
-	}
-}
 
 var (
 	errType        = errors.New("invalid type")
