@@ -386,15 +386,6 @@ func (n number) Eval(_ Node) (any, error) {
 	return n.expr, nil
 }
 
-type chain struct {
-	expr Expr
-	next Expr
-}
-
-func (c chain) Eval(node Node) (any, error) {
-	return nil, errImplemented
-}
-
 type call struct {
 	ident string
 	args  []Expr

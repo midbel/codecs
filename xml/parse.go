@@ -53,7 +53,6 @@ var bindings = map[rune]int{
 	opMul:     powMul,
 	opDiv:     powMul,
 	opMod:     powMul,
-	opChain:   powCall,
 	begGrp:    powCall,
 	begPred:   powPred,
 }
@@ -87,7 +86,6 @@ func Compile(r io.Reader) (Expr, error) {
 		opGe:      cp.compileBinary,
 		opLt:      cp.compileBinary,
 		opLe:      cp.compileBinary,
-		opChain:   cp.compileChain,
 		begGrp:    cp.compileCall,
 	}
 	cp.prefix = map[rune]func() (Expr, error){
@@ -229,13 +227,6 @@ func (c *compiler) compileAttr() (Expr, error) {
 		ident: c.curr.Literal,
 	}
 	return createNoop(a), nil
-}
-
-func (c *compiler) compileChain(left Expr) (Expr, error) {
-	ch := chain{
-		expr: left,
-	}
-	return createNoop(ch), nil
 }
 
 func (c *compiler) compileCall(left Expr) (Expr, error) {
@@ -402,7 +393,6 @@ const (
 	opAnd
 	opOr
 	opSeq
-	opChain
 	opAxis
 )
 
@@ -468,10 +458,6 @@ func (s *QueryScanner) scanOperator(tok *Token) {
 		tok.Type = opMod
 	case equal:
 		tok.Type = opEq
-		if k == rangle {
-			s.read()
-			tok.Type = opChain
-		}
 	case bang:
 		tok.Type = Invalid
 		if k == equal {
