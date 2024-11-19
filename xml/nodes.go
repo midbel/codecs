@@ -8,6 +8,18 @@ import (
 	"slices"
 )
 
+type Node interface {
+	LocalName() string
+	QualifiedName() string
+	Leaf() bool
+	Position() int
+	Parent() Node
+	Value() string
+
+	setParent(Node)
+	setPosition(int)
+}
+
 var ErrElement = errors.New("element expected")
 
 type Document struct {
@@ -87,18 +99,6 @@ func (d *Document) Map() (map[string]any, error) {
 
 func (d *Document) Root() Node {
 	return d.root
-}
-
-type Node interface {
-	LocalName() string
-	QualifiedName() string
-	Leaf() bool
-	Position() int
-	Parent() Node
-	Value() string
-
-	setParent(Node)
-	setPosition(int)
 }
 
 type QName struct {
