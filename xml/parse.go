@@ -313,7 +313,11 @@ func (c *compiler) compileName() (Expr, error) {
 	if c.is(opAxis) {
 		c.next()
 		n.axis = n.ident
-		if !c.is(Name) {
+		switch {
+		case c.is(Name):
+		case c.is(opMul):
+			return nil, errImplemented
+		default:
 			return nil, fmt.Errorf("name expected")
 		}
 		n.ident = c.curr.Literal

@@ -10,6 +10,16 @@ import (
 )
 
 func main() {
+	options := struct {
+		Query        string
+		NoTrimSpace  bool
+		NoOmitProlog bool
+		Compact      bool
+	}{}
+	flag.StringVar(&options.Query, "q", "", "search for element in document")
+	flag.BoolVar(&options.NoTrimSpace, "t", false, "trim space")
+	flag.BoolVar(&options.NoOmitProlog, "p", false, "omit prolog")
+	flag.BoolVar(&options.Compact, "c", false, "write compact output")
 	flag.Parse()
 
 	r, err := os.Open(flag.Arg(0))
@@ -19,30 +29,42 @@ func main() {
 	}
 	defer r.Close()
 
-	doc, err := xml.NewParser(r).Parse()
+	p := xml.NewParser(r)
+	p.TrimSpace = !options.NoTrimSpace
+	p.OmitProlog = !options.NoOmitProlog
+
+	doc, err := p.Parse()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
-
-	if path := flag.Arg(1); path != "" {
-		expr, err := xml.Compile(strings.NewReader(path))
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "invalid expression:", err)
-			os.Exit(1)
-		}
-		list, err := expr.Next(doc.Root())
-		if err != nil {
-			fmt.Println(os.Stderr, err)
-			return
-		}
-		el := xml.NewElement(xml.LocalName("result"))
-		el.Nodes = list.Nodes()
-
-		doc = xml.NewDocument(el)
+	if doc, err = search(doc, options.Query); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(122)
 	}
-	if err := doc.Write(os.Stdout); err != nil {
+	ws := xml.NewWriter(os.Stdout)
+	ws.Compact = options.Compact
+	if err := ws.Write(doc); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(121)
 	}
+}
+
+func search(doc *xml.Document, query string) (*xml.Document, error) {
+	if query == "" {
+		return doc, nil
+	}
+	expr, err := xml.Compile(strings.NewReader(query))
+	if err != nil {
+		return nil, err
+	}
+
+	list, err := expr.Next(doc.Root())
+	if err != nil {
+		return nil, err
+	}
+	el := xml.NewElement(xml.LocalName("result"))
+	el.Nodes = list.Nodes()
+
+	return xml.NewDocument(el), nil
 }
