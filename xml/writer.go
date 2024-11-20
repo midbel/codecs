@@ -23,9 +23,6 @@ func NewWriter(w io.Writer) *Writer {
 }
 
 func (w *Writer) Write(doc *Document) error {
-	if w.Compact {
-		w.Indent = ""
-	}
 	if err := w.writeProlog(); err != nil {
 		return err
 	}
@@ -53,7 +50,7 @@ func (w *Writer) writeNode(node Node, depth int) error {
 func (w *Writer) writeElement(node *Element, depth int) error {
 	w.writeNL()
 
-	prefix := strings.Repeat(w.Indent, depth)
+	prefix := w.getIndent(depth)
 	if prefix != "" {
 		w.writer.WriteString(prefix)
 	}
@@ -111,7 +108,7 @@ func (w *Writer) writeCharData(node *CharData, _ int) error {
 
 func (w *Writer) writeComment(node *Comment, depth int) error {
 	w.writeNL()
-	prefix := strings.Repeat(w.Indent, depth)
+	prefix := w.getIndent(depth)
 	w.writer.WriteString(prefix)
 	w.writer.WriteRune(langle)
 	w.writer.WriteRune(bang)
@@ -128,7 +125,7 @@ func (w *Writer) writeInstruction(node *Instruction, depth int) error {
 	if depth > 0 {
 		w.writeNL()
 	}
-	prefix := strings.Repeat(w.Indent, depth)
+	prefix := w.getIndent(depth)
 	if prefix != "" {
 		w.writer.WriteString(prefix)
 	}
@@ -156,7 +153,7 @@ func (w *Writer) writeProlog() error {
 }
 
 func (w *Writer) writeAttributes(attrs []Attribute, depth int) error {
-	prefix := strings.Repeat(w.Indent, depth)
+	prefix := w.getIndent(depth)
 	for _, a := range attrs {
 		if depth == 0 || w.Compact {
 			w.writer.WriteRune(' ')
@@ -178,4 +175,11 @@ func (w *Writer) writeNL() {
 		return
 	}
 	w.writer.WriteRune('\n')
+}
+
+func (w *Writer) getIndent(depth int) string {
+	if w.Compact {
+		return ""
+	}
+	return strings.Repeat(w.Indent, depth)
 }

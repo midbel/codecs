@@ -63,8 +63,13 @@ func search(doc *xml.Document, query string) (*xml.Document, error) {
 	if err != nil {
 		return nil, err
 	}
-	el := xml.NewElement(xml.LocalName("result"))
-	el.Nodes = list.Nodes()
-
-	return xml.NewDocument(el), nil
+	var root xml.Node
+	if ns := list.Nodes(); list.Len() == 1 {
+		root = ns[0]
+	} else {
+		el := xml.NewElement(xml.LocalName("result"))
+		el.Nodes = ns
+		root = el
+	}
+	return xml.NewDocument(root), nil
 }
