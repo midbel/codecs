@@ -2,9 +2,11 @@ package xml
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"strings"
+	"unicode/utf8"
 )
 
 type Writer struct {
@@ -89,7 +91,7 @@ func (w *Writer) writeElement(node *Element, depth int) error {
 }
 
 func (w *Writer) writeLiteral(node *Text, _ int) error {
-	_, err := w.writer.WriteString(node.Content)
+	_, err := w.writer.WriteString(escapeText(node.Content))
 	return err
 }
 
@@ -164,7 +166,7 @@ func (w *Writer) writeAttributes(attrs []Attribute, depth int) error {
 		w.writer.WriteString(a.QualifiedName())
 		w.writer.WriteRune(equal)
 		w.writer.WriteRune(quote)
-		w.writer.WriteString(a.Value)
+		w.writer.WriteString(escapeText(a.Value))
 		w.writer.WriteRune(quote)
 	}
 	return nil
@@ -182,4 +184,28 @@ func (w *Writer) getIndent(depth int) string {
 		return ""
 	}
 	return strings.Repeat(w.Indent, depth)
+}
+
+func escapeText(str string) string {
+	var buf bytes.Buffer
+	for i := 0; i < len(str); {
+		r, z := utf8.DecodeRuneInString(str[i:])
+		i += z
+
+		switch r {
+		case '<':
+			buf.WriteString("&lt;")
+		case '>':
+			buf.WriteString("&gt;")
+		case '&':
+			buf.WriteString("&amp;")
+		case '"':
+			buf.WriteString("&quot;")
+		case '\'':
+			buf.WriteString("&apos;")
+		default:
+			buf.WriteRune(r)
+		}
+	}
+	return buf.String()
 }
