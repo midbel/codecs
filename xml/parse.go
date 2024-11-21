@@ -230,36 +230,53 @@ func (c *compiler) compileAttr() (Expr, error) {
 }
 
 func (c *compiler) compileCall(left Expr) (Expr, error) {
-	n, ok := left.(name)
-	if !ok {
-		return nil, fmt.Errorf("invalid function identifier")
+	compile := func(left Expr) (call, error) {
+		n, ok := left.(name)
+		if !ok {
+			return call{}, fmt.Errorf("invalid function identifier")
+		}
+		fn := call{
+			ident: n.ident,
+		}
+		c.next()
+		for !c.done() && !c.is(endGrp) {
+			arg, err := c.compileExpr(powLowest)
+			if err != nil {
+				return fn, err
+			}
+			fn.args = append(fn.args, arg)
+			switch {
+			case c.is(opSeq):
+				c.next()
+				if c.is(endGrp) {
+					return fn, errSyntax
+				}
+			case c.is(endGrp):
+			default:
+				return fn, errSyntax
+			}
+		}
+		if !c.is(endGrp) {
+			return fn, fmt.Errorf("%w: missing closing ')'", errSyntax)
+		}
+		c.next()
+		return fn, nil
 	}
-	c.next()
-	fn := call{
-		ident: n.ident,
-	}
-	for !c.done() && !c.is(endGrp) {
-		arg, err := c.compileExpr(powLowest)
+	switch e := left.(type) {
+	case axis:
+		expr, err := compile(e.next)
 		if err != nil {
 			return nil, err
 		}
-		fn.args = append(fn.args, arg)
-		switch {
-		case c.is(opSeq):
-			c.next()
-			if c.is(endGrp) {
-				return nil, errSyntax
-			}
-		case c.is(endGrp):
-		default:
-			return nil, errSyntax
+		e.next = expr
+		return e, nil
+	default:
+		fn, err := compile(left)
+		if err != nil {
+			return nil, err
 		}
+		return createNoop(fn), nil
 	}
-	if !c.is(endGrp) {
-		return nil, fmt.Errorf("%w: missing closing ')'", errSyntax)
-	}
-	c.next()
-	return createNoop(fn), nil
 }
 
 func (c *compiler) compileExpr(pow int) (Expr, error) {

@@ -420,11 +420,17 @@ type call struct {
 	args  []Expr
 }
 
+func (c call) Next(curr Node) (*NodeList, error) {
+	list := createList()
+	return list, nil
+}
+
 func (c call) Eval(node Node) (any, error) {
 	fn, ok := builtins[c.ident]
 	if !ok {
 		return nil, fmt.Errorf("undefined function")
 	}
+	fmt.Println(c.ident)
 	if fn == nil {
 		return nil, errImplemented
 	}
