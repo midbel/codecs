@@ -66,6 +66,20 @@ const (
 	nextSiblingAxis    = "following-sibling"
 )
 
+type query struct {
+	expr Expr
+}
+
+func (q query) Next(node Node) (*NodeList, error) {
+	if r := node.Parent(); r == nil {
+		var qn QName
+		root := NewElement(qn)
+		root.Append(node)
+		node = root
+	}
+	return q.expr.Next(node)
+}
+
 type all struct{}
 
 func (_ all) Next(curr Node) (*NodeList, error) {
@@ -81,6 +95,18 @@ func (_ all) Next(curr Node) (*NodeList, error) {
 type current struct{}
 
 func (_ current) Next(curr Node) (*NodeList, error) {
+	list := createList()
+	list.Push(curr)
+	return list, nil
+}
+
+type parent struct{}
+
+func (_ parent) Next(curr Node) (*NodeList, error) {
+	n := curr.Parent()
+	if n == nil {
+		return nil, fmt.Errorf("root element has no parent")
+	}
 	list := createList()
 	list.Push(curr)
 	return list, nil
@@ -114,15 +140,65 @@ func (_ root) Next(curr Node) (*NodeList, error) {
 	return list, nil
 }
 
-type parent struct{}
+type axis struct {
+	ident string
+	next  Expr
+}
 
-func (_ parent) Next(curr Node) (*NodeList, error) {
-	n := curr.Parent()
-	if n == nil {
-		return nil, fmt.Errorf("root element has no parent")
-	}
+func (a axis) Next(curr Node) (*NodeList, error) {
 	list := createList()
-	list.Push(curr)
+	if a.ident == selfAxis || a.ident == descendantSelfAxis || a.ident == ancestorSelfAxis {
+		other, err := a.next.Next(curr)
+		if err != nil {
+			return nil, err
+		}
+		list.Merge(other)
+	}
+	switch a.ident {
+	case selfAxis:
+		return list, nil
+	case childAxis:
+		el, ok := curr.(*Element)
+		if !ok {
+			return nil, fmt.Errorf("element node expected")
+		}
+		for _, c := range el.Nodes {
+			other, err := a.next.Next(c)
+			if err == nil {
+				list.Merge(other)
+			}
+		}
+	case parentAxis:
+		p := curr.Parent()
+		if p != nil {
+			return a.next.Next(p)
+		}
+		return nil, errDiscard
+	case ancestorAxis, ancestorSelfAxis:
+		el, ok := curr.(*Element)
+		if !ok {
+			return nil, fmt.Errorf("element node expected")
+		}
+		for p := el.Parent(); p != nil; {
+			other, err := a.next.Next(p)
+			if err == nil {
+				list.Merge(other)
+			}
+		}
+	case descendantAxis, descendantSelfAxis:
+		el, ok := curr.(*Element)
+		if !ok {
+			return nil, fmt.Errorf("element node expected")
+		}
+		for i := range el.Nodes {
+			other, err := a.next.Next(el.Nodes[i])
+			if err == nil {
+				list.Merge(other)
+			}
+		}
+	default:
+		return nil, errImplemented
+	}
 	return list, nil
 }
 
@@ -133,58 +209,11 @@ type name struct {
 }
 
 func (n name) Next(curr Node) (*NodeList, error) {
-	list := createList()
-	switch n.axis {
-	case childAxis, "":
-		el, ok := curr.(*Element)
-		if !ok {
-			return nil, fmt.Errorf("element node expected")
-		}
-		for _, c := range el.Nodes {
-			if c.LocalName() != n.ident {
-				continue
-			}
-			list.Push(c)
-		}
-	case parentAxis:
-		p := curr.Parent()
-		if p != nil && p.LocalName() == n.ident {
-			list.Push(p)
-		}
-	case selfAxis:
-		list.Push(curr)
-	case ancestorAxis, ancestorSelfAxis:
-		for x := curr; ; {
-			p := x.Parent()
-			if p == nil {
-				break
-			}
-			if p.LocalName() == n.ident {
-				list.Push(p)
-			}
-			x = p
-		}
-		if n.axis == ancestorSelfAxis && curr.LocalName() == n.ident {
-			list.Push(curr)
-		}
-	case descendantAxis, descendantSelfAxis:
-		el, ok := curr.(*Element)
-		if !ok {
-			return nil, fmt.Errorf("element node expected")
-		}
-		for i := range el.Nodes {
-			other, err := n.Next(el.Nodes[i])
-			if err != nil {
-				continue
-			}
-			list.Merge(other)
-		}
-		if n.axis == descendantSelfAxis && curr.LocalName() == n.ident {
-			list.Push(curr)
-		}
-	default:
-		return nil, errImplemented
+	if curr.LocalName() != n.ident {
+		return nil, errDiscard
 	}
+	list := createList()
+	list.Push(curr)
 	return list, nil
 }
 
@@ -478,20 +507,6 @@ func (f filter) Next(curr Node) (*NodeList, error) {
 		}
 	}
 	return ret, nil
-}
-
-type query struct {
-	expr Expr
-}
-
-func (q query) Next(node Node) (*NodeList, error) {
-	if r := node.Parent(); r == nil {
-		var qn QName
-		root := NewElement(qn)
-		root.Append(node)
-		node = root
-	}
-	return q.expr.Next(node)
 }
 
 func apply(left, right any, do func(left, right float64) (float64, error)) (any, error) {

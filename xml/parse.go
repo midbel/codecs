@@ -299,30 +299,45 @@ func (c *compiler) compileRoot() (Expr, error) {
 	return a, nil
 }
 
+func (c *compiler) compileAxis() (Expr, error) {
+	a := axis{
+		ident: c.curr.Literal,
+	}
+	c.next()
+	c.next()
+	expr, err := c.compileNameBase()
+	if err != nil {
+		return nil, err
+	}
+	a.next = expr
+	return a, nil
+}
+
 func (c *compiler) compileName() (Expr, error) {
+	if c.peek.Type == opAxis {
+		return c.compileAxis()
+	}
+	expr, err := c.compileNameBase()
+	if err != nil {
+		return nil, err
+	}
+	a := axis{
+		ident: childAxis,
+		next:  expr,
+	}
+	return a, nil
+}
+
+func (c *compiler) compileNameBase() (Expr, error) {
 	if c.is(opMul) {
 		c.next()
 		var a all
 		return a, nil
 	}
 	n := name{
-		axis:  childAxis,
 		ident: c.curr.Literal,
 	}
 	c.next()
-	if c.is(opAxis) {
-		c.next()
-		n.axis = n.ident
-		switch {
-		case c.is(Name):
-		case c.is(opMul):
-			return nil, errImplemented
-		default:
-			return nil, fmt.Errorf("name expected")
-		}
-		n.ident = c.curr.Literal
-		c.next()
-	}
 	if c.is(Namespace) {
 		c.next()
 		n.space = n.ident

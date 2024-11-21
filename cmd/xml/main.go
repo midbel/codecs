@@ -42,6 +42,9 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(122)
 	}
+	if doc == nil {
+		return
+	}
 	ws := xml.NewWriter(os.Stdout)
 	ws.Compact = options.Compact
 	if err := ws.Write(doc); err != nil {
@@ -62,6 +65,9 @@ func search(doc *xml.Document, query string) (*xml.Document, error) {
 	list, err := expr.Next(doc.Root())
 	if err != nil {
 		return nil, err
+	}
+	if list.Empty() {
+		return nil, nil
 	}
 	var root xml.Node
 	if ns := list.Nodes(); list.Len() == 1 {
