@@ -421,7 +421,25 @@ type call struct {
 }
 
 func (c call) Next(curr Node) (*NodeList, error) {
-	list := createList()
+	var (
+		list = createList()
+		keep bool
+	)
+	switch c.ident {
+	case "node":
+		_, keep = curr.(*Element)
+	case "text":
+		_, keep = curr.(*Text)
+	case "processing-instruction":
+		_, keep = curr.(*Instruction)
+	case "comment":
+		_, keep = curr.(*Comment)
+	default:
+		return nil, fmt.Errorf("undefined function")
+	}
+	if keep {
+		list.Push(curr)
+	}
 	return list, nil
 }
 
