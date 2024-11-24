@@ -12,12 +12,12 @@ var builtins = map[string]builtinFunc{
 	"not":               checkArity(1, callNot),
 	"true":              checkArity(0, callTrue),
 	"false":             checkArity(0, callFalse),
-	"concat":            nil,
+	"concat":            checkArity(1, callConcat),
 	"contains":          checkArity(2, callContains),
 	"string-length":     checkArity(1, callStringLen),
 	"starts-with":       checkArity(2, callStartsWith),
 	"ends-width":        checkArity(2, callEndsWith),
-	"substring":         nil,
+	"substring":         checkArity(2, callSubstring),
 	"substring-after":   checkArity(2, callCutSuffix),
 	"substring-before":  checkArity(2, callCutPrefix),
 	"normalize-space":   checkArity(1, callTrimSpace),
@@ -27,6 +27,7 @@ var builtins = map[string]builtinFunc{
 	"min":               nil,
 	"max":               nil,
 	"sum":               nil,
+	"avg":               nil,
 	"ceiling":           checkArity(1, callCeil),
 	"floor":             checkArity(1, callFloor),
 	"round":             checkArity(1, callRound),
@@ -179,6 +180,40 @@ func callLower(_ Node, args []any) (any, error) {
 		return nil, errType
 	}
 	return strings.ToLower(str), nil
+}
+
+func callConcat(_ Node, args []any) (any, error) {
+	var str []string
+	for i := range args {
+		s, err := toString(args[i])
+		if err != nil {
+			return nil, err
+		}
+		str = append(str, s)
+	}
+	return strings.Join(str, ""), nil
+}
+
+func callSubstring(_ Node, args []any) (any, error) {
+	str, err := toString(args[0])
+	if err != nil {
+		return nil, err
+	}
+	pos, err := toFloat(args[1])
+	if err != nil {
+		return nil, err
+	}
+	var size float64
+	if len(args) >= 2 {
+		size, err = toFloat(args[2])
+		if err != nil {
+			return nil, err
+		}
+	}
+	if size == 0 {
+		size = float64(len(str)) - pos
+	}
+	return str[int(pos) : int(pos+size)], nil
 }
 
 func callLocalName(ctx Node, _ []any) (any, error) {
