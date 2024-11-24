@@ -19,25 +19,11 @@ func main() {
 	}
 	defer r.Close()
 
-	doc, err := json.Parse(r)
+	doc, err := json.Find(r, *query)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-
-	if *query != "" {
-		q, err := json.Compile(*query)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-		doc, err = q.Get(doc)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(2)
-		}
-	}
-
 	ws := json.NewWriter(os.Stdout)
 	ws.Write(doc)
 }

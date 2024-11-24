@@ -14,6 +14,21 @@ import (
 	"unicode/utf8"
 )
 
+func Find(r io.Reader, q string) (any, error) {
+	doc, err := Parse(r)
+	if err != nil {
+		return nil, err
+	}
+	if q == "" {
+		return doc, nil
+	}
+	query, err := Compile(q)
+	if err != nil {
+		return nil, err
+	}
+	return query.Get(doc)
+}
+
 type Query interface {
 	Get(any) (any, error)
 }
