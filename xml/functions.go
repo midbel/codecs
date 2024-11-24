@@ -213,7 +213,7 @@ func callSubstring(_ Node, args []any) (any, error) {
 	if size == 0 {
 		size = float64(len(str)) - pos
 	}
-	return str[int(pos) : int(pos+size)], nil
+	return str[int(pos):int(pos+size)], nil
 }
 
 func callLocalName(ctx Node, _ []any) (any, error) {
