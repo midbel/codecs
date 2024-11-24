@@ -24,6 +24,8 @@ func (t Token) String() string {
 	switch t.Type {
 	case EOF:
 		return "<eof>"
+	case EOL:
+		return "<eol>"
 	case Comment:
 		prefix = "comment"
 	case Literal:
@@ -68,6 +70,7 @@ func (t Token) String() string {
 
 const (
 	EOF = -(iota + 1)
+	EOL
 	Comment
 	Literal
 	Name
@@ -95,7 +98,8 @@ type Scanner struct {
 	Position
 	old Position
 
-	str bytes.Buffer
+	str    bytes.Buffer
+	nested int
 }
 
 func Scan(r io.Reader) *Scanner {
@@ -115,8 +119,13 @@ func (s *Scanner) Scan() Token {
 		tok.Type = EOF
 		return tok
 	}
-	s.skipBlank()
+	s.skip(isSpace)
+	if s.nested > 0 {
+		s.skip(isBlank)
+	}
 	switch {
+	case isNL(s.char):
+		s.scanNL(&tok)
 	case isComment(s.char):
 		s.scanComment(&tok)
 	case isLetter(s.char):
@@ -131,6 +140,11 @@ func (s *Scanner) Scan() Token {
 		tok.Type = Invalid
 	}
 	return tok
+}
+
+func (s *Scanner) scanNL(tok *Token) {
+	tok.Type = EOL
+	s.skip(isBlank)
 }
 
 func (s *Scanner) scanQuote(tok *Token) {
@@ -155,6 +169,7 @@ func (s *Scanner) scanComment(tok *Token) {
 		s.write()
 		s.read()
 	}
+	s.read()
 	tok.Type = Comment
 	tok.Literal = s.literal()
 }
@@ -202,8 +217,10 @@ func (s *Scanner) scanPunct(tok *Token) {
 		tok.Type = Comma
 	case '{':
 		tok.Type = BegBrace
+		s.nested++
 	case '}':
 		tok.Type = EndBrace
+		s.nested--
 	case '(':
 		tok.Type = BegParen
 	case ')':
@@ -263,7 +280,13 @@ func (s *Scanner) reset() {
 }
 
 func (s *Scanner) skipBlank() {
-	for isBlank(s.char) {
+	for isSpace(s.char) {
+		s.read()
+	}
+}
+
+func (s *Scanner) skip(accept func(rune) bool) {
+	for accept(s.char) {
 		s.read()
 	}
 }

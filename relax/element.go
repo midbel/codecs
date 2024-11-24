@@ -15,11 +15,15 @@ type QName struct {
 
 type Attribute struct {
 	QName
+	Type string
+	List []string
 }
 
 type Element struct {
 	QName
 	Arity
+	Type     string
+	List     []string
 	Attrs    []*Attribute
 	Elements []*Element
 }
