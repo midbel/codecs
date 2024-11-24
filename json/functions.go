@@ -560,11 +560,11 @@ func boolNot(ctx any, args []any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	res, ok := res.(bool)
+	val, ok := res.(bool)
 	if !ok {
 		return nil, errType
 	}
-	return !res, nil
+	return !val, nil
 }
 
 func objectKeys(ctx any, args []any) (any, error) {
@@ -681,6 +681,7 @@ func objectType(ctx any, args []any) (any, error) {
 	case map[string]any:
 		return "object", nil
 	default:
+		return "unknown", nil
 	}
 }
 
