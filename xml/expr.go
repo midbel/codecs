@@ -448,7 +448,6 @@ func (c call) Eval(node Node) (any, error) {
 	if !ok {
 		return nil, fmt.Errorf("undefined function")
 	}
-	fmt.Println(c.ident)
 	if fn == nil {
 		return nil, errImplemented
 	}
@@ -611,5 +610,19 @@ func toBool(v any) bool {
 		return len(v) > 0
 	default:
 		return false
+	}
+}
+
+type Context struct {
+	Node
+	Size     int
+	Position int
+}
+
+func getContextFromNode(node Node) Context {
+	return Context{
+		Node:     node,
+		Position: node.Position(),
+		Size:     0,
 	}
 }
