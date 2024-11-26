@@ -15,6 +15,7 @@ type QName struct {
 
 type Attribute struct {
 	QName
+	Arity
 	Type string
 	List []string
 }
@@ -22,8 +23,28 @@ type Attribute struct {
 type Element struct {
 	QName
 	Arity
-	Type     string
-	List     []string
-	Attrs    []*Attribute
-	Elements []*Element
+	Type       string
+	Attributes []*Attribute
+	Elements   []*Element
+}
+
+type Text struct{}
+
+type Empty struct{}
+
+type Enum struct {
+	List []string
+}
+
+type Type struct {
+	Name string
+	Constraint
+}
+
+type Constraint struct {
+	Length    int
+	MinLength int
+	MaxLength int
+	Pattern   string
+	Enum      []string
 }

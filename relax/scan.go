@@ -190,6 +190,8 @@ func (s *Scanner) scanName(tok *Token) {
 	case "datatypes":
 	case "include":
 	case "external":
+	case "text":
+	case "empty":
 	default:
 		tok.Type = Name
 	}
