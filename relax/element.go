@@ -10,24 +10,19 @@ const (
 
 type Pattern interface{}
 
+type Grammar struct {
+	Start Pattern
+	List  map[string]Pattern
+}
+
 type QName struct {
 	Space string
 	Local string
 }
 
-type Grammar struct {
-	Start Pattern
-}
-
 type Link struct {
 	Ident string
 	Arity
-}
-
-type Reference struct {
-	Ident string
-	Arity
-	Pattern
 }
 
 type Attribute struct {
@@ -39,12 +34,9 @@ type Attribute struct {
 type Element struct {
 	QName
 	Arity
-	Value      Pattern
-	Attributes []Pattern
-	Elements   []Pattern
+	Value    Pattern
+	Patterns []Pattern
 }
-
-type Alternative struct{}
 
 type Text struct{}
 

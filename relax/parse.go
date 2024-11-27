@@ -12,7 +12,6 @@ type Parser struct {
 
 	spaces map[string]string
 	types  map[string]string
-	names  map[string]Pattern
 }
 
 func Parse(r io.Reader) *Parser {
@@ -20,7 +19,6 @@ func Parse(r io.Reader) *Parser {
 		scan:   Scan(r),
 		spaces: make(map[string]string),
 		types:  make(map[string]string),
-		names:  make(map[string]Pattern),
 	}
 	p.next()
 	p.next()
@@ -57,6 +55,7 @@ func (p *Parser) parseGrammar() (Pattern, error) {
 	if !p.is(BegBrace) {
 		return nil, p.unexpected()
 	}
+	p.next()
 	_, err := p.parseDefinitions()
 	if err != nil {
 		return nil, err
@@ -70,40 +69,31 @@ func (p *Parser) parseGrammar() (Pattern, error) {
 }
 
 func (p *Parser) parseDefinitions() (Pattern, error) {
-	if _, err := p.parseStartPattern(); err != nil {
+	var (
+		grm Grammar
+		err error
+	)
+	if grm.Start, err = p.parseStartPattern(); err != nil {
 		return nil, err
 	}
+	grm.List = make(map[string]Pattern)
 	for !p.done() {
 		p.skipComment()
 		if !p.is(Name) {
 			return nil, fmt.Errorf("missing name")
 		}
-		pat, err := p.parseName()
-		if err != nil {
+		name := p.curr.Literal
+		p.next()
+		if !p.is(Assign) {
+			return nil, fmt.Errorf("missing assignment after name")
+		}
+		p.next()
+		if grm.List[name], err = p.parseElement(); err != nil {
 			return nil, err
 		}
-		_ = pat
+		p.skipEOL()
 	}
-	return nil, nil
-}
-
-func (p *Parser) parseName() (Pattern, error) {
-	defer p.skipEOL()
-	name := p.curr.Literal
-	p.next()
-	if !p.is(Assign) {
-		return nil, fmt.Errorf("missing assignment after name")
-	}
-	p.next()
-	pattern, err := p.parseElement()
-	if err != nil {
-		return nil, err
-	}
-	ref := Reference{
-		Ident:   name,
-		Pattern: pattern,
-	}
-	return ref, err
+	return grm, nil
 }
 
 func (p *Parser) parseStartPattern() (Pattern, error) {
@@ -126,43 +116,37 @@ func (p *Parser) parseStartPattern() (Pattern, error) {
 	return p.parseElement()
 }
 
-func (p *Parser) parsePatternForElement(el *Element) error {
+func (p *Parser) parsePatternForElement() (Pattern, error) {
 	p.skipComment()
 	if p.is(Name) {
 		var ref Link
 		ref.Ident = p.curr.Literal
 		p.next()
 		ref.Arity = p.parseArity()
-		el.Elements = append(el.Elements, ref)
-		return nil
+		return ref, nil
 	}
 	if !p.is(Keyword) {
-		return fmt.Errorf("pattern: keyword expected")
+		return nil, fmt.Errorf("pattern: keyword expected")
 	}
 	switch p.curr.Literal {
 	case "element":
-		ch, err := p.parseElement()
-		if err != nil {
-			return err
-		}
-		el.Elements = append(el.Elements, ch)
+		return p.parseElement()
 	case "attribute":
-		at, err := p.parseAttribute()
-		if err != nil {
-			return err
-		}
-		el.Attributes = append(el.Attributes, at)
+		return p.parseAttribute()
 	case "text":
 		p.next()
+		var pat Text
+		return pat, nil
 	case "empty":
 		p.next()
+		var pat Empty
+		return pat, nil
 	default:
-		return fmt.Errorf("%s: pattern not supported for element", p.curr.Literal)
+		return nil, fmt.Errorf("%s: pattern not supported for element", p.curr.Literal)
 	}
-	return nil
 }
 
-func (p *Parser) parseElement() (*Element, error) {
+func (p *Parser) parseElement() (Pattern, error) {
 	p.next()
 	if !p.is(Name) {
 		return nil, fmt.Errorf("element name expected")
@@ -188,9 +172,11 @@ func (p *Parser) parseElement() (*Element, error) {
 		el.Value = Empty{}
 	} else {
 		for !p.done() && !p.is(EndBrace) {
-			if err := p.parsePatternForElement(&el); err != nil {
+			pat, err := p.parsePatternForElement()
+			if err != nil {
 				return nil, err
 			}
+			el.Patterns = append(el.Patterns, pat)
 			switch {
 			case p.is(Comma):
 				p.next()
@@ -208,7 +194,7 @@ func (p *Parser) parseElement() (*Element, error) {
 	}
 	p.next()
 	el.Arity = p.parseArity()
-	return &el, nil
+	return el, nil
 }
 
 func (p *Parser) parsePatternForAttribute() (Pattern, error) {
@@ -228,7 +214,7 @@ func (p *Parser) parsePatternForAttribute() (Pattern, error) {
 	}
 }
 
-func (p *Parser) parseAttribute() (*Attribute, error) {
+func (p *Parser) parseAttribute() (Pattern, error) {
 	p.next()
 	if !p.is(Name) {
 		return nil, fmt.Errorf("expected attribute name")
@@ -253,7 +239,7 @@ func (p *Parser) parseAttribute() (*Attribute, error) {
 	if at.Arity > 0 && at.Arity != ZeroOrOne {
 		return nil, fmt.Errorf("unexpected value for attribute")
 	}
-	return &at, nil
+	return at, nil
 }
 
 func (p *Parser) parseArity() Arity {
