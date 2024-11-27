@@ -19,12 +19,12 @@ func main() {
 	defer r.Close()
 
 	p := relax.Parse(r)
-	el, err := p.Parse()
+	a, err := p.Parse()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		fmt.Fprintln(os.Stderr, "parsing error:", err)
+		os.Exit(21)
 	}
-	printR(el)
+	fmt.Println(a)
 	// scan := relax.Scan(r)
 	// for {
 	// 	tok := scan.Scan()
@@ -33,21 +33,5 @@ func main() {
 	// 		break
 	// 	}
 	// }
-}
 
-func printAs(attrs []*relax.Attribute) {
-	if len(attrs) == 0 {
-		return
-	}
-	for i := range attrs {
-		fmt.Printf(">> %+v\n", attrs[i])
-	}
-}
-
-func printR(el *relax.Element) {
-	fmt.Printf("%+v\n", el)
-	printAs(el.Attributes)
-	for i := range el.Elements {
-		printR(el.Elements[i])
-	}
 }

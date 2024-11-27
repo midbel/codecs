@@ -192,6 +192,7 @@ func (s *Scanner) scanName(tok *Token) {
 	case "external":
 	case "text":
 	case "empty":
+	case "start":
 	default:
 		tok.Type = Name
 	}

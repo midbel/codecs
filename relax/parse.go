@@ -12,6 +12,7 @@ type Parser struct {
 
 	spaces map[string]string
 	types  map[string]string
+	names  map[string]Pattern
 }
 
 func Parse(r io.Reader) *Parser {
@@ -19,31 +20,122 @@ func Parse(r io.Reader) *Parser {
 		scan:   Scan(r),
 		spaces: make(map[string]string),
 		types:  make(map[string]string),
+		names:  make(map[string]Pattern),
 	}
 	p.next()
 	p.next()
 	return &p
 }
 
-func (p *Parser) Parse() (*Element, error) {
+func (p *Parser) Parse() (Pattern, error) {
 	return p.parse()
 }
 
-func (p *Parser) parse() (*Element, error) {
-	p.skipComment()
-	if !p.is(Keyword) {
-		return nil, fmt.Errorf("keyword expected")
+func (p *Parser) parse() (Pattern, error) {
+	if err := p.parseDeclarations(); err != nil {
+		return nil, err
 	}
+	p.skipEOL()
 	switch p.curr.Literal {
+	case "grammar":
+		return p.parseGrammar()
 	case "element":
 		return p.parseElement()
+	case "start":
+		return p.parseDefinitions()
 	default:
-		return nil, fmt.Errorf("pattern not yet supported")
+		return nil, fmt.Errorf("unexpected keyword")
 	}
+}
+
+func (p *Parser) parseDeclarations() error {
+	return nil
+}
+
+func (p *Parser) parseGrammar() (Pattern, error) {
+	p.next()
+	if !p.is(BegBrace) {
+		return nil, p.unexpected()
+	}
+	_, err := p.parseDefinitions()
+	if err != nil {
+		return nil, err
+	}
+	p.next()
+	if !p.is(EndBrace) {
+		return nil, p.unexpected()
+	}
+	p.next()
+	return nil, nil
+}
+
+func (p *Parser) parseDefinitions() (Pattern, error) {
+	if _, err := p.parseStartPattern(); err != nil {
+		return nil, err
+	}
+	for !p.done() {
+		p.skipComment()
+		if !p.is(Name) {
+			return nil, fmt.Errorf("missing name")
+		}
+		pat, err := p.parseName()
+		if err != nil {
+			return nil, err
+		}
+		_ = pat
+	}
+	return nil, nil
+}
+
+func (p *Parser) parseName() (Pattern, error) {
+	defer p.skipEOL()
+	name := p.curr.Literal
+	p.next()
+	if !p.is(Assign) {
+		return nil, fmt.Errorf("missing assignment after name")
+	}
+	p.next()
+	pattern, err := p.parseElement()
+	if err != nil {
+		return nil, err
+	}
+	ref := Reference{
+		Ident:   name,
+		Pattern: pattern,
+	}
+	return ref, err
+}
+
+func (p *Parser) parseStartPattern() (Pattern, error) {
+	defer p.skipEOL()
+	if !p.is(Keyword) && p.curr.Literal != "start" {
+		return nil, fmt.Errorf("start keyword expected")
+	}
+	p.next()
+	if !p.is(Assign) {
+		return nil, fmt.Errorf("missing assignlent after start")
+	}
+	p.next()
+	if p.is(Name) {
+		var ref Link
+		ref.Ident = p.curr.Literal
+		p.next()
+		ref.Arity = p.parseArity()
+		return ref, nil
+	}
+	return p.parseElement()
 }
 
 func (p *Parser) parsePatternForElement(el *Element) error {
 	p.skipComment()
+	if p.is(Name) {
+		var ref Link
+		ref.Ident = p.curr.Literal
+		p.next()
+		ref.Arity = p.parseArity()
+		el.Elements = append(el.Elements, ref)
+		return nil
+	}
 	if !p.is(Keyword) {
 		return fmt.Errorf("pattern: keyword expected")
 	}
@@ -83,10 +175,17 @@ func (p *Parser) parseElement() (*Element, error) {
 	}
 	p.next()
 	if p.is(Literal) {
-		_, err := p.parseEnum()
+		pattern, err := p.parseEnum()
 		if err != nil {
 			return nil, err
 		}
+		el.Value = pattern
+	} else if p.is(Keyword) && p.curr.Literal == "text" {
+		p.next()
+		el.Value = Text{}
+	} else if p.is(Keyword) && p.curr.Literal == "empty" {
+		p.next()
+		el.Value = Empty{}
 	} else {
 		for !p.done() && !p.is(EndBrace) {
 			if err := p.parsePatternForElement(&el); err != nil {
@@ -112,17 +211,21 @@ func (p *Parser) parseElement() (*Element, error) {
 	return &el, nil
 }
 
-func (p *Parser) parsePatternForAttribute() error {
+func (p *Parser) parsePatternForAttribute() (Pattern, error) {
+	if p.is(Literal) {
+		return p.parseEnum()
+	}
 	if !p.is(Keyword) {
-		return fmt.Errorf("pattern: keyword expected")
+		return nil, fmt.Errorf("pattern: keyword expected")
 	}
 	switch p.curr.Literal {
 	case "text":
-		p.next()
+		defer p.next()
+		var pattern Text
+		return pattern, nil
 	default:
-		return fmt.Errorf("%s: pattern not supported for attribute", p.curr.Literal)
+		return nil, fmt.Errorf("%s: pattern not supported for attribute", p.curr.Literal)
 	}
-	return nil
 }
 
 func (p *Parser) parseAttribute() (*Attribute, error) {
@@ -137,17 +240,11 @@ func (p *Parser) parseAttribute() (*Attribute, error) {
 		return nil, p.unexpected()
 	}
 	p.next()
-	if p.is(Literal) {
-		_, err := p.parseEnum()
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		err := p.parsePatternForAttribute()
-		if err != nil {
-			return nil, err
-		}
+	pattern, err := p.parsePatternForAttribute()
+	if err != nil {
+		return nil, err
 	}
+	at.Value = pattern
 	if !p.is(EndBrace) {
 		return nil, p.unexpected()
 	}
@@ -175,20 +272,26 @@ func (p *Parser) parseArity() Arity {
 	}
 }
 
-func (p *Parser) parseEnum() ([]string, error) {
-	var list []string
+func (p *Parser) parseEnum() (Pattern, error) {
+	var pt Enum
 	for !p.done() && p.is(Literal) {
-		list = append(list, p.curr.Literal)
+		pt.List = append(pt.List, p.curr.Literal)
 		p.next()
 		if p.is(Choice) {
 			p.next()
 		}
 	}
-	return list, nil
+	return pt, nil
 }
 
 func (p *Parser) skipComment() {
 	for p.is(Comment) {
+		p.next()
+	}
+}
+
+func (p *Parser) skipEOL() {
+	for p.is(EOL) {
 		p.next()
 	}
 }
