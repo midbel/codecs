@@ -7,35 +7,50 @@ import (
 	"strings"
 
 	"github.com/midbel/codecs/relax"
+	"github.com/midbel/codecs/xml"
 )
 
 func main() {
 	flag.Parse()
 
-	r, err := os.Open(flag.Arg(0))
+	schema, err := parseSchema(flag.Arg(0))
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
+		fmt.Fprintln(os.Stderr, "parsing schema:", err)
+		os.Exit(21)
+	}
+	doc, err := parseDocument(flag.Arg(1))
+	if err != nil {
+		fmt.Println(flag.Arg(1))
+		fmt.Fprintln(os.Stderr, "parsing document:", err)
+		os.Exit(11)
+	}
+	printPattern(schema, 0)
+	fmt.Println(doc.Root())
+}
+
+func parseSchema(file string) (relax.Pattern, error) {
+	r, err := os.Open(file)
+	if err != nil {
+		return nil, err
 	}
 	defer r.Close()
 
 	p := relax.Parse(r)
-	a, err := p.Parse()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "parsing error:", err)
-		os.Exit(21)
-	}
-	fmt.Println(a)
-	printPattern(a, 0)
-	// scan := relax.Scan(r)
-	// for {
-	// 	tok := scan.Scan()
-	// 	fmt.Println(tok)
-	// 	if tok.Type == relax.EOF || tok.Type == relax.Invalid {
-	// 		break
-	// 	}
-	// }
+	return p.Parse()
+}
 
+func parseDocument(file string) (*xml.Document, error) {
+	r, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+
+	p := xml.NewParser(r)
+	p.TrimSpace = true
+	p.OmitProlog = false
+
+	return p.Parse()
 }
 
 func printPattern(pattern relax.Pattern, depth int) {

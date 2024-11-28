@@ -148,22 +148,22 @@ func (p *Parser) parsePatternForElement() (Pattern, error) {
 
 func (p *Parser) parseElement() (Pattern, error) {
 	p.next()
-	if !p.is(Name) {
-		return nil, fmt.Errorf("element name expected")
+	var (
+		el  Element
+		err error
+	)
+	if el.QName, err = p.parseName(); err != nil {
+		return nil, err
 	}
-	var el Element
-	el.Local = p.curr.Literal
-	p.next()
 	if !p.is(BegBrace) {
 		return nil, p.unexpected()
 	}
 	p.next()
 	if p.is(Literal) {
-		pattern, err := p.parseEnum()
+		el.Value, err = p.parseEnum()
 		if err != nil {
 			return nil, err
 		}
-		el.Value = pattern
 	} else if p.is(Keyword) && p.curr.Literal == "text" {
 		p.next()
 		el.Value = Text{}
@@ -216,21 +216,21 @@ func (p *Parser) parsePatternForAttribute() (Pattern, error) {
 
 func (p *Parser) parseAttribute() (Pattern, error) {
 	p.next()
-	if !p.is(Name) {
-		return nil, fmt.Errorf("expected attribute name")
+	var (
+		at  Attribute
+		err error
+	)
+	if at.QName, err = p.parseName(); err != nil {
+		return nil, err
 	}
-	var at Attribute
-	at.Local = p.curr.Literal
-	p.next()
 	if !p.is(BegBrace) {
 		return nil, p.unexpected()
 	}
 	p.next()
-	pattern, err := p.parsePatternForAttribute()
+	at.Value, err = p.parsePatternForAttribute()
 	if err != nil {
 		return nil, err
 	}
-	at.Value = pattern
 	if !p.is(EndBrace) {
 		return nil, p.unexpected()
 	}
@@ -240,6 +240,25 @@ func (p *Parser) parseAttribute() (Pattern, error) {
 		return nil, fmt.Errorf("unexpected value for attribute")
 	}
 	return at, nil
+}
+
+func (p *Parser) parseName() (QName, error) {
+	var q QName
+	if !p.is(Name) {
+		return q, fmt.Errorf("name expected")
+	}
+	q.Local = p.curr.Literal
+	p.next()
+	if p.is(Colon) {
+		p.next()
+		if !p.is(Name) {
+			return q, fmt.Errorf("local name expected")
+		}
+		defer p.next()
+		q.Space = q.Local
+		q.Local = p.curr.Literal
+	}
+	return q, nil
 }
 
 func (p *Parser) parseArity() Arity {
