@@ -47,6 +47,42 @@ func (p *Parser) parse() (Pattern, error) {
 }
 
 func (p *Parser) parseDeclarations() error {
+	for !p.done() {
+		p.skipEOL()
+		p.skipComment()
+
+		if !p.is(Keyword) || (p.curr.Literal == "start" || p.curr.Literal == "element") {
+			break
+		}
+		if err := p.parseNamespace(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (p *Parser) parseNamespace() error {
+	switch p.curr.Literal {
+	case "default":
+		p.next()
+		return p.parseNamespace()
+	case "namespace":
+		p.next()
+	default:
+		return fmt.Errorf("unexpected keyword")
+	}
+	name := p.curr.Literal
+	p.next()
+	if !p.is(Assign) {
+		return p.unexpected()
+	}
+	p.next()
+	if !p.is(Literal) {
+		return p.unexpected()
+	}
+
+	p.spaces[name] = p.curr.Literal
+	p.next()
 	return nil
 }
 
@@ -70,13 +106,13 @@ func (p *Parser) parseGrammar() (Pattern, error) {
 
 func (p *Parser) parseDefinitions() (Pattern, error) {
 	var (
-		grm Grammar
-		err error
+		start Pattern
+		err   error
 	)
-	if grm.Start, err = p.parseStartPattern(); err != nil {
+	if start, err = p.parseStartPattern(); err != nil {
 		return nil, err
 	}
-	grm.List = make(map[string]Pattern)
+	patterns := make(map[string]Pattern)
 	for !p.done() {
 		p.skipComment()
 		if !p.is(Name) {
@@ -88,12 +124,12 @@ func (p *Parser) parseDefinitions() (Pattern, error) {
 			return nil, fmt.Errorf("missing assignment after name")
 		}
 		p.next()
-		if grm.List[name], err = p.parseElement(); err != nil {
+		if patterns[name], err = p.parseElement(); err != nil {
 			return nil, err
 		}
 		p.skipEOL()
 	}
-	return grm, nil
+	return reassemble(start, patterns)
 }
 
 func (p *Parser) parseStartPattern() (Pattern, error) {
@@ -116,36 +152,6 @@ func (p *Parser) parseStartPattern() (Pattern, error) {
 	return p.parseElement()
 }
 
-func (p *Parser) parsePatternForElement() (Pattern, error) {
-	p.skipComment()
-	if p.is(Name) {
-		var ref Link
-		ref.Ident = p.curr.Literal
-		p.next()
-		ref.Arity = p.parseArity()
-		return ref, nil
-	}
-	if !p.is(Keyword) {
-		return nil, fmt.Errorf("pattern: keyword expected")
-	}
-	switch p.curr.Literal {
-	case "element":
-		return p.parseElement()
-	case "attribute":
-		return p.parseAttribute()
-	case "text":
-		p.next()
-		var pat Text
-		return pat, nil
-	case "empty":
-		p.next()
-		var pat Empty
-		return pat, nil
-	default:
-		return nil, fmt.Errorf("%s: pattern not supported for element", p.curr.Literal)
-	}
-}
-
 func (p *Parser) parseElement() (Pattern, error) {
 	p.next()
 	var (
@@ -155,39 +161,82 @@ func (p *Parser) parseElement() (Pattern, error) {
 	if el.QName, err = p.parseName(); err != nil {
 		return nil, err
 	}
+	el.Arity = One
 	if !p.is(BegBrace) {
 		return nil, p.unexpected()
 	}
 	p.next()
-	if p.is(Literal) {
+	p.skipEOL()
+	p.skipComment()
+	for p.is(Keyword) && p.curr.Literal == "attribute" {
+		at, err := p.parseAttribute()
+		if err != nil {
+			return nil, err
+		}
+		el.Attributes = append(el.Attributes, at)
+		switch {
+		case p.is(Comma):
+			p.next()
+			if p.is(EndBrace) {
+				return nil, p.unexpected()
+			}
+		case p.is(EndBrace):
+		default:
+			return nil, p.unexpected()
+		}
+	}
+	p.skipEOL()
+	p.skipComment()
+	for p.is(Name) || (p.is(Keyword) && p.curr.Literal == "element") {
+		if p.is(Name) {
+			var ref Link
+			ref.Ident = p.curr.Literal
+			p.next()
+			ref.Arity = p.parseArity()
+			el.Elements = append(el.Elements, ref)
+		} else {
+			elem, err := p.parseElement()
+			if err != nil {
+				return nil, err
+			}
+			el.Elements = append(el.Elements, elem)
+		}
+		switch {
+		case p.is(Comma):
+			p.next()
+			if p.is(EndBrace) {
+				return nil, p.unexpected()
+			}
+		case p.is(EndBrace):
+		default:
+			return nil, p.unexpected()
+		}
+	}
+	p.skipEOL()
+	p.skipComment()
+	switch {
+	case p.is(Keyword) && p.curr.Literal == "text":
+		p.next()
+		el.Value = Text{}
+		if len(el.Elements) != 0 {
+			return nil, fmt.Errorf("invalid text pattern! no empty elements")
+		}
+	case p.is(Keyword) && p.curr.Literal == "empty":
+		el.Value = Empty{}
+		if len(el.Elements) != 0 {
+			return nil, fmt.Errorf("invalid empty pattern! no empty elements")
+		}
+	case p.is(Literal):
 		el.Value, err = p.parseEnum()
 		if err != nil {
 			return nil, err
 		}
-	} else if p.is(Keyword) && p.curr.Literal == "text" {
-		p.next()
-		el.Value = Text{}
-	} else if p.is(Keyword) && p.curr.Literal == "empty" {
-		p.next()
-		el.Value = Empty{}
-	} else {
-		for !p.done() && !p.is(EndBrace) {
-			pat, err := p.parsePatternForElement()
-			if err != nil {
-				return nil, err
-			}
-			el.Patterns = append(el.Patterns, pat)
-			switch {
-			case p.is(Comma):
-				p.next()
-				if p.is(EndBrace) {
-					return nil, p.unexpected()
-				}
-			case p.is(EndBrace):
-			default:
-				return nil, p.unexpected()
-			}
-		}
+	case p.is(EOL) || p.is(Comment):
+		p.skipEOL()
+		p.skipComment()
+	case p.is(EndBrace):
+	default:
+		return nil, fmt.Errorf("unexpected pattern type")
 	}
 	if !p.is(EndBrace) {
 		return nil, p.unexpected()
@@ -195,23 +244,6 @@ func (p *Parser) parseElement() (Pattern, error) {
 	p.next()
 	el.Arity = p.parseArity()
 	return el, nil
-}
-
-func (p *Parser) parsePatternForAttribute() (Pattern, error) {
-	if p.is(Literal) {
-		return p.parseEnum()
-	}
-	if !p.is(Keyword) {
-		return nil, fmt.Errorf("pattern: keyword expected")
-	}
-	switch p.curr.Literal {
-	case "text":
-		defer p.next()
-		var pattern Text
-		return pattern, nil
-	default:
-		return nil, fmt.Errorf("%s: pattern not supported for attribute", p.curr.Literal)
-	}
 }
 
 func (p *Parser) parseAttribute() (Pattern, error) {
@@ -227,10 +259,11 @@ func (p *Parser) parseAttribute() (Pattern, error) {
 		return nil, p.unexpected()
 	}
 	p.next()
-	at.Value, err = p.parsePatternForAttribute()
-	if err != nil {
-		return nil, err
+	if !p.is(Keyword) && p.curr.Literal != "text" {
+		return nil, fmt.Errorf("unexpected pattern type for attribute")
 	}
+	p.next()
+	at.Value = Text{}
 	if !p.is(EndBrace) {
 		return nil, p.unexpected()
 	}

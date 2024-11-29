@@ -1,6 +1,8 @@
 package relax
 
 import (
+	"fmt"
+
 	"github.com/midbel/codecs/xml"
 )
 
@@ -10,24 +12,27 @@ const (
 	ZeroOrMore Arity = 1 << iota
 	ZeroOrOne
 	OneOrMore
+	One
 )
 
 type Pattern interface {
 	// Validate(xml.Node) error
 }
 
-type Grammar struct {
-	Start Pattern
-	List  map[string]Pattern
-}
-
-func (g Grammar) Validate(root xml.Node) error {
-	return nil
-}
-
 type QName struct {
 	Space string
 	Local string
+}
+
+func (q QName) QualifiedName() string {
+	if q.Space == "" {
+		return q.Local
+	}
+	return fmt.Sprintf("%s:%s", q.Space, q.Local)
+}
+
+func (q QName) LocalName() string {
+	return q.Local
 }
 
 type Link struct {
@@ -48,12 +53,9 @@ func (a Attribute) Validate(node xml.Node) error {
 type Element struct {
 	QName
 	Arity
-	Value    Pattern
-	Patterns []Pattern
-}
-
-func (e Element) Validate(node xml.Node) error {
-	return nil
+	Value      Pattern
+	Attributes []Pattern
+	Elements   []Pattern
 }
 
 type Text struct{}
@@ -70,4 +72,29 @@ func (_ Empty) Validate(node xml.Node) error {
 
 type Enum struct {
 	List []string
+}
+
+func reassemble(start Pattern, others map[string]Pattern) (Pattern, error) {
+	link, ok := start.(Link)
+	if !ok {
+		return start, nil
+	}
+	el, ok := others[link.Ident].(Element)
+	if !ok {
+		return nil, fmt.Errorf("%s: pattern not defined", link.Ident)
+	}
+	if link.Arity == 0 {
+		link.Arity = ZeroOrOne
+	}
+	if el.Arity == 0 {
+		el.Arity = link.Arity
+	}
+	for i := range el.Elements {
+		p, err := reassemble(el.Elements[i], others)
+		if err != nil {
+			return nil, err
+		}
+		el.Elements[i] = p
+	}
+	return el, nil
 }
