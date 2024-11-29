@@ -35,8 +35,6 @@ func (p *Parser) parse() (Pattern, error) {
 	}
 	p.skipEOL()
 	switch p.curr.Literal {
-	case "grammar":
-		return p.parseGrammar()
 	case "element":
 		return p.parseElement()
 	case "start":
@@ -84,24 +82,6 @@ func (p *Parser) parseNamespace() error {
 	p.spaces[name] = p.curr.Literal
 	p.next()
 	return nil
-}
-
-func (p *Parser) parseGrammar() (Pattern, error) {
-	p.next()
-	if !p.is(BegBrace) {
-		return nil, p.unexpected()
-	}
-	p.next()
-	_, err := p.parseDefinitions()
-	if err != nil {
-		return nil, err
-	}
-	p.next()
-	if !p.is(EndBrace) {
-		return nil, p.unexpected()
-	}
-	p.next()
-	return nil, nil
 }
 
 func (p *Parser) parseDefinitions() (Pattern, error) {

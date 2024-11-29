@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"slices"
-	"strings"
 
 	"github.com/midbel/codecs/relax"
 	"github.com/midbel/codecs/xml"
@@ -149,58 +148,4 @@ func validateEmpty(node xml.Node) error {
 		return fmt.Errorf("expected element to be empty")
 	}
 	return nil
-}
-
-func groupNodes(node *xml.Element) [][]xml.Node {
-	var groups [][]xml.Node
-	for i := 0; i < len(node.Nodes); {
-		n := node.Nodes[i]
-		if _, ok := n.(*xml.Element); !ok {
-			i++
-			continue
-		}
-		tmp := []xml.Node{n}
-		if i >= len(node.Nodes) {
-			groups = append(groups, tmp)
-			break
-		}
-		for _, x := range node.Nodes[i+1:] {
-			if _, ok := x.(*xml.Element); !ok {
-				continue
-			}
-			if x.QualifiedName() != n.QualifiedName() {
-				break
-			}
-			tmp = append(tmp, x)
-		}
-		groups = append(groups, tmp)
-		i += len(tmp)
-	}
-	return groups
-}
-
-func printPattern(pattern relax.Pattern, depth int) {
-	var prefix string
-	if depth > 1 {
-		prefix = strings.Repeat(">", depth)
-	}
-	switch p := pattern.(type) {
-	case relax.Element:
-		for i := range p.Attributes {
-			printPattern(p.Attributes[i], depth+1)
-		}
-		for i := range p.Elements {
-			printPattern(p.Elements[i], depth+1)
-		}
-	case relax.Attribute:
-		fmt.Println(prefix, "attribute:", p.Local)
-	case relax.Text:
-		fmt.Println(prefix, "text")
-	case relax.Empty:
-		fmt.Println(prefix, "empty")
-	case relax.Link:
-		fmt.Println(prefix, "link", p.Ident)
-	default:
-		fmt.Println(prefix, "unknown")
-	}
 }
