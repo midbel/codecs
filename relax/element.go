@@ -16,7 +16,7 @@ const (
 )
 
 type Pattern interface {
-	// Validate(xml.Node) error
+	Validate(xml.Node) error
 }
 
 type QName struct {
@@ -38,6 +38,7 @@ func (q QName) LocalName() string {
 type Link struct {
 	Ident string
 	Arity
+	Pattern
 }
 
 type Attribute struct {
@@ -58,6 +59,10 @@ type Element struct {
 	Elements   []Pattern
 }
 
+func (e Element) Validate(node xml.Node) error {
+	return nil
+}
+
 type Text struct{}
 
 func (_ Text) Validate(node xml.Node) error {
@@ -72,6 +77,10 @@ func (_ Empty) Validate(node xml.Node) error {
 
 type Enum struct {
 	List []string
+}
+
+func (e Enum) Validate(node xml.Node) error {
+	return nil
 }
 
 func reassemble(start Pattern, others map[string]Pattern) (Pattern, error) {
