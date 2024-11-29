@@ -161,7 +161,6 @@ func (p *Parser) parseElement() (Pattern, error) {
 	if el.QName, err = p.parseName(); err != nil {
 		return nil, err
 	}
-	el.Arity = One
 	if !p.is(BegBrace) {
 		return nil, p.unexpected()
 	}
@@ -209,6 +208,7 @@ func (p *Parser) parseElement() (Pattern, error) {
 			}
 		case p.is(EndBrace):
 		default:
+			fmt.Println(p.curr, p.peek)
 			return nil, p.unexpected()
 		}
 	}
@@ -295,19 +295,20 @@ func (p *Parser) parseName() (QName, error) {
 }
 
 func (p *Parser) parseArity() Arity {
+	var arity Arity
 	switch {
 	case p.is(Mandatory):
-		p.next()
-		return OneOrMore
+		arity = OneOrMore
 	case p.is(Optional):
-		p.next()
-		return ZeroOrOne
+		arity = ZeroOrOne
 	case p.is(Star):
-		p.next()
-		return ZeroOrMore
+		arity = ZeroOrMore
 	default:
-		return 0
 	}
+	if arity != 0 {
+		p.next()
+	}
+	return arity
 }
 
 func (p *Parser) parseEnum() (Pattern, error) {

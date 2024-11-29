@@ -24,8 +24,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, "parsing document:", err)
 		os.Exit(11)
 	}
+	printPattern(schema, 0)
 	if err := validateDocument(doc, schema); err != nil {
-		fmt.Fprintln(os.Stderr, "document does not conform to given schema: %s", err)
+		fmt.Fprintln(os.Stderr, "document does not conform to given schema")
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(32)
 	}
 	fmt.Println("document is valid")
@@ -83,41 +85,34 @@ func validateElement(node xml.Node, elem relax.Element) error {
 	if !ok {
 		return fmt.Errorf("node is not a xml element")
 	}
-	var (
-		groups = groupNodes(curr)
-		// offset int
-		j      int
-	)
-	for i := range elem.Elements {
-		el, ok := elem.Elements[i].(relax.Element)
+	var offset int
+	for _, el := range elem.Elements {
+		k, ok := el.(relax.Element)
 		if !ok {
-			continue
+			return fmt.Errorf("missing element")
 		}
-		if el.QualifiedName() != groups[j][0].QualifiedName() {
-			if el.Arity == relax.ZeroOrOne || el.Arity == relax.ZeroOrMore {
+		var count int
+		for i := offset; i < len(curr.Nodes); i++ {
+			offset++
+			if _, ok := curr.Nodes[i].(*xml.Element); !ok {
 				continue
 			}
-			return fmt.Errorf("invalid element: want %s, got %s", el.QualifiedName(), groups[j][0].QualifiedName())
-		}
-		switch el.Arity {
-		case relax.ZeroOrOne, 0:
-			if len(groups[j]) != 1 {
-				return fmt.Errorf("invalid number of elements for %s", el.QualifiedName())
+			if curr.Nodes[i].QualifiedName() != k.QualifiedName() {
+				offset--
+				break
 			}
-		case relax.OneOrMore:
-			if len(groups[j]) < 1 {
-				return fmt.Errorf("invalid number of elements for %s", el.QualifiedName())
-			}
-		case relax.ZeroOrMore:
-		default:
-			return fmt.Errorf("can not check number of elements")
-		}
-		for _, n := range groups[j] {
-			if err := validateNode(n, el); err != nil {
+			if err := validateNode(curr.Nodes[i], k); err != nil {
 				return err
 			}
+			count++
 		}
-		j++
+		switch {
+		case count == 0 && k.Arity.Zero():
+		case count == 1 && k.Arity.One():
+		case count > 1 && k.Arity.More():
+		default:
+			return fmt.Errorf("%s: invalid number of elements (%d)", k.QualifiedName(), count)
+		}
 	}
 	return nil
 }

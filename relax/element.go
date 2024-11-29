@@ -15,6 +15,18 @@ const (
 	One
 )
 
+func (a Arity) Zero() bool {
+	return a == ZeroOrMore || a == ZeroOrOne
+}
+
+func (a Arity) One() bool {
+	return a == 0 || a == ZeroOrOne || a == OneOrMore || a == One
+}
+
+func (a Arity) More() bool {
+	return a == ZeroOrMore || a == OneOrMore
+}
+
 type Pattern interface {
 	Validate(xml.Node) error
 }
@@ -91,9 +103,6 @@ func reassemble(start Pattern, others map[string]Pattern) (Pattern, error) {
 	el, ok := others[link.Ident].(Element)
 	if !ok {
 		return nil, fmt.Errorf("%s: pattern not defined", link.Ident)
-	}
-	if link.Arity == 0 {
-		link.Arity = ZeroOrOne
 	}
 	if el.Arity == 0 {
 		el.Arity = link.Arity
