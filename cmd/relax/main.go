@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/midbel/codecs/relax"
@@ -24,7 +25,6 @@ func main() {
 		fmt.Fprintln(os.Stderr, "parsing document:", err)
 		os.Exit(11)
 	}
-	printPattern(schema, 0)
 	if err := validateDocument(doc, schema); err != nil {
 		fmt.Fprintln(os.Stderr, "document does not conform to given schema")
 		fmt.Fprintln(os.Stderr, err)
@@ -81,6 +81,11 @@ func validateElement(node xml.Node, elem relax.Element) error {
 	if elem.QualifiedName() != node.QualifiedName() {
 		return fmt.Errorf("element name mismatched! want %s, got %s", elem.QualifiedName(), node.QualifiedName())
 	}
+	for _, a := range elem.Attributes {
+		if err := validateNode(node, a); err != nil {
+			return err
+		}
+	}
 	curr, ok := node.(*xml.Element)
 	if !ok {
 		return fmt.Errorf("node is not a xml element")
@@ -118,6 +123,16 @@ func validateElement(node xml.Node, elem relax.Element) error {
 }
 
 func validateAttribute(node xml.Node, attr relax.Attribute) error {
+	el, ok := node.(*xml.Element)
+	if !ok {
+		return fmt.Errorf("node is not a xml element")
+	}
+	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
+		return a.QualifiedName() == attr.QualifiedName()
+	})
+	if ix < 0 && !attr.Arity.Zero() {
+		return fmt.Errorf("missing attribute")
+	}
 	return nil
 }
 
@@ -171,7 +186,6 @@ func printPattern(pattern relax.Pattern, depth int) {
 	}
 	switch p := pattern.(type) {
 	case relax.Element:
-		fmt.Println(prefix, "element:", p.Local)
 		for i := range p.Attributes {
 			printPattern(p.Attributes[i], depth+1)
 		}
