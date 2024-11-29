@@ -87,6 +87,14 @@ func (_ Empty) Validate(node xml.Node) error {
 	return nil
 }
 
+type Type struct {
+	Name string
+}
+
+func (t Type) Validate(node xml.Node) error {
+	return nil
+}
+
 type Enum struct {
 	List []string
 }

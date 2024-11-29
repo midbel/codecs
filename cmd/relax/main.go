@@ -3,8 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net/url"
 	"os"
 	"slices"
+	"strconv"
+	"time"
 
 	"github.com/midbel/codecs/relax"
 	"github.com/midbel/codecs/xml"
@@ -131,6 +134,46 @@ func validateAttribute(node xml.Node, attr relax.Attribute) error {
 	})
 	if ix < 0 && !attr.Arity.Zero() {
 		return fmt.Errorf("missing attribute")
+	}
+	switch vs := attr.Value.(type) {
+	case relax.Enum:
+		ok := slices.Contains(vs.List, el.Attrs[ix].Value)
+		if !ok {
+			return fmt.Errorf("attribute value not acceptable")
+		}
+	case relax.Type:
+		return validateType(vs, el.Attrs[ix].Value)
+	case relax.Text:
+	default:
+		return fmt.Errorf("unsupported patter for attribute")
+	}
+	return nil
+}
+
+func validateType(t relax.Type, value string) error {
+	switch t.Name {
+	case "int":
+		_, err := strconv.ParseInt(value, 0, 64)
+		return err
+	case "float", "decimal":
+		_, err := strconv.ParseFloat(value, 64)
+		return err
+	case "string":
+	case "uri":
+		_, err := url.Parse(value)
+		return err
+	case "boolean":
+		_, err := strconv.ParseBool(value)
+		return err
+	case "date":
+		_, err := time.Parse("2006-01-02", value)
+		return err
+	case "datetime":
+	case "time":
+	case "base64":
+	case "hex":
+	default:
+		return fmt.Errorf("unknown data type")
 	}
 	return nil
 }
