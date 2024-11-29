@@ -206,6 +206,10 @@ func (e *Element) Leaf() bool {
 		_, ok := e.Nodes[0].(*Text)
 		return ok
 	}
+	return e.Empty()
+}
+
+func (e *Element) Empty() bool {
 	return len(e.Nodes) == 0
 }
 
