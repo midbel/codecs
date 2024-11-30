@@ -44,10 +44,10 @@ func (t Token) String() string {
 		return "<end-paren>"
 	case Comma:
 		return "<comma>"
-	case Choice:
-		return "<choice>"
-	case MergeChoice:
-		return "<merge-choice>"
+	case Alt:
+		return "<alternative>"
+	case MergeAlt:
+		return "<merge-alt>"
 	case Interleave:
 		return "<interleave>"
 	case MergeLeave:
@@ -82,8 +82,8 @@ const (
 	Comma
 	Interleave
 	MergeLeave
-	Choice
-	MergeChoice
+	Alt
+	MergeAlt
 	Optional  // ?
 	Mandatory // +
 	Star      // *
@@ -205,10 +205,10 @@ func (s *Scanner) scanPunct(tok *Token) {
 	case '=':
 		tok.Type = Assign
 	case '|':
-		tok.Type = Choice
+		tok.Type = Alt
 		if k == '=' {
 			s.read()
-			tok.Type = MergeChoice
+			tok.Type = MergeAlt
 		}
 	case '&':
 		tok.Type = Interleave

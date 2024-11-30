@@ -63,6 +63,22 @@ func (a Attribute) Validate(node xml.Node) error {
 	return nil
 }
 
+type Group struct {
+	List []Pattern
+}
+
+func (g Group) Validate(node xml.Node) error {
+	return nil
+}
+
+type Choice struct {
+	List []Pattern
+}
+
+func (c Choice) Validate(node xml.Node) error {
+	return nil
+}
+
 type Element struct {
 	QName
 	Arity

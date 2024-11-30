@@ -68,6 +68,8 @@ func validateNode(root xml.Node, pattern relax.Pattern) error {
 	switch pattern := pattern.(type) {
 	case relax.Element:
 		return validateElement(root, pattern)
+	case relax.Choice:
+		return validateChoice(root, pattern)
 	case relax.Attribute:
 		return validateAttribute(root, pattern)
 	case relax.Text:
@@ -77,6 +79,10 @@ func validateNode(root xml.Node, pattern relax.Pattern) error {
 	default:
 		return fmt.Errorf("pattern not yet supported")
 	}
+}
+
+func validateChoice(node xml.Node, elem relax.Choice) error {
+	return nil
 }
 
 func validateElement(node xml.Node, elem relax.Element) error {

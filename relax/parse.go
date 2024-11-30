@@ -132,6 +132,60 @@ func (p *Parser) parseStartPattern() (Pattern, error) {
 	return p.parseElement()
 }
 
+func (p *Parser) parseList() (Pattern, error) {
+	var grp Group
+	for p.is(Keyword) && p.curr.Literal == "element" {
+		el, err := p.parseElement()
+		if err != nil {
+			return nil, err
+		}
+		grp.List = append(grp.List, el)
+		if !p.is(Comma) {
+			break
+		}
+		p.next()
+	}
+	if len(grp.List) == 1 {
+		return grp.List[0], nil
+	}
+	return grp, nil
+}
+
+func (p *Parser) parseChoice() (Pattern, error) {
+	p.next()
+	var ch Choice
+	for !p.done() && !p.is(EndParen) {
+		var (
+			el Pattern
+			err error
+		)
+		switch {
+		case p.is(Keyword) && p.curr.Literal == "element":
+			el, err = p.parseList()
+		case p.is(BegParen):
+			el, err = p.parseChoice()
+		default:
+			return nil, p.unexpected()
+		}
+		if err != nil {
+			return nil, err
+		}
+		ch.List = append(ch.List, el)
+		switch {
+		case p.is(Alt):
+			p.next()
+		case p.is(EndParen):
+		default:
+			return nil, p.unexpected()
+		}
+	}
+	if !p.is(EndParen) {
+		return nil, p.unexpected()
+	}
+	p.next()
+	return ch, nil
+}
+
 func (p *Parser) parseElement() (Pattern, error) {
 	p.next()
 	var (
@@ -166,13 +220,19 @@ func (p *Parser) parseElement() (Pattern, error) {
 	}
 	p.skipEOL()
 	p.skipComment()
-	for p.is(Name) || (p.is(Keyword) && p.curr.Literal == "element") {
+	for p.is(Name) || p.is(BegParen) || (p.is(Keyword) && p.curr.Literal == "element") {
 		if p.is(Name) {
 			var ref Link
 			ref.Ident = p.curr.Literal
 			p.next()
 			ref.Arity = p.parseArity()
 			el.Elements = append(el.Elements, ref)
+		} else if p.is(BegParen) {
+			elem, err := p.parseChoice()
+			if err != nil {
+				return nil, err
+			}
+			el.Elements = append(el.Elements, elem)
 		} else {
 			elem, err := p.parseElement()
 			if err != nil {
@@ -296,7 +356,7 @@ func (p *Parser) parseEnum() (Pattern, error) {
 	for !p.done() && p.is(Literal) {
 		pt.List = append(pt.List, p.curr.Literal)
 		p.next()
-		if p.is(Choice) {
+		if p.is(Alt) {
 			p.next()
 		}
 	}
