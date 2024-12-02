@@ -68,8 +68,6 @@ func validateNode(root xml.Node, pattern relax.Pattern) error {
 	switch pattern := pattern.(type) {
 	case relax.Element:
 		return validateElement(root, pattern)
-	case relax.Choice:
-		return validateChoice(root, pattern)
 	case relax.Attribute:
 		return validateAttribute(root, pattern)
 	case relax.Text:
@@ -81,8 +79,30 @@ func validateNode(root xml.Node, pattern relax.Pattern) error {
 	}
 }
 
-func validateChoice(node xml.Node, elem relax.Choice) error {
-	return nil
+func validateChoice(node xml.Node, elem relax.Choice, parent relax.Element) (int, error) {
+	var err error
+	for _, e := range elem.List {
+		switch e := e.(type) {
+		case relax.Element:
+			fmt.Println("test:single", e)
+			parent.Elements = []relax.Pattern{e}
+			err = validateElement(node, parent)
+			if err == nil {
+				return 1, nil
+			}
+		case relax.Group:
+			fmt.Println("test:group", e.List)
+			parent.Elements = e.List
+			err = validateElement(node, parent)
+			if err == nil {
+				return len(e.List), nil
+			}
+		case relax.Choice:
+		default:
+			return 0, fmt.Errorf("unsupported pattern")
+		}
+	}
+	return 0, err
 }
 
 func validateElement(node xml.Node, elem relax.Element) error {
@@ -101,9 +121,14 @@ func validateElement(node xml.Node, elem relax.Element) error {
 	var offset int
 	for _, el := range elem.Elements {
 		if c, ok := el.(relax.Choice); ok {
-			if err := validateChoice(curr, c); err != nil {
+			tmp := *curr
+			tmp.Nodes = slices.Clone(tmp.Nodes[offset:])
+
+			z, err := validateChoice(&tmp, c, elem)
+			if err != nil {
 				return err
 			}
+			offset += z
 			continue
 		}
 		k, ok := el.(relax.Element)

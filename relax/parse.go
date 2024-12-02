@@ -151,6 +151,33 @@ func (p *Parser) parseList() (Pattern, error) {
 	return grp, nil
 }
 
+func (p *Parser) parseGroup() (Pattern, error) {
+	p.next()
+	var grp Group
+	for !p.done() && !p.is(EndParen) {
+		el, err := p.parseElement()
+		if err != nil {
+			return nil, err
+		}
+		grp.List = append(grp.List, el)
+		switch {
+		case p.is(Comma):
+			p.next()
+		case p.is(EndParen):
+		default:
+			return nil, p.unexpected()
+		}
+	} 
+	if !p.is(EndParen) {
+		return nil, p.unexpected()
+	}
+	p.next()
+	if len(grp.List) == 1 {
+		return grp.List[0], nil
+	}
+	return grp, nil
+}
+
 func (p *Parser) parseChoice() (Pattern, error) {
 	p.next()
 	var ch Choice
@@ -163,7 +190,7 @@ func (p *Parser) parseChoice() (Pattern, error) {
 		case p.is(Keyword) && p.curr.Literal == "element":
 			el, err = p.parseList()
 		case p.is(BegParen):
-			el, err = p.parseChoice()
+			el, err = p.parseGroup()
 		default:
 			return nil, p.unexpected()
 		}
