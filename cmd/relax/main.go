@@ -83,23 +83,29 @@ func validateChoice(node xml.Node, elem relax.Choice, parent relax.Element) (int
 	var err error
 	for _, e := range elem.List {
 		switch e := e.(type) {
+		case relax.Attribute:
+			parent.Attributes = []relax.Pattern{e}
+			parent.Elements = nil
 		case relax.Element:
-			fmt.Println("test:single", e)
+			parent.Attributes = nil
 			parent.Elements = []relax.Pattern{e}
-			err = validateElement(node, parent)
-			if err == nil {
-				return 1, nil
-			}
 		case relax.Group:
-			fmt.Println("test:group", e.List)
-			parent.Elements = e.List
-			err = validateElement(node, parent)
-			if err == nil {
-				return len(e.List), nil
+			parent.Attributes = nil
+			parent.Elements = nil
+			for i := range e.List {
+				if _, ok := e.List[i].(relax.Attribute); ok {
+					parent.Attributes = append(parent.Attributes, e.List[i])
+				} else if _, ok := e.List[i].(relax.Element); ok {
+					parent.Elements = append(parent.Elements, e.List[i])
+				}
 			}
 		case relax.Choice:
 		default:
 			return 0, fmt.Errorf("unsupported pattern")
+		}
+		err = validateNode(node, parent)
+		if err == nil {
+			return len(parent.Elements), nil
 		}
 	}
 	return 0, err

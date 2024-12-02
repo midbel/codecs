@@ -134,12 +134,23 @@ func (p *Parser) parseStartPattern() (Pattern, error) {
 
 func (p *Parser) parseList() (Pattern, error) {
 	var grp Group
-	for p.is(Keyword) && p.curr.Literal == "element" {
-		el, err := p.parseElement()
+	for p.is(Keyword) {
+		var (
+			pat Pattern
+			err error
+		)
+		switch p.curr.Literal {
+		case "element":
+			pat, err = p.parseElement()
+		case "attribute":
+			pat, err = p.parseAttribute()
+		default:
+			return nil, fmt.Errorf("unexpected keyword %s", p.curr.Literal)
+		}
 		if err != nil {
 			return nil, err
 		}
-		grp.List = append(grp.List, el)
+		grp.List = append(grp.List, pat)
 		if !p.is(Comma) {
 			break
 		}
@@ -167,7 +178,7 @@ func (p *Parser) parseGroup() (Pattern, error) {
 		default:
 			return nil, p.unexpected()
 		}
-	} 
+	}
 	if !p.is(EndParen) {
 		return nil, p.unexpected()
 	}
@@ -187,7 +198,7 @@ func (p *Parser) parseChoice() (Pattern, error) {
 			err error
 		)
 		switch {
-		case p.is(Keyword) && p.curr.Literal == "element":
+		case p.is(Keyword):
 			el, err = p.parseList()
 		case p.is(BegParen):
 			el, err = p.parseGroup()

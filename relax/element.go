@@ -2,6 +2,7 @@ package relax
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/midbel/codecs/xml"
 )
@@ -104,11 +105,36 @@ func (_ Empty) Validate(node xml.Node) error {
 }
 
 type Type struct {
-	Name string
+	Name    string
+	Pattern string
 }
 
 func (t Type) Validate(node xml.Node) error {
 	return nil
+}
+
+type StringType struct {
+	Type
+	MinLength int
+	MaxLength int
+}
+
+type IntType struct {
+	Type
+	MinValue int
+	MaxValue int
+}
+
+type FloatType struct {
+	Type
+	MinValue int
+	MaxValue int
+}
+
+type TimeType struct {
+	Type
+	MinValue time.Time
+	MaxValue time.Time
 }
 
 type Enum struct {
