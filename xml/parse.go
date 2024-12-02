@@ -719,6 +719,10 @@ func NewParser(r io.Reader) *Parser {
 	return &p
 }
 
+func (p *Parser) ParseWithSchema(schema any) (*Document, error) {
+	return nil, nil
+}
+
 func (p *Parser) Parse() (*Document, error) {
 	if _, err := p.parseProlog(); err != nil {
 		return nil, err

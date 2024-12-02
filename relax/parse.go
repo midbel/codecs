@@ -156,7 +156,7 @@ func (p *Parser) parseChoice() (Pattern, error) {
 	var ch Choice
 	for !p.done() && !p.is(EndParen) {
 		var (
-			el Pattern
+			el  Pattern
 			err error
 		)
 		switch {

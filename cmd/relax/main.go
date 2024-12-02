@@ -100,6 +100,12 @@ func validateElement(node xml.Node, elem relax.Element) error {
 	}
 	var offset int
 	for _, el := range elem.Elements {
+		if c, ok := el.(relax.Choice); ok {
+			if err := validateChoice(curr, c); err != nil {
+				return err
+			}
+			continue
+		}
 		k, ok := el.(relax.Element)
 		if !ok {
 			return fmt.Errorf("missing element")
