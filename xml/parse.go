@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"slices"
 	"strconv"
@@ -1165,10 +1166,10 @@ func (s *Scanner) Scan() Token {
 		s.scanOpeningTag(&tok)
 	case s.char == rangle:
 		s.scanEndTag(&tok)
-	case s.char == quote:
-		s.scanValue(&tok)
 	case s.char == slash || s.char == question:
 		s.scanClosingTag(&tok)
+	case s.char == quote:
+		s.scanValue(&tok)
 	case unicode.IsLetter(s.char):
 		s.scanName(&tok)
 	default:
@@ -1295,10 +1296,12 @@ func (s *Scanner) scanValue(tok *Token) {
 		s.write()
 		s.read()
 		if s.char == ampersand {
-			s.char = s.scanEntity()
-			if s.char == utf8.RuneError {
+			str := s.scanEntity()
+			if str == "" {
 				break
 			}
+			s.str.WriteString(str)
+			continue
 		}
 	}
 	tok.Type = Literal
@@ -1311,30 +1314,19 @@ func (s *Scanner) scanValue(tok *Token) {
 
 }
 
-func (s *Scanner) scanEntity() rune {
+func (s *Scanner) scanEntity() string {
 	s.read()
 	var str bytes.Buffer
+	str.WriteRune('&')
 	for !s.done() && s.char != semicolon {
 		str.WriteRune(s.char)
+		s.read()
 	}
 	if s.char != semicolon {
-		return utf8.RuneError
+		return ""
 	}
 	s.read()
-	switch str.String() {
-	case "lt":
-		return langle
-	case "gt":
-		return rangle
-	case "amp":
-		return ampersand
-	case "apos":
-		return apos
-	case "quot":
-		return quote
-	default:
-		return utf8.RuneError
-	}
+	return html.UnescapeString(str.String())
 }
 
 func (s *Scanner) scanLiteral(tok *Token) {
@@ -1342,10 +1334,11 @@ func (s *Scanner) scanLiteral(tok *Token) {
 		s.write()
 		s.read()
 		if s.char == ampersand {
-			s.char = s.scanEntity()
-			if s.char == utf8.RuneError {
+			str := s.scanEntity()
+			if str == "" {
 				break
 			}
+			s.str.WriteString(str)
 		}
 	}
 	tok.Type = Literal
