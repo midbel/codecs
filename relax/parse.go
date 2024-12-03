@@ -34,10 +34,10 @@ func (p *Parser) parse() (Pattern, error) {
 		return nil, err
 	}
 	p.skipEOL()
-	switch p.curr.Literal {
-	case "element":
+	switch {
+	case p.isKeyword("element"):
 		return p.parseElement()
-	case "start":
+	case p.isKeyword("start"):
 		return p.parseDefinitions()
 	default:
 		return nil, fmt.Errorf("unexpected keyword")
@@ -49,7 +49,7 @@ func (p *Parser) parseDeclarations() error {
 		p.skipEOL()
 		p.skipComment()
 
-		if !p.is(Keyword) || (p.curr.Literal == "start" || p.curr.Literal == "element") {
+		if !p.is(Keyword) || (p.isKeyword("start") || p.isKeyword("element")) {
 			break
 		}
 		if err := p.parseNamespace(); err != nil {
@@ -60,11 +60,11 @@ func (p *Parser) parseDeclarations() error {
 }
 
 func (p *Parser) parseNamespace() error {
-	switch p.curr.Literal {
-	case "default":
+	switch {
+	case p.isKeyword("default"):
 		p.next()
 		return p.parseNamespace()
-	case "namespace":
+	case p.isKeyword("namespace"):
 		p.next()
 	default:
 		return fmt.Errorf("unexpected keyword")
@@ -114,7 +114,7 @@ func (p *Parser) parseDefinitions() (Pattern, error) {
 
 func (p *Parser) parseStartPattern() (Pattern, error) {
 	defer p.skipEOL()
-	if !p.is(Keyword) && p.curr.Literal != "start" {
+	if !p.isKeyword("start") {
 		return nil, fmt.Errorf("start keyword expected")
 	}
 	p.next()
@@ -239,45 +239,34 @@ func (p *Parser) parseElement() (Pattern, error) {
 	p.next()
 	p.skipEOL()
 	p.skipComment()
-	for p.is(Keyword) && p.curr.Literal == "attribute" {
-		at, err := p.parseAttribute()
-		if err != nil {
-			return nil, err
-		}
-		el.Attributes = append(el.Attributes, at)
+	for {
+		var (
+			pat Pattern
+			err error
+		)
 		switch {
-		case p.is(Comma):
-			p.next()
-			if p.is(EndBrace) {
-				return nil, p.unexpected()
-			}
-		case p.is(EndBrace):
-		default:
-			return nil, p.unexpected()
-		}
-	}
-	p.skipEOL()
-	p.skipComment()
-	for p.is(Name) || p.is(BegParen) || (p.is(Keyword) && p.curr.Literal == "element") {
-		if p.is(Name) {
+		case p.is(Name):
 			var ref Link
 			ref.Ident = p.curr.Literal
 			p.next()
 			ref.Arity = p.parseArity()
-			el.Elements = append(el.Elements, ref)
-		} else if p.is(BegParen) {
-			elem, err := p.parseChoice()
-			if err != nil {
-				return nil, err
-			}
-			el.Elements = append(el.Elements, elem)
-		} else {
-			elem, err := p.parseElement()
-			if err != nil {
-				return nil, err
-			}
-			el.Elements = append(el.Elements, elem)
+			pat = ref
+		case p.is(BegParen):
+			pat, err = p.parseChoice()
+		case p.isKeyword("attribute"):
+			pat, err = p.parseAttribute()
+		case p.isKeyword("element"):
+			pat, err = p.parseElement()
+		default:
 		}
+		if err != nil {
+			return nil, err
+		}
+		if pat == nil {
+			break
+		}
+		el.Patterns = append(el.Patterns, pat)
+
 		switch {
 		case p.is(Comma):
 			p.next()
@@ -286,24 +275,17 @@ func (p *Parser) parseElement() (Pattern, error) {
 			}
 		case p.is(EndBrace):
 		default:
-			fmt.Println(p.curr, p.peek)
 			return nil, p.unexpected()
 		}
 	}
 	p.skipEOL()
 	p.skipComment()
 	switch {
-	case p.is(Keyword) && p.curr.Literal == "text":
+	case p.isKeyword("text"):
 		p.next()
 		el.Value = Text{}
-		if len(el.Elements) != 0 {
-			return nil, fmt.Errorf("invalid text pattern! no empty elements")
-		}
-	case p.is(Keyword) && p.curr.Literal == "empty":
+	case p.isKeyword("empty"):
 		el.Value = Empty{}
-		if len(el.Elements) != 0 {
-			return nil, fmt.Errorf("invalid empty pattern! no empty elements")
-		}
 	case p.is(Literal):
 		el.Value, err = p.parseEnum()
 		if err != nil {
@@ -337,7 +319,7 @@ func (p *Parser) parseAttribute() (Pattern, error) {
 		return nil, p.unexpected()
 	}
 	p.next()
-	if !p.is(Keyword) && p.curr.Literal != "text" {
+	if !p.isKeyword("text") {
 		return nil, fmt.Errorf("unexpected pattern type for attribute")
 	}
 	p.next()
@@ -415,6 +397,10 @@ func (p *Parser) skipEOL() {
 
 func (p *Parser) is(kind rune) bool {
 	return p.curr.Type == kind
+}
+
+func (p *Parser) isKeyword(kw string) bool {
+	return p.is(Keyword) && p.curr.Literal == kw
 }
 
 func (p *Parser) done() bool {

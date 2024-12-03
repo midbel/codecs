@@ -74,94 +74,43 @@ func validateNode(root xml.Node, pattern relax.Pattern) error {
 		return validateText(root)
 	case relax.Empty:
 		return validateEmpty(root)
+	case relax.Choice:
+		return validateChoice(root, pattern)
 	default:
 		return fmt.Errorf("pattern not yet supported")
 	}
 }
 
-func validateChoice(node xml.Node, elem relax.Choice, parent relax.Element) (int, error) {
-	var err error
-	for _, e := range elem.List {
-		switch e := e.(type) {
-		case relax.Attribute:
-			parent.Attributes = []relax.Pattern{e}
-			parent.Elements = nil
-		case relax.Element:
-			parent.Attributes = nil
-			parent.Elements = []relax.Pattern{e}
-		case relax.Group:
-			parent.Attributes = nil
-			parent.Elements = nil
-			for i := range e.List {
-				if _, ok := e.List[i].(relax.Attribute); ok {
-					parent.Attributes = append(parent.Attributes, e.List[i])
-				} else if _, ok := e.List[i].(relax.Element); ok {
-					parent.Elements = append(parent.Elements, e.List[i])
-				}
-			}
-		case relax.Choice:
-		default:
-			return 0, fmt.Errorf("unsupported pattern")
-		}
-		err = validateNode(node, parent)
-		if err == nil {
-			return len(parent.Elements), nil
-		}
-	}
-	return 0, err
+func validateChoice(node xml.Node, elem relax.Choice) error {
+	return fmt.Errorf("choice: pattern not yet supported")
 }
 
 func validateElement(node xml.Node, elem relax.Element) error {
 	if elem.QualifiedName() != node.QualifiedName() {
 		return fmt.Errorf("element name mismatched! want %s, got %s", elem.QualifiedName(), node.QualifiedName())
 	}
-	for _, a := range elem.Attributes {
-		if err := validateNode(node, a); err != nil {
-			return err
-		}
-	}
 	curr, ok := node.(*xml.Element)
 	if !ok {
-		return fmt.Errorf("node is not a xml element")
+		return fmt.Errorf("xml element expected")
 	}
 	var offset int
-	for _, el := range elem.Elements {
-		if c, ok := el.(relax.Choice); ok {
-			tmp := *curr
-			tmp.Nodes = slices.Clone(tmp.Nodes[offset:])
-
-			z, err := validateChoice(&tmp, c, elem)
-			if err != nil {
-				return err
-			}
-			offset += z
-			continue
-		}
-		k, ok := el.(relax.Element)
-		if !ok {
-			return fmt.Errorf("missing element")
-		}
-		var count int
+	for _, el := range elem.Patterns {
+		fmt.Printf("%T, %d, %s\n", el, len(curr.Nodes), curr.QualifiedName())
+		var (
+			count int
+			start int = offset
+		)
 		for i := offset; i < len(curr.Nodes); i++ {
 			offset++
 			if _, ok := curr.Nodes[i].(*xml.Element); !ok {
 				continue
 			}
-			if curr.Nodes[i].QualifiedName() != k.QualifiedName() {
+			if curr.Nodes[i].QualifiedName() != curr.Nodes[start].QualifiedName() {
 				offset--
 				break
 			}
-			if err := validateNode(curr.Nodes[i], k); err != nil {
-				return err
-			}
 			count++
-		}
-		switch {
-		case count == 0 && k.Arity.Zero():
-		case count == 1 && k.Arity.One():
-		case count > 1 && k.Arity.More():
-		default:
-			return fmt.Errorf("%s: invalid number of elements (%d)", k.QualifiedName(), count)
+			fmt.Println(i, curr.Nodes[i].QualifiedName(), count)
 		}
 	}
 	return nil
@@ -188,7 +137,7 @@ func validateAttribute(node xml.Node, attr relax.Attribute) error {
 		return validateType(vs, el.Attrs[ix].Value)
 	case relax.Text:
 	default:
-		return fmt.Errorf("unsupported patter for attribute")
+		return fmt.Errorf("unsupported pattern for attribute")
 	}
 	return nil
 }

@@ -83,9 +83,8 @@ func (c Choice) Validate(node xml.Node) error {
 type Element struct {
 	QName
 	Arity
-	Value      Pattern
-	Attributes []Pattern
-	Elements   []Pattern
+	Value    Pattern
+	Patterns []Pattern
 }
 
 func (e Element) Validate(node xml.Node) error {
@@ -146,6 +145,31 @@ func (e Enum) Validate(node xml.Node) error {
 }
 
 func reassemble(start Pattern, others map[string]Pattern) (Pattern, error) {
+	switch el := start.(type) {
+	case Element:
+		return el, nil
+	case Choice:
+		for i := range el.List {
+			tmp, err := reassemble(el.List[i], others)
+			if err != nil {
+				return nil, err
+			}
+			el.List[i] = tmp
+		}
+		return el, nil
+	case Group:
+		for i := range el.List {
+			tmp, err := reassemble(el.List[i], others)
+			if err != nil {
+				return nil, err
+			}
+			el.List[i] = tmp
+		}
+		return el, nil
+	case Link:
+	default:
+		return nil, fmt.Errorf("unsupported pattern")
+	}
 	link, ok := start.(Link)
 	if !ok {
 		return start, nil
@@ -157,12 +181,12 @@ func reassemble(start Pattern, others map[string]Pattern) (Pattern, error) {
 	if el.Arity == 0 {
 		el.Arity = link.Arity
 	}
-	for i := range el.Elements {
-		p, err := reassemble(el.Elements[i], others)
+	for i := range el.Patterns {
+		p, err := reassemble(el.Patterns[i], others)
 		if err != nil {
 			return nil, err
 		}
-		el.Elements[i] = p
+		el.Patterns[i] = p
 	}
 	return el, nil
 }
