@@ -7,6 +7,7 @@ import (
 	"os"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/midbel/codecs/relax"
@@ -14,12 +15,17 @@ import (
 )
 
 func main() {
+	debug := flag.Bool("g", false, "print parsed schema")
 	flag.Parse()
 
 	schema, err := parseSchema(flag.Arg(0))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "parsing schema:", err)
 		os.Exit(21)
+	}
+	if *debug {
+		printSchema(schema, 0)
+		return
 	}
 	doc, err := parseDocument(flag.Arg(1))
 	if err != nil {
@@ -33,6 +39,50 @@ func main() {
 		os.Exit(32)
 	}
 	fmt.Println("document is valid")
+}
+
+func printSchema(schema relax.Pattern, depth int) {
+	var prefix string
+	if depth > 0 {
+		prefix = strings.Repeat(" ", depth*2)
+	}
+	fmt.Print(prefix)
+	switch p := schema.(type) {
+	case relax.Element:
+		fmt.Printf("element(%s)", p.QualifiedName())
+		if len(p.Patterns) > 0 {
+			fmt.Print("[")
+		}
+		fmt.Println()
+		for i := range p.Patterns {
+			printSchema(p.Patterns[i], depth+1)
+		}
+		if len(p.Patterns) > 0 {
+			fmt.Print(prefix)
+			fmt.Println("]")
+		}
+	case relax.Attribute:
+		fmt.Printf("attribute(%s)", p.QualifiedName())
+		fmt.Println()
+	case relax.Choice:
+		fmt.Printf("choice(%d)[", len(p.List))
+		fmt.Println()
+		for i := range p.List {
+			printSchema(p.List[i], depth+1)
+		}
+		fmt.Print(prefix)
+		fmt.Println("]")
+	case relax.Group:
+		fmt.Printf("group(%d)[", len(p.List))
+		for i := range p.List {
+			fmt.Println()
+			printSchema(p.List[i], depth+1)
+		}
+		fmt.Print(prefix)
+		fmt.Println("]")
+	default:
+		fmt.Println("unknown")
+	}
 }
 
 func parseSchema(file string) (relax.Pattern, error) {
@@ -82,7 +132,31 @@ func validateNode(root xml.Node, pattern relax.Pattern) error {
 }
 
 func validateChoice(node xml.Node, elem relax.Choice) error {
-	return fmt.Errorf("choice: pattern not yet supported")
+	var err error
+	for _, el := range elem.List {
+		if err = validateNode(node, el); err == nil {
+			break
+		}
+	}
+	return err
+}
+
+func validateNodes(nodes []xml.Node, elem relax.Pattern) (int, error) {
+	var ptr int
+	for i := 0; i < len(nodes); i++ {
+		ptr++
+		if _, ok := nodes[i].(*xml.Element); !ok {
+			continue
+		}
+		if i > 0 && nodes[i].QualifiedName() != nodes[i-1].QualifiedName() {
+			ptr = i - 1
+			break
+		}
+		if err := validateNode(nodes[i], elem); err != nil {
+			return 0, err
+		}
+	}
+	return ptr, nil
 }
 
 func validateElement(node xml.Node, elem relax.Element) error {
@@ -95,22 +169,27 @@ func validateElement(node xml.Node, elem relax.Element) error {
 	}
 	var offset int
 	for _, el := range elem.Patterns {
-		fmt.Printf("%T, %d, %s\n", el, len(curr.Nodes), curr.QualifiedName())
-		var (
-			count int
-			start int = offset
-		)
-		for i := offset; i < len(curr.Nodes); i++ {
-			offset++
-			if _, ok := curr.Nodes[i].(*xml.Element); !ok {
-				continue
-			}
-			if curr.Nodes[i].QualifiedName() != curr.Nodes[start].QualifiedName() {
-				offset--
+		var err error
+		switch el := el.(type) {
+		case relax.Element:
+			step, err1 := validateNodes(curr.Nodes[offset:], el)
+			offset += step
+			err = err1
+		case relax.Attribute:
+			err = validateAttribute(curr, el)
+		case relax.Choice:
+			err = validateNode(curr, el)
+			if err == nil {
 				break
 			}
-			count++
-			fmt.Println(i, curr.Nodes[i].QualifiedName(), count)
+			step, err1 := validateNodes(curr.Nodes[offset:], el)
+			offset += step
+			err = err1
+		default:
+			return fmt.Errorf("element: unsupported pattern %T", el)
+		}
+		if err != nil {
+			return err
 		}
 	}
 	return nil
@@ -125,7 +204,7 @@ func validateAttribute(node xml.Node, attr relax.Attribute) error {
 		return a.QualifiedName() == attr.QualifiedName()
 	})
 	if ix < 0 && !attr.Arity.Zero() {
-		return fmt.Errorf("missing attribute")
+		return fmt.Errorf("missing attribute: %s", attr.QualifiedName())
 	}
 	switch vs := attr.Value.(type) {
 	case relax.Enum:

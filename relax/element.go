@@ -148,6 +148,8 @@ func reassemble(start Pattern, others map[string]Pattern) (Pattern, error) {
 	switch el := start.(type) {
 	case Element:
 		return el, nil
+	case Attribute:
+		return el, nil
 	case Choice:
 		for i := range el.List {
 			tmp, err := reassemble(el.List[i], others)

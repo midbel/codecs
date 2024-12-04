@@ -26,7 +26,8 @@ func Parse(r io.Reader) *Parser {
 }
 
 func (p *Parser) Parse() (Pattern, error) {
-	return p.parse()
+	pattern, err := p.parse()
+	return pattern, err
 }
 
 func (p *Parser) parse() (Pattern, error) {
@@ -331,6 +332,9 @@ func (p *Parser) parseAttribute() (Pattern, error) {
 	at.Arity = p.parseArity()
 	if at.Arity > 0 && at.Arity != ZeroOrOne {
 		return nil, fmt.Errorf("unexpected value for attribute")
+	}
+	if at.Arity == 0 {
+		at.Arity = One
 	}
 	return at, nil
 }
