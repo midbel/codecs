@@ -67,15 +67,22 @@ func printSchema(schema relax.Pattern, depth int) {
 	case relax.Choice:
 		fmt.Printf("choice(%d)[", len(p.List))
 		fmt.Println()
+		depth++
 		for i := range p.List {
+			pfx := strings.Repeat(" ", depth*2)
+			fmt.Print(pfx)
+			fmt.Printf("choice#%d[", i+1)
+			fmt.Println()
 			printSchema(p.List[i], depth+1)
+			fmt.Print(pfx)
+			fmt.Println("]")
 		}
 		fmt.Print(prefix)
 		fmt.Println("]")
 	case relax.Group:
 		fmt.Printf("group(%d)[", len(p.List))
+		fmt.Println()
 		for i := range p.List {
-			fmt.Println()
 			printSchema(p.List[i], depth+1)
 		}
 		fmt.Print(prefix)
