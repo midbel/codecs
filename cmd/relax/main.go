@@ -150,8 +150,9 @@ func validateChoice(node xml.Node, elem relax.Choice) error {
 
 func validateNodes(nodes []xml.Node, elem relax.Pattern) (int, error) {
 	var (
-		ptr int
-		prv = -1
+		count int
+		ptr   int
+		prv   = -1
 	)
 	for ; ptr < len(nodes); ptr++ {
 		if _, ok := nodes[ptr].(*xml.Element); !ok {
@@ -161,9 +162,25 @@ func validateNodes(nodes []xml.Node, elem relax.Pattern) (int, error) {
 			break
 		}
 		if err := validateNode(nodes[ptr], elem); err != nil {
+			a, ok := elem.(relax.Element)
+			if ok && a.Zero() {
+				return 0, nil
+			}
 			return 0, err
 		}
+		count++
 		prv = ptr
+	}
+	a, ok := elem.(relax.Element)
+	if !ok {
+		return ptr, nil
+	}
+	switch {
+	case count == 0 && a.Arity.Zero():
+	case count == 1 && a.Arity.One():
+	case count > 1 && a.Arity.More():
+	default:
+		return 0, fmt.Errorf("element count mismatched")
 	}
 	return ptr, nil
 }
