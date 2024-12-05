@@ -218,7 +218,7 @@ func validateElement(node xml.Node, elem relax.Element) error {
 			return err
 		}
 	}
-	return nil
+	return validateValue(curr, elem.Value)
 }
 
 func validateAttribute(node xml.Node, attr relax.Attribute) error {
@@ -245,6 +245,17 @@ func validateAttribute(node xml.Node, attr relax.Attribute) error {
 		return fmt.Errorf("unsupported pattern for attribute")
 	}
 	return nil
+}
+
+func validateValue(node xml.Node, value relax.Pattern) error {
+	switch value.(type) {
+	case relax.Text:
+		return validateText(node)
+	case relax.Empty:
+		return validateEmpty(node)
+	default:
+		return nil
+	}
 }
 
 func validateType(t relax.Type, value string) error {
