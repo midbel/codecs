@@ -126,8 +126,8 @@ type IntType struct {
 
 type FloatType struct {
 	Type
-	MinValue int
-	MaxValue int
+	MinValue float64
+	MaxValue float64
 }
 
 type TimeType struct {

@@ -282,6 +282,12 @@ func (p *Parser) parseElement() (Pattern, error) {
 	p.skipEOL()
 	p.skipComment()
 	switch {
+	case p.isType():
+		t, err := p.parseType()
+		if err != nil {
+			return nil, err
+		}
+		el.Value = t
 	case p.isKeyword("text"):
 		p.next()
 		el.Value = Text{}
@@ -320,11 +326,18 @@ func (p *Parser) parseAttribute() (Pattern, error) {
 		return nil, p.unexpected()
 	}
 	p.next()
-	if !p.isKeyword("text") {
+	switch {
+	case p.isKeyword("text"):
+		p.next()
+		at.Value = Text{}
+	case p.is(Literal):
+		at.Value, err = p.parseEnum()
+		if err != nil {
+			return nil, err
+		}
+	default:
 		return nil, fmt.Errorf("unexpected pattern type for attribute")
 	}
-	p.next()
-	at.Value = Text{}
 	if !p.is(EndBrace) {
 		return nil, p.unexpected()
 	}
@@ -375,6 +388,40 @@ func (p *Parser) parseArity() Arity {
 	return arity
 }
 
+func (p *Parser) parseType() (Pattern, error) {
+	defer p.skipEOL()
+	t := Type{
+		Name: p.curr.Literal,
+	}
+	p.next()
+	if !p.is(BegBrace) {
+		return t, nil
+	}
+	p.next()
+	for !p.done() && !p.is(EndBrace) {
+		if !p.is(Name) {
+			return nil, fmt.Errorf("missing parameter name")
+		}
+		name := p.curr.Literal
+		p.next()
+		if !p.is(Assign) {
+			return nil, p.unexpected()
+		}
+		p.next()
+		if !p.is(Literal) {
+			return nil, fmt.Errorf("parameter value should be a literal")
+		}
+		value := p.curr.Literal
+		fmt.Println(name, value)
+		p.next()
+	}
+	if !p.is(EndBrace) {
+		return nil, p.unexpected()
+	}
+	p.next()
+	return t, nil
+}
+
 func (p *Parser) parseEnum() (Pattern, error) {
 	var pt Enum
 	for !p.done() && p.is(Literal) {
@@ -405,6 +452,16 @@ func (p *Parser) is(kind rune) bool {
 
 func (p *Parser) isKeyword(kw string) bool {
 	return p.is(Keyword) && p.curr.Literal == kw
+}
+
+func (p *Parser) isType() bool {
+	types := []string{"int", "float", "decimal", "bool", "string", "date"}
+	for i := range types {
+		if p.isKeyword(types[i]) {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *Parser) done() bool {

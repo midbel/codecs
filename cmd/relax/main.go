@@ -149,19 +149,21 @@ func validateChoice(node xml.Node, elem relax.Choice) error {
 }
 
 func validateNodes(nodes []xml.Node, elem relax.Pattern) (int, error) {
-	var ptr int
-	for i := 0; i < len(nodes); i++ {
-		ptr++
-		if _, ok := nodes[i].(*xml.Element); !ok {
+	var (
+		ptr int
+		prv = -1
+	)
+	for ; ptr < len(nodes); ptr++ {
+		if _, ok := nodes[ptr].(*xml.Element); !ok {
 			continue
 		}
-		if i > 0 && nodes[i].QualifiedName() != nodes[i-1].QualifiedName() {
-			ptr = i - 1
+		if prv >= 0 && nodes[ptr].QualifiedName() != nodes[prv].QualifiedName() {
 			break
 		}
-		if err := validateNode(nodes[i], elem); err != nil {
+		if err := validateNode(nodes[ptr], elem); err != nil {
 			return 0, err
 		}
+		prv = ptr
 	}
 	return ptr, nil
 }
