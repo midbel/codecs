@@ -3,6 +3,8 @@ package relax
 import (
 	"fmt"
 	"io"
+	"strconv"
+	"time"
 )
 
 type Parser struct {
@@ -397,29 +399,153 @@ func (p *Parser) parseType() (Pattern, error) {
 	if !p.is(BegBrace) {
 		return t, nil
 	}
+	switch t.Name {
+	case "int":
+		return p.parseTypeInt(t)
+	case "float", "decimal":
+		return p.parseTypeFloat(t)
+	case "date":
+		return p.parseTypeDate(t)
+	case "string":
+		return p.parseTypeString(t)
+	case "bool":
+		return t, nil
+	default:
+		return nil, fmt.Errorf("type not supported")
+	}
+}
+
+func (p *Parser) parseTypeString(t Type) (Pattern, error) {
+	res := StringType{
+		Type: t,
+	}
+	err := p.parseParameters(func(name, value string) error {
+		switch name {
+		case "format":
+			res.Format = value
+		case "minLength":
+			n, err := strconv.Atoi(value)
+			if err != nil {
+				return err
+			}
+			res.MinLength = n
+		case "maxLength":
+			n, err := strconv.Atoi(value)
+			if err != nil {
+				return err
+			}
+			res.MaxLength = n
+		default:
+			return fmt.Errorf("unsupported string parameter")
+		}
+		return nil
+	})
+	return res, err
+}
+
+func (p *Parser) parseTypeInt(t Type) (Pattern, error) {
+	res := IntType{
+		Type: t,
+	}
+	err := p.parseParameters(func(name, value string) error {
+		switch name {
+		case "minValue":
+			n, err := strconv.Atoi(value)
+			if err != nil {
+				return err
+			}
+			res.MinValue = int(n)
+		case "maxValue":
+			n, err := strconv.Atoi(value)
+			if err != nil {
+				return err
+			}
+			res.MaxValue = int(n)
+		default:
+			return fmt.Errorf("unsupported string parameter")
+		}
+		return nil
+	})
+	return res, err
+}
+
+func (p *Parser) parseTypeFloat(t Type) (Pattern, error) {
+	res := FloatType{
+		Type: t,
+	}
+	err := p.parseParameters(func(name, value string) error {
+		switch name {
+		case "minValue":
+			n, err := strconv.ParseFloat(value, 64)
+			if err != nil {
+				return err
+			}
+			res.MinValue = n
+		case "maxValue":
+			n, err := strconv.ParseFloat(value, 64)
+			if err != nil {
+				return err
+			}
+			res.MaxValue = n
+		default:
+			return fmt.Errorf("unsupported string parameter")
+		}
+		return nil
+	})
+	return res, err
+}
+
+func (p *Parser) parseTypeDate(t Type) (Pattern, error) {
+	res := TimeType{
+		Type: t,
+	}
+	err := p.parseParameters(func(name, value string) error {
+		switch name {
+		case "minValue":
+			n, err := time.Parse("2006-01-02", value)
+			if err != nil {
+				return err
+			}
+			res.MinValue = n
+		case "maxValue":
+			n, err := time.Parse("2006-01-02", value)
+			if err != nil {
+				return err
+			}
+			res.MaxValue = n
+		default:
+			return fmt.Errorf("unsupported string parameter")
+		}
+		return nil
+	})
+	return res, err
+}
+
+func (p *Parser) parseParameters(do func(name, value string) error) error {
 	p.next()
 	for !p.done() && !p.is(EndBrace) {
 		if !p.is(Name) {
-			return nil, fmt.Errorf("missing parameter name")
+			return fmt.Errorf("missing parameter name")
 		}
 		name := p.curr.Literal
 		p.next()
 		if !p.is(Assign) {
-			return nil, p.unexpected()
+			return p.unexpected()
 		}
 		p.next()
 		if !p.is(Literal) {
-			return nil, fmt.Errorf("parameter value should be a literal")
+			return fmt.Errorf("parameter value should be a literal")
 		}
-		value := p.curr.Literal
-		fmt.Println(name, value)
+		if err := do(name, p.curr.Literal); err != nil {
+			return err
+		}
 		p.next()
 	}
 	if !p.is(EndBrace) {
-		return nil, p.unexpected()
+		return p.unexpected()
 	}
 	p.next()
-	return t, nil
+	return nil
 }
 
 func (p *Parser) parseEnum() (Pattern, error) {

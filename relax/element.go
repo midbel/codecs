@@ -105,6 +105,7 @@ func (_ Empty) Validate(node xml.Node) error {
 
 type Type struct {
 	Name    string
+	Format  string
 	Pattern string
 }
 
