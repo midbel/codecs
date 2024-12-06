@@ -1,6 +1,9 @@
 package main
 
 import (
+	"encoding/base64"
+	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
 	"net/url"
@@ -248,40 +251,105 @@ func validateAttribute(node xml.Node, attr relax.Attribute) error {
 }
 
 func validateValue(node xml.Node, value relax.Pattern) error {
-	switch value.(type) {
-	case relax.Text:
-		return validateText(node)
-	case relax.Empty:
-		return validateEmpty(node)
-	default:
+	if value == nil {
 		return nil
 	}
+	var err error
+	switch v := value.(type) {
+	case relax.Text:
+		err = validateText(node)
+	case relax.Empty:
+		err = validateEmpty(node)
+	case relax.Type:
+	case relax.TimeType:
+		err = validateTime(node, v)
+	case relax.IntType:
+		err = validateInt(node, v)
+	case relax.FloatType:
+		err = validateFloat(node, v)
+	case relax.StringType:
+		err = validateString(node, v)
+	default:
+		return fmt.Errorf("type pattern not supported (%T)", v)
+	}
+	return err
 }
 
-func validateType(t relax.Type, value string) error {
-	switch t.Name {
-	case "int":
-		_, err := strconv.ParseInt(value, 0, 64)
-		return err
-	case "float", "decimal":
-		_, err := strconv.ParseFloat(value, 64)
-		return err
-	case "string":
+var (
+	errRange  = errors.New("value out of range")
+	errLength = errors.New("invalid length")
+	errFormat = errors.New("invalid format")
+)
+
+func validateInt(node xml.Node, value relax.IntType) error {
+	val, err := strconv.ParseInt(node.Value(), 0, 64)
+	if err != nil {
+		return errFormat
+	}
+	if val < int64(value.MinValue) {
+		return errRange
+	}
+	if val > int64(value.MaxValue) {
+		return errRange
+	}
+	return nil
+}
+
+func validateFloat(node xml.Node, value relax.FloatType) error {
+	val, err := strconv.ParseFloat(node.Value(), 64)
+	if err != nil {
+		return errFormat
+	}
+	if val < value.MinValue {
+		return errRange
+	}
+	if val > value.MaxValue {
+		return errRange
+	}
+	return nil
+}
+
+func validateTime(node xml.Node, value relax.TimeType) error {
+	layout := "2006-01-02"
+	if value.Format != "" {
+		layout = value.Format
+	}
+	when, err := time.Parse(layout, node.Value())
+	if err != nil {
+		return errFormat
+	}
+	if !value.MinValue.IsZero() && when.Before(value.MinValue) {
+		return errRange
+	}
+	if !value.MaxValue.IsZero() && when.After(value.MaxValue) {
+		return errRange
+	}
+	return nil
+}
+
+func validateString(node xml.Node, value relax.StringType) error {
+	var (
+		err error
+		str = node.Value()
+	)
+	if value.MinLength > 0 && len(str) < value.MinLength {
+		return errLength
+	}
+	if value.MaxLength > 0 && len(str) > value.MaxLength {
+		return errLength
+	}
+	switch value.Format {
 	case "uri":
-		_, err := url.Parse(value)
-		return err
-	case "boolean":
-		_, err := strconv.ParseBool(value)
-		return err
-	case "date":
-		_, err := time.Parse("2006-01-02", value)
-		return err
-	case "datetime":
-	case "time":
-	case "base64":
+		_, err = url.Parse(str)
 	case "hex":
+		_, err = hex.DecodeString(str)
+		return err
+	case "base64":
+		_, err = base64.StdEncoding.DecodeString(str)
 	default:
-		return fmt.Errorf("unknown data type")
+	}
+	if err != nil {
+		return errFormat
 	}
 	return nil
 }

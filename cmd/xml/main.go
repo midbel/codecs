@@ -15,8 +15,10 @@ func main() {
 		NoTrimSpace  bool
 		NoOmitProlog bool
 		Compact      bool
+		Schema       string
 	}{}
 	flag.StringVar(&options.Query, "q", "", "search for element in document")
+	flag.StringVar(&options.Schema, "s", "", "relax schema to validate XML document")
 	flag.BoolVar(&options.NoTrimSpace, "t", false, "trim space")
 	flag.BoolVar(&options.NoOmitProlog, "p", false, "omit prolog")
 	flag.BoolVar(&options.Compact, "c", false, "write compact output")
