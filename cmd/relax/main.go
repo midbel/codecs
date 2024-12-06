@@ -261,6 +261,8 @@ func validateValue(node xml.Node, value relax.Pattern) error {
 	case relax.Empty:
 		err = validateEmpty(node)
 	case relax.Type:
+	case relax.BoolType:
+		err = validateBool(node, v)
 	case relax.TimeType:
 		err = validateTime(node, v)
 	case relax.IntType:
@@ -280,6 +282,14 @@ var (
 	errLength = errors.New("invalid length")
 	errFormat = errors.New("invalid format")
 )
+
+func validateBool(node xml.Node, value relax.BoolType) error {
+	_, err := strconv.ParseBool(node.Value())
+	if err != nil {
+		err = errFormat
+	}
+	return err
+}
 
 func validateInt(node xml.Node, value relax.IntType) error {
 	val, err := strconv.ParseInt(node.Value(), 0, 64)

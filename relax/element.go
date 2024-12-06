@@ -113,6 +113,10 @@ func (t Type) Validate(node xml.Node) error {
 	return nil
 }
 
+type BoolType struct {
+	Type
+}
+
 type StringType struct {
 	Type
 	MinLength int
