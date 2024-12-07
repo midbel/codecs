@@ -3,6 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"strings"
 
@@ -24,7 +27,7 @@ func main() {
 	flag.BoolVar(&options.Compact, "c", false, "write compact output")
 	flag.Parse()
 
-	r, err := os.Open(flag.Arg(0))
+	r, err := open(flag.Arg(0))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -52,6 +55,33 @@ func main() {
 	if err := ws.Write(doc); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(121)
+	}
+}
+
+func open(file string) (io.ReadCloser, error) {
+	u, err := url.Parse(file)
+	if err != nil {
+		return nil, err
+	}
+	switch u.Scheme {
+	case "", "file":
+		return os.Open(file)
+	case "http", "https":
+		req, err := http.NewRequest(http.MethodGet, u.String(), nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("accept", "text/xml")
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		if res.StatusCode != 200 {
+			return nil, fmt.Errorf("fail to retrieve remote file")
+		}
+		return res.Body, nil
+	default:
+		return nil, fmt.Errorf("unsupported")
 	}
 }
 

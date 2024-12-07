@@ -196,7 +196,10 @@ func validateElement(node xml.Node, elem relax.Element) error {
 	if !ok {
 		return fmt.Errorf("xml element expected")
 	}
-	var offset int
+	var (
+		offset int
+		attrs  int
+	)
 	for _, el := range elem.Patterns {
 		var err error
 		switch el := el.(type) {
@@ -206,9 +209,11 @@ func validateElement(node xml.Node, elem relax.Element) error {
 			err = err1
 		case relax.Attribute:
 			err = validateAttribute(curr, el)
+			attrs++
 		case relax.Choice:
 			err = validateNode(curr, el)
 			if err == nil {
+				attrs++
 				break
 			}
 			step, err1 := validateNodes(curr.Nodes[offset:], el)
@@ -221,6 +226,9 @@ func validateElement(node xml.Node, elem relax.Element) error {
 			return err
 		}
 	}
+	// if len(curr.Attrs) > attrs {
+	// 	return fmt.Errorf("element has more attributes than expected")
+	// }
 	return validateValue(curr, elem.Value)
 }
 
@@ -241,8 +249,8 @@ func validateAttribute(node xml.Node, attr relax.Attribute) error {
 		if !ok {
 			return fmt.Errorf("attribute value not acceptable")
 		}
-	case relax.Type:
-		return validateType(vs, el.Attrs[ix].Value)
+	// case relax.Type:
+	// return validateType(vs, el.Attrs[ix].Value)
 	case relax.Text:
 	default:
 		return fmt.Errorf("unsupported pattern for attribute")

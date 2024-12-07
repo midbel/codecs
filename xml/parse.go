@@ -761,10 +761,10 @@ func (p *Parser) parseProlog() (Node, error) {
 	if !ok {
 		return nil, fmt.Errorf("xml version not supported!")
 	}
-	ok = slices.ContainsFunc(pi.Attrs, func(a Attribute) bool {
-		return a.LocalName() == "encoding" && a.Value == SupportedEncoding
+	ix := slices.IndexFunc(pi.Attrs, func(a Attribute) bool {
+		return a.LocalName() == "encoding"
 	})
-	if !ok {
+	if ix >= 0 && pi.Attrs[ix].Value != SupportedEncoding {
 		return nil, fmt.Errorf("xml encoding not supported!")
 	}
 	return pi, nil
