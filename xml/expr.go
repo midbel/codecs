@@ -612,17 +612,3 @@ func toBool(v any) bool {
 		return false
 	}
 }
-
-type Context struct {
-	Node
-	Size     int
-	Position int
-}
-
-func getContextFromNode(node Node) Context {
-	return Context{
-		Node:     node,
-		Position: node.Position(),
-		Size:     0,
-	}
-}

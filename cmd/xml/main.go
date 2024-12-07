@@ -14,12 +14,14 @@ import (
 
 func main() {
 	options := struct {
+		Root string
 		Query        string
 		NoTrimSpace  bool
 		NoOmitProlog bool
 		Compact      bool
 		Schema       string
 	}{}
+	flag.StringVar(&options.Root, "r", "document", "root element name to use when using a query")
 	flag.StringVar(&options.Query, "q", "", "search for element in document")
 	flag.StringVar(&options.Schema, "s", "", "relax schema to validate XML document")
 	flag.BoolVar(&options.NoTrimSpace, "t", false, "trim space")
@@ -43,7 +45,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
-	if doc, err = search(doc, options.Query); err != nil {
+	if doc, err = search(doc, options.Query, options.Root); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(122)
 	}
@@ -81,11 +83,11 @@ func open(file string) (io.ReadCloser, error) {
 		}
 		return res.Body, nil
 	default:
-		return nil, fmt.Errorf("unsupported")
+		return nil, fmt.Errorf("file can not be retrieve with %s protocol", u.Scheme)
 	}
 }
 
-func search(doc *xml.Document, query string) (*xml.Document, error) {
+func search(doc *xml.Document, query, root string) (*xml.Document, error) {
 	if query == "" {
 		return doc, nil
 	}
@@ -101,13 +103,13 @@ func search(doc *xml.Document, query string) (*xml.Document, error) {
 	if list.Empty() {
 		return nil, nil
 	}
-	var root xml.Node
+	var node xml.Node
 	if ns := list.Nodes(); list.Len() == 1 {
-		root = ns[0]
+		node = ns[0]
 	} else {
-		el := xml.NewElement(xml.LocalName("result"))
+		el := xml.NewElement(xml.LocalName(root))
 		el.Nodes = ns
-		root = el
+		node = el
 	}
-	return xml.NewDocument(root), nil
+	return xml.NewDocument(node), nil
 }
