@@ -695,6 +695,24 @@ const (
 	SupportedEncoding = "UTF-8"
 )
 
+type ParseError struct {
+	Position
+	Element string
+	Message string
+}
+
+func createParseError(elem, msg string, pos Position) error {
+	return ParseError{
+		Position: pos,
+		Element:  elem,
+		Message:  msg,
+	}
+}
+
+func (p ParseError) Error() string {
+	return fmt.Sprintf("%d:%d: %s: %s", p.Line, p.Column, p.Element, p.Message)
+}
+
 type Parser struct {
 	scan *Scanner
 	curr Token
@@ -743,7 +761,7 @@ func (p *Parser) Parse() (*Document, error) {
 func (p *Parser) parseProlog() (Node, error) {
 	if !p.is(ProcInstTag) {
 		if !p.OmitProlog {
-			return nil, p.formatError("xml: xml prolog missing")
+			return nil, p.createError("document", "xml prolog missing")
 		}
 		return nil, nil
 	}
@@ -753,19 +771,19 @@ func (p *Parser) parseProlog() (Node, error) {
 	}
 	pi, ok := node.(*Instruction)
 	if !ok {
-		return nil, fmt.Errorf("processing instruction expected")
+		return nil, p.createError("document", "expected xml prolog")
 	}
 	ok = slices.ContainsFunc(pi.Attrs, func(a Attribute) bool {
 		return a.LocalName() == "version" && a.Value == SupportedVersion
 	})
 	if !ok {
-		return nil, fmt.Errorf("xml version not supported!")
+		return nil, p.createError("document", "xml version not supported")
 	}
 	ix := slices.IndexFunc(pi.Attrs, func(a Attribute) bool {
 		return a.LocalName() == "encoding"
 	})
 	if ix >= 0 && pi.Attrs[ix].Value != SupportedEncoding {
-		return nil, fmt.Errorf("xml encoding not supported!")
+		return nil, p.createError("document", "xml encoding not supported")
 	}
 	return pi, nil
 }
@@ -774,7 +792,7 @@ func (p *Parser) parseNode() (Node, error) {
 	p.enter()
 	defer p.leave()
 	if p.depth >= p.MaxDepth {
-		return nil, p.formatError("xml: maximum depth reached!")
+		return nil, p.createError("document", "maximum depth reached")
 	}
 	var (
 		node Node
@@ -792,7 +810,7 @@ func (p *Parser) parseNode() (Node, error) {
 	case Literal:
 		node, _ = p.parseLiteral()
 	default:
-		return nil, p.formatError("xml: unexpected element type")
+		return nil, p.createError("document", "unsupported element type")
 	}
 	if err != nil {
 		return nil, err
@@ -811,7 +829,7 @@ func (p *Parser) parseElement() (Node, error) {
 		p.next()
 	}
 	if !p.is(Name) {
-		return nil, p.formatError("element: missing name")
+		return nil, p.createError("element", "name is missing")
 	}
 	elem.Name = p.curr.Literal
 	p.next()
@@ -842,31 +860,31 @@ func (p *Parser) parseElement() (Node, error) {
 			}
 		}
 		if !p.is(CloseTag) {
-			return nil, p.formatError("element: missing closing element")
+			return nil, p.createError("element", "closing element is missing")
 		}
 		p.next()
 		return &elem, p.parseCloseElement(elem)
 	default:
-		return nil, p.formatError("element: malformed - expected end of element")
+		return nil, p.createError("element", "end of element expected")
 	}
 }
 
 func (p *Parser) parseCloseElement(elem Element) error {
 	if p.is(Namespace) {
 		if elem.Space != p.curr.Literal {
-			return p.formatError("element: namespace mismatched!")
+			return p.createError("element", "namespace mismatched with opening element")
 		}
 		p.next()
 	}
 	if !p.is(Name) {
-		return fmt.Errorf("element: missing name")
+		return p.createError("element", "name is missing")
 	}
 	if p.curr.Literal != elem.Name {
-		return p.formatError("element: name mismatched!")
+		return p.createError("element", "name mismatched with opening element")
 	}
 	p.next()
 	if !p.is(EndTag) {
-		return p.formatError("element: malformed - expected end of element")
+		return p.createError("element", "end of element expected")
 	}
 	p.next()
 	return nil
@@ -875,7 +893,7 @@ func (p *Parser) parseCloseElement(elem Element) error {
 func (p *Parser) parseProcessingInstr() (Node, error) {
 	p.next()
 	if !p.is(Name) {
-		return nil, p.formatError("pi: missing name")
+		return nil, p.createError("processing instruction", "name is missing")
 	}
 	var elem Instruction
 	elem.Name = p.curr.Literal
@@ -888,7 +906,7 @@ func (p *Parser) parseProcessingInstr() (Node, error) {
 		return nil, err
 	}
 	if !p.is(ProcInstTag) {
-		return nil, p.formatError("pi: malformed - expected end of element")
+		return nil, p.createError("processing instruction", "end of element expected")
 	}
 	p.next()
 	return &elem, nil
@@ -905,7 +923,7 @@ func (p *Parser) parseAttributes(done func() bool) ([]Attribute, error) {
 			return attr.QualifiedName() == a.QualifiedName()
 		})
 		if ok {
-			return nil, p.formatError("attribute: duplicate attribute")
+			return nil, p.createError("attribute", "attribute is already defined")
 		}
 		attrs = append(attrs, attr)
 	}
@@ -919,12 +937,12 @@ func (p *Parser) parseAttr() (Attribute, error) {
 		p.next()
 	}
 	if !p.is(Attr) {
-		return attr, p.formatError("attribute: attribute name expected")
+		return attr, p.createError("attribute", "name is expected")
 	}
 	attr.Name = p.curr.Literal
 	p.next()
 	if !p.is(Literal) {
-		return attr, p.formatError("attribute: missing attribute value")
+		return attr, p.createError("attribute", "value is missing")
 	}
 	attr.Value = p.curr.Literal
 	p.next()
@@ -961,8 +979,8 @@ func (p *Parser) parseLiteral() (Node, error) {
 	return &text, nil
 }
 
-func (p *Parser) formatError(msg string) error {
-	return fmt.Errorf("(%d:%d) %s", p.curr.Line, p.curr.Column, msg)
+func (p *Parser) createError(elem, msg string) error {
+	return createParseError(elem, msg, p.curr.Position)
 }
 
 func (p *Parser) is(kind rune) bool {

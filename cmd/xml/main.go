@@ -14,7 +14,7 @@ import (
 
 func main() {
 	options := struct {
-		Root string
+		Root         string
 		Query        string
 		NoTrimSpace  bool
 		NoOmitProlog bool
