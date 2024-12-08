@@ -10,7 +10,6 @@ import (
 	"os"
 	"slices"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/midbel/codecs/relax"
@@ -27,7 +26,7 @@ func main() {
 		os.Exit(21)
 	}
 	if *debug {
-		printSchema(schema, 0)
+		relax.Print(os.Stdout, schema)
 		return
 	}
 	doc, err := parseDocument(flag.Arg(1))
@@ -42,57 +41,6 @@ func main() {
 		os.Exit(32)
 	}
 	fmt.Println("document is valid")
-}
-
-func printSchema(schema relax.Pattern, depth int) {
-	var prefix string
-	if depth > 0 {
-		prefix = strings.Repeat(" ", depth*2)
-	}
-	fmt.Print(prefix)
-	switch p := schema.(type) {
-	case relax.Element:
-		fmt.Printf("element(%s)", p.QualifiedName())
-		if len(p.Patterns) > 0 {
-			fmt.Print("[")
-		}
-		fmt.Println()
-		for i := range p.Patterns {
-			printSchema(p.Patterns[i], depth+1)
-		}
-		if len(p.Patterns) > 0 {
-			fmt.Print(prefix)
-			fmt.Println("]")
-		}
-	case relax.Attribute:
-		fmt.Printf("attribute(%s)", p.QualifiedName())
-		fmt.Println()
-	case relax.Choice:
-		fmt.Printf("choice(%d)[", len(p.List))
-		fmt.Println()
-		depth++
-		for i := range p.List {
-			pfx := strings.Repeat(" ", depth*2)
-			fmt.Print(pfx)
-			fmt.Printf("choice#%d[", i+1)
-			fmt.Println()
-			printSchema(p.List[i], depth+1)
-			fmt.Print(pfx)
-			fmt.Println("]")
-		}
-		fmt.Print(prefix)
-		fmt.Println("]")
-	case relax.Group:
-		fmt.Printf("group(%d)[", len(p.List))
-		fmt.Println()
-		for i := range p.List {
-			printSchema(p.List[i], depth+1)
-		}
-		fmt.Print(prefix)
-		fmt.Println("]")
-	default:
-		fmt.Println("unknown")
-	}
 }
 
 func parseSchema(file string) (relax.Pattern, error) {
