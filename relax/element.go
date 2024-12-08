@@ -1,10 +1,22 @@
 package relax
 
 import (
+	"encoding/base64"
+	"encoding/hex"
+	"errors"
 	"fmt"
+	"net/url"
+	"slices"
+	"strconv"
 	"time"
 
 	"github.com/midbel/codecs/xml"
+)
+
+var (
+	ErrRange  = errors.New("value out of range")
+	ErrLength = errors.New("invalid length")
+	ErrFormat = errors.New("invalid format")
 )
 
 type Arity int8
@@ -61,6 +73,26 @@ type Attribute struct {
 }
 
 func (a Attribute) Validate(node xml.Node) error {
+	el, ok := node.(*xml.Element)
+	if !ok {
+		return fmt.Errorf("node is not a xml element")
+	}
+	ix := slices.IndexFunc(el.Attrs, func(attr xml.Attribute) bool {
+		return a.QualifiedName() == attr.QualifiedName()
+	})
+	if ix < 0 && !a.Zero() {
+		return fmt.Errorf("missing attribute: %s", a.QualifiedName())
+	}
+	switch vs := a.Value.(type) {
+	case Enum:
+		ok := slices.Contains(vs.List, el.Attrs[ix].Value)
+		if !ok {
+			return fmt.Errorf("attribute value not acceptable")
+		}
+	case Text:
+	default:
+		return fmt.Errorf("unsupported pattern for attribute")
+	}
 	return nil
 }
 
@@ -77,7 +109,13 @@ type Choice struct {
 }
 
 func (c Choice) Validate(node xml.Node) error {
-	return nil
+	var err error
+	for i := range c.List {
+		if err = c.List[i].Validate(node); err == nil {
+			break
+		}
+	}
+	return err
 }
 
 type Element struct {
@@ -88,18 +126,72 @@ type Element struct {
 }
 
 func (e Element) Validate(node xml.Node) error {
+	return e.validate(node)
+}
+
+func (e Element) validate(node xml.Node) error {
+	if e.QualifiedName() != node.QualifiedName() {
+		return fmt.Errorf("element name mismatched! want %s, got %s", e.QualifiedName(), node.QualifiedName())
+	}
+	curr, ok := node.(*xml.Element)
+	if !ok {
+		return fmt.Errorf("xml element expected")
+	}
+	var (
+		offset int
+		attrs  int
+	)
+	for _, el := range e.Patterns {
+		var err error
+		switch el := el.(type) {
+		case Element:
+			step, err1 := validateNodes(curr.Nodes[offset:], el)
+			offset += step
+			err = err1
+		case Attribute:
+			err = el.Validate(curr)
+			attrs++
+		case Choice:
+			err = el.Validate(curr)
+			if err == nil {
+				attrs++
+				break
+			}
+			step, err1 := validateNodes(curr.Nodes[offset:], el)
+			offset += step
+			err = err1
+		default:
+			return fmt.Errorf("element: unsupported pattern %T", el)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	// if len(curr.Attrs) > attrs {
+	// 	return fmt.Errorf("element has more attributes than expected")
+	// }
+	if e.Value != nil {
+		return e.Value.Validate(curr)
+	}
 	return nil
 }
 
 type Text struct{}
 
 func (_ Text) Validate(node xml.Node) error {
+	if !node.Leaf() {
+		return fmt.Errorf("expected text content")
+	}
 	return nil
 }
 
 type Empty struct{}
 
 func (_ Empty) Validate(node xml.Node) error {
+	el, ok := node.(*xml.Element)
+	if ok && len(el.Nodes) != 0 {
+		return fmt.Errorf("expected element to be empty")
+	}
 	return nil
 }
 
@@ -117,10 +209,45 @@ type BoolType struct {
 	Type
 }
 
+func (t BoolType) Validate(node xml.Node) error {
+	_, err := strconv.ParseBool(node.Value())
+	if err != nil {
+		err = ErrFormat
+	}
+	return err
+}
+
 type StringType struct {
 	Type
 	MinLength int
 	MaxLength int
+}
+
+func (t StringType) Validate(node xml.Node) error {
+	var (
+		err error
+		str = node.Value()
+	)
+	if t.MinLength > 0 && len(str) < t.MinLength {
+		return ErrLength
+	}
+	if t.MaxLength > 0 && len(str) > t.MaxLength {
+		return ErrLength
+	}
+	switch t.Format {
+	case "uri":
+		_, err = url.Parse(str)
+	case "hex":
+		_, err = hex.DecodeString(str)
+		return err
+	case "base64":
+		_, err = base64.StdEncoding.DecodeString(str)
+	default:
+	}
+	if err != nil {
+		return ErrFormat
+	}
+	return nil
 }
 
 type IntType struct {
@@ -129,10 +256,38 @@ type IntType struct {
 	MaxValue int
 }
 
+func (t IntType) Validate(node xml.Node) error {
+	val, err := strconv.ParseInt(node.Value(), 0, 64)
+	if err != nil {
+		return ErrFormat
+	}
+	if val < int64(t.MinValue) {
+		return ErrRange
+	}
+	if val > int64(t.MaxValue) {
+		return ErrRange
+	}
+	return nil
+}
+
 type FloatType struct {
 	Type
 	MinValue float64
 	MaxValue float64
+}
+
+func (t FloatType) Validate(node xml.Node) error {
+	val, err := strconv.ParseFloat(node.Value(), 64)
+	if err != nil {
+		return ErrFormat
+	}
+	if val < t.MinValue {
+		return ErrRange
+	}
+	if val > t.MaxValue {
+		return ErrRange
+	}
+	return nil
 }
 
 type TimeType struct {
@@ -141,11 +296,33 @@ type TimeType struct {
 	MaxValue time.Time
 }
 
+func (t TimeType) Validate(node xml.Node) error {
+	layout := "2006-01-02"
+	if t.Format != "" {
+		layout = t.Format
+	}
+	when, err := time.Parse(layout, node.Value())
+	if err != nil {
+		return ErrFormat
+	}
+	if !t.MinValue.IsZero() && when.Before(t.MinValue) {
+		return ErrRange
+	}
+	if !t.MaxValue.IsZero() && when.After(t.MaxValue) {
+		return ErrRange
+	}
+	return nil
+}
+
 type Enum struct {
 	List []string
 }
 
 func (e Enum) Validate(node xml.Node) error {
+	ok := slices.Contains(e.List, node.Value())
+	if !ok {
+		return fmt.Errorf("attribute value not acceptable")
+	}
 	return nil
 }
 
@@ -196,4 +373,40 @@ func reassemble(start Pattern, others map[string]Pattern) (Pattern, error) {
 		el.Patterns[i] = p
 	}
 	return el, nil
+}
+
+func validateNodes(nodes []xml.Node, elem Pattern) (int, error) {
+	var (
+		count int
+		ptr   int
+		prv   = -1
+	)
+	for ; ptr < len(nodes); ptr++ {
+		if _, ok := nodes[ptr].(*xml.Element); !ok {
+			continue
+		}
+		if prv >= 0 && nodes[ptr].QualifiedName() != nodes[prv].QualifiedName() {
+			break
+		}
+		if err := elem.Validate(nodes[ptr]); err != nil {
+			if a, ok := elem.(Element); ok && a.Zero() {
+				return 0, nil
+			}
+			return 0, err
+		}
+		count++
+		prv = ptr
+	}
+	a, ok := elem.(Element)
+	if !ok {
+		return ptr, nil
+	}
+	switch {
+	case count == 0 && a.Arity.Zero():
+	case count == 1 && a.Arity.One():
+	case count > 1 && a.Arity.More():
+	default:
+		return 0, fmt.Errorf("element count mismatched")
+	}
+	return ptr, nil
 }
