@@ -78,7 +78,7 @@ func parseSchema(file string) (relax.Pattern, error) {
 	if file == "" {
 		return relax.Valid(), nil
 	}
-	r, err := os.Open(file)
+	r, err := open(file)
 	if err != nil {
 		return nil, err
 	}
