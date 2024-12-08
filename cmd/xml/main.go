@@ -9,55 +9,78 @@ import (
 	"os"
 	"strings"
 
+	"github.com/midbel/codecs/relax"
 	"github.com/midbel/codecs/xml"
 )
 
 func main() {
 	options := struct {
-		Root         string
-		Query        string
-		NoTrimSpace  bool
-		NoOmitProlog bool
-		Compact      bool
-		Schema       string
+		Root    string
+		Query   string
+		Compact bool
+		Schema  string
 	}{}
 	flag.StringVar(&options.Root, "r", "document", "root element name to use when using a query")
 	flag.StringVar(&options.Query, "q", "", "search for element in document")
 	flag.StringVar(&options.Schema, "s", "", "relax schema to validate XML document")
-	flag.BoolVar(&options.NoTrimSpace, "t", false, "trim space")
-	flag.BoolVar(&options.NoOmitProlog, "p", false, "omit prolog")
 	flag.BoolVar(&options.Compact, "c", false, "write compact output")
 	flag.Parse()
 
-	r, err := open(flag.Arg(0))
+	schema, err := parseSchema(options.Schema)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		os.Exit(78)
 	}
-	defer r.Close()
 
-	p := xml.NewParser(r)
-	p.TrimSpace = !options.NoTrimSpace
-	p.OmitProlog = !options.NoOmitProlog
-
-	doc, err := p.Parse()
+	doc, err := parseDocument(flag.Arg(0))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
-	if doc, err = search(doc, options.Query, options.Root); err != nil {
+	if doc, err = search(doc, schema, options.Query, options.Root); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(122)
 	}
-	if doc == nil {
-		return
-	}
-	ws := xml.NewWriter(os.Stdout)
-	ws.Compact = options.Compact
-	if err := ws.Write(doc); err != nil {
+	if err := writeDocument(doc, options.Compact); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(121)
 	}
+}
+
+func parseDocument(file string) (*xml.Document, error) {
+	r, err := open(file)
+	if err != nil {
+		return nil, err
+	}
+
+	p := xml.NewParser(r)
+	p.TrimSpace = true
+	p.OmitProlog = true
+
+	return p.Parse()
+}
+
+func writeDocument(doc *xml.Document, compact bool) error {
+	if doc == nil {
+		return nil
+	}
+	ws := xml.NewWriter(os.Stdout)
+	ws.Compact = compact
+	return ws.Write(doc)
+}
+
+func parseSchema(file string) (relax.Pattern, error) {
+	if file == "" {
+		return relax.Valid(), nil
+	}
+	r, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+
+	p := relax.Parse(r)
+	return p.Parse()
 }
 
 func open(file string) (io.ReadCloser, error) {
@@ -87,7 +110,7 @@ func open(file string) (io.ReadCloser, error) {
 	}
 }
 
-func search(doc *xml.Document, query, root string) (*xml.Document, error) {
+func search(doc *xml.Document, schema relax.Pattern, query, root string) (*xml.Document, error) {
 	if query == "" {
 		return doc, nil
 	}

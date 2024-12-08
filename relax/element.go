@@ -44,6 +44,16 @@ type Pattern interface {
 	Validate(xml.Node) error
 }
 
+func Valid() Pattern {
+	return valid{}
+}
+
+type valid struct{}
+
+func (_ valid) Validate(_ xml.Node) error {
+	return nil
+}
+
 type QName struct {
 	Space string
 	Local string
@@ -96,6 +106,7 @@ func (a Attribute) Validate(node xml.Node) error {
 	default:
 		return fmt.Errorf("unsupported pattern for attribute")
 	}
+	return nil
 }
 
 type Group struct {
