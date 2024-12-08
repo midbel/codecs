@@ -83,6 +83,9 @@ func (a Attribute) Validate(node xml.Node) error {
 	if ix < 0 && !a.Zero() {
 		return fmt.Errorf("missing attribute: %s", a.QualifiedName())
 	}
+	if a.Value == nil {
+		return nil
+	}
 	switch vs := a.Value.(type) {
 	case Enum:
 		ok := slices.Contains(vs.List, el.Attrs[ix].Value)
@@ -93,7 +96,6 @@ func (a Attribute) Validate(node xml.Node) error {
 	default:
 		return fmt.Errorf("unsupported pattern for attribute")
 	}
-	return nil
 }
 
 type Group struct {
