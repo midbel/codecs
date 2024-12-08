@@ -29,7 +29,7 @@ func main() {
 	schema, err := parseSchema(options.Schema)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(78)
+		os.Exit(2)
 	}
 
 	doc, err := parseDocument(flag.Arg(0))
@@ -39,11 +39,16 @@ func main() {
 	}
 	if doc, err = search(doc, schema, options.Query, options.Root); err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(122)
+		os.Exit(3)
+	}
+	if err := schema.Validate(doc); err != nil {
+		fmt.Fprintln(os.Stderr, "document does not conform to specify schema")
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
 	}
 	if err := writeDocument(doc, options.Compact); err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(121)
+		os.Exit(5)
 	}
 }
 
