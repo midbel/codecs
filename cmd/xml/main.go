@@ -37,11 +37,11 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
-	if doc, err = search(doc, schema, options.Query, options.Root); err != nil {
+	if doc, err = search(doc, options.Query, options.Root); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(3)
 	}
-	if err := schema.Validate(doc); err != nil {
+	if err := schema.Validate(doc.Root()); err != nil {
 		fmt.Fprintln(os.Stderr, "document does not conform to specify schema")
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
@@ -115,7 +115,7 @@ func open(file string) (io.ReadCloser, error) {
 	}
 }
 
-func search(doc *xml.Document, schema relax.Pattern, query, root string) (*xml.Document, error) {
+func search(doc *xml.Document, query, root string) (*xml.Document, error) {
 	if query == "" {
 		return doc, nil
 	}
