@@ -91,6 +91,7 @@ func Compile(r io.Reader) (Expr, error) {
 	}
 	cp.prefix = map[rune]func() (Expr, error){
 		currLevel:  cp.compileRoot,
+		anyLevel:   cp.compileDescendantFromRoot,
 		Name:       cp.compileName,
 		currNode:   cp.compileCurrent,
 		parentNode: cp.compileParent,
@@ -125,8 +126,7 @@ func (c *compiler) compile() (Expr, error) {
 				return c.compileRoot()
 			}
 			if c.is(anyLevel) {
-				var expr root
-				return c.compileDescendant(expr)
+				return c.compileDescendantFromRoot()
 			}
 			return c.compileExpr(powLowest)
 		}
@@ -302,35 +302,6 @@ func (c *compiler) compileExpr(pow int) (Expr, error) {
 	return left, nil
 }
 
-func (c *compiler) compileRoot() (Expr, error) {
-	c.next()
-	if c.done() {
-		return root{}, nil
-	}
-	next, err := c.compileExpr(powLowest)
-	if err != nil {
-		return nil, err
-	}
-	a := absolute{
-		expr: next,
-	}
-	return a, nil
-}
-
-func (c *compiler) compileAxis() (Expr, error) {
-	a := axis{
-		ident: c.curr.Literal,
-	}
-	c.next()
-	c.next()
-	expr, err := c.compileNameBase()
-	if err != nil {
-		return nil, err
-	}
-	a.next = expr
-	return a, nil
-}
-
 func (c *compiler) compileName() (Expr, error) {
 	if c.peek.Type == opAxis {
 		return c.compileAxis()
@@ -390,6 +361,40 @@ func (c *compiler) compileDescendant(left Expr) (Expr, error) {
 	}
 	d.next = next
 	return d, nil
+}
+
+func (c *compiler) compileDescendantFromRoot() (Expr, error) {
+	var expr root
+	return c.compileDescendant(expr)
+}
+
+func (c *compiler) compileRoot() (Expr, error) {
+	c.next()
+	if c.done() {
+		return root{}, nil
+	}
+	next, err := c.compileExpr(powLowest)
+	if err != nil {
+		return nil, err
+	}
+	a := absolute{
+		expr: next,
+	}
+	return a, nil
+}
+
+func (c *compiler) compileAxis() (Expr, error) {
+	a := axis{
+		ident: c.curr.Literal,
+	}
+	c.next()
+	c.next()
+	expr, err := c.compileNameBase()
+	if err != nil {
+		return nil, err
+	}
+	a.next = expr
+	return a, nil
 }
 
 func (c *compiler) is(kind rune) bool {

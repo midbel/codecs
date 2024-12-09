@@ -41,10 +41,12 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(3)
 	}
-	if err := schema.Validate(doc.Root()); err != nil {
-		fmt.Fprintln(os.Stderr, "document does not conform to specify schema")
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
+	if doc != nil {
+		if err := schema.Validate(doc.Root()); err != nil {
+			fmt.Fprintln(os.Stderr, "document does not conform to specify schema")
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
 	}
 	if err := writeDocument(doc, options.Compact); err != nil {
 		fmt.Fprintln(os.Stderr, err)
