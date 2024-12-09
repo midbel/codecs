@@ -126,27 +126,33 @@ func (p *Parser) parseStartPattern() (Pattern, error) {
 	}
 	p.next()
 	if p.is(Name) {
-		var ref Link
-		ref.Ident = p.curr.Literal
-		p.next()
-		ref.Arity = p.parseArity()
-		return ref, nil
+		return p.parseLink()
 	}
 	return p.parseElement()
 }
 
+func (p *Parser) parseLink() (Pattern, error) {
+	var ref Link
+	ref.Ident = p.curr.Literal
+	p.next()
+	ref.Arity = p.parseArity()
+	return ref, nil	
+}
+
 func (p *Parser) parseList() (Pattern, error) {
 	var grp Group
-	for p.is(Keyword) {
+	for p.is(Keyword) || p.is(Name) {
 		var (
 			pat Pattern
 			err error
 		)
-		switch p.curr.Literal {
-		case "element":
+		switch {
+		case p.isKeyword("element"):
 			pat, err = p.parseElement()
-		case "attribute":
+		case p.isKeyword("attribute"):
 			pat, err = p.parseAttribute()
+		case p.is(Name):
+			pat, err = p.parseLink()	
 		default:
 			return nil, fmt.Errorf("unexpected keyword %s", p.curr.Literal)
 		}
@@ -201,7 +207,7 @@ func (p *Parser) parseChoice() (Pattern, error) {
 			err error
 		)
 		switch {
-		case p.is(Keyword):
+		case p.is(Keyword) || p.is(Name):
 			el, err = p.parseList()
 		case p.is(BegParen):
 			el, err = p.parseGroup()
@@ -249,11 +255,7 @@ func (p *Parser) parseElement() (Pattern, error) {
 		)
 		switch {
 		case p.is(Name):
-			var ref Link
-			ref.Ident = p.curr.Literal
-			p.next()
-			ref.Arity = p.parseArity()
-			pat = ref
+			pat, err = p.parseLink()
 		case p.is(BegParen):
 			pat, err = p.parseChoice()
 		case p.isKeyword("attribute"):
