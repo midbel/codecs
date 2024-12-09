@@ -371,21 +371,35 @@ func reassemble(start Pattern, others map[string]Pattern) (Pattern, error) {
 	if !ok {
 		return start, nil
 	}
-	el, ok := others[link.Ident].(Element)
+	el, ok := others[link.Ident]
 	if !ok {
-		return nil, fmt.Errorf("%s: pattern not defined", link.Ident)
+		return nil, fmt.Errorf("%s: pattern not defined")
 	}
-	if el.Arity == 0 {
-		el.Arity = link.Arity
-	}
-	for i := range el.Patterns {
-		p, err := reassemble(el.Patterns[i], others)
-		if err != nil {
-			return nil, err
+	switch el := el.(type) {
+	case Element:
+		if el.Arity == 0 {
+			el.Arity = link.Arity
 		}
-		el.Patterns[i] = p
+		for i := range el.Patterns {
+			p, err := reassemble(el.Patterns[i], others)
+			if err != nil {
+				return nil, err
+			}
+			el.Patterns[i] = p
+		}
+		return el, nil
+	case Choice:
+		for i := range el.List {
+			p, err := reassemble(el.List[i], others)
+			if err != nil {
+				return nil, err
+			}
+			el.List[i] = p
+		}
+		return el, nil
+	default:
+		return nil, fmt.Errorf("%s: unsupported pattern type", link.Ident)
 	}
-	return el, nil
 }
 
 func validateNodes(nodes []xml.Node, elem Pattern) (int, error) {
