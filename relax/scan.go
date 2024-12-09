@@ -17,6 +17,7 @@ type Position struct {
 type Token struct {
 	Literal string
 	Type    rune
+	Position
 }
 
 func (t Token) String() string {
@@ -50,7 +51,7 @@ func (t Token) String() string {
 		return "<merge-alt>"
 	case Interleave:
 		return "<interleave>"
-	case MergeLeave:
+	case MergeInter:
 		return "<merge-interleave>"
 	case Optional:
 		return "<optional>"
@@ -81,7 +82,7 @@ const (
 	EndParen
 	Comma
 	Interleave
-	MergeLeave
+	MergeInter
 	Alt
 	MergeAlt
 	Optional  // ?
@@ -115,6 +116,7 @@ func (s *Scanner) Scan() Token {
 	defer s.reset()
 
 	var tok Token
+	tok.Position = s.Position
 	if s.char == utf8.RuneError {
 		tok.Type = EOF
 		return tok
@@ -215,7 +217,7 @@ func (s *Scanner) scanPunct(tok *Token) {
 		tok.Type = Interleave
 		if k == '=' {
 			s.read()
-			tok.Type = MergeLeave
+			tok.Type = MergeInter
 		}
 	case ',':
 		tok.Type = Comma

@@ -23,6 +23,5 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-
 	relax.Print(os.Stdout, schema)
 }

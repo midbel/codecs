@@ -95,20 +95,51 @@ func (p *Parser) parseDefinitions() (Pattern, error) {
 	if start, err = p.parseStartPattern(); err != nil {
 		return nil, err
 	}
+
+	register := func(name string, elem Pattern, patterns map[string]Pattern) map[string]Pattern {
+		parent, ok := patterns[name]
+		if !ok {
+			patterns[name] = elem
+			return patterns
+		}
+		if c, ok := parent.(Choice); ok {
+			c.List = append(c.List, elem)
+			parent = c
+		} else {
+			var c Choice
+			c.List = append(c.List, parent, elem)
+			parent = c
+		}
+		patterns[name] = parent
+		return patterns
+	}
 	patterns := make(map[string]Pattern)
 	for !p.done() {
 		p.skipComment()
 		if !p.is(Name) {
 			return nil, fmt.Errorf("missing name")
 		}
-		name := p.curr.Literal
+		var (
+			name = p.curr.Literal
+			merge bool
+		)
 		p.next()
-		if !p.is(Assign) {
+		switch {
+		case p.is(Assign):
+		case p.is(MergeAlt):
+			merge = true
+		default:
 			return nil, fmt.Errorf("missing assignment after name")
 		}
 		p.next()
-		if patterns[name], err = p.parseElement(); err != nil {
+		elem, err := p.parseElement()
+		if err != nil {
 			return nil, err
+		}
+		if merge {
+			patterns = register(name, elem, patterns)
+		} else {
+			patterns[name] = elem
 		}
 		p.skipEOL()
 	}
