@@ -70,6 +70,11 @@ func (q QName) LocalName() string {
 	return q.Local
 }
 
+type Grammar struct {
+	Links []Link
+	Start Pattern
+}
+
 type Link struct {
 	Ident string
 	Arity

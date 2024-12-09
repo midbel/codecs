@@ -3,6 +3,7 @@ package relax
 import (
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"time"
 )
@@ -47,6 +48,10 @@ func (p *Parser) parse() (Pattern, error) {
 		return nil, err
 	}
 	p.skipEOL()
+	p.skipComment()
+	for p.isKeyword("include") {
+
+	}
 	switch {
 	case p.isKeyword("element"):
 		return p.parseElement()
@@ -57,12 +62,32 @@ func (p *Parser) parse() (Pattern, error) {
 	}
 }
 
+func (p *Parser) parseInclude() (Pattern, error) {
+	p.next()
+	if !p.is(Literal) {
+		return nil, fmt.Errorf("expected url to be in a string literal")
+	}
+	r, err := os.Open(p.curr.Literal)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+
+	ps := Parse(r)
+	return ps.Parse()
+}
+
 func (p *Parser) parseDeclarations() error {
+	ok := func() bool {
+		return p.isKeyword("include") ||
+			p.isKeyword("start") ||
+			p.isKeyword("element")
+	}
 	for !p.done() {
 		p.skipEOL()
 		p.skipComment()
 
-		if !p.is(Keyword) || (p.isKeyword("start") || p.isKeyword("element")) {
+		if !p.is(Keyword) || ok() {
 			break
 		}
 		if err := p.parseNamespace(); err != nil {
