@@ -7,6 +7,16 @@ import (
 	"time"
 )
 
+type ParserError struct {
+	Position
+	Element string
+	Message string
+}
+
+func (p ParserError) Error() string {
+	return fmt.Sprintf("%d:%d: %s: %s", p.Line, p.Column, p.Element, p.Message)
+}
+
 type Parser struct {
 	scan *Scanner
 	curr Token
@@ -120,7 +130,7 @@ func (p *Parser) parseDefinitions() (Pattern, error) {
 			return nil, fmt.Errorf("missing name")
 		}
 		var (
-			name = p.curr.Literal
+			name  = p.curr.Literal
 			merge bool
 		)
 		p.next()
@@ -206,7 +216,18 @@ func (p *Parser) parseGroup() (Pattern, error) {
 	p.next()
 	var grp Group
 	for !p.done() && !p.is(EndParen) {
-		el, err := p.parseElement()
+		var (
+			el  Pattern
+			err error
+		)
+		switch {
+		case p.isKeyword("element"):
+			el, err = p.parseElement()
+		case p.is(Name):
+			el, err = p.parseLink()
+		default:
+			return nil, fmt.Errorf("unexpected pattern type")
+		}
 		if err != nil {
 			return nil, err
 		}

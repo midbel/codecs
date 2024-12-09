@@ -342,6 +342,13 @@ func (e Enum) Validate(node xml.Node) error {
 func reassemble(start Pattern, others map[string]Pattern) (Pattern, error) {
 	switch el := start.(type) {
 	case Element:
+		for i := range el.Patterns {
+			p, err := reassemble(el.Patterns[i], others)
+			if err != nil {
+				return nil, err
+			}
+			el.Patterns[i] = p
+		}
 		return el, nil
 	case Attribute:
 		return el, nil
