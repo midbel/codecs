@@ -24,17 +24,17 @@ var builtins = map[string]builtinFunc{
 	"upper-case":        checkArity(1, callUpper),
 	"lower-case":        checkArity(1, callLower),
 	"translate":         nil,
-	"min":               nil,
-	"max":               nil,
-	"sum":               nil,
-	"avg":               nil,
+	"min":               checkArity(1, callMin),
+	"max":               checkArity(1, callMax),
+	"sum":               checkArity(1, callSum),
+	"avg":               checkArity(1, callAvg),
 	"ceiling":           checkArity(1, callCeil),
 	"floor":             checkArity(1, callFloor),
 	"round":             checkArity(1, callRound),
 	"abs":               checkArity(1, callAbs),
-	"first":             nil,
-	"last":              nil,
-	"count":             nil,
+	"first":             checkArity(0, callFirst),
+	"last":              checkArity(0, callLast),
+	"count":             checkArity(0, callCount),
 	"id":                nil,
 	"name":              checkArity(0, callName),
 	"local-name":        checkArity(0, callLocalName),
@@ -53,6 +53,42 @@ func checkArity(minArgs int, fn builtinFunc) builtinFunc {
 		return fn(node, args)
 	}
 	return do
+}
+
+func callFirst(n Node, _ []any) (any, error) {
+	return float64(0), nil
+}
+
+func callLast(n Node, _ []any) (any, error) {
+	p := n.Parent()
+	if p == nil {
+		return 1.0, nil
+	}
+	x, ok := p.(*Element)
+	if !ok {
+		return 1.0, nil
+	}
+	return float64(len(x.Nodes)), nil
+}
+
+func callCount(_ Node, args []any) (any, error) {
+	return 0.0, nil
+}
+
+func callSum(_ Node, args []any) (any, error) {
+	return nil, nil
+}
+
+func callMin(_ Node, args []any) (any, error) {
+	return nil, nil
+}
+
+func callMax(_ Node, args []any) (any, error) {
+	return nil, nil
+}
+
+func callAvg(_ Node, args []any) (any, error) {
+	return nil, nil
 }
 
 func callRound(_ Node, args []any) (any, error) {
