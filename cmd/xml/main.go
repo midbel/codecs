@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/midbel/codecs/relax"
@@ -19,7 +20,7 @@ func main() {
 		Query   string
 		Schema  string
 		Compact bool
-		Check bool
+		Check   bool
 	}{}
 	flag.StringVar(&options.Root, "r", "document", "root element name to use when using a query")
 	flag.StringVar(&options.Query, "q", "", "search for element in document")
@@ -60,6 +61,20 @@ func main() {
 	}
 }
 
+func piInclude(_ string, attrs []xml.Attribute) (xml.Node, error) {
+	ix := slices.IndexFunc(attrs, func(a xml.Attribute) bool {
+		return a.QualifiedName() == "filename"
+	})
+	if ix < 0 {
+		return nil, fmt.Errorf("filename: attribute is missing")
+	}
+	doc, err := parseDocument(attrs[ix].Value)
+	if err != nil {
+		return nil, err
+	}
+	return doc.Root(), nil
+}
+
 func parseDocument(file string) (*xml.Document, error) {
 	r, err := open(file)
 	if err != nil {
@@ -67,6 +82,7 @@ func parseDocument(file string) (*xml.Document, error) {
 	}
 
 	p := xml.NewParser(r)
+	p.RegisterPI("include", piInclude)
 	p.TrimSpace = true
 	p.OmitProlog = true
 

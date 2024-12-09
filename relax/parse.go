@@ -136,7 +136,7 @@ func (p *Parser) parseLink() (Pattern, error) {
 	ref.Ident = p.curr.Literal
 	p.next()
 	ref.Arity = p.parseArity()
-	return ref, nil	
+	return ref, nil
 }
 
 func (p *Parser) parseList() (Pattern, error) {
@@ -152,7 +152,7 @@ func (p *Parser) parseList() (Pattern, error) {
 		case p.isKeyword("attribute"):
 			pat, err = p.parseAttribute()
 		case p.is(Name):
-			pat, err = p.parseLink()	
+			pat, err = p.parseLink()
 		default:
 			return nil, fmt.Errorf("unexpected keyword %s", p.curr.Literal)
 		}

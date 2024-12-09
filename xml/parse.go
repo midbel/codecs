@@ -718,6 +718,8 @@ func (p ParseError) Error() string {
 	return fmt.Sprintf("%d:%d: %s: %s", p.Line, p.Column, p.Element, p.Message)
 }
 
+type PiFunc func(string, []Attribute) (Node, error)
+
 type Parser struct {
 	scan *Scanner
 	curr Token
@@ -729,6 +731,8 @@ type Parser struct {
 	KeepEmpty  bool
 	OmitProlog bool
 	MaxDepth   int
+
+	piFuncs map[string]PiFunc
 }
 
 func NewParser(r io.Reader) *Parser {
@@ -736,14 +740,19 @@ func NewParser(r io.Reader) *Parser {
 		scan:      Scan(r),
 		TrimSpace: true,
 		MaxDepth:  MaxDepth,
+		piFuncs:   make(map[string]PiFunc),
 	}
 	p.next()
 	p.next()
 	return &p
 }
 
-func (p *Parser) ParseWithSchema(schema any) (*Document, error) {
-	return nil, nil
+func (p *Parser) RegisterPI(name string, fn PiFunc) {
+	p.piFuncs[name] = fn
+}
+
+func (p *Parser) UnregisterPI(name string) {
+	delete(p.piFuncs, name)
 }
 
 func (p *Parser) Parse() (*Document, error) {
@@ -914,6 +923,10 @@ func (p *Parser) parseProcessingInstr() (Node, error) {
 		return nil, p.createError("processing instruction", "end of element expected")
 	}
 	p.next()
+	fn, ok := p.piFuncs[elem.Name]
+	if ok {
+		return fn(elem.Name, elem.Attrs)
+	}
 	return &elem, nil
 }
 
