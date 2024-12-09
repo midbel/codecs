@@ -17,13 +17,15 @@ func main() {
 	options := struct {
 		Root    string
 		Query   string
-		Compact bool
 		Schema  string
+		Compact bool
+		Check bool
 	}{}
 	flag.StringVar(&options.Root, "r", "document", "root element name to use when using a query")
 	flag.StringVar(&options.Query, "q", "", "search for element in document")
 	flag.StringVar(&options.Schema, "s", "", "relax schema to validate XML document")
 	flag.BoolVar(&options.Compact, "c", false, "write compact output")
+	flag.BoolVar(&options.Check, "k", false, "validate only the document")
 	flag.Parse()
 
 	schema, err := parseSchema(options.Schema)
@@ -46,6 +48,10 @@ func main() {
 			fmt.Fprintln(os.Stderr, "document does not conform to specify schema")
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(2)
+		}
+		if options.Check {
+			fmt.Println("document is valid")
+			return
 		}
 	}
 	if err := writeDocument(doc, options.Compact); err != nil {
