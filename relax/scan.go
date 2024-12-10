@@ -256,6 +256,12 @@ func (s *Scanner) scanArity(tok *Token) {
 }
 
 func (s *Scanner) read() {
+	s.old = s.Position
+	if s.char == '\n' {
+		s.Column = 0
+		s.Line++
+	}
+	s.Column++
 	char, _, err := s.input.ReadRune()
 	if errors.Is(err, io.EOF) {
 		char = utf8.RuneError
