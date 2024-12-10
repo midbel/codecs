@@ -344,7 +344,6 @@ func (p *Parser) parseElement() (Pattern, error) {
 			pat, err = p.parseAttribute()
 		case p.isKeyword("element"):
 			pat, err = p.parseElement()
-			fmt.Println("after element", p.curr, p.peek)
 		default:
 			// msg := fmt.Sprintf("expected element/attribute keyword or a name but got %s", p.curr.Literal)
 			// return nil, p.createError("element", msg)
