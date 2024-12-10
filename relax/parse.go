@@ -8,13 +8,13 @@ import (
 	"time"
 )
 
-type ParserError struct {
+type ParseError struct {
 	Position
 	Element string
 	Message string
 }
 
-func (p ParserError) Error() string {
+func (p ParseError) Error() string {
 	return fmt.Sprintf("%d:%d: %s: %s", p.Line, p.Column, p.Element, p.Message)
 }
 
@@ -58,14 +58,15 @@ func (p *Parser) parse() (Pattern, error) {
 	case p.isKeyword("start"):
 		return p.parseDefinitions()
 	default:
-		return nil, fmt.Errorf("unexpected keyword")
+		msg := fmt.Sprintf("want element/start keyword but got %s", p.curr.Literal)
+		return nil, p.createError("parser", msg)
 	}
 }
 
 func (p *Parser) parseInclude() (Pattern, error) {
 	p.next()
 	if !p.is(Literal) {
-		return nil, fmt.Errorf("expected url to be in a string literal")
+		return nil, p.createError("include", "include URL should be in quoted string")
 	}
 	r, err := os.Open(p.curr.Literal)
 	if err != nil {
@@ -105,16 +106,17 @@ func (p *Parser) parseNamespace() error {
 	case p.isKeyword("namespace"):
 		p.next()
 	default:
-		return fmt.Errorf("unexpected keyword")
+		msg := fmt.Sprintf("want default/namespace keyword but got %s", p.curr.Literal)
+		return p.createError("namespace", msg)
 	}
 	name := p.curr.Literal
 	p.next()
 	if !p.is(Assign) {
-		return p.unexpected()
+		return p.createError("namespace", "missing assignment operator (\"=\") after namespace")
 	}
 	p.next()
 	if !p.is(Literal) {
-		return p.unexpected()
+		return p.createError("namespace", "namespace URL should be in quoted string")
 	}
 
 	p.spaces[name] = p.curr.Literal
@@ -152,7 +154,7 @@ func (p *Parser) parseDefinitions() (Pattern, error) {
 	for !p.done() {
 		p.skipComment()
 		if !p.is(Name) {
-			return nil, fmt.Errorf("missing name")
+			return nil, p.createError("pattern", "pattern should be a name")
 		}
 		var (
 			name  = p.curr.Literal
@@ -164,7 +166,7 @@ func (p *Parser) parseDefinitions() (Pattern, error) {
 		case p.is(MergeAlt):
 			merge = true
 		default:
-			return nil, fmt.Errorf("missing assignment after name")
+			return nil, p.createError("pattern", "missing assignment operator (\"=\") after name")
 		}
 		p.next()
 		elem, err := p.parseElement()
@@ -184,11 +186,12 @@ func (p *Parser) parseDefinitions() (Pattern, error) {
 func (p *Parser) parseStartPattern() (Pattern, error) {
 	defer p.skipEOL()
 	if !p.isKeyword("start") {
-		return nil, fmt.Errorf("start keyword expected")
+		msg := fmt.Sprintf("expected start keyword but got %s", p.curr.Literal)
+		return nil, p.createError("start", msg)
 	}
 	p.next()
 	if !p.is(Assign) {
-		return nil, fmt.Errorf("missing assignlent after start")
+		return nil, p.createError("start", "missing assignment operator (\"=\") after start")
 	}
 	p.next()
 	if p.is(Name) {
@@ -220,7 +223,8 @@ func (p *Parser) parseList() (Pattern, error) {
 		case p.is(Name):
 			pat, err = p.parseLink()
 		default:
-			return nil, fmt.Errorf("unexpected keyword %s", p.curr.Literal)
+			msg := fmt.Sprintf("expected element/attribute keyword or a name but got %s", p.curr.Literal)
+			return nil, p.createError("pattern", msg)
 		}
 		if err != nil {
 			return nil, err
@@ -251,7 +255,8 @@ func (p *Parser) parseGroup() (Pattern, error) {
 		case p.is(Name):
 			el, err = p.parseLink()
 		default:
-			return nil, fmt.Errorf("unexpected pattern type")
+			msg := fmt.Sprintf("expected element keyword or a name but got %s", p.curr.Literal)
+			return nil, p.createError("group", msg)
 		}
 		if err != nil {
 			return nil, err
@@ -262,11 +267,11 @@ func (p *Parser) parseGroup() (Pattern, error) {
 			p.next()
 		case p.is(EndParen):
 		default:
-			return nil, p.unexpected()
+			return nil, p.createError("group", "only \")\" or \",\" after pattern is allowed")
 		}
 	}
 	if !p.is(EndParen) {
-		return nil, p.unexpected()
+		return nil, p.createError("group", "missing \")\" at end of pattern")
 	}
 	p.next()
 	if len(grp.List) == 1 {
@@ -289,7 +294,7 @@ func (p *Parser) parseChoice() (Pattern, error) {
 		case p.is(BegParen):
 			el, err = p.parseGroup()
 		default:
-			return nil, p.unexpected()
+			return nil, p.createError("choice", "expected one of keyword/name/group")
 		}
 		if err != nil {
 			return nil, err
@@ -300,11 +305,11 @@ func (p *Parser) parseChoice() (Pattern, error) {
 			p.next()
 		case p.is(EndParen):
 		default:
-			return nil, p.unexpected()
+			return nil, p.createError("choice", "only \")\" or \"|\" after pattern is allowed")
 		}
 	}
 	if !p.is(EndParen) {
-		return nil, p.unexpected()
+		return nil, p.createError("choice", "missing \")\" at end of pattern")
 	}
 	p.next()
 	return ch, nil
@@ -320,7 +325,7 @@ func (p *Parser) parseElement() (Pattern, error) {
 		return nil, err
 	}
 	if !p.is(BegBrace) {
-		return nil, p.unexpected()
+		return nil, p.createError("element", "missing \"{\" at beginning of pattern")
 	}
 	p.next()
 	p.skipEOL()
@@ -340,6 +345,8 @@ func (p *Parser) parseElement() (Pattern, error) {
 		case p.isKeyword("element"):
 			pat, err = p.parseElement()
 		default:
+			msg := fmt.Sprintf("expected element/attribute keyword or a name but got %s", p.curr.Literal)
+			return nil, p.createError("element", msg)
 		}
 		if err != nil {
 			return nil, err
@@ -353,11 +360,11 @@ func (p *Parser) parseElement() (Pattern, error) {
 		case p.is(Comma):
 			p.next()
 			if p.is(EndBrace) {
-				return nil, p.unexpected()
+				return nil, p.createError("element", "\"}\" can not be used after \",\"")
 			}
 		case p.is(EndBrace):
 		default:
-			return nil, p.unexpected()
+			return nil, p.createError("element", "only \"}\" or \",\" after pattern is allowed")
 		}
 	}
 	p.skipEOL()
@@ -384,10 +391,10 @@ func (p *Parser) parseElement() (Pattern, error) {
 		p.skipComment()
 	case p.is(EndBrace):
 	default:
-		return nil, fmt.Errorf("unexpected pattern type")
+		return nil, p.createError("element", "expected one of type/text/empty pattern")
 	}
 	if !p.is(EndBrace) {
-		return nil, p.unexpected()
+		return nil, p.createError("element", "missing \"}\" at end of pattern")
 	}
 	p.next()
 	el.Arity = p.parseArity()
@@ -404,7 +411,7 @@ func (p *Parser) parseAttribute() (Pattern, error) {
 		return nil, err
 	}
 	if !p.is(BegBrace) {
-		return nil, p.unexpected()
+		return nil, p.createError("attribute", "missing \"{\" at beginning of pattern")
 	}
 	p.next()
 	switch {
@@ -417,15 +424,15 @@ func (p *Parser) parseAttribute() (Pattern, error) {
 			return nil, err
 		}
 	default:
-		return nil, fmt.Errorf("unexpected pattern type for attribute")
+		return nil, p.createError("attribute", "expected one of text/type/enum pattern")
 	}
 	if !p.is(EndBrace) {
-		return nil, p.unexpected()
+		return nil, p.createError("attribute", "missing \"}\" at end of pattern")
 	}
 	p.next()
 	at.Arity = p.parseArity()
 	if at.Arity > 0 && at.Arity != ZeroOrOne {
-		return nil, fmt.Errorf("unexpected value for attribute")
+		return nil, p.createError("attribute", "arity for attribute can only be one of \"+\" or \"?\"")
 	}
 	if at.Arity == 0 {
 		at.Arity = One
@@ -436,14 +443,14 @@ func (p *Parser) parseAttribute() (Pattern, error) {
 func (p *Parser) parseName() (QName, error) {
 	var q QName
 	if !p.is(Name) {
-		return q, fmt.Errorf("name expected")
+		return q, p.createError("name", "an element name is missing")
 	}
 	q.Local = p.curr.Literal
 	p.next()
 	if p.is(Colon) {
 		p.next()
 		if !p.is(Name) {
-			return q, fmt.Errorf("local name expected")
+			return q, p.createError("name", "an element name is missing")
 		}
 		defer p.next()
 		q.Space = q.Local
@@ -490,7 +497,7 @@ func (p *Parser) parseType() (Pattern, error) {
 	case "bool":
 		return t, nil
 	default:
-		return nil, fmt.Errorf("type not supported")
+		return nil, p.createError("type", fmt.Sprintf("%s is not a supported type", t.Name))
 	}
 }
 
@@ -515,7 +522,7 @@ func (p *Parser) parseTypeString(t Type) (Pattern, error) {
 			}
 			res.MaxLength = n
 		default:
-			return fmt.Errorf("unsupported string parameter")
+			return p.createError("string", fmt.Sprintf("%s is not a supported string parameter", name))
 		}
 		return nil
 	})
@@ -541,7 +548,7 @@ func (p *Parser) parseTypeInt(t Type) (Pattern, error) {
 			}
 			res.MaxValue = int(n)
 		default:
-			return fmt.Errorf("unsupported string parameter")
+			return p.createError("int", fmt.Sprintf("%s is not a supported integer parameter", name))
 		}
 		return nil
 	})
@@ -567,7 +574,7 @@ func (p *Parser) parseTypeFloat(t Type) (Pattern, error) {
 			}
 			res.MaxValue = n
 		default:
-			return fmt.Errorf("unsupported string parameter")
+			return p.createError("float", fmt.Sprintf("%s is not a supported float parameter", name))
 		}
 		return nil
 	})
@@ -593,7 +600,7 @@ func (p *Parser) parseTypeDate(t Type) (Pattern, error) {
 			}
 			res.MaxValue = n
 		default:
-			return fmt.Errorf("unsupported string parameter")
+			return p.createError("date", fmt.Sprintf("%s is not a supported date parameter", name))
 		}
 		return nil
 	})
@@ -604,16 +611,16 @@ func (p *Parser) parseParameters(do func(name, value string) error) error {
 	p.next()
 	for !p.done() && !p.is(EndBrace) {
 		if !p.is(Name) {
-			return fmt.Errorf("missing parameter name")
+			return p.createError("parameter", "parameter name is missing")
 		}
 		name := p.curr.Literal
 		p.next()
 		if !p.is(Assign) {
-			return p.unexpected()
+			return p.createError("parameter", "missing assignment operator (\"=\") after parameter name")
 		}
 		p.next()
 		if !p.is(Literal) {
-			return fmt.Errorf("parameter value should be a literal")
+			return p.createError("parameter", "parameter value should be given as a quoted string")
 		}
 		if err := do(name, p.curr.Literal); err != nil {
 			return err
@@ -621,7 +628,7 @@ func (p *Parser) parseParameters(do func(name, value string) error) error {
 		p.next()
 	}
 	if !p.is(EndBrace) {
-		return p.unexpected()
+		return p.createError("parameter", "missing \"}\" at end of pattern")
 	}
 	p.next()
 	return nil
@@ -678,6 +685,10 @@ func (p *Parser) next() {
 	p.peek = p.scan.Scan()
 }
 
-func (p *Parser) unexpected() error {
-	return fmt.Errorf("unexpected token: %s", p.curr)
+func (p *Parser) createError(elem, message string) error {
+	return ParseError{
+		Position: p.curr.Position,
+		Element:  elem,
+		Message:  message,
+	}
 }
