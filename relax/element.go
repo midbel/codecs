@@ -19,24 +19,24 @@ var (
 	ErrFormat = errors.New("invalid format")
 )
 
-type Arity int8
+type cardinality int8
 
 const (
-	ZeroOrMore Arity = 1 << iota
+	ZeroOrMore cardinality = 1 << iota
 	ZeroOrOne
 	OneOrMore
 	One
 )
 
-func (a Arity) Zero() bool {
+func (a cardinality) Zero() bool {
 	return a == ZeroOrMore || a == ZeroOrOne
 }
 
-func (a Arity) One() bool {
+func (a cardinality) One() bool {
 	return a == 0 || a == ZeroOrOne || a == OneOrMore || a == One
 }
 
-func (a Arity) More() bool {
+func (a cardinality) More() bool {
 	return a == ZeroOrMore || a == OneOrMore
 }
 
@@ -77,13 +77,13 @@ type Grammar struct {
 
 type Link struct {
 	Ident string
-	Arity
+	cardinality
 	Pattern
 }
 
 type Attribute struct {
 	QName
-	Arity
+	cardinality
 	Value Pattern
 }
 
@@ -129,6 +129,7 @@ type Choice struct {
 func (c Choice) Validate(node xml.Node) error {
 	var err error
 	for i := range c.List {
+		fmt.Printf("choice.Validate: %T: %s\n", c.List[i], node.QualifiedName())
 		if err = c.List[i].Validate(node); err == nil {
 			break
 		}
@@ -138,7 +139,7 @@ func (c Choice) Validate(node xml.Node) error {
 
 type Element struct {
 	QName
-	Arity
+	cardinality
 	Value    Pattern
 	Patterns []Pattern
 }
@@ -389,8 +390,8 @@ func reassemble(start Pattern, others map[string]Pattern) (Pattern, error) {
 	}
 	switch el := el.(type) {
 	case Element:
-		if el.Arity == 0 {
-			el.Arity = link.Arity
+		if el.cardinality == 0 {
+			el.cardinality = link.cardinality
 		}
 		for i := range el.Patterns {
 			p, err := reassemble(el.Patterns[i], others)
@@ -441,9 +442,9 @@ func validateNodes(nodes []xml.Node, elem Pattern) (int, error) {
 		return ptr, nil
 	}
 	switch {
-	case count == 0 && a.Arity.Zero():
-	case count == 1 && a.Arity.One():
-	case count > 1 && a.Arity.More():
+	case count == 0 && a.cardinality.Zero():
+	case count == 1 && a.cardinality.One():
+	case count > 1 && a.cardinality.More():
 	default:
 		return 0, fmt.Errorf("element count mismatched")
 	}

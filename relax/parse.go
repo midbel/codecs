@@ -204,7 +204,7 @@ func (p *Parser) parseLink() (Pattern, error) {
 	var ref Link
 	ref.Ident = p.curr.Literal
 	p.next()
-	ref.Arity = p.parseArity()
+	ref.cardinality = p.parseCardinality()
 	return ref, nil
 }
 
@@ -397,7 +397,7 @@ func (p *Parser) parseElement() (Pattern, error) {
 		return nil, p.createError("element", "missing \"}\" at end of pattern")
 	}
 	p.next()
-	el.Arity = p.parseArity()
+	el.cardinality = p.parseCardinality()
 	return el, nil
 }
 
@@ -430,12 +430,12 @@ func (p *Parser) parseAttribute() (Pattern, error) {
 		return nil, p.createError("attribute", "missing \"}\" at end of pattern")
 	}
 	p.next()
-	at.Arity = p.parseArity()
-	if at.Arity > 0 && at.Arity != ZeroOrOne {
+	at.cardinality = p.parseCardinality()
+	if at.cardinality > 0 && at.cardinality != ZeroOrOne {
 		return nil, p.createError("attribute", "arity for attribute can only be one of \"+\" or \"?\"")
 	}
-	if at.Arity == 0 {
-		at.Arity = One
+	if at.cardinality == 0 {
+		at.cardinality = One
 	}
 	return at, nil
 }
@@ -459,21 +459,21 @@ func (p *Parser) parseName() (QName, error) {
 	return q, nil
 }
 
-func (p *Parser) parseArity() Arity {
-	var arity Arity
+func (p *Parser) parseCardinality() cardinality {
+	var value cardinality
 	switch {
 	case p.is(Mandatory):
-		arity = OneOrMore
+		value = OneOrMore
 	case p.is(Optional):
-		arity = ZeroOrOne
+		value = ZeroOrOne
 	case p.is(Star):
-		arity = ZeroOrMore
+		value = ZeroOrMore
 	default:
 	}
-	if arity != 0 {
+	if value != 0 {
 		p.next()
 	}
-	return arity
+	return value
 }
 
 func (p *Parser) parseType() (Pattern, error) {
