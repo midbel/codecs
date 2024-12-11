@@ -22,22 +22,22 @@ var (
 type cardinality int8
 
 const (
-	ZeroOrMore cardinality = 1 << iota
-	ZeroOrOne
-	OneOrMore
-	One
+	zeroOrMore cardinality = 1 << iota
+	zeroOrOne
+	oneOrMore
+	one
 )
 
 func (a cardinality) Zero() bool {
-	return a == ZeroOrMore || a == ZeroOrOne
+	return a == zeroOrMore || a == zeroOrOne
 }
 
 func (a cardinality) One() bool {
-	return a == 0 || a == ZeroOrOne || a == OneOrMore || a == One
+	return a == 0 || a == zeroOrOne || a == oneOrMore || a == one
 }
 
 func (a cardinality) More() bool {
-	return a == ZeroOrMore || a == OneOrMore
+	return a == zeroOrMore || a == oneOrMore
 }
 
 type Pattern interface {

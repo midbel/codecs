@@ -431,11 +431,11 @@ func (p *Parser) parseAttribute() (Pattern, error) {
 	}
 	p.next()
 	at.cardinality = p.parseCardinality()
-	if at.cardinality > 0 && at.cardinality != ZeroOrOne {
-		return nil, p.createError("attribute", "arity for attribute can only be one of \"+\" or \"?\"")
+	if at.cardinality > 0 && at.cardinality != zeroOrOne {
+		return nil, p.createError("attribute", "cardinality for attribute can only be one of \"+\" or \"?\"")
 	}
 	if at.cardinality == 0 {
-		at.cardinality = One
+		at.cardinality = one
 	}
 	return at, nil
 }
@@ -463,11 +463,11 @@ func (p *Parser) parseCardinality() cardinality {
 	var value cardinality
 	switch {
 	case p.is(Mandatory):
-		value = OneOrMore
+		value = oneOrMore
 	case p.is(Optional):
-		value = ZeroOrOne
+		value = zeroOrOne
 	case p.is(Star):
-		value = ZeroOrMore
+		value = zeroOrMore
 	default:
 	}
 	if value != 0 {
