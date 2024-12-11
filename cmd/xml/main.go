@@ -48,6 +48,9 @@ func main() {
 		if err := schema.Validate(doc.Root()); err != nil {
 			fmt.Fprintln(os.Stderr, "document does not conform to specify schema")
 			fmt.Fprintln(os.Stderr, err)
+			if err, ok := err.(relax.NodeError); ok {
+				fmt.Fprintln(os.Stderr, xml.WriteNode(err.Node))
+			}
 			os.Exit(2)
 		}
 		if options.Check {

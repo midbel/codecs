@@ -17,6 +17,14 @@ type Writer struct {
 	NoProlog bool
 }
 
+func WriteNode(node Node) string {
+	var buf bytes.Buffer
+
+	ws := NewWriter(&buf)
+	ws.writeNode(node, 0)
+	return buf.String()
+}
+
 func NewWriter(w io.Writer) *Writer {
 	return &Writer{
 		writer: bufio.NewWriter(w),

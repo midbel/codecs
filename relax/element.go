@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/midbel/codecs/xml"
@@ -18,6 +19,22 @@ var (
 	ErrLength = errors.New("invalid length")
 	ErrFormat = errors.New("invalid format")
 )
+
+type NodeError struct {
+	Node  xml.Node
+	Cause string
+}
+
+func createError(cause string, node xml.Node) error {
+	return NodeError{
+		Node:  node,
+		Cause: cause,
+	}
+}
+
+func (n NodeError) Error() string {
+	return n.Cause
+}
 
 type cardinality int8
 
@@ -90,13 +107,14 @@ type Attribute struct {
 func (a Attribute) Validate(node xml.Node) error {
 	el, ok := node.(*xml.Element)
 	if !ok {
-		return fmt.Errorf("node is not a xml element")
+		return createError("xml element expected", node)
 	}
 	ix := slices.IndexFunc(el.Attrs, func(attr xml.Attribute) bool {
 		return a.QualifiedName() == attr.QualifiedName()
 	})
 	if ix < 0 && !a.Zero() {
-		return fmt.Errorf("missing attribute: %s", a.QualifiedName())
+		msg := fmt.Sprintf("element is missing %s attribute", a.QualifiedName())
+		return createError(msg, node)
 	}
 	if a.Value == nil {
 		return nil
@@ -105,11 +123,11 @@ func (a Attribute) Validate(node xml.Node) error {
 	case Enum:
 		ok := slices.Contains(vs.List, el.Attrs[ix].Value)
 		if !ok {
-			return fmt.Errorf("attribute value not acceptable")
+			return createError("value is not acceptable", node)
 		}
 	case Text:
 	default:
-		return fmt.Errorf("unsupported pattern for attribute")
+		return fmt.Errorf("pattern not applicatble for attribute")
 	}
 	return nil
 }
@@ -150,11 +168,12 @@ func (e Element) Validate(node xml.Node) error {
 
 func (e Element) validate(node xml.Node) error {
 	if e.QualifiedName() != node.QualifiedName() {
-		return fmt.Errorf("element name mismatched! want %s, got %s", e.QualifiedName(), node.QualifiedName())
+		msg := fmt.Sprintf("want %s but got %s", e.QualifiedName(), node.QualifiedName())
+		return createError(msg, node)
 	}
 	curr, ok := node.(*xml.Element)
 	if !ok {
-		return fmt.Errorf("xml element expected")
+		return createError("xml element expected", node)
 	}
 	var (
 		offset int
@@ -180,7 +199,7 @@ func (e Element) validate(node xml.Node) error {
 			offset += step
 			err = err1
 		default:
-			return fmt.Errorf("element: unsupported pattern %T", el)
+			return fmt.Errorf("pattern not applicatble for attribute")
 		}
 		if err != nil {
 			return err
@@ -199,7 +218,7 @@ type Text struct{}
 
 func (_ Text) Validate(node xml.Node) error {
 	if !node.Leaf() {
-		return fmt.Errorf("expected text content")
+		return createError("element is not a text node", node)
 	}
 	return nil
 }
@@ -209,7 +228,7 @@ type Empty struct{}
 func (_ Empty) Validate(node xml.Node) error {
 	el, ok := node.(*xml.Element)
 	if ok && len(el.Nodes) != 0 {
-		return fmt.Errorf("expected element to be empty")
+		return createError("element is not empty", node)
 	}
 	return nil
 }
@@ -340,7 +359,7 @@ type Enum struct {
 func (e Enum) Validate(node xml.Node) error {
 	ok := slices.Contains(e.List, node.Value())
 	if !ok {
-		return fmt.Errorf("attribute value not acceptable")
+		return fmt.Errorf("%q: value not allowed (%s)", node.Value(), strings.Join(e.List, ", "))
 	}
 	return nil
 }
