@@ -87,10 +87,10 @@ func (q QName) LocalName() string {
 	return q.Local
 }
 
-type Grammar struct {
-	Links []Link
-	Start Pattern
-}
+// type Grammar struct {
+// 	Links []Link
+// 	Start Pattern
+// }
 
 type Link struct {
 	Ident string
@@ -113,7 +113,7 @@ func (a Attribute) Validate(node xml.Node) error {
 		return a.QualifiedName() == attr.QualifiedName()
 	})
 	if ix < 0 && !a.Zero() {
-		msg := fmt.Sprintf("element is missing %s attribute", a.QualifiedName())
+		msg := fmt.Sprintf("%s: attribute is missing", a.QualifiedName())
 		return createError(msg, node)
 	}
 	if a.Value == nil {
@@ -123,7 +123,8 @@ func (a Attribute) Validate(node xml.Node) error {
 	case Enum:
 		ok := slices.Contains(vs.List, el.Attrs[ix].Value)
 		if !ok {
-			return createError("value is not acceptable", node)
+			msg := fmt.Sprintf("%s: value is not allowed", el.Attrs[ix].Value)
+			return createError(msg, el)
 		}
 	case Text:
 	default:
@@ -145,13 +146,7 @@ type Choice struct {
 }
 
 func (c Choice) Validate(node xml.Node) error {
-	var err error
-	for i := range c.List {
-		fmt.Printf("choice.Validate: %T: %s\n", c.List[i], node.QualifiedName())
-		if err = c.List[i].Validate(node); err == nil {
-			break
-		}
-	}
+	_, err := validateChoice([]xml.Node{node}, c)
 	return err
 }
 
@@ -195,7 +190,8 @@ func (e Element) validate(node xml.Node) error {
 				attrs++
 				break
 			}
-			step, err1 := validateNodes(curr.Nodes[offset:], el)
+			step, err1 := validateChoice(curr.Nodes[offset:], el)
+			// step, err1 := validateNodes(curr.Nodes[offset:], el)
 			offset += step
 			err = err1
 		default:
@@ -435,6 +431,9 @@ func reassemble(start Pattern, others map[string]Pattern) (Pattern, error) {
 }
 
 func validateNodes(nodes []xml.Node, elem Pattern) (int, error) {
+	if c, ok := elem.(Choice); ok {
+		return validateChoice(nodes, c)
+	}
 	var (
 		count int
 		ptr   int
@@ -468,4 +467,34 @@ func validateNodes(nodes []xml.Node, elem Pattern) (int, error) {
 		return 0, fmt.Errorf("element count mismatched")
 	}
 	return ptr, nil
+}
+
+func validateChoice(nodes []xml.Node, el Choice) (int, error) {
+	var (
+		step int
+		err  error
+	)
+	for _, el := range el.List {
+		if g, ok := el.(Group); ok {
+			step, err = validateGroup(nodes, g)
+		} else {
+			step, err = validateNodes(nodes, el)
+		}
+		if err == nil {
+			break
+		}
+	}
+	return step, err
+}
+
+func validateGroup(nodes []xml.Node, el Group) (int, error) {
+	var step int
+	for i := range el.List {
+		x, err := validateNodes(nodes[step:], el.List[i])
+		if err != nil {
+			return 0, err
+		}
+		step += x
+	}
+	return step, nil
 }
