@@ -61,6 +61,15 @@ type Pattern interface {
 	Validate(xml.Node) error
 }
 
+type Grammar struct {
+	Links map[string]Pattern
+	Start Pattern
+}
+
+func (g Grammar) Validate(_ xml.Node) error {
+	return nil
+}
+
 func Valid() Pattern {
 	return valid{}
 }
@@ -86,11 +95,6 @@ func (q QName) QualifiedName() string {
 func (q QName) LocalName() string {
 	return q.Local
 }
-
-// type Grammar struct {
-// 	Links []Link
-// 	Start Pattern
-// }
 
 type Link struct {
 	Ident string

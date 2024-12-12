@@ -11,12 +11,43 @@ func Print(w io.Writer, schema Pattern) {
 }
 
 func printSchema(w io.Writer, schema Pattern, depth int) {
+	if schema == nil {
+		return
+	}
 	var prefix string
 	if depth > 0 {
 		prefix = strings.Repeat(" ", depth*2)
 	}
 	fmt.Fprint(w, prefix)
 	switch p := schema.(type) {
+	case Grammar:
+		fmt.Fprintf(w, "grammar[")
+		fmt.Fprintln(w)
+
+		depth++
+
+		pfx := strings.Repeat(" ", depth*2)
+		fmt.Fprint(w, pfx)
+		fmt.Fprintln(w, "start[")
+		printSchema(w, p.Start, depth+1)
+		fmt.Fprint(w, pfx)
+		fmt.Fprintln(w, "]")
+
+		if len(p.Links) > 0 {
+			fmt.Fprint(w, pfx)
+			fmt.Fprintln(w, "links[")
+			for _, k := range p.Links {
+				printSchema(w, k, depth+1)
+			}
+			fmt.Fprint(w, pfx)
+			fmt.Fprintln(w, "]")
+		}
+
+		fmt.Fprint(w, prefix)
+		fmt.Fprintln(w, "]")
+	case Link:
+		fmt.Fprintf(w, "link[%s]", p.Ident)
+		fmt.Fprintln(w)
 	case Element:
 		fmt.Fprintf(w, "element(%s)", p.QualifiedName())
 		if len(p.Patterns) > 0 {

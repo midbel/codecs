@@ -126,18 +126,17 @@ func (p *Parser) parseNamespace() error {
 
 func (p *Parser) parseDefinitions() (Pattern, error) {
 	var (
-		start Pattern
-		err   error
+		gram Grammar
+		err  error
 	)
-	if start, err = p.parseStartPattern(); err != nil {
+	if gram.Start, err = p.parseStartPattern(); err != nil {
 		return nil, err
 	}
 
-	register := func(name string, elem Pattern, patterns map[string]Pattern) map[string]Pattern {
-		parent, ok := patterns[name]
+	register := func(name string, elem Pattern) {
+		parent, ok := gram.Links[name]
 		if !ok {
-			patterns[name] = elem
-			return patterns
+			gram.Links[name] = elem
 		}
 		if c, ok := parent.(Choice); ok {
 			c.List = append(c.List, elem)
@@ -147,10 +146,9 @@ func (p *Parser) parseDefinitions() (Pattern, error) {
 			c.List = append(c.List, parent, elem)
 			parent = c
 		}
-		patterns[name] = parent
-		return patterns
+		gram.Links[name] = parent
 	}
-	patterns := make(map[string]Pattern)
+	gram.Links = make(map[string]Pattern)
 	for !p.done() {
 		p.skipComment()
 		if !p.is(Name) {
@@ -174,13 +172,13 @@ func (p *Parser) parseDefinitions() (Pattern, error) {
 			return nil, err
 		}
 		if merge {
-			patterns = register(name, elem, patterns)
+			register(name, elem)
 		} else {
-			patterns[name] = elem
+			gram.Links[name] = elem
 		}
 		p.skipEOL()
 	}
-	return reassemble(start, patterns)
+	return gram, nil // reassemble(start, patterns)
 }
 
 func (p *Parser) parseStartPattern() (Pattern, error) {
