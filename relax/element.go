@@ -61,21 +61,33 @@ type Pattern interface {
 	Validate(xml.Node) error
 }
 
+type Resolver interface {
+	Resolve(Pattern) (Pattern, error)
+}
+
 type Grammar struct {
 	Links map[string]Pattern
 	Start Pattern
 }
 
 func (g Grammar) Validate(node xml.Node) error {
-	switch k := g.Start.(type) {
+	p, err := g.Resolve(g.Start)
+	if err != nil {
+		return err
+	}
+	return p.Validate(node)
+}
+
+func (g Grammar) Resolve(pattern Pattern) (Pattern, error) {
+	switch k := pattern.(type) {
 	case Link:
 		p, ok := g.Links[k.Ident]
 		if !ok {
-			return fmt.Errorf("%s: undefined pattern", k.Ident)
+			return nil, fmt.Errorf("%s: undefined pattern", k.Ident)
 		}
-		return p.Validate(node)
+		return p, nil
 	default:
-		return g.Start.Validate(node)
+		return pattern, nil
 	}
 }
 
@@ -108,7 +120,10 @@ func (q QName) LocalName() string {
 type Link struct {
 	Ident string
 	cardinality
-	Pattern
+}
+
+func (k Link) Validate(node xml.Node) error {
+	return nil
 }
 
 type Attribute struct {
@@ -293,7 +308,7 @@ func (t StringType) validateValue(str string) error {
 	if err != nil {
 		return ErrFormat
 	}
-	return nil	
+	return nil
 }
 
 type IntType struct {
@@ -317,7 +332,7 @@ func (t IntType) validateValue(str string) error {
 	if val > int64(t.MaxValue) {
 		return ErrRange
 	}
-	return nil	
+	return nil
 }
 
 type FloatType struct {
@@ -341,7 +356,7 @@ func (t FloatType) validateValue(str string) error {
 	if val > t.MaxValue {
 		return ErrRange
 	}
-	return nil	
+	return nil
 }
 
 type TimeType struct {
@@ -369,7 +384,7 @@ func (t TimeType) validateValue(str string) error {
 	if !t.MaxValue.IsZero() && when.After(t.MaxValue) {
 		return ErrRange
 	}
-	return nil	
+	return nil
 }
 
 type Enum struct {
@@ -385,7 +400,7 @@ func (e Enum) validateValue(str string) error {
 	if !ok {
 		return fmt.Errorf("%q: value not allowed (%s)", str, strings.Join(e.List, ", "))
 	}
-	return nil	
+	return nil
 }
 
 func reassemble(start Pattern, others map[string]Pattern) (Pattern, error) {
