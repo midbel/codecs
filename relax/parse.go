@@ -143,7 +143,7 @@ func (p *Parser) parseDefinitions() (Pattern, error) {
 			parent = c
 		} else {
 			var c Choice
-			c.List = append(c.List, parent, elem)
+			c.List = append(c.List, elem)
 			parent = c
 		}
 		gram.Links[name] = parent

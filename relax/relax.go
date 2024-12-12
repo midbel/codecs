@@ -33,15 +33,25 @@ func printSchema(w io.Writer, schema Pattern, depth int) {
 		fmt.Fprint(w, pfx)
 		fmt.Fprintln(w, "]")
 
-		if len(p.Links) > 0 {
+		if len(p.Links) == 0 {
+			break
+		}
+		fmt.Fprint(w, pfx)
+		fmt.Fprintln(w, "links[")
+
+		depth++
+		for n, k := range p.Links {
+			pfx := strings.Repeat(" ", depth*2)
+
 			fmt.Fprint(w, pfx)
-			fmt.Fprintln(w, "links[")
-			for _, k := range p.Links {
-				printSchema(w, k, depth+1)
-			}
+			fmt.Fprintf(w, "%s[", n)
+			fmt.Fprintln(w)
+			printSchema(w, k, depth+1)
 			fmt.Fprint(w, pfx)
 			fmt.Fprintln(w, "]")
 		}
+		fmt.Fprint(w, pfx)
+		fmt.Fprintln(w, "]")
 
 		fmt.Fprint(w, prefix)
 		fmt.Fprintln(w, "]")

@@ -66,8 +66,17 @@ type Grammar struct {
 	Start Pattern
 }
 
-func (g Grammar) Validate(_ xml.Node) error {
-	return nil
+func (g Grammar) Validate(node xml.Node) error {
+	switch k := g.Start.(type) {
+	case Link:
+		p, ok := g.Links[k.Ident]
+		if !ok {
+			return fmt.Errorf("%s: undefined pattern", k.Ident)
+		}
+		return p.Validate(node)
+	default:
+		return g.Start.Validate(node)
+	}
 }
 
 func Valid() Pattern {
@@ -123,18 +132,11 @@ func (a Attribute) Validate(node xml.Node) error {
 	if a.Value == nil {
 		return nil
 	}
-	switch vs := a.Value.(type) {
-	case Enum:
-		ok := slices.Contains(vs.List, el.Attrs[ix].Value)
-		if !ok {
-			msg := fmt.Sprintf("%s: value is not allowed", el.Attrs[ix].Value)
-			return createError(msg, el)
-		}
-	case Text:
-	default:
+	v, ok := a.Value.(interface{ validateValue(string) error })
+	if !ok {
 		return fmt.Errorf("pattern not applicatble for attribute")
 	}
-	return nil
+	return v.validateValue(el.Attrs[ix].Value)
 }
 
 type Group struct {
@@ -223,6 +225,10 @@ func (_ Text) Validate(node xml.Node) error {
 	return nil
 }
 
+func (_ Text) validateValue(_ string) error {
+	return nil
+}
+
 type Empty struct{}
 
 func (_ Empty) Validate(node xml.Node) error {
@@ -262,16 +268,17 @@ type StringType struct {
 }
 
 func (t StringType) Validate(node xml.Node) error {
-	var (
-		err error
-		str = node.Value()
-	)
+	return t.validateValue(node.Value())
+}
+
+func (t StringType) validateValue(str string) error {
 	if t.MinLength > 0 && len(str) < t.MinLength {
 		return ErrLength
 	}
 	if t.MaxLength > 0 && len(str) > t.MaxLength {
 		return ErrLength
 	}
+	var err error
 	switch t.Format {
 	case "uri":
 		_, err = url.Parse(str)
@@ -280,12 +287,13 @@ func (t StringType) Validate(node xml.Node) error {
 		return err
 	case "base64":
 		_, err = base64.StdEncoding.DecodeString(str)
+	case "email":
 	default:
 	}
 	if err != nil {
 		return ErrFormat
 	}
-	return nil
+	return nil	
 }
 
 type IntType struct {
@@ -295,7 +303,11 @@ type IntType struct {
 }
 
 func (t IntType) Validate(node xml.Node) error {
-	val, err := strconv.ParseInt(node.Value(), 0, 64)
+	return t.validateValue(node.Value())
+}
+
+func (t IntType) validateValue(str string) error {
+	val, err := strconv.ParseInt(str, 0, 64)
 	if err != nil {
 		return ErrFormat
 	}
@@ -305,7 +317,7 @@ func (t IntType) Validate(node xml.Node) error {
 	if val > int64(t.MaxValue) {
 		return ErrRange
 	}
-	return nil
+	return nil	
 }
 
 type FloatType struct {
@@ -315,7 +327,11 @@ type FloatType struct {
 }
 
 func (t FloatType) Validate(node xml.Node) error {
-	val, err := strconv.ParseFloat(node.Value(), 64)
+	return t.validateValue(node.Value())
+}
+
+func (t FloatType) validateValue(str string) error {
+	val, err := strconv.ParseFloat(str, 64)
 	if err != nil {
 		return ErrFormat
 	}
@@ -325,7 +341,7 @@ func (t FloatType) Validate(node xml.Node) error {
 	if val > t.MaxValue {
 		return ErrRange
 	}
-	return nil
+	return nil	
 }
 
 type TimeType struct {
@@ -335,11 +351,15 @@ type TimeType struct {
 }
 
 func (t TimeType) Validate(node xml.Node) error {
+	return t.validateValue(node.Value())
+}
+
+func (t TimeType) validateValue(str string) error {
 	layout := "2006-01-02"
 	if t.Format != "" {
 		layout = t.Format
 	}
-	when, err := time.Parse(layout, node.Value())
+	when, err := time.Parse(layout, str)
 	if err != nil {
 		return ErrFormat
 	}
@@ -349,7 +369,7 @@ func (t TimeType) Validate(node xml.Node) error {
 	if !t.MaxValue.IsZero() && when.After(t.MaxValue) {
 		return ErrRange
 	}
-	return nil
+	return nil	
 }
 
 type Enum struct {
@@ -357,11 +377,15 @@ type Enum struct {
 }
 
 func (e Enum) Validate(node xml.Node) error {
-	ok := slices.Contains(e.List, node.Value())
+	return e.validateValue(node.Value())
+}
+
+func (e Enum) validateValue(str string) error {
+	ok := slices.Contains(e.List, str)
 	if !ok {
-		return fmt.Errorf("%q: value not allowed (%s)", node.Value(), strings.Join(e.List, ", "))
+		return fmt.Errorf("%q: value not allowed (%s)", str, strings.Join(e.List, ", "))
 	}
-	return nil
+	return nil	
 }
 
 func reassemble(start Pattern, others map[string]Pattern) (Pattern, error) {
