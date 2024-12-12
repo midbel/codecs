@@ -59,11 +59,20 @@ func (a cardinality) More() bool {
 
 type Pattern interface {
 	Validate(xml.Node) error
+	validate(xml.Node, Resolver) error
 }
 
 type Resolver interface {
 	Resolve(Pattern) (Pattern, error)
 }
+
+type emptyResolver struct{}
+
+func (_ emptyResolver) Resolve(p Pattern) (Pattern, error) {
+	return p, nil
+}
+
+var noopResolver emptyResolver
 
 type Grammar struct {
 	Links map[string]Pattern
@@ -71,11 +80,15 @@ type Grammar struct {
 }
 
 func (g Grammar) Validate(node xml.Node) error {
-	p, err := g.Resolve(g.Start)
+	return g.validate(node, g)
+}
+
+func (g Grammar) validate(node xml.Node, ctx Resolver) error {
+	p, err := ctx.Resolve(g.Start)
 	if err != nil {
 		return err
 	}
-	return p.Validate(node)
+	return p.validate(node, ctx)
 }
 
 func (g Grammar) Resolve(pattern Pattern) (Pattern, error) {
@@ -97,9 +110,9 @@ func Valid() Pattern {
 
 type valid struct{}
 
-func (_ valid) Validate(_ xml.Node) error {
-	return nil
-}
+func (_ valid) Validate(_ xml.Node) error { return nil }
+
+func (_ valid) validate(_ xml.Node, _ Resolver) error { return nil }
 
 type QName struct {
 	Space string
@@ -123,7 +136,15 @@ type Link struct {
 }
 
 func (k Link) Validate(node xml.Node) error {
-	return nil
+	return k.validate(node, noopResolver)
+}
+
+func (k Link) validate(node xml.Node, ctx Resolver) error {
+	p, err := ctx.Resolve(k)
+	if err != nil {
+		return err
+	}
+	return p.validate(node, ctx)
 }
 
 type Attribute struct {
@@ -133,6 +154,10 @@ type Attribute struct {
 }
 
 func (a Attribute) Validate(node xml.Node) error {
+	return a.validate(node, noopResolver)
+}
+
+func (a Attribute) validate(node xml.Node, _ Resolver) error {
 	el, ok := node.(*xml.Element)
 	if !ok {
 		return createError("xml element expected", node)
@@ -158,16 +183,20 @@ type Group struct {
 	List []Pattern
 }
 
-func (g Group) Validate(node xml.Node) error {
-	return nil
-}
+func (_ Group) Validate(_ xml.Node) error             { return nil }
+func (_ Group) validate(_ xml.Node, _ Resolver) error { return nil }
 
 type Choice struct {
 	List []Pattern
 }
 
 func (c Choice) Validate(node xml.Node) error {
-	_, err := validateChoice([]xml.Node{node}, c)
+	_, err := validateChoice([]xml.Node{node}, c, noopResolver)
+	return err
+}
+
+func (c Choice) validate(node xml.Node, ctx Resolver) error {
+	_, err := validateChoice([]xml.Node{node}, c, ctx)
 	return err
 }
 
@@ -179,10 +208,10 @@ type Element struct {
 }
 
 func (e Element) Validate(node xml.Node) error {
-	return e.validate(node)
+	return e.validate(node, noopResolver)
 }
 
-func (e Element) validate(node xml.Node) error {
+func (e Element) validate(node xml.Node, ctx Resolver) error {
 	if e.QualifiedName() != node.QualifiedName() {
 		msg := fmt.Sprintf("want %s but got %s", e.QualifiedName(), node.QualifiedName())
 		return createError(msg, node)
@@ -199,24 +228,27 @@ func (e Element) validate(node xml.Node) error {
 		var err error
 		switch el := el.(type) {
 		case Element:
-			step, err1 := validateNodes(curr.Nodes[offset:], el)
+			step, err1 := validateNodes(curr.Nodes[offset:], el, ctx)
 			offset += step
 			err = err1
 		case Attribute:
-			err = el.Validate(curr)
+			err = el.validate(curr, ctx)
 			attrs++
 		case Choice:
-			err = el.Validate(curr)
+			err = el.validate(curr, ctx)
 			if err == nil {
 				attrs++
 				break
 			}
-			step, err1 := validateChoice(curr.Nodes[offset:], el)
-			// step, err1 := validateNodes(curr.Nodes[offset:], el)
+			step, err1 := validateChoice(curr.Nodes[offset:], el, ctx)
+			offset += step
+			err = err1
+		case Link:
+			step, err1 := validateNodes(curr.Nodes[offset:], el, ctx)
 			offset += step
 			err = err1
 		default:
-			return fmt.Errorf("pattern not applicatble for attribute")
+			return fmt.Errorf("pattern not applicatble for element")
 		}
 		if err != nil {
 			return err
@@ -233,7 +265,11 @@ func (e Element) validate(node xml.Node) error {
 
 type Text struct{}
 
-func (_ Text) Validate(node xml.Node) error {
+func (t Text) Validate(node xml.Node) error {
+	return t.validate(node, noopResolver)
+}
+
+func (_ Text) validate(node xml.Node, _ Resolver) error {
 	if !node.Leaf() {
 		return createError("element is not a text node", node)
 	}
@@ -246,7 +282,11 @@ func (_ Text) validateValue(_ string) error {
 
 type Empty struct{}
 
-func (_ Empty) Validate(node xml.Node) error {
+func (e Empty) Validate(node xml.Node) error {
+	return e.validate(node, noopResolver)
+}
+
+func (_ Empty) validate(node xml.Node, _ Resolver) error {
 	el, ok := node.(*xml.Element)
 	if ok && len(el.Nodes) != 0 {
 		return createError("element is not empty", node)
@@ -260,16 +300,23 @@ type Type struct {
 	Pattern string
 }
 
-func (t Type) Validate(node xml.Node) error {
-	return nil
-}
+func (_ Type) Validate(_ xml.Node) error             { return nil }
+func (_ Type) validate(_ xml.Node, _ Resolver) error { return nil }
 
 type BoolType struct {
 	Type
 }
 
 func (t BoolType) Validate(node xml.Node) error {
-	_, err := strconv.ParseBool(node.Value())
+	return t.validate(node, noopResolver)
+}
+
+func (t BoolType) validate(node xml.Node, _ Resolver) error {
+	return t.validateValue(node.Value())
+}
+
+func (t BoolType) validateValue(str string) error {
+	_, err := strconv.ParseBool(str)
 	if err != nil {
 		err = ErrFormat
 	}
@@ -283,6 +330,10 @@ type StringType struct {
 }
 
 func (t StringType) Validate(node xml.Node) error {
+	return t.validate(node, noopResolver)
+}
+
+func (t StringType) validate(node xml.Node, _ Resolver) error {
 	return t.validateValue(node.Value())
 }
 
@@ -318,6 +369,10 @@ type IntType struct {
 }
 
 func (t IntType) Validate(node xml.Node) error {
+	return t.validate(node, noopResolver)
+}
+
+func (t IntType) validate(node xml.Node, _ Resolver) error {
 	return t.validateValue(node.Value())
 }
 
@@ -342,6 +397,10 @@ type FloatType struct {
 }
 
 func (t FloatType) Validate(node xml.Node) error {
+	return t.validate(node, noopResolver)
+}
+
+func (t FloatType) validate(node xml.Node, _ Resolver) error {
 	return t.validateValue(node.Value())
 }
 
@@ -366,6 +425,10 @@ type TimeType struct {
 }
 
 func (t TimeType) Validate(node xml.Node) error {
+	return t.validate(node, noopResolver)
+}
+
+func (t TimeType) validate(node xml.Node, _ Resolver) error {
 	return t.validateValue(node.Value())
 }
 
@@ -392,6 +455,10 @@ type Enum struct {
 }
 
 func (e Enum) Validate(node xml.Node) error {
+	return e.validate(node, noopResolver)
+}
+
+func (e Enum) validate(node xml.Node, _ Resolver) error {
 	return e.validateValue(node.Value())
 }
 
@@ -473,9 +540,9 @@ func reassemble(start Pattern, others map[string]Pattern) (Pattern, error) {
 	}
 }
 
-func validateNodes(nodes []xml.Node, elem Pattern) (int, error) {
+func validateNodes(nodes []xml.Node, elem Pattern, ctx Resolver) (int, error) {
 	if c, ok := elem.(Choice); ok {
-		return validateChoice(nodes, c)
+		return validateChoice(nodes, c, ctx)
 	}
 	var (
 		count int
@@ -489,7 +556,7 @@ func validateNodes(nodes []xml.Node, elem Pattern) (int, error) {
 		if prv >= 0 && nodes[ptr].QualifiedName() != nodes[prv].QualifiedName() {
 			break
 		}
-		if err := elem.Validate(nodes[ptr]); err != nil {
+		if err := elem.validate(nodes[ptr], ctx); err != nil {
 			if a, ok := elem.(Element); ok && a.Zero() {
 				return 0, nil
 			}
@@ -512,16 +579,16 @@ func validateNodes(nodes []xml.Node, elem Pattern) (int, error) {
 	return ptr, nil
 }
 
-func validateChoice(nodes []xml.Node, el Choice) (int, error) {
+func validateChoice(nodes []xml.Node, el Choice, ctx Resolver) (int, error) {
 	var (
 		step int
 		err  error
 	)
 	for _, el := range el.List {
 		if g, ok := el.(Group); ok {
-			step, err = validateGroup(nodes, g)
+			step, err = validateGroup(nodes, g, ctx)
 		} else {
-			step, err = validateNodes(nodes, el)
+			step, err = validateNodes(nodes, el, ctx)
 		}
 		if err == nil {
 			break
@@ -530,10 +597,10 @@ func validateChoice(nodes []xml.Node, el Choice) (int, error) {
 	return step, err
 }
 
-func validateGroup(nodes []xml.Node, el Group) (int, error) {
+func validateGroup(nodes []xml.Node, el Group, ctx Resolver) (int, error) {
 	var step int
 	for i := range el.List {
-		x, err := validateNodes(nodes[step:], el.List[i])
+		x, err := validateNodes(nodes[step:], el.List[i], ctx)
 		if err != nil {
 			return 0, err
 		}
