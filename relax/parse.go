@@ -49,8 +49,13 @@ func (p *Parser) parse() (Pattern, error) {
 	}
 	p.skipEOL()
 	p.skipComment()
+	var includes []Pattern
 	for p.isKeyword("include") {
-
+		inc, err := p.parseInclude()
+		if err != nil {
+			return nil, err
+		}
+		includes = append(includes, inc)
 	}
 	switch {
 	case p.isKeyword("element"):
@@ -75,7 +80,14 @@ func (p *Parser) parseInclude() (Pattern, error) {
 	defer r.Close()
 
 	ps := Parse(r)
-	return ps.Parse()
+	pat, err := ps.Parse()
+	if err != nil {
+		return nil, err
+	}
+	if p.is(BegBrace) {
+		p.next()
+	}
+	return pat, err
 }
 
 func (p *Parser) parseDeclarations() error {
