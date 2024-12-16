@@ -37,7 +37,15 @@ func (r *Reader) Read() (Node, error) {
 	case r.is(Cdata):
 		return r.readChardata()
 	case r.is(Literal):
-		return r.readLiteral()
+		node, err := r.readLiteral()
+		if err != nil {
+			return nil, err
+		}
+		txt, ok := node.(*Text)
+		if ok && txt.Content == "" {
+			return r.Read()
+		}
+		return node, nil
 	default:
 		return nil, r.createError("reader", "unexpected element type")
 	}
