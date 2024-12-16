@@ -26,7 +26,7 @@ func main() {
 		if errors.Is(err, io.EOF) {
 			break
 		}
-		if err != nil {
+		if err != nil && !errors.Is(err, xml.ErrClosed) {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(3)
 		}

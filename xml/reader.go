@@ -1,10 +1,13 @@
 package xml
 
 import (
+	"errors"
 	"io"
 	"slices"
 	"strings"
 )
+
+var ErrClosed = errors.New("closed")
 
 type Reader struct {
 	scan *Scanner
@@ -31,7 +34,7 @@ func (r *Reader) Read() (Node, error) {
 	case r.is(OpenTag):
 		return r.readStartElement()
 	case r.is(CloseTag):
-		return nil, r.readEndElement()
+		return r.readEndElement()
 	case r.is(CommentTag):
 		return r.readComment()
 	case r.is(Cdata):
@@ -97,14 +100,17 @@ func (r *Reader) readStartElement() (Node, error) {
 	}
 	switch {
 	case r.is(EmptyElemTag) || r.is(EndTag):
+		if r.is(EmptyElemTag) {
+			err = ErrClosed
+		}
 		r.next()
-		return &elem, nil
+		return &elem, err
 	default:
 		return nil, r.createError("element", "end of element expected")
 	}
 }
 
-func (r *Reader) readEndElement() error {
+func (r *Reader) readEndElement() (Node, error) {
 	r.next()
 	var elem Element
 	if r.is(Namespace) {
@@ -112,15 +118,15 @@ func (r *Reader) readEndElement() error {
 		r.next()
 	}
 	if !r.is(Name) {
-		return r.createError("element", "name is missing")
+		return nil, r.createError("element", "name is missing")
 	}
 	elem.Name = r.curr.Literal
 	r.next()
 	if !r.is(EndTag) {
-		return r.createError("element", "end of element expected")
+		return nil, r.createError("element", "end of element expected")
 	}
 	r.next()
-	return nil
+	return &elem, ErrClosed
 }
 
 func (r *Reader) readAttributes(done func() bool) ([]Attribute, error) {
