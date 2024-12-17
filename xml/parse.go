@@ -411,9 +411,25 @@ func (c *compiler) next() {
 }
 
 const (
+	kwIf        = "if"
+	kwElse      = "else"
+	kwThen      = "then"
+	kwFor       = "for"
+	kwIn        = "in"
+	kwUnion     = "union"
+	kwIntersect = "intersect"
+	kwExcept    = "except"
+	kwSome      = "some"
+	kwEvery     = "every"
+	kwReturn    = "return"
+)
+
+const (
 	currNode = -(iota + 1000)
 	parentNode
 	attrNode
+	keyword
+	variable
 	currLevel
 	anyLevel
 	begPred
@@ -608,6 +624,11 @@ func (s *QueryScanner) scanNumber(tok *Token) {
 		s.read()
 	}
 	tok.Literal = s.str.String()
+	// if s.char != 'e' && s.char != 'E' {
+	// 	return
+	// }
+	// s.write()
+	// s.read()
 }
 
 func (s *QueryScanner) scanIdent(tok *Token) {

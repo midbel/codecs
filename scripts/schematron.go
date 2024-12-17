@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"slices"
+	"strings"
 
 	"github.com/midbel/codecs/xml"
 )
@@ -89,10 +90,10 @@ func main() {
 	}
 	for {
 		node, err := rs.Read()
-		if errors.Is(err, io.EOF) || errors.Is(err, xml.ErrClosed) {
+		if errors.Is(err, io.EOF) {
 			break
 		}
-		if err != nil {
+		if err != nil && !errors.Is(err, xml.ErrClosed) {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(2)
 		}
@@ -108,7 +109,6 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(2)
 		}
-		fmt.Println(node)
 	}
 }
 
@@ -118,6 +118,10 @@ func readTop(rs *xml.Reader, node *xml.Element) error {
 		return readPattern(rs)
 	case "let":
 		return readLet(rs)
+	case "ns":
+		return readNS(rs)
+	case "function":
+		return readFunction(rs)
 	default:
 		return fmt.Errorf("%s: unexpected element", node.LocalName())
 	}
@@ -128,7 +132,7 @@ func readPattern(rs *xml.Reader) error {
 		pat Pattern
 		err error
 	)
-	if pat.Title, err = getPatternTitle(rs); err != nil {
+	if pat.Title, err = getTitleElement(rs); err != nil {
 		return err
 	}
 	for {
@@ -157,9 +161,17 @@ func readRule(rs *xml.Reader, elem *xml.Element) (Rule, error) {
 	if qn := elem.QualifiedName(); qn != "rule" {
 		return rule, fmt.Errorf("%s: unexpected element", qn)
 	}
-	if rule.Context, err = getAttribute(elem, "context"); err != nil {
+	ctx, err := getAttribute(elem, "context")
+	if err != nil {
+		return rule, nil
+	}
+	if _, err := xml.Compile(strings.NewReader(ctx)); err != nil {
 		return rule, err
 	}
+	rule.Context = ctx
+	// if rule.Context, err = getAttribute(elem, "context"); err != nil {
+	// 	return rule, err
+	// }
 	rule.env = Empty()
 	for {
 		el, err := getElementFromReader(rs)
@@ -182,10 +194,14 @@ func readAssert(rs *xml.Reader, elem *xml.Element) (Assert, error) {
 	if qn := elem.QualifiedName(); qn != "assert" {
 		return ass, fmt.Errorf("%s: unexpected element", qn)
 	}
-	ass.Test, err = getAttribute(elem, "test")
+	test, err := getAttribute(elem, "test")
 	if err != nil {
 		return ass, err
 	}
+	if _, err := xml.Compile(strings.NewReader(test)); err != nil {
+		return ass, err
+	}
+	ass.Test = test
 	ass.Ident, _ = getAttribute(elem, "id")
 	ass.Flag, _ = getAttribute(elem, "flag")
 
@@ -200,7 +216,17 @@ func readLet(rs *xml.Reader) error {
 	return nil
 }
 
+func readNS(rs *xml.Reader) error {
+	return nil
+}
+
 func readFunction(rs *xml.Reader) error {
+	for {
+		el, err := rs.Read()
+		if errors.Is(err, xml.ErrClosed) && el.QualifiedName() == "function" {
+			break
+		}
+	}
 	return nil
 }
 
@@ -213,9 +239,14 @@ func readIntro(rs *xml.Reader) error {
 	switch node := node.(type) {
 	case *xml.Instruction:
 		return readIntro(rs)
+	case *xml.Comment:
+		return readIntro(rs)
 	case *xml.Element:
 		if node.LocalName() != "schema" {
 			return fmt.Errorf("expected schema element")
+		}
+		if _, err := getTitleElement(rs); err != nil {
+			return err
 		}
 		return nil
 	default:
@@ -287,7 +318,7 @@ func getAttribute(elem *xml.Element, name string) (string, error) {
 	return elem.Attrs[ix].Value, nil
 }
 
-func getPatternTitle(rs *xml.Reader) (string, error) {
+func getTitleElement(rs *xml.Reader) (string, error) {
 	el, err := getElementFromReader(rs)
 	if err != nil {
 		return "", err
