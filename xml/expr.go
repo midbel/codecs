@@ -203,7 +203,6 @@ func (a axis) Next(curr Node) (*NodeList, error) {
 }
 
 type name struct {
-	axis  string
 	space string
 	ident string
 }
