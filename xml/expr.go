@@ -3,7 +3,6 @@ package xml
 import (
 	"errors"
 	"fmt"
-	"iter"
 	"math"
 	"slices"
 	"strconv"
@@ -17,46 +16,6 @@ var (
 
 type Expr interface {
 	Next(Node) (*NodeList, error)
-}
-
-type NodeList struct {
-	nodes []Node
-}
-
-func createList() *NodeList {
-	return &NodeList{}
-}
-
-func (n *NodeList) Nodes() []Node {
-	tmp := slices.Clone(n.nodes)
-	return tmp
-}
-
-func (n *NodeList) Merge(other *NodeList) {
-	n.nodes = slices.Concat(n.nodes, other.nodes)
-}
-
-func (n *NodeList) Push(node Node) {
-	n.nodes = append(n.nodes, node)
-}
-
-func (n *NodeList) Empty() bool {
-	return len(n.nodes) == 0
-}
-
-func (n *NodeList) Len() int {
-	return len(n.nodes)
-}
-
-func (n *NodeList) All() iter.Seq[Node] {
-	do := func(yield func(Node) bool) {
-		for _, n := range n.nodes {
-			if !yield(n) {
-				break
-			}
-		}
-	}
-	return do
 }
 
 const (
@@ -447,7 +406,7 @@ func (c call) Next(curr Node) (*NodeList, error) {
 	case "comment":
 		_, keep = curr.(*Comment)
 	default:
-		return nil, fmt.Errorf("%w function", ErrUndefined)
+		return nil, fmt.Errorf("%s: %w function", c.ident, ErrUndefined)
 	}
 	if keep {
 		list.Push(curr)
@@ -458,7 +417,7 @@ func (c call) Next(curr Node) (*NodeList, error) {
 func (c call) Eval(node Node) (any, error) {
 	fn, ok := builtins[c.ident]
 	if !ok {
-		return nil, fmt.Errorf("undefined function")
+		return nil, fmt.Errorf("%s: %w function", c.ident, ErrUndefined)
 	}
 	if fn == nil {
 		return nil, errImplemented
