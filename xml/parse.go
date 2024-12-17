@@ -624,11 +624,19 @@ func (s *QueryScanner) scanNumber(tok *Token) {
 		s.read()
 	}
 	tok.Literal = s.str.String()
-	// if s.char != 'e' && s.char != 'E' {
-	// 	return
-	// }
-	// s.write()
-	// s.read()
+	if s.char != 'e' && s.char != 'E' {
+		return
+	}
+	s.write()
+	s.read()
+	if s.char == '-' || s.char == '+' {
+		s.write()
+		s.read()
+	}
+	for !s.done() && unicode.IsDigit(s.char) {
+		s.write()
+		s.read()
+	}
 }
 
 func (s *QueryScanner) scanIdent(tok *Token) {
