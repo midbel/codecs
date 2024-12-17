@@ -1,11 +1,18 @@
 package xml
 
 import (
+	"errors"
 	"fmt"
 	"iter"
 	"math"
 	"slices"
 	"strconv"
+)
+
+var (
+	ErrNode      = errors.New("element node expected")
+	ErrRoot      = errors.New("root element expected")
+	ErrUndefined = errors.New("undefined")
 )
 
 type Expr interface {
@@ -83,9 +90,8 @@ func (q query) Next(node Node) (*NodeList, error) {
 type all struct{}
 
 func (_ all) Next(curr Node) (*NodeList, error) {
-	_, ok := curr.(*Element)
-	if !ok {
-		return nil, fmt.Errorf("element node expected")
+	if _, ok := curr.(*Element); !ok {
+		return nil, ErrNode
 	}
 	list := createList()
 	list.Push(curr)
@@ -133,7 +139,7 @@ type root struct{}
 func (_ root) Next(curr Node) (*NodeList, error) {
 	n := curr.Parent()
 	if n != nil {
-		return nil, fmt.Errorf("root element expected")
+		return nil, ErrRoot
 	}
 	list := createList()
 	list.Push(curr)
@@ -160,7 +166,7 @@ func (a axis) Next(curr Node) (*NodeList, error) {
 	case childAxis:
 		el, ok := curr.(*Element)
 		if !ok {
-			return nil, fmt.Errorf("element node expected")
+			return nil, ErrNode
 		}
 		for _, c := range el.Nodes {
 			other, err := a.next.Next(c)
@@ -177,7 +183,7 @@ func (a axis) Next(curr Node) (*NodeList, error) {
 	case ancestorAxis, ancestorSelfAxis:
 		el, ok := curr.(*Element)
 		if !ok {
-			return nil, fmt.Errorf("element node expected")
+			return nil, ErrNode
 		}
 		for p := el.Parent(); p != nil; {
 			other, err := a.next.Next(p)
@@ -188,7 +194,7 @@ func (a axis) Next(curr Node) (*NodeList, error) {
 	case descendantAxis, descendantSelfAxis:
 		el, ok := curr.(*Element)
 		if !ok {
-			return nil, fmt.Errorf("element node expected")
+			return nil, ErrNode
 		}
 		for i := range el.Nodes {
 			other, err := a.next.Next(el.Nodes[i])
@@ -207,8 +213,15 @@ type name struct {
 	ident string
 }
 
+func (n name) QualifiedName() string {
+	if n.space == "" {
+		return n.ident
+	}
+	return fmt.Sprintf("%s:%s", n.space, n.ident)
+}
+
 func (n name) Next(curr Node) (*NodeList, error) {
-	if curr.LocalName() != n.ident {
+	if curr.QualifiedName() != n.QualifiedName() {
 		return nil, errDiscard
 	}
 	list := createList()
@@ -219,7 +232,7 @@ func (n name) Next(curr Node) (*NodeList, error) {
 func (n name) Eval(curr Node) (any, error) {
 	el, ok := curr.(*Element)
 	if !ok {
-		return nil, fmt.Errorf("element node expected")
+		return nil, ErrNode
 	}
 	child := el.Find(n.ident)
 	if child == nil {
@@ -434,7 +447,7 @@ func (c call) Next(curr Node) (*NodeList, error) {
 	case "comment":
 		_, keep = curr.(*Comment)
 	default:
-		return nil, fmt.Errorf("undefined function")
+		return nil, fmt.Errorf("%w function", ErrUndefined)
 	}
 	if keep {
 		list.Push(curr)
@@ -472,7 +485,7 @@ func (a attr) Next(node Node) (*NodeList, error) {
 func (a attr) Eval(node Node) (any, error) {
 	el, ok := node.(*Element)
 	if !ok {
-		return nil, fmt.Errorf("element node expected")
+		return nil, ErrNode
 	}
 	ix := slices.IndexFunc(el.Attrs, func(attr Attribute) bool {
 		return attr.Name == a.ident
