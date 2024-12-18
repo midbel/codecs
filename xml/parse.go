@@ -419,16 +419,37 @@ const (
 	kwUnion     = "union"
 	kwIntersect = "intersect"
 	kwExcept    = "except"
+	kwReturn    = "return"
 	kwSome      = "some"
 	kwEvery     = "every"
-	kwReturn    = "return"
+	kwAnd       = "and"
+	kwOr        = "or"
+	kwDiv       = "div"
+	kwMod       = "mod"
 )
+
+func isReserved(str string) bool {
+	switch str {
+	case kwIf:
+	case kwElse:
+	case kwThen:
+	case kwFor:
+	case kwIn:
+	case kwUnion:
+	case kwIntersect:
+	case kwExcept:
+	case kwReturn:
+	default:
+		return false
+	}
+	return true
+}
 
 const (
 	currNode = -(iota + 1000)
 	parentNode
 	attrNode
-	keyword
+	reserved
 	variable
 	currLevel
 	anyLevel
@@ -494,6 +515,8 @@ func (s *QueryScanner) Scan() Token {
 		s.scanAttr(&tok)
 	case s.char == apos || s.char == quote:
 		s.scanLiteral(&tok)
+	case isVariable(s.char):
+		s.scanVariable(&tok)
 	case unicode.IsLetter(s.char):
 		s.scanIdent(&tok)
 	case unicode.IsDigit(s.char):
@@ -639,6 +662,16 @@ func (s *QueryScanner) scanNumber(tok *Token) {
 	}
 }
 
+func (s *QueryScanner) scanVariable(tok *Token) {
+	s.read()
+	for !s.done() && (unicode.IsLetter(s.char) || unicode.IsDigit(s.char)) {
+		s.write()
+		s.read()
+	}
+	tok.Type = variable
+	tok.Literal = s.str.String()
+}
+
 func (s *QueryScanner) scanIdent(tok *Token) {
 	accept := func() bool {
 		return unicode.IsLetter(s.char) || unicode.IsDigit(s.char) ||
@@ -650,13 +683,13 @@ func (s *QueryScanner) scanIdent(tok *Token) {
 	}
 	tok.Literal = s.str.String()
 	switch tok.Literal {
-	case "and":
+	case kwAnd:
 		tok.Type = opAnd
-	case "or":
+	case kwOr:
 		tok.Type = opOr
-	case "div":
+	case kwDiv:
 		tok.Type = opDiv
-	case "mod":
+	case kwMod:
 		tok.Type = opMod
 	default:
 		tok.Type = Name
@@ -709,6 +742,10 @@ func (s *QueryScanner) peek() rune {
 
 func (s *QueryScanner) done() bool {
 	return s.char == utf8.RuneError
+}
+
+func isVariable(c rune) bool {
+	return c == dollar
 }
 
 func isDelimiter(c rune) bool {
@@ -1147,6 +1184,10 @@ func (t Token) String() string {
 		return fmt.Sprintf("chardata(%s)", t.Literal)
 	case Literal:
 		return fmt.Sprintf("literal(%s)", t.Literal)
+	case variable:
+		return fmt.Sprintf("variable(%s)", t.Literal)
+	case reserved:
+		return fmt.Sprintf("reserved(%s)", t.Literal)
 	case OpenTag:
 		return "<open-elem-tag>"
 	case EndTag:
@@ -1189,6 +1230,7 @@ const (
 	star       = '*'
 	percent    = '%'
 	pipe       = '|'
+	dollar     = '$'
 )
 
 type state int8
