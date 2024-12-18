@@ -113,28 +113,27 @@ func main() {
 }
 
 func readTop(rs *xml.Reader, node *xml.Element) error {
-	switch node.LocalName() {
+	switch node.QualifiedName() {
 	case "pattern":
 		return readPattern(rs)
 	case "let":
-		return readLet(rs)
+		return readLet(rs, node)
 	case "ns":
-		return readNS(rs)
+		return readNS(rs, node)
 	case "function":
-		return readFunction(rs)
+		return readFunction(rs, node)
 	default:
-		return fmt.Errorf("%s: unexpected element", node.LocalName())
+		return fmt.Errorf("%s: unexpected element", node.QualifiedName())
 	}
 }
 
 func readPattern(rs *xml.Reader) error {
-	var (
-		pat Pattern
-		err error
-	)
-	if pat.Title, err = getTitleElement(rs); err != nil {
-		return err
-	}
+	// if pat.Title, err = getTitleElement(rs); err != nil {
+	// 	return err
+	// }
+	fmt.Println(">>> enter Pattern")
+	defer fmt.Println("<<< leave Pattern")
+	var pat Pattern
 	for {
 		el, err := getElementFromReader(rs)
 		if err != nil {
@@ -143,6 +142,7 @@ func readPattern(rs *xml.Reader) error {
 			}
 			return err
 		}
+		fmt.Println("start rule", el.QualifiedName())
 		rule, err := readRule(rs, el)
 		if !errors.Is(err, xml.ErrClosed) {
 			return fmt.Errorf("missing closing rule element")
@@ -154,6 +154,8 @@ func readPattern(rs *xml.Reader) error {
 }
 
 func readRule(rs *xml.Reader, elem *xml.Element) (Rule, error) {
+	fmt.Println(">>> enter rule")
+	defer fmt.Println("<<< leave rule")
 	var (
 		rule Rule
 		err  error
@@ -161,29 +163,32 @@ func readRule(rs *xml.Reader, elem *xml.Element) (Rule, error) {
 	if qn := elem.QualifiedName(); qn != "rule" {
 		return rule, fmt.Errorf("%s: unexpected element", qn)
 	}
-	ctx, err := getAttribute(elem, "context")
-	if err != nil {
-		return rule, nil
-	}
-	if _, err := xml.Compile(strings.NewReader(ctx)); err != nil {
+	if rule.Context, err = getAttribute(elem, "context"); err != nil {
 		return rule, err
 	}
-	rule.Context = ctx
-	// if rule.Context, err = getAttribute(elem, "context"); err != nil {
-	// 	return rule, err
-	// }
-	rule.env = Empty()
 	for {
 		el, err := getElementFromReader(rs)
 		if err != nil {
 			return rule, err
 		}
-		ass, err := readAssert(rs, el)
-		if err != nil {
-			return rule, err
+		switch qn := el.QualifiedName(); qn {
+		case "let":
+			err := readLet(rs, el)
+			if err != nil {
+				return rule, err
+			}
+		case "assert":
+			ass, err := readAssert(rs, el)
+			if err != nil {
+				return rule, err
+			}
+			rule.Assertions = append(rule.Assertions, ass)
+		default:
+			return rule, fmt.Errorf("rule: unexpected %s element", qn)
 		}
-		rule.Assertions = append(rule.Assertions, ass)
 	}
+	fmt.Printf("rule: %+v\n", rule)
+	return rule, nil
 }
 
 func readAssert(rs *xml.Reader, elem *xml.Element) (Assert, error) {
@@ -194,14 +199,9 @@ func readAssert(rs *xml.Reader, elem *xml.Element) (Assert, error) {
 	if qn := elem.QualifiedName(); qn != "assert" {
 		return ass, fmt.Errorf("%s: unexpected element", qn)
 	}
-	test, err := getAttribute(elem, "test")
-	if err != nil {
+	if ass.Test, err = getAttribute(elem, "test"); err != nil {
 		return ass, err
 	}
-	if _, err := xml.Compile(strings.NewReader(test)); err != nil {
-		return ass, err
-	}
-	ass.Test = test
 	ass.Ident, _ = getAttribute(elem, "id")
 	ass.Flag, _ = getAttribute(elem, "flag")
 
@@ -209,18 +209,45 @@ func readAssert(rs *xml.Reader, elem *xml.Element) (Assert, error) {
 	if err != nil {
 		return ass, err
 	}
+	fmt.Printf("assert: %+v\n", ass)
 	return ass, isClosed(rs, "assert")
 }
 
-func readLet(rs *xml.Reader) error {
+func readLet(rs *xml.Reader, elem *xml.Element) error {
+	var (
+		let Let
+		err error
+	)
+	let.Ident, err = getAttribute(elem, "name")
+	if err != nil {
+		return err
+	}
+	let.Value, err = getAttribute(elem, "value")
+	if err != nil {
+		return err
+	}
+	fmt.Printf("let: %+v\n", let)
 	return nil
 }
 
-func readNS(rs *xml.Reader) error {
+func readNS(rs *xml.Reader, elem *xml.Element) error {
+	var (
+		ns  Namespace
+		err error
+	)
+	ns.URI, err = getAttribute(elem, "uri")
+	if err != nil {
+		return err
+	}
+	ns.Prefix, err = getAttribute(elem, "prefix")
+	if err != nil {
+		return err
+	}
+	fmt.Printf("namespace: %+v\n", ns)
 	return nil
 }
 
-func readFunction(rs *xml.Reader) error {
+func readFunction(rs *xml.Reader, elem *xml.Element) error {
 	for {
 		el, err := rs.Read()
 		if errors.Is(err, xml.ErrClosed) && el.QualifiedName() == "function" {
@@ -233,8 +260,7 @@ func readFunction(rs *xml.Reader) error {
 func readIntro(rs *xml.Reader) error {
 	node, err := rs.Read()
 	if err != nil && !errors.Is(err, xml.ErrClosed) {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(3)
+		return err
 	}
 	switch node := node.(type) {
 	case *xml.Instruction:
@@ -242,7 +268,7 @@ func readIntro(rs *xml.Reader) error {
 	case *xml.Comment:
 		return readIntro(rs)
 	case *xml.Element:
-		if node.LocalName() != "schema" {
+		if node.QualifiedName() != "schema" {
 			return fmt.Errorf("expected schema element")
 		}
 		if _, err := getTitleElement(rs); err != nil {
@@ -262,7 +288,7 @@ func isClosed(rs *xml.Reader, name string) error {
 	if _, err := getElement(node); err != nil {
 		return err
 	}
-	if node.LocalName() != name {
+	if node.QualifiedName() != name {
 		return fmt.Errorf("expected closing element for %s", name)
 	}
 	return nil
@@ -272,6 +298,9 @@ func getElementFromReader(rs *xml.Reader) (*xml.Element, error) {
 	node, err := rs.Read()
 	if err != nil {
 		return nil, err
+	}
+	if _, ok := node.(*xml.Comment); ok {
+		return getElementFromReader(rs)
 	}
 	return getElement(node)
 }
@@ -315,7 +344,17 @@ func getAttribute(elem *xml.Element, name string) (string, error) {
 	if ix < 0 {
 		return "", fmt.Errorf("%s: attribute %q is missing", elem.QualifiedName(), name)
 	}
-	return elem.Attrs[ix].Value, nil
+	value := elem.Attrs[ix].Value
+	value = strings.Map(func(r rune) rune {
+		if r == '\r' || r == '\t' {
+			return -1
+		}
+		if r == '\n' {
+			return ' '
+		}
+		return r
+	}, value)
+	return strings.TrimSpace(value), nil
 }
 
 func getTitleElement(rs *xml.Reader) (string, error) {
