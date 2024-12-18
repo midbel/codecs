@@ -455,14 +455,23 @@ func (a attr) Eval(node Node) (any, error) {
 	return "", nil
 }
 
-type alternative struct {
+type intersect struct {
 	all []Expr
 }
 
-func (a alternative) Next(node Node) (*NodeList, error) {
+func (i intersect) Next(node Node) (*NodeList, error) {
 	list := createList()
-	for i := range a.all {
-		res, err := a.all[i].Next(node)
+	return list, nil
+}
+
+type union struct {
+	all []Expr
+}
+
+func (u union) Next(node Node) (*NodeList, error) {
+	list := createList()
+	for i := range u.all {
+		res, err := u.all[i].Next(node)
 		if err != nil {
 			return nil, err
 		}

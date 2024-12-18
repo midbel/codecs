@@ -100,6 +100,7 @@ func Compile(r io.Reader) (Expr, error) {
 		Digit:      cp.compileNumber,
 		opSub:      cp.compileReverse,
 		opMul:      cp.compileName,
+		begGrp:     cp.compileSequence,
 	}
 
 	cp.next()
@@ -120,8 +121,8 @@ func (c *compiler) Compile() (Expr, error) {
 
 func (c *compiler) compile() (Expr, error) {
 	var (
-		alt alternative
-		do  = func() (Expr, error) {
+		expr union
+		do   = func() (Expr, error) {
 			if c.is(currLevel) {
 				return c.compileRoot()
 			}
@@ -136,7 +137,7 @@ func (c *compiler) compile() (Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		alt.all = append(alt.all, e)
+		expr.all = append(expr.all, e)
 		switch {
 		case c.is(opAlt):
 			c.next()
@@ -148,10 +149,10 @@ func (c *compiler) compile() (Expr, error) {
 			return nil, errSyntax
 		}
 	}
-	if len(alt.all) == 1 {
-		return alt.all[0], nil
+	if len(expr.all) == 1 {
+		return expr.all[0], nil
 	}
-	return alt, nil
+	return expr, nil
 }
 
 func (c *compiler) compileFilter(left Expr) (Expr, error) {
@@ -170,6 +171,10 @@ func (c *compiler) compileFilter(left Expr) (Expr, error) {
 		check: expr,
 	}
 	return f, nil
+}
+
+func (c *compiler) compileSequence() (Expr, error) {
+	return nil, nil
 }
 
 func (c *compiler) compileBinary(left Expr) (Expr, error) {
@@ -439,6 +444,8 @@ func isReserved(str string) bool {
 	case kwIntersect:
 	case kwExcept:
 	case kwReturn:
+	case kwSome:
+	case kwEvery:
 	default:
 		return false
 	}
