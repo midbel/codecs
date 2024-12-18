@@ -455,6 +455,15 @@ func (a attr) Eval(node Node) (any, error) {
 	return "", nil
 }
 
+type except struct {
+	all []Expr
+}
+
+func (e except) Next(node Node) (*NodeList, error) {
+	list := createList()
+	return list, nil
+}
+
 type intersect struct {
 	all []Expr
 }

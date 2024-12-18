@@ -25,6 +25,8 @@ var (
 
 const (
 	powLowest = iota
+	powReserv
+	powAlt
 	powLevel
 	powOr
 	powAnd
@@ -39,8 +41,10 @@ const (
 )
 
 var bindings = map[rune]int{
+	reserved:  powReserv,
 	currLevel: powLevel,
 	anyLevel:  powLevel,
+	opAlt:     powAlt,
 	opEq:      powEq,
 	opNe:      powNe,
 	opGt:      powCmp,
@@ -87,6 +91,7 @@ func Compile(r io.Reader) (Expr, error) {
 		opGe:      cp.compileBinary,
 		opLt:      cp.compileBinary,
 		opLe:      cp.compileBinary,
+		opAlt:     cp.compileAlt,
 		begGrp:    cp.compileCall,
 		reserved:  cp.compileReservedInfix,
 	}
@@ -121,7 +126,7 @@ func (c *compiler) Compile() (Expr, error) {
 	return expr, err
 }
 
-func (c *compiler) compile() (Expr, error) {
+func (c *compiler) compile2() (Expr, error) {
 	var (
 		expr union
 		do   = func() (Expr, error) {
@@ -157,6 +162,10 @@ func (c *compiler) compile() (Expr, error) {
 	return expr, nil
 }
 
+func (c *compiler) compile() (Expr, error) {
+	return c.compileExpr(powLowest)
+}
+
 func (c *compiler) compileReservedPrefix() (Expr, error) {
 	switch c.curr.Literal {
 	case kwIf:
@@ -173,30 +182,52 @@ func (c *compiler) compileReservedPrefix() (Expr, error) {
 }
 
 func (c *compiler) compileIf() (Expr, error) {
+	c.next()
 	return nil, errImplemented
 }
 
 func (c *compiler) compileFor() (Expr, error) {
+	c.next()
 	return nil, errImplemented
 }
 
 func (c *compiler) compileSome() (Expr, error) {
+	c.next()
 	return nil, errImplemented
 }
 
 func (c *compiler) compileEvery() (Expr, error) {
+	c.next()
 	return nil, errImplemented
 }
 
 func (c *compiler) compileReservedInfix(left Expr) (Expr, error) {
-	switch c.curr.Literal {
+	keyword := c.curr.Literal
+	c.next()
+
+	expr, err := c.compileExpr(powLowest)
+	if err != nil {
+		return nil, err
+	}
+	switch keyword {
 	case kwUnion:
+		var res union
+		res.all = []Expr{left, expr}
+
+		expr = res
 	case kwIntersect:
+		var res intersect
+		res.all = []Expr{left, expr}
+
+		expr = res
 	case kwExcept:
+		var res except
+		res.all = []Expr{left, expr}
+		expr = res
 	default:
 		return nil, fmt.Errorf("%s: reserved word can not be used as infix operator")
 	}
-	return nil, errImplemented
+	return expr, nil
 }
 
 func (c *compiler) compileFilter(left Expr) (Expr, error) {
@@ -219,6 +250,17 @@ func (c *compiler) compileFilter(left Expr) (Expr, error) {
 
 func (c *compiler) compileSequence() (Expr, error) {
 	return nil, errImplemented
+}
+
+func (c *compiler) compileAlt(left Expr) (Expr, error) {
+	c.next()
+	expr, err := c.compileExpr(powLowest)
+	if err != nil {
+		return nil, err
+	}
+	var res union
+	res.all = []Expr{left, expr}
+	return res, nil
 }
 
 func (c *compiler) compileBinary(left Expr) (Expr, error) {
@@ -338,7 +380,7 @@ func (c *compiler) compileExpr(pow int) (Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	for !c.done() && !c.is(opAlt) && pow < bindings[c.curr.Type] {
+	for !c.done() && pow < bindings[c.curr.Type] {
 		fn, ok := c.infix[c.curr.Type]
 		if !ok {
 			return nil, fmt.Errorf("unexpected infix expression")
@@ -733,9 +775,6 @@ func (s *QueryScanner) scanIdent(tok *Token) {
 		s.read()
 	}
 	tok.Literal = s.str.String()
-	if isReserved(tok.Literal) {
-		tok.Type = reserved
-	}
 	switch tok.Literal {
 	case kwAnd:
 		tok.Type = opAnd
@@ -747,6 +786,9 @@ func (s *QueryScanner) scanIdent(tok *Token) {
 		tok.Type = opMod
 	default:
 		tok.Type = Name
+		if isReserved(tok.Literal) {
+			tok.Type = reserved
+		}
 	}
 	s.skipBlank()
 }
