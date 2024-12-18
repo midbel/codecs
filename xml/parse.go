@@ -88,6 +88,7 @@ func Compile(r io.Reader) (Expr, error) {
 		opLt:      cp.compileBinary,
 		opLe:      cp.compileBinary,
 		begGrp:    cp.compileCall,
+		reserved:  cp.compileReservedInfix,
 	}
 	cp.prefix = map[rune]func() (Expr, error){
 		currLevel:  cp.compileRoot,
@@ -101,6 +102,7 @@ func Compile(r io.Reader) (Expr, error) {
 		opSub:      cp.compileReverse,
 		opMul:      cp.compileName,
 		begGrp:     cp.compileSequence,
+		reserved:   cp.compileReservedPrefix,
 	}
 
 	cp.next()
@@ -155,6 +157,48 @@ func (c *compiler) compile() (Expr, error) {
 	return expr, nil
 }
 
+func (c *compiler) compileReservedPrefix() (Expr, error) {
+	switch c.curr.Literal {
+	case kwIf:
+		return c.compileIf()
+	case kwFor:
+		return c.compileFor()
+	case kwSome:
+		return c.compileSome()
+	case kwEvery:
+		return c.compileEvery()
+	default:
+		return nil, fmt.Errorf("%s: reserved word can not be used as prefix operator")
+	}
+}
+
+func (c *compiler) compileIf() (Expr, error) {
+	return nil, errImplemented
+}
+
+func (c *compiler) compileFor() (Expr, error) {
+	return nil, errImplemented
+}
+
+func (c *compiler) compileSome() (Expr, error) {
+	return nil, errImplemented
+}
+
+func (c *compiler) compileEvery() (Expr, error) {
+	return nil, errImplemented
+}
+
+func (c *compiler) compileReservedInfix(left Expr) (Expr, error) {
+	switch c.curr.Literal {
+	case kwUnion:
+	case kwIntersect:
+	case kwExcept:
+	default:
+		return nil, fmt.Errorf("%s: reserved word can not be used as infix operator")
+	}
+	return nil, errImplemented
+}
+
 func (c *compiler) compileFilter(left Expr) (Expr, error) {
 	c.next()
 	expr, err := c.compileExpr(powLowest)
@@ -174,7 +218,7 @@ func (c *compiler) compileFilter(left Expr) (Expr, error) {
 }
 
 func (c *compiler) compileSequence() (Expr, error) {
-	return nil, nil
+	return nil, errImplemented
 }
 
 func (c *compiler) compileBinary(left Expr) (Expr, error) {
@@ -689,6 +733,9 @@ func (s *QueryScanner) scanIdent(tok *Token) {
 		s.read()
 	}
 	tok.Literal = s.str.String()
+	if isReserved(tok.Literal) {
+		tok.Type = reserved
+	}
 	switch tok.Literal {
 	case kwAnd:
 		tok.Type = opAnd
