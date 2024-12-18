@@ -99,6 +99,7 @@ func Compile(r io.Reader) (Expr, error) {
 		currLevel:  cp.compileRoot,
 		anyLevel:   cp.compileDescendantFromRoot,
 		Name:       cp.compileName,
+		variable:   cp.compileVariable,
 		currNode:   cp.compileCurrent,
 		parentNode: cp.compileParent,
 		attrNode:   cp.compileAttr,
@@ -249,7 +250,29 @@ func (c *compiler) compileFilter(left Expr) (Expr, error) {
 }
 
 func (c *compiler) compileSequence() (Expr, error) {
-	return nil, errImplemented
+	c.next()
+	var seq sequence
+	for !c.done() && !c.is(endGrp) {
+		expr, err := c.compileExpr(powLowest)
+		if err != nil {
+			return nil, err
+		}
+		seq.all = append(seq.all, expr)
+		switch {
+		case c.is(opSeq):
+			c.next()
+			if c.is(endGrp) {
+				return nil, fmt.Errorf("%w: comma not allowed before end of sequence", errSyntax)
+			}
+		case c.is(endGrp):
+		default:
+			return nil, fmt.Errorf("%w: unexpected operator after expression", errSyntax)
+		}
+	}
+	if !c.is(endGrp) {
+		return nil, fmt.Errorf("%w: missing ')' at end of sequence", errSyntax)
+	}
+	return seq, nil
 }
 
 func (c *compiler) compileAlt(left Expr) (Expr, error) {
@@ -391,6 +414,10 @@ func (c *compiler) compileExpr(pow int) (Expr, error) {
 		}
 	}
 	return left, nil
+}
+
+func (c *compiler) compileVariable() (Expr, error) {
+	return nil, nil
 }
 
 func (c *compiler) compileName() (Expr, error) {

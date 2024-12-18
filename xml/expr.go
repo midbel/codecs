@@ -248,6 +248,14 @@ func (d *descendant) traverse(n Node) (*NodeList, error) {
 	return list, nil
 }
 
+type sequence struct {
+	all []Expr
+}
+
+func (s sequence) Next(node Node) (*NodeList, error) {
+	return createList(), nil
+}
+
 type Predicate interface {
 	Eval(Node) (any, error)
 }
