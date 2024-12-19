@@ -2,6 +2,7 @@ package xml
 
 import (
 	"math"
+	"strconv"
 	"strings"
 )
 
@@ -75,10 +76,6 @@ func callCount(_ Node, args []any) (any, error) {
 	return 0.0, nil
 }
 
-func callSum(_ Node, args []any) (any, error) {
-	return nil, nil
-}
-
 func callMin(_ Node, args []any) (any, error) {
 	return nil, nil
 }
@@ -87,8 +84,42 @@ func callMax(_ Node, args []any) (any, error) {
 	return nil, nil
 }
 
+func callSum(_ Node, args []any) (any, error) {
+	return sum(args)
+}
+
 func callAvg(_ Node, args []any) (any, error) {
-	return nil, nil
+	if len(args) == 0 {
+		return 0, nil
+	}
+	res, err := sum(args)
+	if err != nil {
+		return nil, err
+	}
+	return res / float64(len(args)), nil
+}
+
+func sum(values []any) (float64, error) {
+	var res float64
+	for i := range values {
+		switch a := values[i].(type) {
+		case string:
+			x, err := strconv.ParseFloat(a, 64)
+			if err != nil {
+				return 0, err
+			}
+			res += x
+		case float64:
+			res += a
+		case bool:
+			if a {
+				res++
+			}
+		default:
+			return 0, errType
+		}
+	}
+	return res, nil
 }
 
 func callRound(_ Node, args []any) (any, error) {

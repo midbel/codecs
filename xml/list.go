@@ -44,3 +44,11 @@ func (n *NodeList) All() iter.Seq[Node] {
 	}
 	return do
 }
+
+func (n *NodeList) Values() []any {
+	var list []any
+	for i := range n.All() {
+		list = append(list, i.Value())
+	}
+	return list
+}

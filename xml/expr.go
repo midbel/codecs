@@ -272,10 +272,10 @@ func createNoop(p Predicate) Expr {
 
 func evalExpr(e Expr, node Node) (any, error) {
 	p, ok := e.(Predicate)
-	if !ok {
-		return nil, fmt.Errorf("expression can not be use as a predicate")
+	if ok {
+		return p.Eval(node)
 	}
-	return p.Eval(node)
+	return nil, fmt.Errorf("expression can not be use as a predicate")
 }
 
 func (_ noopExpr) Next(_ Node) (*NodeList, error) {
@@ -414,7 +414,23 @@ func (c call) Next(curr Node) (*NodeList, error) {
 	case "comment":
 		_, keep = curr.(*Comment)
 	default:
-		return nil, fmt.Errorf("%s: %w function", c.ident, ErrUndefined)
+		value, err := c.Eval(curr)
+		if err != nil {
+			return nil, err
+		}
+		str, err := toString(value)
+		if err != nil {
+			return nil, err
+		}
+		var (
+			qn = QName{
+				Name: c.ident,
+			}
+			txt = NewText(str)
+			res = NewElement(qn)
+		)
+		res.Append(txt)
+		list.Push(res)
 	}
 	if keep {
 		list.Push(curr)
@@ -432,11 +448,19 @@ func (c call) Eval(node Node) (any, error) {
 	}
 	var args []any
 	for i := range c.args {
-		a, err := evalExpr(c.args[i], node)
-		if err != nil {
-			return nil, err
+		if e, ok := c.args[i].(Predicate); ok {
+			a, err := e.Eval(node)
+			if err != nil {
+				return nil, err
+			}
+			args = append(args, a)
+		} else {
+			list, err := c.args[i].Next(node)
+			if err != nil {
+				return nil, err
+			}
+			args = append(args, list.Values()...)
 		}
-		args = append(args, a)
 	}
 	return fn(node, args)
 }

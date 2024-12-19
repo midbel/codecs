@@ -379,12 +379,7 @@ func (c *compiler) compileCall(left Expr) (Expr, error) {
 	}
 	switch e := left.(type) {
 	case axis:
-		expr, err := compile(e.next)
-		if err != nil {
-			return nil, err
-		}
-		e.next = expr
-		return e, nil
+		return compile(e.next)
 	default:
 		fn, err := compile(left)
 		if err != nil {
