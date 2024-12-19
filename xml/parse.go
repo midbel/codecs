@@ -27,7 +27,6 @@ const (
 	powLowest = iota
 	powReserv
 	powAlt
-	powLevel
 	powOr
 	powAnd
 	powNe
@@ -38,6 +37,7 @@ const (
 	powPrefix
 	powCall
 	powPred
+	powLevel
 )
 
 var bindings = map[rune]int{
@@ -473,7 +473,7 @@ func (c *compiler) compileDescendant(left Expr) (Expr, error) {
 		deep: c.is(anyLevel),
 	}
 	c.next()
-	next, err := c.compileExpr(powLowest)
+	next, err := c.compileExpr(powLevel)
 	if err != nil {
 		return nil, err
 	}
