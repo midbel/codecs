@@ -272,6 +272,7 @@ func (c *compiler) compileSequence() (Expr, error) {
 	if !c.is(endGrp) {
 		return nil, fmt.Errorf("%w: missing ')' at end of sequence", errSyntax)
 	}
+	c.next()
 	return seq, nil
 }
 
