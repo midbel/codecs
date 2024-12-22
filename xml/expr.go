@@ -15,7 +15,7 @@ var (
 )
 
 type Expr interface {
-	Next(Node) (*NodeList, error)
+	Next(Node) (*ResultList, error)
 }
 
 const (
@@ -36,7 +36,7 @@ type query struct {
 	expr Expr
 }
 
-func (q query) Next(node Node) (*NodeList, error) {
+func (q query) Next(node Node) (*ResultList, error) {
 	if r := node.Parent(); r == nil {
 		var qn QName
 		root := NewElement(qn)
@@ -48,7 +48,7 @@ func (q query) Next(node Node) (*NodeList, error) {
 
 type all struct{}
 
-func (_ all) Next(curr Node) (*NodeList, error) {
+func (_ all) Next(curr Node) (*ResultList, error) {
 	if _, ok := curr.(*Element); !ok {
 		return nil, ErrNode
 	}
@@ -59,7 +59,7 @@ func (_ all) Next(curr Node) (*NodeList, error) {
 
 type current struct{}
 
-func (_ current) Next(curr Node) (*NodeList, error) {
+func (_ current) Next(curr Node) (*ResultList, error) {
 	list := createList()
 	list.Push(curr)
 	return list, nil
@@ -67,7 +67,7 @@ func (_ current) Next(curr Node) (*NodeList, error) {
 
 type parent struct{}
 
-func (_ parent) Next(curr Node) (*NodeList, error) {
+func (_ parent) Next(curr Node) (*ResultList, error) {
 	n := curr.Parent()
 	if n == nil {
 		return nil, fmt.Errorf("root element has no parent")
@@ -81,7 +81,7 @@ type absolute struct {
 	expr Expr
 }
 
-func (a absolute) Next(curr Node) (*NodeList, error) {
+func (a absolute) Next(curr Node) (*ResultList, error) {
 	return a.expr.Next(a.root(curr))
 }
 
@@ -95,7 +95,7 @@ func (a absolute) root(node Node) Node {
 
 type root struct{}
 
-func (_ root) Next(curr Node) (*NodeList, error) {
+func (_ root) Next(curr Node) (*ResultList, error) {
 	n := curr.Parent()
 	if n != nil {
 		return nil, ErrRoot
@@ -110,7 +110,7 @@ type axis struct {
 	next  Expr
 }
 
-func (a axis) Next(curr Node) (*NodeList, error) {
+func (a axis) Next(curr Node) (*ResultList, error) {
 	list := createList()
 	if a.ident == selfAxis || a.ident == descendantSelfAxis || a.ident == ancestorSelfAxis {
 		other, err := a.next.Next(curr)
@@ -179,7 +179,7 @@ func (n name) QualifiedName() string {
 	return fmt.Sprintf("%s:%s", n.space, n.ident)
 }
 
-func (n name) Next(curr Node) (*NodeList, error) {
+func (n name) Next(curr Node) (*ResultList, error) {
 	if curr.QualifiedName() != n.QualifiedName() {
 		return nil, errDiscard
 	}
@@ -206,14 +206,14 @@ type descendant struct {
 	deep bool
 }
 
-func (d descendant) Next(node Node) (*NodeList, error) {
+func (d descendant) Next(node Node) (*ResultList, error) {
 	ns, err := d.curr.Next(node)
 	if err != nil {
 		return nil, err
 	}
 	list := createList()
-	for i := range ns.All() {
-		xs, err := d.traverse(i)
+	for n := range ns.Nodes() {
+		xs, err := d.traverse(n)
 		if err != nil {
 			continue
 		}
@@ -222,7 +222,7 @@ func (d descendant) Next(node Node) (*NodeList, error) {
 	return list, nil
 }
 
-func (d *descendant) traverse(n Node) (*NodeList, error) {
+func (d *descendant) traverse(n Node) (*ResultList, error) {
 	list, err := d.next.Next(n)
 	if err == nil && list.Len() > 0 {
 		return list, nil
@@ -252,7 +252,7 @@ type sequence struct {
 	all []Expr
 }
 
-func (s sequence) Next(node Node) (*NodeList, error) {
+func (s sequence) Next(node Node) (*ResultList, error) {
 	return createList(), nil
 }
 
@@ -278,7 +278,7 @@ func evalExpr(e Expr, node Node) (any, error) {
 	return nil, fmt.Errorf("expression can not be use as a predicate")
 }
 
-func (_ noopExpr) Next(_ Node) (*NodeList, error) {
+func (_ noopExpr) Next(_ Node) (*ResultList, error) {
 	return nil, errImplemented
 }
 
@@ -399,7 +399,7 @@ type call struct {
 	args  []Expr
 }
 
-func (c call) Next(curr Node) (*NodeList, error) {
+func (c call) Next(curr Node) (*ResultList, error) {
 	var (
 		list = createList()
 		keep bool
@@ -414,23 +414,6 @@ func (c call) Next(curr Node) (*NodeList, error) {
 	case "comment":
 		_, keep = curr.(*Comment)
 	default:
-		value, err := c.Eval(curr)
-		if err != nil {
-			return nil, err
-		}
-		str, err := toString(value)
-		if err != nil {
-			return nil, err
-		}
-		var (
-			qn = QName{
-				Name: c.ident,
-			}
-			txt = NewText(str)
-			res = NewElement(qn)
-		)
-		res.Append(txt)
-		list.Push(res)
 	}
 	if keep {
 		list.Push(curr)
@@ -446,30 +429,14 @@ func (c call) Eval(node Node) (any, error) {
 	if fn == nil {
 		return nil, errImplemented
 	}
-	var args []any
-	for i := range c.args {
-		if e, ok := c.args[i].(Predicate); ok {
-			a, err := e.Eval(node)
-			if err != nil {
-				return nil, err
-			}
-			args = append(args, a)
-		} else {
-			list, err := c.args[i].Next(node)
-			if err != nil {
-				return nil, err
-			}
-			args = append(args, list.Values()...)
-		}
-	}
-	return fn(node, args)
+	return nil, nil
 }
 
 type attr struct {
 	ident string
 }
 
-func (a attr) Next(node Node) (*NodeList, error) {
+func (a attr) Next(node Node) (*ResultList, error) {
 	return nil, errImplemented
 }
 
@@ -491,7 +458,7 @@ type except struct {
 	all []Expr
 }
 
-func (e except) Next(node Node) (*NodeList, error) {
+func (e except) Next(node Node) (*ResultList, error) {
 	list := createList()
 	return list, nil
 }
@@ -500,7 +467,7 @@ type intersect struct {
 	all []Expr
 }
 
-func (i intersect) Next(node Node) (*NodeList, error) {
+func (i intersect) Next(node Node) (*ResultList, error) {
 	list := createList()
 	return list, nil
 }
@@ -509,7 +476,7 @@ type union struct {
 	all []Expr
 }
 
-func (u union) Next(node Node) (*NodeList, error) {
+func (u union) Next(node Node) (*ResultList, error) {
 	list := createList()
 	for i := range u.all {
 		res, err := u.all[i].Next(node)
@@ -526,13 +493,13 @@ type filter struct {
 	check Expr
 }
 
-func (f filter) Next(curr Node) (*NodeList, error) {
+func (f filter) Next(curr Node) (*ResultList, error) {
 	list, err := f.expr.Next(curr)
 	if err != nil {
 		return nil, err
 	}
 	ret := createList()
-	for n := range list.All() {
+	for n := range list.Nodes() {
 		res, err := evalExpr(f.check, n)
 		if err != nil {
 			continue

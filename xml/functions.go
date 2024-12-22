@@ -44,10 +44,10 @@ var builtins = map[string]builtinFunc{
 	"element-available": checkArity(1, callAvailable),
 }
 
-type builtinFunc func(Node, []any) (any, error)
+type builtinFunc func(Node, []Expr) (any, error)
 
 func checkArity(minArgs int, fn builtinFunc) builtinFunc {
-	do := func(node Node, args []any) (any, error) {
+	do := func(node Node, args []Expr) (any, error) {
 		if len(args) < minArgs {
 			return nil, errArgument
 		}
@@ -56,11 +56,11 @@ func checkArity(minArgs int, fn builtinFunc) builtinFunc {
 	return do
 }
 
-func callFirst(n Node, _ []any) (any, error) {
+func callFirst(n Node, _ []Expr) (any, error) {
 	return float64(0), nil
 }
 
-func callLast(n Node, _ []any) (any, error) {
+func callLast(n Node, _ []Expr) (any, error) {
 	p := n.Parent()
 	if p == nil {
 		return 1.0, nil
@@ -72,57 +72,27 @@ func callLast(n Node, _ []any) (any, error) {
 	return float64(len(x.Nodes)), nil
 }
 
-func callCount(_ Node, args []any) (any, error) {
+func callCount(ctx Node, args []Expr) (any, error) {
 	return 0.0, nil
 }
 
-func callMin(_ Node, args []any) (any, error) {
+func callMin(ctx Node, args []Expr) (any, error) {
 	return nil, nil
 }
 
-func callMax(_ Node, args []any) (any, error) {
+func callMax(ctx Node, args []Expr) (any, error) {
 	return nil, nil
 }
 
-func callSum(_ Node, args []any) (any, error) {
-	return sum(args)
+func callSum(ctx Node, args []Expr) (any, error) {
+	return nil, nil
 }
 
-func callAvg(_ Node, args []any) (any, error) {
-	if len(args) == 0 {
-		return 0, nil
-	}
-	res, err := sum(args)
-	if err != nil {
-		return nil, err
-	}
-	return res / float64(len(args)), nil
+func callAvg(ctx Node, args []Expr) (any, error) {
+	return nil, nil
 }
 
-func sum(values []any) (float64, error) {
-	var res float64
-	for i := range values {
-		switch a := values[i].(type) {
-		case string:
-			x, err := strconv.ParseFloat(a, 64)
-			if err != nil {
-				return 0, err
-			}
-			res += x
-		case float64:
-			res += a
-		case bool:
-			if a {
-				res++
-			}
-		default:
-			return 0, errType
-		}
-	}
-	return res, nil
-}
-
-func callRound(_ Node, args []any) (any, error) {
+func callRound(ctx Node, args []Expr) (any, error) {
 	n, ok := args[0].(float64)
 	if !ok {
 		return nil, errType
@@ -130,7 +100,7 @@ func callRound(_ Node, args []any) (any, error) {
 	return math.Round(n), nil
 }
 
-func callCeil(_ Node, args []any) (any, error) {
+func callCeil(ctx Node, args []Expr) (any, error) {
 	n, ok := args[0].(float64)
 	if !ok {
 		return nil, errType
@@ -138,7 +108,7 @@ func callCeil(_ Node, args []any) (any, error) {
 	return math.Ceil(n), nil
 }
 
-func callFloor(_ Node, args []any) (any, error) {
+func callFloor(ctx Node, args []Expr) (any, error) {
 	n, ok := args[0].(float64)
 	if !ok {
 		return nil, errType
@@ -146,7 +116,7 @@ func callFloor(_ Node, args []any) (any, error) {
 	return math.Floor(n), nil
 }
 
-func callAbs(_ Node, args []any) (any, error) {
+func callAbs(ctx Node, args []Expr) (any, error) {
 	n, ok := args[0].(float64)
 	if !ok {
 		return nil, errType
@@ -154,7 +124,7 @@ func callAbs(_ Node, args []any) (any, error) {
 	return math.Abs(n), nil
 }
 
-func callCutPrefix(_ Node, args []any) (any, error) {
+func callCutPrefix(ctx Node, args []Expr) (any, error) {
 	str, ok := args[0].(string)
 	if !ok {
 		return nil, errType
@@ -167,7 +137,7 @@ func callCutPrefix(_ Node, args []any) (any, error) {
 	return str, nil
 }
 
-func callCutSuffix(_ Node, args []any) (any, error) {
+func callCutSuffix(ctx Node, args []Expr) (any, error) {
 	str, ok := args[0].(string)
 	if !ok {
 		return nil, errType
@@ -180,7 +150,7 @@ func callCutSuffix(_ Node, args []any) (any, error) {
 	return str, nil
 }
 
-func callContains(_ Node, args []any) (any, error) {
+func callContains(ctx Node, args []Expr) (any, error) {
 	str, ok := args[0].(string)
 	if !ok {
 		return nil, errType
@@ -192,7 +162,7 @@ func callContains(_ Node, args []any) (any, error) {
 	return strings.Contains(str, check), nil
 }
 
-func callStartsWith(_ Node, args []any) (any, error) {
+func callStartsWith(ctx Node, args []Expr) (any, error) {
 	str, ok := args[0].(string)
 	if !ok {
 		return nil, errType
@@ -204,7 +174,7 @@ func callStartsWith(_ Node, args []any) (any, error) {
 	return strings.HasPrefix(str, check), nil
 }
 
-func callEndsWith(_ Node, args []any) (any, error) {
+func callEndsWith(ctx Node, args []Expr) (any, error) {
 	str, ok := args[0].(string)
 	if !ok {
 		return nil, errType
@@ -216,7 +186,7 @@ func callEndsWith(_ Node, args []any) (any, error) {
 	return strings.HasSuffix(str, check), nil
 }
 
-func callTrimSpace(_ Node, args []any) (any, error) {
+func callTrimSpace(ctx Node, args []Expr) (any, error) {
 	str, ok := args[0].(string)
 	if !ok {
 		return nil, errType
@@ -224,7 +194,7 @@ func callTrimSpace(_ Node, args []any) (any, error) {
 	return strings.TrimSpace(str), nil
 }
 
-func callStringLen(_ Node, args []any) (any, error) {
+func callStringLen(ctx Node, args []Expr) (any, error) {
 	str, ok := args[0].(string)
 	if !ok {
 		return nil, errType
@@ -233,7 +203,7 @@ func callStringLen(_ Node, args []any) (any, error) {
 	return float64(n), nil
 }
 
-func callUpper(_ Node, args []any) (any, error) {
+func callUpper(ctx Node, args []Expr) (any, error) {
 	str, ok := args[0].(string)
 	if !ok {
 		return nil, errType
@@ -241,7 +211,7 @@ func callUpper(_ Node, args []any) (any, error) {
 	return strings.ToUpper(str), nil
 }
 
-func callLower(_ Node, args []any) (any, error) {
+func callLower(ctx Node, args []Expr) (any, error) {
 	str, ok := args[0].(string)
 	if !ok {
 		return nil, errType
@@ -249,7 +219,7 @@ func callLower(_ Node, args []any) (any, error) {
 	return strings.ToLower(str), nil
 }
 
-func callConcat(_ Node, args []any) (any, error) {
+func callConcat(ctx Node, args []Expr) (any, error) {
 	var str []string
 	for i := range args {
 		s, err := toString(args[i])
@@ -261,7 +231,7 @@ func callConcat(_ Node, args []any) (any, error) {
 	return strings.Join(str, ""), nil
 }
 
-func callSubstring(_ Node, args []any) (any, error) {
+func callSubstring(ctx Node, args []Expr) (any, error) {
 	str, err := toString(args[0])
 	if err != nil {
 		return nil, err
@@ -283,23 +253,23 @@ func callSubstring(_ Node, args []any) (any, error) {
 	return str[int(pos):int(pos+size)], nil
 }
 
-func callLocalName(ctx Node, _ []any) (any, error) {
+func callLocalName(ctx Node, _ []Expr) (any, error) {
 	return ctx.LocalName(), nil
 }
 
-func callName(ctx Node, _ []any) (any, error) {
+func callName(ctx Node, _ []Expr) (any, error) {
 	return ctx.QualifiedName(), nil
 }
 
-func callValue(ctx Node, _ []any) (any, error) {
+func callValue(ctx Node, _ []Expr) (any, error) {
 	return ctx.Value(), nil
 }
 
-func callPosition(ctx Node, _ []any) (any, error) {
+func callPosition(ctx Node, _ []Expr) (any, error) {
 	return float64(ctx.Position()), nil
 }
 
-func callAvailable(ctx Node, args []any) (any, error) {
+func callAvailable(ctx Node, args []Expr) (any, error) {
 	str, ok := args[0].(string)
 	if !ok {
 		return nil, errType
@@ -311,27 +281,27 @@ func callAvailable(ctx Node, args []any) (any, error) {
 	return el.Has(str), nil
 }
 
-func callNumber(_ Node, args []any) (any, error) {
+func callNumber(ctx Node, args []Expr) (any, error) {
 	return toFloat(args[0])
 }
 
-func callString(_ Node, args []any) (any, error) {
+func callString(ctx Node, args []Expr) (any, error) {
 	return toString(args[0])
 }
 
-func callBoolean(_ Node, args []any) (any, error) {
+func callBoolean(ctx Node, args []Expr) (any, error) {
 	return toBool(args[0]), nil
 }
 
-func callNot(_ Node, args []any) (any, error) {
+func callNot(ctx Node, args []Expr) (any, error) {
 	ok := toBool(args[0])
 	return !ok, nil
 }
 
-func callTrue(_ Node, _ []any) (any, error) {
+func callTrue(ctx Node, _ []Expr) (any, error) {
 	return true, nil
 }
 
-func callFalse(_ Node, _ []any) (any, error) {
+func callFalse(ctx Node, _ []Expr) (any, error) {
 	return false, nil
 }

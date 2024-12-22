@@ -71,39 +71,39 @@ func (i nodeItem) Value() any {
 	return traverse(i.node)
 }
 
-type NodeList struct {
-	nodes []Node
+type ResultList struct {
+	items []ResultItem
 }
 
-func createList() *NodeList {
-	return &NodeList{}
+func createList() *ResultList {
+	return &ResultList{}
 }
 
-func (n *NodeList) Nodes() []Node {
-	tmp := slices.Clone(n.nodes)
+func (r *ResultList) Items() []ResultItem {
+	tmp := slices.Clone(r.items)
 	return tmp
 }
 
-func (n *NodeList) Merge(other *NodeList) {
-	n.nodes = slices.Concat(n.nodes, other.nodes)
+func (r *ResultList) Merge(other *ResultList) {
+	r.items = slices.Concat(r.items, other.items)
 }
 
-func (n *NodeList) Push(node Node) {
-	n.nodes = append(n.nodes, node)
+func (r *ResultList) Push(node Node) {
+	r.items = append(r.items, createNode(node))
 }
 
-func (n *NodeList) Empty() bool {
-	return len(n.nodes) == 0
+func (r *ResultList) Empty() bool {
+	return len(r.items) == 0
 }
 
-func (n *NodeList) Len() int {
-	return len(n.nodes)
+func (r *ResultList) Len() int {
+	return len(r.items)
 }
 
-func (n *NodeList) All() iter.Seq[Node] {
+func (r *ResultList) Nodes() iter.Seq[Node] {
 	do := func(yield func(Node) bool) {
-		for _, n := range n.nodes {
-			if !yield(n) {
+		for _, i := range r.items {
+			if !yield(i.Node()) {
 				break
 			}
 		}
@@ -111,7 +111,18 @@ func (n *NodeList) All() iter.Seq[Node] {
 	return do
 }
 
-func (n *NodeList) Values() []any {
+func (r *ResultList) All() iter.Seq[ResultItem] {
+	do := func(yield func(ResultItem) bool) {
+		for _, i := range r.items {
+			if !yield(i) {
+				break
+			}
+		}
+	}
+	return do
+}
+
+func (r *ResultList) Values() []any {
 	var list []any
 	for i := range n.All() {
 		list = append(list, i.Value())
