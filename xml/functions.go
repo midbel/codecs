@@ -57,228 +57,111 @@ func checkArity(minArgs int, fn builtinFunc) builtinFunc {
 }
 
 func callFirst(n Node, _ []Expr) (any, error) {
-	return float64(0), nil
+	return nil, errImplemented
 }
 
 func callLast(n Node, _ []Expr) (any, error) {
-	p := n.Parent()
-	if p == nil {
-		return 1.0, nil
-	}
-	x, ok := p.(*Element)
-	if !ok {
-		return 1.0, nil
-	}
-	return float64(len(x.Nodes)), nil
+	return nil, errImplemented
 }
 
 func callCount(ctx Node, args []Expr) (any, error) {
-	return 0.0, nil
+	return nil, errImplemented
 }
 
 func callMin(ctx Node, args []Expr) (any, error) {
-	return nil, nil
+	return nil, errImplemented
 }
 
 func callMax(ctx Node, args []Expr) (any, error) {
-	return nil, nil
+	return nil, errImplemented
 }
 
 func callSum(ctx Node, args []Expr) (any, error) {
-	return nil, nil
+	return nil, errImplemented
 }
 
 func callAvg(ctx Node, args []Expr) (any, error) {
-	return nil, nil
+	return nil, errImplemented
 }
 
 func callRound(ctx Node, args []Expr) (any, error) {
-	n, ok := args[0].(float64)
-	if !ok {
-		return nil, errType
-	}
-	return math.Round(n), nil
+	return nil, errImplemented
 }
 
 func callCeil(ctx Node, args []Expr) (any, error) {
-	n, ok := args[0].(float64)
-	if !ok {
-		return nil, errType
-	}
-	return math.Ceil(n), nil
+	return nil, errImplemented
 }
 
 func callFloor(ctx Node, args []Expr) (any, error) {
-	n, ok := args[0].(float64)
-	if !ok {
-		return nil, errType
-	}
-	return math.Floor(n), nil
+	return nil, errImplemented
 }
 
 func callAbs(ctx Node, args []Expr) (any, error) {
-	n, ok := args[0].(float64)
-	if !ok {
-		return nil, errType
-	}
-	return math.Abs(n), nil
+	return nil, errImplemented
 }
 
 func callCutPrefix(ctx Node, args []Expr) (any, error) {
-	str, ok := args[0].(string)
-	if !ok {
-		return nil, errType
-	}
-	check, ok := args[1].(string)
-	if !ok {
-		return nil, errType
-	}
-	str, _ = strings.CutPrefix(str, check)
-	return str, nil
+	return nil, errImplemented
 }
 
 func callCutSuffix(ctx Node, args []Expr) (any, error) {
-	str, ok := args[0].(string)
-	if !ok {
-		return nil, errType
-	}
-	check, ok := args[1].(string)
-	if !ok {
-		return nil, errType
-	}
-	str, _ = strings.CutSuffix(str, check)
-	return str, nil
+	return nil, errImplemented
 }
 
 func callContains(ctx Node, args []Expr) (any, error) {
-	str, ok := args[0].(string)
-	if !ok {
-		return nil, errType
-	}
-	check, ok := args[1].(string)
-	if !ok {
-		return nil, errType
-	}
-	return strings.Contains(str, check), nil
+	return nil, errImplemented
 }
 
 func callStartsWith(ctx Node, args []Expr) (any, error) {
-	str, ok := args[0].(string)
-	if !ok {
-		return nil, errType
-	}
-	check, ok := args[1].(string)
-	if !ok {
-		return nil, errType
-	}
-	return strings.HasPrefix(str, check), nil
+	return nil, errImplemented
 }
 
 func callEndsWith(ctx Node, args []Expr) (any, error) {
-	str, ok := args[0].(string)
-	if !ok {
-		return nil, errType
-	}
-	check, ok := args[1].(string)
-	if !ok {
-		return nil, errType
-	}
-	return strings.HasSuffix(str, check), nil
+	return nil, errImplemented
 }
 
 func callTrimSpace(ctx Node, args []Expr) (any, error) {
-	str, ok := args[0].(string)
-	if !ok {
-		return nil, errType
-	}
-	return strings.TrimSpace(str), nil
+	return nil, errImplemented
 }
 
 func callStringLen(ctx Node, args []Expr) (any, error) {
-	str, ok := args[0].(string)
-	if !ok {
-		return nil, errType
-	}
-	n := len(str)
-	return float64(n), nil
+	return nil, errImplemented
 }
 
 func callUpper(ctx Node, args []Expr) (any, error) {
-	str, ok := args[0].(string)
-	if !ok {
-		return nil, errType
-	}
-	return strings.ToUpper(str), nil
+	return nil, errImplemented
 }
 
 func callLower(ctx Node, args []Expr) (any, error) {
-	str, ok := args[0].(string)
-	if !ok {
-		return nil, errType
-	}
-	return strings.ToLower(str), nil
+	return nil, errImplemented
 }
 
 func callConcat(ctx Node, args []Expr) (any, error) {
-	var str []string
-	for i := range args {
-		s, err := toString(args[i])
-		if err != nil {
-			return nil, err
-		}
-		str = append(str, s)
-	}
-	return strings.Join(str, ""), nil
+	return nil, errImplemented
 }
 
 func callSubstring(ctx Node, args []Expr) (any, error) {
-	str, err := toString(args[0])
-	if err != nil {
-		return nil, err
-	}
-	pos, err := toFloat(args[1])
-	if err != nil {
-		return nil, err
-	}
-	var size float64
-	if len(args) >= 2 {
-		size, err = toFloat(args[2])
-		if err != nil {
-			return nil, err
-		}
-	}
-	if size == 0 {
-		size = float64(len(str)) - pos
-	}
-	return str[int(pos):int(pos+size)], nil
+	return nil, errImplemented
 }
 
-func callLocalName(ctx Node, _ []Expr) (any, error) {
-	return ctx.LocalName(), nil
+func callLocalName(ctx Node, args []Expr) (any, error) {
+	return nil, errImplemented
 }
 
-func callName(ctx Node, _ []Expr) (any, error) {
-	return ctx.QualifiedName(), nil
+func callName(ctx Node, args []Expr) (any, error) {
+	return nil, errImplemented
 }
 
-func callValue(ctx Node, _ []Expr) (any, error) {
-	return ctx.Value(), nil
+func callValue(ctx Node, args []Expr) (any, error) {
+	return nil, errImplemented
 }
 
-func callPosition(ctx Node, _ []Expr) (any, error) {
-	return float64(ctx.Position()), nil
+func callPosition(ctx Node, args []Expr) (any, error) {
+	return nil, errImplemented
 }
 
 func callAvailable(ctx Node, args []Expr) (any, error) {
-	str, ok := args[0].(string)
-	if !ok {
-		return nil, errType
-	}
-	el, ok := ctx.(*Element)
-	if !ok {
-		return nil, errType
-	}
-	return el.Has(str), nil
+	return nil, errImplemented
 }
 
 func callNumber(ctx Node, args []Expr) (any, error) {
@@ -298,10 +181,10 @@ func callNot(ctx Node, args []Expr) (any, error) {
 	return !ok, nil
 }
 
-func callTrue(ctx Node, _ []Expr) (any, error) {
+func callTrue(ctx Node, args []Expr) (any, error) {
 	return true, nil
 }
 
-func callFalse(ctx Node, _ []Expr) (any, error) {
+func callFalse(ctx Node, args []Expr) (any, error) {
 	return false, nil
 }
