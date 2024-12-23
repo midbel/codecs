@@ -161,7 +161,7 @@ func search(doc *xml.Document, query, root string) (*xml.Document, error) {
 		return nil, nil
 	}
 	var node xml.Node
-	if ns := list.Nodes(); list.Len() == 1 {
+	if ns := getNodesFromList(list); len(ns) == 1 {
 		node = ns[0]
 	} else {
 		el := xml.NewElement(xml.LocalName(root))
@@ -169,4 +169,12 @@ func search(doc *xml.Document, query, root string) (*xml.Document, error) {
 		node = el
 	}
 	return xml.NewDocument(node), nil
+}
+
+func getNodesFromList(list *xml.ResultList) []xml.Node {
+	var all []xml.Node
+	for i := range list.Nodes() {
+		all = append(all, i)
+	}
+	return all
 }
