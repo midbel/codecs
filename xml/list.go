@@ -124,7 +124,7 @@ func (r *ResultList) All() iter.Seq[ResultItem] {
 
 func (r *ResultList) Values() []any {
 	var list []any
-	for i := range n.All() {
+	for i := range r.All() {
 		list = append(list, i.Value())
 	}
 	return list
