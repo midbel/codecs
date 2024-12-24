@@ -8,6 +8,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"iter"
 
 	"github.com/midbel/codecs/xml"
 )
@@ -59,8 +60,25 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
-	_ = sch
+	for a := range getAssertions(sch) {
+		fmt.Printf("%-16s | %-8s | %-s", a.Ident, a.Flag, a.Message)
+		fmt.Println()
+	}
+}
 
+func getAssertions(sch *Schema) iter.Seq[Assert] {
+	return func(yield func(Assert) bool) {
+		for _, p := sch.Patterns {
+			for _, r := range p.Rules {
+				for _, a := range r.Assertions {
+					if !yield(a) {
+						return
+					}
+				}
+			}
+		}
+
+	}
 }
 
 func parseSchema(file string) (*Schema, error) {
