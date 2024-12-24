@@ -12,6 +12,15 @@ import (
 	"github.com/midbel/codecs/xml"
 )
 
+type Schema struct {
+	Title string
+
+	Patterns  []*Pattern
+	Variables []*Let
+	Spaces    []*Namespace
+	Functions []*Function
+}
+
 type Namespace struct {
 	URI    string
 	Prefix string
@@ -33,61 +42,85 @@ type Assert struct {
 
 type Rule struct {
 	Context    string
-	Assertions []Assert
+	Assertions []*Assert
+	Variables  []*Let
 }
 
 type Pattern struct {
-	Title string
-	Rules []Rule
+	Title     string
+	Rules     []*Rule
+	Variables []*Let
 }
 
 func main() {
 	flag.Parse()
-
-	r, err := os.Open(flag.Arg(0))
+	sch, err := parseSchema(flag.Arg(0))
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	defer r.Close()
-
-	rs := xml.NewReader(r)
-	if err := readIntro(rs); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
+	_ = sch
+
+}
+
+func parseSchema(file string) (*Schema, error) {
+	r, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+
+	var (
+		rs  = xml.NewReader(r)
+		sch Schema
+	)
+	if err := readIntro(rs); err != nil {
+		return nil, err
+	}
 	for {
 		node, err := rs.Read()
+		if errors.Is(err, xml.ErrClosed) && node.QualifiedName() == "schema" {
+			break
+		}
 		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil && !errors.Is(err, xml.ErrClosed) {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(2)
+			return nil, err
 		}
 		switch node := node.(type) {
 		case *xml.Element:
-			err = readTop(rs, node)
+			err = readTop(rs, node, &sch)
 		case *xml.Instruction:
 		case *xml.Comment:
 		default:
 			fmt.Fprintln(os.Stderr, "unexpected element type")
 		}
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(2)
+			return nil, err
 		}
 	}
+	return &sch, nil
 }
 
-func readTop(rs *xml.Reader, node *xml.Element) error {
+func readTop(rs *xml.Reader, node *xml.Element, sch *Schema) error {
 	switch node.QualifiedName() {
 	case "pattern":
-		return readPattern(rs)
+		return readPattern(rs, sch)
 	case "let":
-		return readLet(rs, node)
+		let, err := readLet(rs, node)
+		if err != nil {
+			return err
+		}
+		sch.Variables = append(sch.Variables, let)
+		return nil
 	case "ns":
-		return readNS(rs, node)
+		ns, err := readNS(rs, node)
+		if err != nil {
+			return err
+		}
+		sch.Spaces = append(sch.Spaces, ns)
+		return nil
 	case "function":
 		return readFunction(rs, node)
 	default:
@@ -95,31 +128,23 @@ func readTop(rs *xml.Reader, node *xml.Element) error {
 	}
 }
 
-func readPattern(rs *xml.Reader) error {
+func readPattern(rs *xml.Reader, sch *Schema) error {
 	var pat Pattern
 	for {
-		node, err := rs.Read()
-		if node.QualifiedName() == "pattern" && errors.Is(err, xml.ErrClosed) {
-			return nil
-		}
-		if err != nil && !errors.Is(err, xml.ErrClosed) {
+		el, err := getElementFromReaderMaybeClosed(rs, "pattern")
+		if err != nil {
+			if errors.Is(err, xml.ErrClosed) {
+				break
+			}
 			return err
-		}
-		var el *xml.Element
-		switch x := node.(type) {
-		case *xml.Comment:
-			continue
-		case *xml.Element:
-			el = x
-		default:
-			return fmt.Errorf("unexpected xml type")
 		}
 		switch qn := el.QualifiedName(); qn {
 		case "let":
-			err := readLet(rs, el)
+			let, err := readLet(rs, el)
 			if err != nil && !errors.Is(err, xml.ErrClosed) {
 				return err
 			}
+			pat.Variables = append(pat.Variables, let)
 		case "rule":
 			rule, err := readRule(rs, el)
 			if !errors.Is(err, xml.ErrClosed) {
@@ -130,111 +155,101 @@ func readPattern(rs *xml.Reader) error {
 			return fmt.Errorf("pattern: unexpected %s element", qn)
 		}
 	}
+	sch.Patterns = append(sch.Patterns, &pat)
 	return nil
 }
 
-func readRule(rs *xml.Reader, elem *xml.Element) (Rule, error) {
+func readRule(rs *xml.Reader, elem *xml.Element) (*Rule, error) {
 	var (
 		rule Rule
 		err  error
 	)
 	if qn := elem.QualifiedName(); qn != "rule" {
-		return rule, fmt.Errorf("%s: unexpected element", qn)
+		return nil, fmt.Errorf("%s: unexpected element", qn)
 	}
 	if rule.Context, err = getAttribute(elem, "context"); err != nil {
-		return rule, err
+		return nil, err
 	}
 	for {
-		node, err := rs.Read()
-		if node.QualifiedName() == "rule" && errors.Is(err, xml.ErrClosed) {
-			return rule, err
-		}
-		if err != nil && !errors.Is(err, xml.ErrClosed) {
-			return rule, err
-		}
-		var el *xml.Element
-		switch x := node.(type) {
-		case *xml.Comment:
-			continue
-		case *xml.Element:
-			el = x
-		default:
-			return rule, fmt.Errorf("unexpected xml type")
+		el, err := getElementFromReaderMaybeClosed(rs, "rule")
+		if err != nil {
+			return &rule, err
 		}
 		switch qn := el.QualifiedName(); qn {
 		case "let":
-			err := readLet(rs, el)
+			let, err := readLet(rs, el)
 			if err != nil && !errors.Is(err, xml.ErrClosed) {
-				return rule, err
+				return nil, err
 			}
+			rule.Variables = append(rule.Variables, let)
 		case "assert":
 			ass, err := readAssert(rs, el)
 			if err != nil {
-				return rule, err
+				return nil, err
 			}
 			rule.Assertions = append(rule.Assertions, ass)
 		default:
-			return rule, fmt.Errorf("rule: unexpected %s element", qn)
+			return nil, fmt.Errorf("rule: unexpected %s element", qn)
 		}
 	}
 	fmt.Printf("rule: %+v\n", rule)
-	return rule, nil
+	return &rule, nil
 }
 
-func readAssert(rs *xml.Reader, elem *xml.Element) (Assert, error) {
+func readAssert(rs *xml.Reader, elem *xml.Element) (*Assert, error) {
 	var (
 		ass Assert
 		err error
 	)
 	if qn := elem.QualifiedName(); qn != "assert" {
-		return ass, fmt.Errorf("%s: unexpected element", qn)
+		return nil, fmt.Errorf("%s: unexpected element", qn)
 	}
 	if ass.Test, err = getAttribute(elem, "test"); err != nil {
-		return ass, err
+		return nil, err
 	}
 	ass.Ident, _ = getAttribute(elem, "id")
 	ass.Flag, _ = getAttribute(elem, "flag")
 
 	ass.Message, err = getStringFromReader(rs)
 	if err != nil {
-		return ass, err
+		return nil, err
 	}
 	fmt.Printf("assert: %+v\n", ass)
-	return ass, isClosed(rs, "assert")
+	return &ass, isClosed(rs, "assert")
 }
 
-func readLet(rs *xml.Reader, elem *xml.Element) error {
+func readLet(rs *xml.Reader, elem *xml.Element) (*Let, error) {
 	var (
 		let Let
 		err error
 	)
 	let.Ident, err = getAttribute(elem, "name")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	let.Value, err = getAttribute(elem, "value")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	fmt.Printf("let: %+v\n", let)
-	return nil
+	return &let, nil
 }
 
-func readNS(rs *xml.Reader, elem *xml.Element) error {
+func readNS(rs *xml.Reader, elem *xml.Element) (*Namespace, error) {
 	var (
 		ns  Namespace
 		err error
 	)
 	ns.URI, err = getAttribute(elem, "uri")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	ns.Prefix, err = getAttribute(elem, "prefix")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	fmt.Printf("namespace: %+v\n", ns)
-	return nil
+	return &ns, nil
 }
 
 func readFunction(rs *xml.Reader, elem *xml.Element) error {
@@ -282,6 +297,24 @@ func isClosed(rs *xml.Reader, name string) error {
 		return fmt.Errorf("expected closing element for %s", name)
 	}
 	return nil
+}
+
+func getElementFromReaderMaybeClosed(rs *xml.Reader, name string) (*xml.Element, error) {
+	node, err := rs.Read()
+	if node.QualifiedName() == name && errors.Is(err, xml.ErrClosed) {
+		return nil, err
+	}
+	if err != nil && !errors.Is(err, xml.ErrClosed) {
+		return nil, err
+	}
+	switch el := node.(type) {
+	case *xml.Comment:
+		return getElementFromReaderMaybeClosed(rs, name)
+	case *xml.Element:
+		return el, nil
+	default:
+		return nil, fmt.Errorf("unexpected xml type")
+	}
 }
 
 func getElementFromReader(rs *xml.Reader) (*xml.Element, error) {
