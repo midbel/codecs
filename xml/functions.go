@@ -484,11 +484,14 @@ func getName(value any, fn func(Node) string) (string, error) {
 }
 
 func getStringFromNode(expr Expr, ctx Node) (string, error) {
-	v, err := evalExpr(expr, ctx)
+	v, err := expr.Next(ctx)
 	if err != nil {
 		return "", err
 	}
-	str, ok := v.(string)
+	if isEmpty(v) {
+		return "", nil
+	}
+	str, ok := v[0].Value().(string)
 	if !ok {
 		return "", errType
 	}

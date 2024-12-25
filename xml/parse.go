@@ -302,7 +302,7 @@ func (c *compiler) compileBinary(left Expr) (Expr, error) {
 		right: next,
 		op:    op,
 	}
-	return createNoop(b), nil
+	return b, nil
 }
 
 func (c *compiler) compileLiteral() (Expr, error) {
@@ -310,7 +310,7 @@ func (c *compiler) compileLiteral() (Expr, error) {
 	i := literal{
 		expr: c.curr.Literal,
 	}
-	return createNoop(i), nil
+	return i, nil
 }
 
 func (c *compiler) compileNumber() (Expr, error) {
@@ -322,7 +322,7 @@ func (c *compiler) compileNumber() (Expr, error) {
 	n := number{
 		expr: f,
 	}
-	return createNoop(n), nil
+	return n, nil
 }
 
 func (c *compiler) compileReverse() (Expr, error) {
@@ -334,7 +334,7 @@ func (c *compiler) compileReverse() (Expr, error) {
 	r := reverse{
 		expr: expr,
 	}
-	return createNoop(r), nil
+	return r, nil
 }
 
 func (c *compiler) compileAttr() (Expr, error) {
@@ -342,7 +342,7 @@ func (c *compiler) compileAttr() (Expr, error) {
 	a := attr{
 		ident: c.curr.Literal,
 	}
-	return createNoop(a), nil
+	return a, nil
 }
 
 func (c *compiler) compileCall(left Expr) (Expr, error) {
@@ -386,7 +386,7 @@ func (c *compiler) compileCall(left Expr) (Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		return createNoop(fn), nil
+		return fn, nil
 	}
 }
 

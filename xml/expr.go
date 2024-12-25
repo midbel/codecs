@@ -242,34 +242,8 @@ type sequence struct {
 	all []Expr
 }
 
-func (s sequence) Next(node Node) ([]Item, error) {
+func (s sequence) Next(_ Node) ([]Item, error) {
 	return nil, nil
-}
-
-type Predicate interface {
-	Eval(Node) (Item, error)
-}
-
-type noopExpr struct {
-	Predicate
-}
-
-func createNoop(p Predicate) Expr {
-	return noopExpr{
-		Predicate: p,
-	}
-}
-
-func evalExpr(e Expr, node Node) (any, error) {
-	p, ok := e.(Predicate)
-	if ok {
-		return p.Eval(node)
-	}
-	return nil, fmt.Errorf("expression can not be use as a predicate")
-}
-
-func (_ noopExpr) Next(_ Node) ([]Item, error) {
-	return nil, errImplemented
 }
 
 type binary struct {
@@ -278,12 +252,12 @@ type binary struct {
 	op    rune
 }
 
-func (b binary) Eval(node Node) (Item, error) {
-	left, err := evalExpr(b.left, node)
+func (b binary) Next(node Node) ([]Item, error) {
+	left, err := b.left.Next(node)
 	if err != nil {
 		return nil, err
 	}
-	right, err := evalExpr(b.right, node)
+	right, err := b.right.Next(node)
 	if err != nil {
 		return nil, err
 	}
@@ -349,15 +323,15 @@ func (b binary) Eval(node Node) (Item, error) {
 	default:
 		return nil, errImplemented
 	}
-	return createLiteral(res), err
+	return createSingle(createLiteral(res)), err
 }
 
 type reverse struct {
 	expr Expr
 }
 
-func (r reverse) Eval(node Node) (Item, error) {
-	v, err := evalExpr(r.expr, node)
+func (r reverse) Next(node Node) ([]Item, error) {
+	v, err := r.expr.Next(node)
 	if err != nil {
 		return nil, err
 	}
@@ -365,23 +339,23 @@ func (r reverse) Eval(node Node) (Item, error) {
 	if err == nil {
 		x = -x
 	}
-	return createLiteral(x), err
+	return createSingle(createLiteral(x)), err
 }
 
 type literal struct {
 	expr string
 }
 
-func (i literal) Eval(_ Node) (Item, error) {
-	return createLiteral(i.expr), nil
+func (i literal) Next(_ Node) ([]Item, error) {
+	return createSingle(createLiteral(i.expr)), nil
 }
 
 type number struct {
 	expr float64
 }
 
-func (n number) Eval(_ Node) (Item, error) {
-	return createLiteral(n.expr), nil
+func (n number) Next(_ Node) ([]Item, error) {
+	return createSingle(createLiteral(n.expr)), nil
 }
 
 type call struct {
@@ -411,7 +385,7 @@ func (c call) Next(curr Node) ([]Item, error) {
 	return list, nil
 }
 
-func (c call) Eval(node Node) (Item, error) {
+func (c call) eval(node Node) ([]Item, error) {
 	fn, ok := builtins[c.ident]
 	if !ok {
 		return nil, fmt.Errorf("%s: %w function", c.ident, ErrUndefined)
@@ -430,7 +404,7 @@ func (a attr) Next(node Node) ([]Item, error) {
 	return nil, errImplemented
 }
 
-func (a attr) Eval(node Node) (Item, error) {
+func (a attr) eval(node Node) ([]Item, error) {
 	el, ok := node.(*Element)
 	if !ok {
 		return nil, ErrNode
@@ -439,9 +413,9 @@ func (a attr) Eval(node Node) (Item, error) {
 		return attr.Name == a.ident
 	})
 	if ix >= 0 {
-		return createLiteral(el.Attrs[ix].Value), nil
+		return createSingle(createLiteral(el.Attrs[ix].Value)), nil
 	}
-	return createLiteral(""), nil
+	return createSingle(createLiteral("")), nil
 }
 
 type except struct {
@@ -488,11 +462,14 @@ func (f filter) Next(curr Node) ([]Item, error) {
 	}
 	var ret []Item
 	for _, n := range list {
-		res, err := evalExpr(f.check, n.Node())
+		res, err := f.check.Next(n.Node())
 		if err != nil {
 			continue
 		}
-		switch x := res.(type) {
+		if isEmpty(res) {
+			return nil, errType
+		}
+		switch x := res[0].Value().(type) {
 		case float64:
 			if int(x) == n.Node().Position() {
 				ret = append(ret, n)
