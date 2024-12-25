@@ -5,10 +5,10 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"iter"
 	"os"
 	"slices"
 	"strings"
-	"iter"
 
 	"github.com/midbel/codecs/xml"
 )
@@ -54,23 +54,58 @@ type Pattern struct {
 }
 
 func main() {
+	var (
+		level = flag.String("l", "", "severity level")
+		group = flag.String("g", "", "group")
+	)
+
 	flag.Parse()
 	sch, err := parseSchema(flag.Arg(0))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
-	for a := range getAssertions(sch) {
-		fmt.Printf("%-16s | %-8s | %-s", a.Ident, a.Flag, a.Message)
+	var count int
+	for a := range getAssertions(sch, strings.TrimSpace(*level), strings.TrimSpace(*group)) {
+		fmt.Printf("%7s | %-20s | %-s", a.Flag, a.Ident, a.Message)
 		fmt.Println()
+		count++
 	}
+	fmt.Printf("%d assertions defined", count)
+	fmt.Println()
 }
 
-func getAssertions(sch *Schema) iter.Seq[Assert] {
-	return func(yield func(Assert) bool) {
-		for _, p := sch.Patterns {
+func getAssertions(sch *Schema, level, group string) iter.Seq[*Assert] {
+	var groups []string
+	if len(group) > 0 {
+		groups = strings.Split(group, "-")
+	}
+
+	keep := func(a *Assert) bool {
+		if len(groups) == 0 {
+			return true
+		}
+		parts := strings.Split(a.Ident, "-")
+		if len(parts) < len(groups) {
+			return false
+		}
+		for i := range groups {
+			if parts[i] != groups[i] {
+				return false
+			}
+		}
+		if level != "" && level != a.Flag {
+			return false
+		}
+		return true
+	}
+	return func(yield func(*Assert) bool) {
+		for _, p := range sch.Patterns {
 			for _, r := range p.Rules {
 				for _, a := range r.Assertions {
+					if !keep(a) {
+						continue
+					}
 					if !yield(a) {
 						return
 					}
@@ -210,7 +245,6 @@ func readRule(rs *xml.Reader, elem *xml.Element) (*Rule, error) {
 			return nil, fmt.Errorf("rule: unexpected %s element", qn)
 		}
 	}
-	fmt.Printf("rule: %+v\n", rule)
 	return &rule, nil
 }
 
@@ -232,7 +266,6 @@ func readAssert(rs *xml.Reader, elem *xml.Element) (*Assert, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("assert: %+v\n", ass)
 	return &ass, isClosed(rs, "assert")
 }
 
@@ -249,7 +282,6 @@ func readLet(rs *xml.Reader, elem *xml.Element) (*Let, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("let: %+v\n", let)
 	return &let, nil
 }
 
@@ -266,7 +298,6 @@ func readNS(rs *xml.Reader, elem *xml.Element) (*Namespace, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("namespace: %+v\n", ns)
 	return &ns, nil
 }
 
