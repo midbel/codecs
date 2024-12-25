@@ -157,24 +157,24 @@ func search(doc *xml.Document, query, root string) (*xml.Document, error) {
 	if err != nil {
 		return nil, err
 	}
-	if list.Empty() {
+	if len(list) == 0 {
 		return nil, nil
 	}
 	var node xml.Node
-	if ns := getNodesFromList(list); len(ns) == 1 {
-		node = ns[0]
+	if len(list) == 1 {
+		node = list[0].Node()
 	} else {
 		el := xml.NewElement(xml.LocalName(root))
-		el.Nodes = ns
+		el.Nodes = getNodesFromList(list)
 		node = el
 	}
 	return xml.NewDocument(node), nil
 }
 
-func getNodesFromList(list *xml.ResultList) []xml.Node {
+func getNodesFromList(list []xml.Item) []xml.Node {
 	var all []xml.Node
-	for i := range list.Nodes() {
-		all = append(all, i)
+	for _, i := range list {
+		all = append(all, i.Node())
 	}
 	return all
 }

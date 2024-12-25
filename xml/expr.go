@@ -15,7 +15,7 @@ var (
 )
 
 type Expr interface {
-	Next(Node) (*ResultList, error)
+	Next(Node) ([]Item, error)
 }
 
 const (
@@ -36,7 +36,7 @@ type query struct {
 	expr Expr
 }
 
-func (q query) Next(node Node) (*ResultList, error) {
+func (q query) Next(node Node) ([]Item, error) {
 	if r := node.Parent(); r == nil {
 		var qn QName
 		root := NewElement(qn)
@@ -48,40 +48,34 @@ func (q query) Next(node Node) (*ResultList, error) {
 
 type all struct{}
 
-func (_ all) Next(curr Node) (*ResultList, error) {
+func (_ all) Next(curr Node) ([]Item, error) {
 	if _, ok := curr.(*Element); !ok {
 		return nil, ErrNode
 	}
-	list := createList()
-	list.Push(curr)
-	return list, nil
+	return createSingle(createNode(curr)), nil
 }
 
 type current struct{}
 
-func (_ current) Next(curr Node) (*ResultList, error) {
-	list := createList()
-	list.Push(curr)
-	return list, nil
+func (_ current) Next(curr Node) ([]Item, error) {
+	return createSingle(createNode(curr)), nil
 }
 
 type parent struct{}
 
-func (_ parent) Next(curr Node) (*ResultList, error) {
+func (_ parent) Next(curr Node) ([]Item, error) {
 	n := curr.Parent()
 	if n == nil {
 		return nil, fmt.Errorf("root element has no parent")
 	}
-	list := createList()
-	list.Push(curr)
-	return list, nil
+	return createSingle(createNode(curr)), nil
 }
 
 type absolute struct {
 	expr Expr
 }
 
-func (a absolute) Next(curr Node) (*ResultList, error) {
+func (a absolute) Next(curr Node) ([]Item, error) {
 	return a.expr.Next(a.root(curr))
 }
 
@@ -95,14 +89,12 @@ func (a absolute) root(node Node) Node {
 
 type root struct{}
 
-func (_ root) Next(curr Node) (*ResultList, error) {
+func (_ root) Next(curr Node) ([]Item, error) {
 	n := curr.Parent()
 	if n != nil {
 		return nil, ErrRoot
 	}
-	list := createList()
-	list.Push(curr)
-	return list, nil
+	return createSingle(createNode(curr)), nil
 }
 
 type axis struct {
@@ -110,14 +102,14 @@ type axis struct {
 	next  Expr
 }
 
-func (a axis) Next(curr Node) (*ResultList, error) {
-	list := createList()
+func (a axis) Next(curr Node) ([]Item, error) {
+	var list []Item
 	if a.ident == selfAxis || a.ident == descendantSelfAxis || a.ident == ancestorSelfAxis {
 		other, err := a.next.Next(curr)
 		if err != nil {
 			return nil, err
 		}
-		list.Merge(other)
+		list = slices.Concat(list, other)
 	}
 	switch a.ident {
 	case selfAxis:
@@ -130,7 +122,7 @@ func (a axis) Next(curr Node) (*ResultList, error) {
 		for _, c := range el.Nodes {
 			other, err := a.next.Next(c)
 			if err == nil {
-				list.Merge(other)
+				list = slices.Concat(list, other)
 			}
 		}
 	case parentAxis:
@@ -147,7 +139,7 @@ func (a axis) Next(curr Node) (*ResultList, error) {
 		for p := el.Parent(); p != nil; {
 			other, err := a.next.Next(p)
 			if err == nil {
-				list.Merge(other)
+				list = slices.Concat(list, other)
 			}
 		}
 	case descendantAxis, descendantSelfAxis:
@@ -158,7 +150,7 @@ func (a axis) Next(curr Node) (*ResultList, error) {
 		for i := range el.Nodes {
 			other, err := a.next.Next(el.Nodes[i])
 			if err == nil {
-				list.Merge(other)
+				list = slices.Concat(list, other)
 			}
 		}
 	default:
@@ -179,13 +171,11 @@ func (n name) QualifiedName() string {
 	return fmt.Sprintf("%s:%s", n.space, n.ident)
 }
 
-func (n name) Next(curr Node) (*ResultList, error) {
+func (n name) Next(curr Node) ([]Item, error) {
 	if curr.QualifiedName() != n.QualifiedName() {
 		return nil, errDiscard
 	}
-	list := createList()
-	list.Push(curr)
-	return list, nil
+	return createSingle(createNode(curr)), nil
 }
 
 func (n name) Eval(curr Node) (any, error) {
@@ -206,25 +196,25 @@ type descendant struct {
 	deep bool
 }
 
-func (d descendant) Next(node Node) (*ResultList, error) {
+func (d descendant) Next(node Node) ([]Item, error) {
 	ns, err := d.curr.Next(node)
 	if err != nil {
 		return nil, err
 	}
-	list := createList()
-	for n := range ns.Nodes() {
-		xs, err := d.traverse(n)
+	var list []Item
+	for _, n := range ns {
+		xs, err := d.traverse(n.Node())
 		if err != nil {
 			continue
 		}
-		list.Merge(xs)
+		list = slices.Concat(list, xs)
 	}
 	return list, nil
 }
 
-func (d *descendant) traverse(n Node) (*ResultList, error) {
+func (d *descendant) traverse(n Node) ([]Item, error) {
 	list, err := d.next.Next(n)
-	if err == nil && list.Len() > 0 {
+	if err == nil && len(list) > 0 {
 		return list, nil
 	}
 	if !d.deep {
@@ -234,14 +224,14 @@ func (d *descendant) traverse(n Node) (*ResultList, error) {
 	if !ok {
 		return nil, errDiscard
 	}
-	list = createList()
+	list = list[:0]
 	for i := range el.Nodes {
 		tmp, err := d.next.Next(el.Nodes[i])
-		if (err != nil || tmp.Len() == 0) && d.deep {
+		if (err != nil || len(tmp) == 0) && d.deep {
 			tmp, err = d.traverse(el.Nodes[i])
 		}
 		if err == nil {
-			list.Merge(tmp)
+			list = slices.Concat(list, tmp)
 		}
 	}
 
@@ -252,8 +242,8 @@ type sequence struct {
 	all []Expr
 }
 
-func (s sequence) Next(node Node) (*ResultList, error) {
-	return createList(), nil
+func (s sequence) Next(node Node) ([]Item, error) {
+	return nil, nil
 }
 
 type Predicate interface {
@@ -278,7 +268,7 @@ func evalExpr(e Expr, node Node) (any, error) {
 	return nil, fmt.Errorf("expression can not be use as a predicate")
 }
 
-func (_ noopExpr) Next(_ Node) (*ResultList, error) {
+func (_ noopExpr) Next(_ Node) ([]Item, error) {
 	return nil, errImplemented
 }
 
@@ -399,9 +389,9 @@ type call struct {
 	args  []Expr
 }
 
-func (c call) Next(curr Node) (*ResultList, error) {
+func (c call) Next(curr Node) ([]Item, error) {
 	var (
-		list = createList()
+		list []Item
 		keep bool
 	)
 	switch c.ident {
@@ -416,7 +406,7 @@ func (c call) Next(curr Node) (*ResultList, error) {
 	default:
 	}
 	if keep {
-		list.Push(curr)
+		list = append(list, createNode(curr))
 	}
 	return list, nil
 }
@@ -436,7 +426,7 @@ type attr struct {
 	ident string
 }
 
-func (a attr) Next(node Node) (*ResultList, error) {
+func (a attr) Next(node Node) ([]Item, error) {
 	return nil, errImplemented
 }
 
@@ -458,32 +448,30 @@ type except struct {
 	all []Expr
 }
 
-func (e except) Next(node Node) (*ResultList, error) {
-	list := createList()
-	return list, nil
+func (e except) Next(node Node) ([]Item, error) {
+	return nil, nil
 }
 
 type intersect struct {
 	all []Expr
 }
 
-func (i intersect) Next(node Node) (*ResultList, error) {
-	list := createList()
-	return list, nil
+func (i intersect) Next(node Node) ([]Item, error) {
+	return nil, nil
 }
 
 type union struct {
 	all []Expr
 }
 
-func (u union) Next(node Node) (*ResultList, error) {
-	list := createList()
+func (u union) Next(node Node) ([]Item, error) {
+	var list []Item
 	for i := range u.all {
 		res, err := u.all[i].Next(node)
 		if err != nil {
 			return nil, err
 		}
-		list.Merge(res)
+		list = slices.Concat(list, res)
 	}
 	return list, nil
 }
@@ -493,25 +481,25 @@ type filter struct {
 	check Expr
 }
 
-func (f filter) Next(curr Node) (*ResultList, error) {
+func (f filter) Next(curr Node) ([]Item, error) {
 	list, err := f.expr.Next(curr)
 	if err != nil {
 		return nil, err
 	}
-	ret := createList()
-	for n := range list.Nodes() {
-		res, err := evalExpr(f.check, n)
+	var ret []Item
+	for _, n := range list {
+		res, err := evalExpr(f.check, n.Node())
 		if err != nil {
 			continue
 		}
 		switch x := res.(type) {
 		case float64:
-			if int(x) == n.Position() {
-				ret.Push(n)
+			if int(x) == n.Node().Position() {
+				ret = append(ret, n)
 			}
 		case bool:
 			if x {
-				ret.Push(n)
+				ret = append(ret, n)
 			}
 		default:
 			return nil, errType
