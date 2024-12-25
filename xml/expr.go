@@ -247,7 +247,7 @@ func (s sequence) Next(node Node) ([]Item, error) {
 }
 
 type Predicate interface {
-	Eval(Node) (any, error)
+	Eval(Node) (Item, error)
 }
 
 type noopExpr struct {
@@ -278,7 +278,7 @@ type binary struct {
 	op    rune
 }
 
-func (b binary) Eval(node Node) (any, error) {
+func (b binary) Eval(node Node) (Item, error) {
 	left, err := evalExpr(b.left, node)
 	if err != nil {
 		return nil, err
@@ -287,76 +287,76 @@ func (b binary) Eval(node Node) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	var res any
 	switch b.op {
 	case opAdd:
-		return apply(left, right, func(left, right float64) (float64, error) {
+		res, err = apply(left, right, func(left, right float64) (float64, error) {
 			return left + right, nil
 		})
 	case opSub:
-		return apply(left, right, func(left, right float64) (float64, error) {
+		res, err = apply(left, right, func(left, right float64) (float64, error) {
 			return left - right, nil
 		})
 	case opMul:
-		return apply(left, right, func(left, right float64) (float64, error) {
+		res, err = apply(left, right, func(left, right float64) (float64, error) {
 			return left * right, nil
 		})
 	case opDiv:
-		return apply(left, right, func(left, right float64) (float64, error) {
+		res, err = apply(left, right, func(left, right float64) (float64, error) {
 			if right == 0 {
 				return 0, errZero
 			}
 			return left / right, nil
 		})
 	case opMod:
-		return apply(left, right, func(left, right float64) (float64, error) {
+		res, err = apply(left, right, func(left, right float64) (float64, error) {
 			if right == 0 {
 				return 0, errZero
 			}
 			return math.Mod(left, right), nil
 		})
 	case opAnd:
-		return toBool(left) && toBool(right), nil
+		res = toBool(left) && toBool(right)
 	case opOr:
-		return toBool(left) || toBool(right), nil
+		res = toBool(left) || toBool(right)
 	case opEq:
-		ok, err := isEqual(left, right)
-		return ok, err
+		res, err = isEqual(left, right)
 	case opNe:
-		ok, err := isEqual(left, right)
-		return !ok, err
+		ok, err1 := isEqual(left, right)
+		res, err = !ok, err1
 	case opLt:
-		ok, err := isLess(left, right)
-		return ok, err
+		res, err = isLess(left, right)
 	case opLe:
-		ok, err := isEqual(left, right)
+		ok, err1 := isEqual(left, right)
 		if !ok {
-			ok, err = isLess(left, right)
+			ok, err1 = isLess(left, right)
 		}
-		return ok, err
+		res, err = ok, err1
 	case opGt:
-		ok, err := isEqual(left, right)
+		ok, err1 := isEqual(left, right)
 		if !ok {
-			ok, err = isLess(left, right)
+			ok, err1 = isLess(left, right)
 			ok = !ok
 		}
-		return ok, err
+		res, err = ok, err1
 	case opGe:
-		ok, err := isEqual(left, right)
+		ok, err1 := isEqual(left, right)
 		if !ok {
-			ok, err = isLess(left, right)
+			ok, err1 = isLess(left, right)
 			ok = !ok
 		}
-		return ok, err
+		res, err = ok, err1
 	default:
 		return nil, errImplemented
 	}
+	return createLiteral(res), err
 }
 
 type reverse struct {
 	expr Expr
 }
 
-func (r reverse) Eval(node Node) (any, error) {
+func (r reverse) Eval(node Node) (Item, error) {
 	v, err := evalExpr(r.expr, node)
 	if err != nil {
 		return nil, err
@@ -365,23 +365,23 @@ func (r reverse) Eval(node Node) (any, error) {
 	if err == nil {
 		x = -x
 	}
-	return x, err
+	return createLiteral(x), err
 }
 
 type literal struct {
 	expr string
 }
 
-func (i literal) Eval(_ Node) (any, error) {
-	return i.expr, nil
+func (i literal) Eval(_ Node) (Item, error) {
+	return createLiteral(i.expr), nil
 }
 
 type number struct {
 	expr float64
 }
 
-func (n number) Eval(_ Node) (any, error) {
-	return n.expr, nil
+func (n number) Eval(_ Node) (Item, error) {
+	return createLiteral(n.expr), nil
 }
 
 type call struct {
@@ -411,7 +411,7 @@ func (c call) Next(curr Node) ([]Item, error) {
 	return list, nil
 }
 
-func (c call) Eval(node Node) (any, error) {
+func (c call) Eval(node Node) (Item, error) {
 	fn, ok := builtins[c.ident]
 	if !ok {
 		return nil, fmt.Errorf("%s: %w function", c.ident, ErrUndefined)
@@ -430,7 +430,7 @@ func (a attr) Next(node Node) ([]Item, error) {
 	return nil, errImplemented
 }
 
-func (a attr) Eval(node Node) (any, error) {
+func (a attr) Eval(node Node) (Item, error) {
 	el, ok := node.(*Element)
 	if !ok {
 		return nil, ErrNode
@@ -439,9 +439,9 @@ func (a attr) Eval(node Node) (any, error) {
 		return attr.Name == a.ident
 	})
 	if ix >= 0 {
-		return el.Attrs[ix].Value, nil
+		return createLiteral(el.Attrs[ix].Value), nil
 	}
-	return "", nil
+	return createLiteral(""), nil
 }
 
 type except struct {

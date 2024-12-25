@@ -1,10 +1,5 @@
 package xml
 
-import (
-	"iter"
-	"slices"
-)
-
 type Item interface {
 	Node() Node
 	Value() any
