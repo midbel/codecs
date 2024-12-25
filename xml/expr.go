@@ -378,6 +378,7 @@ func (c call) Next(curr Node) ([]Item, error) {
 	case "comment":
 		_, keep = curr.(*Comment)
 	default:
+		return c.eval(curr)
 	}
 	if keep {
 		list = append(list, createNode(curr))
@@ -461,7 +462,7 @@ func (f filter) Next(curr Node) ([]Item, error) {
 		return nil, err
 	}
 	var ret []Item
-	for _, n := range list {
+	for j, n := range list {
 		res, err := f.check.Next(n.Node())
 		if err != nil {
 			continue
@@ -471,7 +472,7 @@ func (f filter) Next(curr Node) ([]Item, error) {
 		}
 		switch x := res[0].Value().(type) {
 		case float64:
-			if int(x) == n.Node().Position() {
+			if int(x) == j {
 				ret = append(ret, n)
 			}
 		case bool:
