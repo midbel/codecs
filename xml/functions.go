@@ -170,6 +170,12 @@ func callStartsWith(ctx Node, args []Expr) ([]Item, error) {
 	if err != nil {
 		return nil, err
 	}
+	if snd == "" {
+		return callTrue(ctx, args)
+	}
+	if fst == "" && snd != "" {
+		return callFalse(ctx, args)
+	}
 	res := strings.HasPrefix(fst, snd)
 	return singleValue(res), nil
 }
@@ -185,6 +191,12 @@ func callEndsWith(ctx Node, args []Expr) ([]Item, error) {
 	snd, err := getStringFromExpr(args[1], ctx)
 	if err != nil {
 		return nil, err
+	}
+	if snd == "" {
+		return callTrue(ctx, args)
+	}
+	if fst == "" && snd != "" {
+		return callFalse(ctx, args)
 	}
 	res := strings.HasSuffix(fst, snd)
 	return singleValue(res), nil
