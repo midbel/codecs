@@ -6,17 +6,31 @@ import (
 )
 
 var builtins = map[string]builtinFunc{
-	"true":         callTrue,
-	"false":        callFalse,
-	"boolean":      callBoolean,
-	"not":          callNot,
-	"name":         callName,
-	"local-name":   callLocalName,
-	"root":         callRoot,
-	"path":         callPath,
-	"has-children": callHasChildren,
-	"innermost":    callInnermost,
-	"outermost":    callOutermost,
+	"true":             callTrue,
+	"false":            callFalse,
+	"boolean":          callBoolean,
+	"not":              callNot,
+	"name":             callName,
+	"local-name":       callLocalName,
+	"root":             callRoot,
+	"path":             callPath,
+	"has-children":     callHasChildren,
+	"innermost":        callInnermost,
+	"outermost":        callOutermost,
+	"compare":          callCompare,
+	"concat":           callConcat,
+	"string-join":      callStringJoin,
+	"substring":        callSubstring,
+	"string-length":    callStringLength,
+	"normalize-space":  callNormalizeSpace,
+	"upper-case":       callUppercase,
+	"lower-case":       callLowercase,
+	"translate":        callTranslate,
+	"contains":         callContains,
+	"starts-with":      callStartsWith,
+	"ends-with":        callEndsWith,
+	"substring-before": callSubstringBefore,
+	"substring-after":  callSubstringAfter,
 }
 
 type builtinFunc func(Node, []Expr) ([]Item, error)
@@ -29,6 +43,183 @@ func checkArity(argCount int, fn builtinFunc) builtinFunc {
 		return fn(node, args)
 	}
 	return do
+}
+
+func callCompare(ctx Node, args []Expr) ([]Item, error) {
+	if len(args) != 2 {
+		return nil, errArgument
+	}
+	fst, err := getStringFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	snd, err := getStringFromExpr(args[1], ctx)
+	if err != nil {
+		return nil, err
+	}
+	cmp := strings.Compare(fst, snd)
+	return singleValue(float64(cmp)), nil
+}
+func callConcat(ctx Node, args []Expr) ([]Item, error) {
+	return nil, errImplemented
+}
+
+func callStringJoin(ctx Node, args []Expr) ([]Item, error) {
+	return nil, errImplemented
+}
+
+func callSubstring(ctx Node, args []Expr) ([]Item, error) {
+	return nil, errImplemented
+}
+
+func callStringLength(ctx Node, args []Expr) ([]Item, error) {
+	if len(args) == 0 {
+		str := ctx.Value()
+		return singleValue(float64(len(str))), nil
+	}
+	items, err := expandArgs(ctx, args)
+	if err != nil {
+		return nil, err
+	}
+	if len(items) == 0 {
+		return singleValue(0.0), nil
+	}
+	v, ok := items[0].(literalItem)
+	if !ok {
+		return nil, errType
+	}
+	str, ok := v.Value().(string)
+	if !ok {
+		return nil, errType
+	}
+	return singleValue(float64(len(str))), nil
+}
+
+func callNormalizeSpace(ctx Node, args []Expr) ([]Item, error) {
+	if len(args) != 1 {
+		return nil, errArgument
+	}
+	var prev rune
+	clear := func(r rune) rune {
+		if r == ' ' && r == prev {
+			return -1
+		}
+		prev = r
+		return r
+	}
+
+	str, err := getStringFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	str = strings.TrimSpace(str)
+	return singleValue(strings.Map(clear, str)), nil
+}
+
+func callUppercase(ctx Node, args []Expr) ([]Item, error) {
+	if len(args) != 1 {
+		return nil, errArgument
+	}
+	str, err := getStringFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	return singleValue(strings.ToUpper(str)), nil
+}
+
+func callLowercase(ctx Node, args []Expr) ([]Item, error) {
+	if len(args) != 1 {
+		return nil, errArgument
+	}
+	str, err := getStringFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	return singleValue(strings.ToLower(str)), nil
+}
+
+func callTranslate(ctx Node, args []Expr) ([]Item, error) {
+	return nil, errImplemented
+}
+
+func callContains(ctx Node, args []Expr) ([]Item, error) {
+	if len(args) != 2 {
+		return nil, errArgument
+	}
+	fst, err := getStringFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	snd, err := getStringFromExpr(args[1], ctx)
+	if err != nil {
+		return nil, err
+	}
+	res := strings.Contains(fst, snd)
+	return singleValue(res), nil
+}
+
+func callStartsWith(ctx Node, args []Expr) ([]Item, error) {
+	if len(args) != 2 {
+		return nil, errArgument
+	}
+	fst, err := getStringFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	snd, err := getStringFromExpr(args[1], ctx)
+	if err != nil {
+		return nil, err
+	}
+	res := strings.HasPrefix(fst, snd)
+	return singleValue(res), nil
+}
+
+func callEndsWith(ctx Node, args []Expr) ([]Item, error) {
+	if len(args) != 2 {
+		return nil, errArgument
+	}
+	fst, err := getStringFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	snd, err := getStringFromExpr(args[1], ctx)
+	if err != nil {
+		return nil, err
+	}
+	res := strings.HasSuffix(fst, snd)
+	return singleValue(res), nil
+}
+
+func callSubstringBefore(ctx Node, args []Expr) ([]Item, error) {
+	if len(args) != 2 {
+		return nil, errArgument
+	}
+	fst, err := getStringFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	snd, err := getStringFromExpr(args[1], ctx)
+	if err != nil {
+		return nil, err
+	}
+	str, _ := strings.CutPrefix(fst, snd)
+	return singleValue(str), nil
+}
+
+func callSubstringAfter(ctx Node, args []Expr) ([]Item, error) {
+	if len(args) != 2 {
+		return nil, errArgument
+	}
+	fst, err := getStringFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	snd, err := getStringFromExpr(args[1], ctx)
+	if err != nil {
+		return nil, err
+	}
+	str, _ := strings.CutSuffix(fst, snd)
+	return singleValue(str), nil
 }
 
 func callName(ctx Node, args []Expr) ([]Item, error) {
@@ -186,6 +377,25 @@ func callTrue(_ Node, _ []Expr) ([]Item, error) {
 
 func callFalse(_ Node, _ []Expr) ([]Item, error) {
 	return singleValue(false), nil
+}
+
+func getStringFromExpr(expr Expr, ctx Node) (string, error) {
+	items, err := expr.Next(ctx)
+	if err != nil {
+		return "", err
+	}
+	if len(items) != 1 {
+		return "", errType
+	}
+	v, ok := items[0].(literalItem)
+	if !ok {
+		return "", errType
+	}
+	str, ok := v.Value().(string)
+	if !ok {
+		return "", errType
+	}
+	return str, nil
 }
 
 func getBooleanFromItem(item Item) (bool, error) {
