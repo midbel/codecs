@@ -37,12 +37,25 @@ type query struct {
 }
 
 func (q query) Next(node Node) ([]Item, error) {
-	if r := node.Parent(); r == nil {
+	el, ok := node.(*Element)
+	if !ok {
+		return nil, fmt.Errorf("xml element expected")
+	}
+	clone := &Element{
+		QName: el.QName,
+		parent: nil,
+		position: el.position,
+	}
+	clone.Attrs = slices.Clone(el.Attrs)
+	for i := range el.Nodes {
+		clone.Append(el.Nodes[i])
+	}
+	if r := clone.Parent(); r == nil {
 		var qn QName
 		root := NewElement(qn)
-		root.Append(node)
+		root.Append(clone)
 		node = root
-	}
+	} 
 	return q.expr.Next(node)
 }
 
@@ -452,7 +465,7 @@ func (u union) Next(node Node) ([]Item, error) {
 	for i := range u.all {
 		res, err := u.all[i].Next(node)
 		if err != nil {
-			return nil, err
+			continue
 		}
 		list = slices.Concat(list, res)
 	}

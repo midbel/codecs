@@ -67,12 +67,16 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
+
 	doc, err := parseDocument(flag.Arg(1))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(3)
 	}
-	var count int
+	var (
+		count int
+		root = doc.Root()
+	)
 	for a := range getAssertions(sch, strings.TrimSpace(*level), strings.TrimSpace(*group)) {
 		expr, err := xml.Compile(strings.NewReader(a.Context))
 		if err != nil {
@@ -81,7 +85,8 @@ func main() {
 		}
 		var total int
 		if expr != nil {
-			items, err := expr.Next(doc.Root())
+
+			items, err := expr.Next(root)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "failure retrieving nodes from document: %s", err)
 				fmt.Fprintln(os.Stderr)
@@ -89,7 +94,7 @@ func main() {
 				total = len(items)
 			}
 		}
-		fmt.Printf("%7s | %-20s | %3d | %-s", a.Flag, a.Ident, total, a.Message)
+		fmt.Printf("%7s | %-20s | %s | %3d | %-s", a.Flag, a.Ident, a.Context, total, a.Message)
 		fmt.Println()
 		count++
 	}
