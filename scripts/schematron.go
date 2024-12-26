@@ -39,6 +39,8 @@ type Assert struct {
 	Flag    string
 	Test    string
 	Message string
+
+	Context string
 }
 
 type Rule struct {
@@ -65,14 +67,45 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
+	doc, err := parseDocument(flag.Arg(1))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(3)
+	}
 	var count int
 	for a := range getAssertions(sch, strings.TrimSpace(*level), strings.TrimSpace(*group)) {
-		fmt.Printf("%7s | %-20s | %-s", a.Flag, a.Ident, a.Message)
+		expr, err := xml.Compile(strings.NewReader(a.Context))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "fail to compile assertion context: %s (%s)", err, a.Context)
+			fmt.Fprintln(os.Stderr)
+		}
+		var total int
+		if expr != nil {
+			items, err := expr.Next(doc.Root())
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "failure retrieving nodes from document: %s", err)
+				fmt.Fprintln(os.Stderr)
+			} else {
+				total = len(items)
+			}
+		}
+		fmt.Printf("%7s | %-20s | %3d | %-s", a.Flag, a.Ident, total, a.Message)
 		fmt.Println()
 		count++
 	}
 	fmt.Printf("%d assertions defined", count)
 	fmt.Println()
+}
+
+func parseDocument(file string) (*xml.Document, error) {
+	r, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+
+	doc, err := xml.NewParser(r).Parse()
+	return doc, err
 }
 
 func getAssertions(sch *Schema, level, group string) iter.Seq[*Assert] {
@@ -106,6 +139,7 @@ func getAssertions(sch *Schema, level, group string) iter.Seq[*Assert] {
 					if !keep(a) {
 						continue
 					}
+					a.Context = r.Context
 					if !yield(a) {
 						return
 					}
