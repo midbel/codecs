@@ -11,6 +11,16 @@ func createSingle(item Item) []Item {
 	return append(list, item)
 }
 
+func singleValue(value any) []Item {
+	literal := createLiteral(value)
+	return createSingle(literal)
+}
+
+func singleNode(value Node) []Item {
+	node := createNode(value)
+	return createSingle(node)
+}
+
 func isSingleton(list []Item) bool {
 	return len(list) == 1
 }
