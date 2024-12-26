@@ -159,6 +159,14 @@ func (a axis) Next(curr Node) ([]Item, error) {
 	return list, nil
 }
 
+type identifier struct {
+	ident string
+}
+
+func (i identifier) Next(curr Node) ([]Item, error) {
+	return nil, nil
+}
+
 type name struct {
 	space string
 	ident string

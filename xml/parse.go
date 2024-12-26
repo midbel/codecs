@@ -413,7 +413,11 @@ func (c *compiler) compileExpr(pow int) (Expr, error) {
 }
 
 func (c *compiler) compileVariable() (Expr, error) {
-	return nil, nil
+	defer c.next()
+	v := identifier{
+		ident: c.curr.Literal,
+	}
+	return v, nil
 }
 
 func (c *compiler) compileName() (Expr, error) {
