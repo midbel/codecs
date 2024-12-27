@@ -75,7 +75,7 @@ func main() {
 	}
 	var (
 		count int
-		root = doc.Root()
+		root  = doc.Root()
 	)
 	for a := range getAssertions(sch, strings.TrimSpace(*level), strings.TrimSpace(*group)) {
 		expr, err := xml.Compile(strings.NewReader(a.Context))
@@ -94,7 +94,7 @@ func main() {
 				total = len(items)
 			}
 		}
-		fmt.Printf("%7s | %-20s | %s | %3d | %-s", a.Flag, a.Ident, a.Context, total, a.Message)
+		fmt.Printf("%7s | %-20s | %3d | %-s", a.Flag, a.Ident, total, a.Message)
 		fmt.Println()
 		count++
 	}

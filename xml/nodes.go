@@ -8,7 +8,19 @@ import (
 	"slices"
 )
 
+type NodeType int8
+
+const (
+	TypeDocument NodeType = 1 << iota
+	TypeElement
+	TypeComment
+	TypeAttribute
+	TypeInstruction
+	TypeText
+)
+
 type Node interface {
+	Type() NodeType
 	LocalName() string
 	QualifiedName() string
 	Leaf() bool
@@ -23,17 +35,20 @@ type Node interface {
 var ErrElement = errors.New("element expected")
 
 type Document struct {
-	root     Node
 	Version  string
 	Encoding string
 
 	Namespaces []string
+	Nodes      []Node
 }
 
 func NewDocument(root Node) *Document {
-	return &Document{
-		root: root,
+	doc := Document{
+		Version:  SupportedVersion,
+		Encoding: SupportedEncoding,
 	}
+	doc.Nodes = append(doc.Nodes, root)
+	return &doc
 }
 
 func (d *Document) Write(w io.Writer) error {
@@ -49,57 +64,109 @@ func (d *Document) WriteString() (string, error) {
 }
 
 func (d *Document) GetElementById(id string) (Node, error) {
-	if el, ok := d.root.(*Element); ok {
+	root := d.Root()
+	if el, ok := root.(*Element); ok {
 		return el.GetElementById(id)
 	}
 	return nil, nil
 }
 
 func (d *Document) GetElementsByTagName(tag string) ([]Node, error) {
-	if el, ok := d.root.(*Element); ok {
+	root := d.Root()
+	if el, ok := root.(*Element); ok {
 		return el.GetElementsByTagName(tag)
 	}
 	return nil, nil
 }
 
 func (d *Document) Find(name string) (Node, error) {
-	if el, ok := d.root.(*Element); ok {
+	root := d.Root()
+	if el, ok := root.(*Element); ok {
 		return el.Find(name), nil
 	}
 	return nil, ErrElement
 }
 
 func (d *Document) FindAll(name string) ([]Node, error) {
-	if el, ok := d.root.(*Element); ok {
+	root := d.Root()
+	if el, ok := root.(*Element); ok {
 		return el.FindAll(name), nil
 	}
 	return nil, ErrElement
 }
 
 func (d *Document) Append(node Node) error {
-	if el, ok := d.root.(*Element); ok {
+	root := d.Root()
+	if el, ok := root.(*Element); ok {
 		el.Append(node)
 	}
 	return ErrElement
 }
 
 func (d *Document) Insert(node Node, index int) error {
-	if el, ok := d.root.(*Element); ok {
+	root := d.Root()
+	if el, ok := root.(*Element); ok {
 		el.Insert(node, index)
 	}
 	return ErrElement
 }
 
 func (d *Document) Map() (map[string]any, error) {
-	if el, ok := d.root.(*Element); ok {
+	root := d.Root()
+	if el, ok := root.(*Element); ok {
 		return el.Map(), nil
 	}
 	return nil, ErrElement
 }
 
 func (d *Document) Root() Node {
-	return d.root
+	if len(d.Nodes) == 0 {
+		return nil
+	}
+	root := d.Nodes[len(d.Nodes)-1]
+	if root.Type() != TypeElement {
+		return nil
+	}
+	return root
 }
+
+func (d *Document) Type() NodeType {
+	return TypeDocument
+}
+
+func (d *Document) LocalName() string {
+	return ""
+}
+
+func (d *Document) QualifiedName() string {
+	return ""
+}
+
+func (d *Document) Leaf() bool {
+	return false
+}
+
+func (d *Document) Position() int {
+	return 0
+}
+
+func (d *Document) Parent() Node {
+	return nil
+}
+
+func (d *Document) Value() string {
+	return ""
+}
+
+func (d *Document) attach(node Node) {
+	node.setParent(d)
+	node.setPosition(len(d.Nodes))
+	d.Nodes = append(d.Nodes, node)
+}
+
+func (d *Document) setParent(_ Node) {}
+
+func (d *Document) setPosition(_ int) {}
 
 type QName struct {
 	Space string
@@ -144,6 +211,10 @@ func NewAttribute(name QName, value string) Attribute {
 	}
 }
 
+func (_ *Attribute) Type() NodeType {
+	return TypeAttribute
+}
+
 type Element struct {
 	QName
 	Attrs []Attribute
@@ -157,6 +228,10 @@ func NewElement(name QName) *Element {
 	return &Element{
 		QName: name,
 	}
+}
+
+func (_ *Element) Type() NodeType {
+	return TypeElement
 }
 
 func (e *Element) Map() map[string]any {
@@ -352,6 +427,10 @@ func NewInstruction(name QName) *Instruction {
 	}
 }
 
+func (_ *Instruction) Type() NodeType {
+	return TypeInstruction
+}
+
 func (i *Instruction) Leaf() bool {
 	return true
 }
@@ -401,6 +480,10 @@ func NewCharacterData(chardata string) *CharData {
 	}
 }
 
+func (_ *CharData) Type() NodeType {
+	return TypeText
+}
+
 func (c *CharData) LocalName() string {
 	return ""
 }
@@ -446,6 +529,10 @@ func NewText(text string) *Text {
 	}
 }
 
+func (_ *Text) Type() NodeType {
+	return TypeText
+}
+
 func (t *Text) LocalName() string {
 	return ""
 }
@@ -489,6 +576,10 @@ func NewComment(comment string) *Comment {
 	return &Comment{
 		Content: comment,
 	}
+}
+
+func (_ *Comment) Type() NodeType {
+	return TypeComment
 }
 
 func (c *Comment) LocalName() string {

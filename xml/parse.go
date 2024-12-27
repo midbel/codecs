@@ -957,7 +957,32 @@ func (p *Parser) Parse() (*Document, error) {
 	)
 	doc.Version = SupportedVersion
 	doc.Encoding = SupportedEncoding
-	doc.root, err = p.parseNode()
+	for !p.done() {
+		node, err := p.parseNode()
+		if err != nil {
+			return nil, err
+		}
+		if node == nil {
+			continue
+		}
+		switch node.Type() {
+		case TypeComment, TypeElement:
+		case TypeText:
+			continue
+		default:
+			return nil, fmt.Errorf("invalid element type")
+		}
+		doc.attach(node)
+		if node.Type() == TypeElement {
+			break
+		}
+	}
+	if !p.done() {
+		return nil, fmt.Errorf("expected document to be done")
+	}
+	if doc.Root() == nil {
+		return nil, fmt.Errorf("missing root element")
+	}
 	return &doc, err
 }
 

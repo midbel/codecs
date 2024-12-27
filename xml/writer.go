@@ -37,7 +37,12 @@ func (w *Writer) Write(doc *Document) error {
 		return err
 	}
 	w.writeNL()
-	return w.writeNode(doc.root, -1)
+	for _, n := range doc.Nodes {
+		if err := w.writeNode(n, -1); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (w *Writer) writeNode(node Node, depth int) error {

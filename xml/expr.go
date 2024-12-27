@@ -42,8 +42,8 @@ func (q query) Next(node Node) ([]Item, error) {
 		return nil, fmt.Errorf("xml element expected")
 	}
 	clone := &Element{
-		QName: el.QName,
-		parent: nil,
+		QName:    el.QName,
+		parent:   nil,
 		position: el.position,
 	}
 	clone.Attrs = slices.Clone(el.Attrs)
@@ -55,7 +55,7 @@ func (q query) Next(node Node) ([]Item, error) {
 		root := NewElement(qn)
 		root.Append(clone)
 		node = root
-	} 
+	}
 	return q.expr.Next(node)
 }
 
