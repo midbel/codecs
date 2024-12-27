@@ -116,6 +116,7 @@ type axis struct {
 }
 
 func (a axis) Next(curr Node) ([]Item, error) {
+	fmt.Printf("axis: %T\n", curr)
 	var list []Item
 	if a.ident == selfAxis || a.ident == descendantSelfAxis || a.ident == ancestorSelfAxis {
 		other, err := a.next.Next(curr)
