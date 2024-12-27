@@ -73,10 +73,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(3)
 	}
-	var (
-		count int
-		root  = doc.Root()
-	)
+	var count int
 	for a := range getAssertions(sch, strings.TrimSpace(*level), strings.TrimSpace(*group)) {
 		expr, err := xml.Compile(strings.NewReader(a.Context))
 		if err != nil {
@@ -86,7 +83,7 @@ func main() {
 		var total int
 		if expr != nil {
 
-			items, err := expr.Next(root)
+			items, err := expr.Next(doc)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "failure retrieving nodes from document: %s", err)
 				fmt.Fprintln(os.Stderr)
@@ -450,9 +447,15 @@ func getStringFromReader(rs *xml.Reader) (string, error) {
 
 func normalizeSpace(str string) string {
 	var prev rune
+	isSpace := func(r rune) bool {
+		return r == ' ' || r == '\t'
+	}
 	clean := func(r rune) rune {
-		if r == 20 && r == prev {
+		if isSpace(r) && isSpace(prev) {
 			return -1
+		}
+		if r == '\t' || r == '\n' {
+			r = ' '
 		}
 		prev = r
 		return r

@@ -91,6 +91,8 @@ func Compile(r io.Reader) (Expr, error) {
 		opGe:      cp.compileBinary,
 		opLt:      cp.compileBinary,
 		opLe:      cp.compileBinary,
+		opAnd:     cp.compileBinary,
+		opOr:      cp.compileBinary,
 		opAlt:     cp.compileAlt,
 		begGrp:    cp.compileCall,
 		reserved:  cp.compileReservedInfix,
