@@ -153,7 +153,7 @@ func search(doc *xml.Document, query, root string) (*xml.Document, error) {
 		return nil, err
 	}
 
-	list, err := expr.Next(doc.Root())
+	list, err := expr.Next(doc)
 	if err != nil {
 		return nil, err
 	}

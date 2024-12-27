@@ -970,7 +970,7 @@ func (p *Parser) Parse() (*Document, error) {
 		case TypeText:
 			continue
 		default:
-			return nil, fmt.Errorf("invalid element type")
+			return nil, p.createError("document", "invalid node type")
 		}
 		doc.attach(node)
 		if node.Type() == TypeElement {
@@ -978,10 +978,10 @@ func (p *Parser) Parse() (*Document, error) {
 		}
 	}
 	if !p.done() {
-		return nil, fmt.Errorf("expected document to be done")
+		return nil, p.createError("document", "end of document expected")
 	}
 	if doc.Root() == nil {
-		return nil, fmt.Errorf("missing root element")
+		return nil, p.createError("document", "missing root element")
 	}
 	return &doc, err
 }
