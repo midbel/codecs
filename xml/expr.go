@@ -116,7 +116,6 @@ type axis struct {
 }
 
 func (a axis) Next(curr Node) ([]Item, error) {
-	fmt.Printf("axis: %T\n", curr)
 	var list []Item
 	if a.ident == selfAxis || a.ident == descendantSelfAxis || a.ident == ancestorSelfAxis {
 		other, err := a.next.Next(curr)
@@ -129,16 +128,11 @@ func (a axis) Next(curr Node) ([]Item, error) {
 	case selfAxis:
 		return list, nil
 	case childAxis:
-		el, ok := curr.(*Element)
-		if !ok {
-			return nil, ErrNode
+		others, err := a.child(curr)
+		if err != nil {
+			return nil, err
 		}
-		for _, c := range el.Nodes {
-			other, err := a.next.Next(c)
-			if err == nil {
-				list = slices.Concat(list, other)
-			}
-		}
+		list = slices.Concat(list, others)
 	case parentAxis:
 		p := curr.Parent()
 		if p != nil {
@@ -146,11 +140,7 @@ func (a axis) Next(curr Node) ([]Item, error) {
 		}
 		return nil, errDiscard
 	case ancestorAxis, ancestorSelfAxis:
-		el, ok := curr.(*Element)
-		if !ok {
-			return nil, ErrNode
-		}
-		for p := el.Parent(); p != nil; {
+		for p := curr.Parent(); p != nil; {
 			other, err := a.next.Next(p)
 			if err == nil {
 				list = slices.Concat(list, other)
@@ -169,6 +159,30 @@ func (a axis) Next(curr Node) ([]Item, error) {
 		}
 	default:
 		return nil, errImplemented
+	}
+	return list, nil
+}
+
+func (a axis) child(curr Node) ([]Item, error) {
+	var nodes []Node
+	switch c := curr.(type) {
+	case *Element:
+		nodes = slices.Concat(nodes, c.Nodes)
+	case *Document:
+		root := c.Root()
+		if root == nil {
+			return nil, ErrRoot
+		}
+		nodes = append(nodes, root)
+	default:
+		return nil, ErrNode
+	}
+	var list []Item
+	for _, c := range nodes {
+		other, err := a.next.Next(c)
+		if err == nil {
+			list = slices.Concat(list, other)
+		}
 	}
 	return list, nil
 }
@@ -242,15 +256,24 @@ func (d *descendant) traverse(n Node) ([]Item, error) {
 	if !d.deep {
 		return nil, errDiscard
 	}
-	el, ok := n.(*Element)
-	if !ok {
-		return nil, errDiscard
+	var nodes []Node
+	switch c := n.(type) {
+	case *Element:
+		nodes = slices.Concat(nodes, c.Nodes)
+	case *Document:
+		root := c.Root()
+		if root == nil {
+			return nil, ErrRoot
+		}
+		nodes = append(nodes, root)
+	default:
+		return nil, ErrNode
 	}
 	list = list[:0]
-	for i := range el.Nodes {
-		tmp, err := d.next.Next(el.Nodes[i])
+	for i := range nodes {
+		tmp, err := d.next.Next(nodes[i])
 		if (err != nil || len(tmp) == 0) && d.deep {
-			tmp, err = d.traverse(el.Nodes[i])
+			tmp, err = d.traverse(nodes[i])
 		}
 		if err == nil {
 			list = slices.Concat(list, tmp)
