@@ -445,7 +445,19 @@ func getStringFromReader(rs *xml.Reader) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return text.Content, nil
+	return normalizeSpace(text.Content), nil
+}
+
+func normalizeSpace(str string) string {
+	var prev rune
+	clean := func(r rune) rune {
+		if r == 20 && r == prev {
+			return -1
+		}
+		prev = r
+		return r
+	}
+	return strings.Map(clean, str)
 }
 
 func getAttribute(elem *xml.Element, name string) (string, error) {

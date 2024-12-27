@@ -977,9 +977,6 @@ func (p *Parser) Parse() (*Document, error) {
 			break
 		}
 	}
-	if !p.done() {
-		return nil, p.createError("document", "end of document expected")
-	}
 	if doc.Root() == nil {
 		return nil, p.createError("document", "missing root element")
 	}
