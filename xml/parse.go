@@ -175,12 +175,10 @@ func (c *compiler) compileReservedPrefix() (Expr, error) {
 		return c.compileIf()
 	case kwFor:
 		return c.compileFor()
-	case kwSome:
-		return c.compileSome()
-	case kwEvery:
-		return c.compileEvery()
+	case kwSome, kwEvery:
+		return c.compileQuantified(c.curr.Literal == kwEvery)
 	default:
-		return nil, fmt.Errorf("%s: reserved word can not be used as prefix operator")
+		return nil, fmt.Errorf("%s: reserved word can not be used as prefix operator", c.curr.Literal)
 	}
 }
 
@@ -194,9 +192,56 @@ func (c *compiler) compileFor() (Expr, error) {
 	return nil, errImplemented
 }
 
-func (c *compiler) compileSome() (Expr, error) {
+func (c *compiler) compileInClause() (binding, error) {
+	var b binding
+	if !c.is(variable) {
+		return b, fmt.Errorf("identifier expected")
+	}
+	b.ident = c.curr.Literal
 	c.next()
-	return nil, errImplemented
+	if !c.is(reserved) && c.curr.Literal != kwIn {
+		return b, fmt.Errorf("expected in operator")
+	}
+	c.next()
+	expr, err := c.compileExpr(powLowest)
+	if err != nil {
+		return b, err
+	}
+	b.expr = expr
+	return b, nil
+}
+
+func (c *compiler) compileQuantified(every bool) (Expr, error) {
+	c.next()
+	var q quantified
+	q.every = every
+	for !c.done() && !c.is(reserved) {
+		bind, err := c.compileInClause()
+		if err != nil {
+			return nil, err
+		}
+		q.binds = append(q.binds, bind)
+		switch c.curr.Type {
+		case opSeq:
+			c.next()
+			if c.is(reserved) {
+				return nil, fmt.Errorf("unexpected reserverd word after sequence operator")
+			}
+		case reserved:
+		default:
+			return nil, fmt.Errorf("unexpected operator")
+		}
+	}
+	if !c.is(reserved) && c.curr.Literal != kwSatisfies {
+		return nil, fmt.Errorf("expected satisfies operator")
+	}
+	c.next()
+	test, err := c.compileExpr(powLowest)
+	if err != nil {
+		return nil, err
+	}
+	q.test = test
+	return q, nil
 }
 
 func (c *compiler) compileEvery() (Expr, error) {
@@ -228,7 +273,7 @@ func (c *compiler) compileReservedInfix(left Expr) (Expr, error) {
 		res.all = []Expr{left, expr}
 		expr = res
 	default:
-		return nil, fmt.Errorf("%s: reserved word can not be used as infix operator")
+		return nil, fmt.Errorf("%s: reserved word can not be used as infix operator", keyword)
 	}
 	return expr, nil
 }
@@ -401,7 +446,7 @@ func (c *compiler) compileExpr(pow int) (Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	for !c.done() && pow < bindings[c.curr.Type] {
+	for !(c.done() || c.endExpr()) && pow < bindings[c.curr.Type] {
 		fn, ok := c.infix[c.curr.Type]
 		if !ok {
 			return nil, fmt.Errorf("unexpected infix expression")
@@ -521,6 +566,19 @@ func (c *compiler) is(kind rune) bool {
 	return c.curr.Type == kind
 }
 
+func (c *compiler) endExpr() bool {
+	if !c.is(reserved) {
+		return false
+	}
+	switch c.curr.Literal {
+	case kwSatisfies:
+	case kwReturn:
+	default:
+		return false
+	}
+	return true
+}
+
 func (c *compiler) done() bool {
 	return c.is(EOF)
 }
@@ -542,6 +600,7 @@ const (
 	kwReturn    = "return"
 	kwSome      = "some"
 	kwEvery     = "every"
+	kwSatisfies = "satisfies"
 	kwAnd       = "and"
 	kwOr        = "or"
 	kwDiv       = "div"
@@ -561,6 +620,7 @@ func isReserved(str string) bool {
 	case kwReturn:
 	case kwSome:
 	case kwEvery:
+	case kwSatisfies:
 	default:
 		return false
 	}

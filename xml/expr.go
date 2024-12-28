@@ -507,6 +507,21 @@ func (f filter) Next(curr Node) ([]Item, error) {
 	return ret, nil
 }
 
+type binding struct {
+	ident string
+	expr  Expr
+}
+
+type quantified struct {
+	binds []binding
+	test  Expr
+	every bool
+}
+
+func (q quantified) Next(curr Node) ([]Item, error) {
+	return nil, nil
+}
+
 func apply(left, right any, do func(left, right float64) (float64, error)) (any, error) {
 	x, err := toFloat(left)
 	if err != nil {
