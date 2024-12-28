@@ -507,6 +507,16 @@ func (f filter) Next(curr Node) ([]Item, error) {
 	return ret, nil
 }
 
+type conditional struct {
+	test Expr
+	csq Expr
+	alt Expr
+}
+
+func (c conditional) Next(curr Node) ([]Item, error) {
+	return nil, nil
+}
+
 type binding struct {
 	ident string
 	expr  Expr

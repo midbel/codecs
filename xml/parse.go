@@ -71,6 +71,10 @@ type compiler struct {
 	prefix map[rune]func() (Expr, error)
 }
 
+func CompileString(q string) (Expr, error) {
+	return Compile(strings.NewReader(q))
+}
+
 func Compile(r io.Reader) (Expr, error) {
 	cp := compiler{
 		scan: ScanQuery(r),
@@ -184,7 +188,28 @@ func (c *compiler) compileReservedPrefix() (Expr, error) {
 
 func (c *compiler) compileIf() (Expr, error) {
 	c.next()
-	return nil, errImplemented
+	var (
+		cdt conditional
+		err error
+	)
+	if cdt.test, err = c.compileExpr(powLowest); err != nil {
+		return nil, err
+	}
+	if !c.is(reserved) && c.curr.Literal != kwThen {
+		return nil, fmt.Errorf("then keyword expected")
+	}
+	c.next()
+	if cdt.csq, err = c.compileExpr(powLowest); err != nil {
+		return nil, err
+	}
+	if !c.is(reserved) && c.curr.Literal != kwElse {
+		return nil, fmt.Errorf("else keyword expected")
+	}
+	c.next()
+	if cdt.alt, err = c.compileExpr(powLowest); err != nil {
+		return nil, err
+	}
+	return cdt, nil
 }
 
 func (c *compiler) compileFor() (Expr, error) {
@@ -225,7 +250,7 @@ func (c *compiler) compileQuantified(every bool) (Expr, error) {
 		case opSeq:
 			c.next()
 			if c.is(reserved) {
-				return nil, fmt.Errorf("unexpected reserverd word after sequence operator")
+				return nil, errSyntax
 			}
 		case reserved:
 		default:
@@ -573,6 +598,9 @@ func (c *compiler) endExpr() bool {
 	switch c.curr.Literal {
 	case kwSatisfies:
 	case kwReturn:
+	case kwIn:
+	case kwElse:
+	case kwThen:
 	default:
 		return false
 	}
@@ -762,8 +790,8 @@ func (s *QueryScanner) scanDelimiter(tok *Token) {
 		}
 	case dot:
 		tok.Type = currNode
-		s.read()
-		if s.char == dot {
+		if k == s.char {
+			s.read()
 			tok.Type = parentNode
 		}
 	case comma:
