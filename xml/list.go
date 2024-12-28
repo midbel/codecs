@@ -3,6 +3,7 @@ package xml
 type Item interface {
 	Node() Node
 	Value() any
+	Atomic() bool
 	// Type() string
 }
 
@@ -37,6 +38,10 @@ func createLiteral(value any) Item {
 	return literalItem{
 		value: value,
 	}
+}
+
+func (i literalItem) Atomic() bool {
+	return true
 }
 
 func (i literalItem) Node() Node {
@@ -88,4 +93,8 @@ func (i nodeItem) Value() any {
 		return arr
 	}
 	return traverse(i.node)
+}
+
+func (i nodeItem) Atomic() bool {
+	return false
 }

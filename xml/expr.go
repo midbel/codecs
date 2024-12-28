@@ -231,11 +231,11 @@ func (d descendant) Next(node Node) ([]Item, error) {
 
 func (d *descendant) traverse(n Node) ([]Item, error) {
 	list, err := d.next.Next(n)
-	if err == nil && len(list) > 0 {
-		return list, nil
+	if err != nil {
+		return nil, err
 	}
 	if !d.deep {
-		return nil, errDiscard
+		return list, nil
 	}
 	var nodes []Node
 	switch c := n.(type) {
@@ -250,17 +250,12 @@ func (d *descendant) traverse(n Node) ([]Item, error) {
 	default:
 		return nil, ErrNode
 	}
-	list = list[:0]
 	for i := range nodes {
-		tmp, err := d.next.Next(nodes[i])
-		if (err != nil || len(tmp) == 0) && d.deep {
-			tmp, err = d.traverse(nodes[i])
-		}
+		tmp, err := d.traverse(nodes[i])
 		if err == nil {
 			list = slices.Concat(list, tmp)
 		}
 	}
-
 	return list, nil
 }
 
@@ -420,7 +415,7 @@ func (c call) eval(node Node) ([]Item, error) {
 	if fn == nil {
 		return nil, errImplemented
 	}
-	return nil, nil
+	return fn(node, c.args)
 }
 
 type attr struct {

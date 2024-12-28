@@ -1,7 +1,6 @@
 package xml
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -359,9 +358,6 @@ func callBoolean(ctx Node, args []Expr) ([]Item, error) {
 	}
 	if len(items) == 0 {
 		return callFalse(ctx, args)
-	}
-	if len(items) != 1 {
-		return nil, fmt.Errorf("%w: too many values in sequence", errType)
 	}
 	ok, err := getBooleanFromItem(items[0])
 	if err != nil {
