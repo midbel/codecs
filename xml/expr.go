@@ -507,6 +507,18 @@ func (f filter) Next(curr Node) ([]Item, error) {
 	return ret, nil
 }
 
+type Let struct{}
+
+func (e Let) Next(curr Node) ([]Item, error) {
+	return nil, nil
+}
+
+type loop struct{}
+
+func (o loop) Next(curr Node) ([]Item, error) {
+	return nil, nil
+}
+
 type conditional struct {
 	test Expr
 	csq  Expr
