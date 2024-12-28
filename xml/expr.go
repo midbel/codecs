@@ -381,7 +381,7 @@ func (b binary) Next(node Node) ([]Item, error) {
 	default:
 		return nil, errImplemented
 	}
-	return createSingle(createLiteral(res)), err
+	return singleValue(res), err
 }
 
 type reverse struct {
