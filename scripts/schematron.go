@@ -13,39 +13,9 @@ import (
 	"github.com/midbel/codecs/xml"
 )
 
-type Environ interface {
-	Resolve(string) (xml.Expr, error)
-	Define(string, xml.Expr)
-}
-
-type Env struct {
-	values map[string]xml.Expr
-	parent Environ
-}
-
-func Empty() Environ {
-	return Enclosed(nil)
-}
-
-func Enclosed(parent Environ) Environ {
-	e := Env{
-		values: make(map[string]xml.Expr),
-		parent: parent,
-	}
-	return &e
-}
-
-func (e *Env) Define(ident string, expr xml.Expr) {
-
-}
-
-func (e *Env) Resolve(ident string) (xml.Expr, error) {
-	return nil, nil
-}
-
 type Schema struct {
 	Title string
-	Environ
+	xml.Environ
 
 	Patterns  []*Pattern
 	Spaces    []*Namespace
@@ -74,7 +44,7 @@ type Assert struct {
 }
 
 type Rule struct {
-	Environ
+	xml.Environ
 
 	Context    string
 	Assertions []*Assert
@@ -82,7 +52,7 @@ type Rule struct {
 
 type Pattern struct {
 	Title string
-	Environ
+	xml.Environ
 	Rules []*Rule
 }
 
@@ -194,7 +164,7 @@ func parseSchema(file string) (*Schema, error) {
 		rs  = xml.NewReader(r)
 		sch Schema
 	)
-	sch.Environ = Empty()
+	sch.Environ = xml.Empty()
 	if err := readIntro(rs); err != nil {
 		return nil, err
 	}
@@ -256,7 +226,7 @@ func readTop(rs *xml.Reader, node *xml.Element, sch *Schema) error {
 
 func readPattern(rs *xml.Reader, sch *Schema) error {
 	var pat Pattern
-	pat.Environ = Enclosed(sch)
+	pat.Environ = xml.Enclosed(sch)
 	for {
 		el, err := getElementFromReaderMaybeClosed(rs, "pattern")
 		if err != nil {
@@ -291,12 +261,12 @@ func readPattern(rs *xml.Reader, sch *Schema) error {
 	return nil
 }
 
-func readRule(rs *xml.Reader, elem *xml.Element, env Environ) (*Rule, error) {
+func readRule(rs *xml.Reader, elem *xml.Element, env xml.Environ) (*Rule, error) {
 	var (
 		rule Rule
 		err  error
 	)
-	rule.Environ = Enclosed(env)
+	rule.Environ = xml.Enclosed(env)
 	if qn := elem.QualifiedName(); qn != "rule" {
 		return nil, fmt.Errorf("%s: unexpected element", qn)
 	}

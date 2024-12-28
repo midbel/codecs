@@ -1,5 +1,46 @@
 package xml
 
+import (
+	"fmt"
+)
+
+type Environ interface {
+	Resolve(string) (Expr, error)
+	Define(string, Expr)
+}
+
+type Env struct {
+	values map[string]Expr
+	parent Environ
+}
+
+func Empty() Environ {
+	return Enclosed(nil)
+}
+
+func Enclosed(parent Environ) Environ {
+	e := Env{
+		values: make(map[string]Expr),
+		parent: parent,
+	}
+	return &e
+}
+
+func (e *Env) Define(ident string, expr Expr) {
+	e.values[ident] = expr
+}
+
+func (e *Env) Resolve(ident string) (Expr, error) {
+	expr, ok := e.values[ident]
+	if ok {
+		return expr, nil
+	}
+	if e.parent != nil {
+		return e.parent.Resolve(ident)
+	}
+	return nil, fmt.Errorf("%s: identifier not defined", ident)
+}
+
 type Item interface {
 	Node() Node
 	Value() any

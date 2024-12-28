@@ -501,7 +501,7 @@ func (c *compiler) compileName() (Expr, error) {
 		return nil, err
 	}
 	a := axis{
-		ident: childAxis,
+		kind: descendantAxis,
 		next:  expr,
 	}
 	return a, nil
@@ -575,7 +575,7 @@ func (c *compiler) compileRoot() (Expr, error) {
 
 func (c *compiler) compileAxis() (Expr, error) {
 	a := axis{
-		ident: c.curr.Literal,
+		kind: c.curr.Literal,
 	}
 	c.next()
 	c.next()

@@ -92,20 +92,20 @@ func (_ root) Next(curr Node) ([]Item, error) {
 }
 
 type axis struct {
-	ident string
+	kind string
 	next  Expr
 }
 
 func (a axis) Next(curr Node) ([]Item, error) {
 	var list []Item
-	if a.ident == selfAxis || a.ident == descendantSelfAxis || a.ident == ancestorSelfAxis {
+	if a.kind == selfAxis || a.kind == descendantSelfAxis || a.kind == ancestorSelfAxis {
 		other, err := a.next.Next(curr)
 		if err != nil {
 			return nil, err
 		}
 		list = slices.Concat(list, other)
 	}
-	switch a.ident {
+	switch a.kind {
 	case selfAxis:
 		return list, nil
 	case childAxis:
@@ -128,23 +128,48 @@ func (a axis) Next(curr Node) ([]Item, error) {
 			}
 		}
 	case descendantAxis, descendantSelfAxis:
-		el, ok := curr.(*Element)
-		if !ok {
-			return nil, ErrNode
+		others, err := a.descendant(curr)
+		if err != nil {
+			return nil, err
 		}
-		for i := range el.Nodes {
-			other, err := a.next.Next(el.Nodes[i])
-			if err == nil {
-				list = slices.Concat(list, other)
-			}
-		}
+		list = slices.Concat(list, others)
 	default:
 		return nil, errImplemented
 	}
 	return list, nil
 }
 
+func (a axis) descendant(curr Node) ([]Item, error) {
+	list, _ := a.next.Next(curr)
+	nodes, err := a.get(curr)
+	if err != nil {
+		return nil, err
+	}
+	for i := range nodes {
+		others, err := a.descendant(nodes[i])
+		if err == nil {
+			list = slices.Concat(list, others)
+		}
+	}
+	return list, nil
+}
+
 func (a axis) child(curr Node) ([]Item, error) {
+	nodes, err := a.get(curr)
+	if err != nil {
+		return nil, err
+	}
+	var list []Item
+	for _, c := range nodes {
+		other, err := a.next.Next(c)
+		if err == nil {
+			list = slices.Concat(list, other)
+		}
+	}
+	return list, nil
+}
+
+func (a axis) get(curr Node) ([]Node, error) {
 	var nodes []Node
 	switch c := curr.(type) {
 	case *Element:
@@ -158,14 +183,7 @@ func (a axis) child(curr Node) ([]Item, error) {
 	default:
 		return nil, ErrNode
 	}
-	var list []Item
-	for _, c := range nodes {
-		other, err := a.next.Next(c)
-		if err == nil {
-			list = slices.Concat(list, other)
-		}
-	}
-	return list, nil
+	return nodes, nil
 }
 
 type identifier struct {
@@ -507,13 +525,24 @@ func (f filter) Next(curr Node) ([]Item, error) {
 	return ret, nil
 }
 
-type Let struct{}
+type Let struct {
+	ident string
+	expr  Expr
+}
 
 func (e Let) Next(curr Node) ([]Item, error) {
 	return nil, nil
 }
 
-type loop struct{}
+type binding struct {
+	ident string
+	expr  Expr
+}
+
+type loop struct {
+	binds []binding
+	body  Expr
+}
 
 func (o loop) Next(curr Node) ([]Item, error) {
 	return nil, nil
@@ -527,11 +556,6 @@ type conditional struct {
 
 func (c conditional) Next(curr Node) ([]Item, error) {
 	return nil, nil
-}
-
-type binding struct {
-	ident string
-	expr  Expr
 }
 
 type quantified struct {
