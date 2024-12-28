@@ -13,11 +13,42 @@ import (
 	"github.com/midbel/codecs/xml"
 )
 
+type Environ interface {
+	Resolve(string) (xml.Expr, error)
+	Define(string, xml.Expr)
+}
+
+type Env struct {
+	values map[string]xml.Expr
+	parent Environ
+}
+
+func Empty() Environ {
+	return Enclosed(nil)
+}
+
+func Enclosed(parent Environ) Environ {
+	e := Env {
+		values: make(map[string]xml.Expr),
+		parent: parent,
+	}
+	return &e
+}
+
+func (e *Env) Define(ident string, expr xml.Expr) {
+
+}
+
+func (e *Env) Resolve(ident string) (xml.Expr, error) {
+	return nil, nil
+}
+
 type Schema struct {
 	Title string
+	Environ
+
 
 	Patterns  []*Pattern
-	Variables []*Let
 	Spaces    []*Namespace
 	Functions []*Function
 }
@@ -44,15 +75,16 @@ type Assert struct {
 }
 
 type Rule struct {
+	Environ
+
 	Context    string
 	Assertions []*Assert
-	Variables  []*Let
 }
 
 type Pattern struct {
 	Title     string
+	Environ
 	Rules     []*Rule
-	Variables []*Let
 }
 
 func main() {
@@ -163,6 +195,7 @@ func parseSchema(file string) (*Schema, error) {
 		rs  = xml.NewReader(r)
 		sch Schema
 	)
+	sch.Environ = Empty()
 	if err := readIntro(rs); err != nil {
 		return nil, err
 	}
@@ -201,7 +234,12 @@ func readTop(rs *xml.Reader, node *xml.Element, sch *Schema) error {
 		if err != nil {
 			return err
 		}
-		sch.Variables = append(sch.Variables, let)
+		expr, err := xml.CompileString(let.Value)
+		if err == nil {
+			sch.Define(let.Ident, expr)
+		} else {
+			fmt.Println("compilation fail", let.Value, err)
+		}
 		return nil
 	case "ns":
 		ns, err := readNS(rs, node)
@@ -219,6 +257,7 @@ func readTop(rs *xml.Reader, node *xml.Element, sch *Schema) error {
 
 func readPattern(rs *xml.Reader, sch *Schema) error {
 	var pat Pattern
+	pat.Environ = Enclosed(sch)
 	for {
 		el, err := getElementFromReaderMaybeClosed(rs, "pattern")
 		if err != nil {
@@ -233,9 +272,14 @@ func readPattern(rs *xml.Reader, sch *Schema) error {
 			if err != nil && !errors.Is(err, xml.ErrClosed) {
 				return err
 			}
-			pat.Variables = append(pat.Variables, let)
+			expr, err := xml.CompileString(let.Value)
+			if err == nil {
+				pat.Define(let.Ident, expr)
+			} else {
+				fmt.Println("compilation fail", let.Value, err)
+			}
 		case "rule":
-			rule, err := readRule(rs, el)
+			rule, err := readRule(rs, el, pat)
 			if !errors.Is(err, xml.ErrClosed) {
 				return fmt.Errorf("missing closing rule element")
 			}
@@ -248,11 +292,12 @@ func readPattern(rs *xml.Reader, sch *Schema) error {
 	return nil
 }
 
-func readRule(rs *xml.Reader, elem *xml.Element) (*Rule, error) {
+func readRule(rs *xml.Reader, elem *xml.Element, env Environ) (*Rule, error) {
 	var (
 		rule Rule
 		err  error
 	)
+	rule.Environ = Enclosed(env)
 	if qn := elem.QualifiedName(); qn != "rule" {
 		return nil, fmt.Errorf("%s: unexpected element", qn)
 	}
@@ -270,7 +315,12 @@ func readRule(rs *xml.Reader, elem *xml.Element) (*Rule, error) {
 			if err != nil && !errors.Is(err, xml.ErrClosed) {
 				return nil, err
 			}
-			rule.Variables = append(rule.Variables, let)
+			expr, err := xml.CompileString(let.Value)
+			if err == nil {
+				rule.Define(let.Ident, expr)
+			} else {
+				fmt.Println("compilation fail", let.Value, err)
+			}
 		case "assert":
 			ass, err := readAssert(rs, el)
 			if err != nil {
@@ -318,6 +368,7 @@ func readLet(rs *xml.Reader, elem *xml.Element) (*Let, error) {
 	if err != nil {
 		return nil, err
 	}
+	let.Value = normalizeSpace(let.Value)
 	return &let, nil
 }
 
