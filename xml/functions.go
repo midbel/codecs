@@ -1,6 +1,7 @@
 package xml
 
 import (
+	"regexp"
 	"strings"
 )
 
@@ -30,6 +31,8 @@ var builtins = map[string]builtinFunc{
 	"ends-with":        callEndsWith,
 	"substring-before": callSubstringBefore,
 	"substring-after":  callSubstringAfter,
+	"matches":          callMatches,
+	"tokenize":         callTokenize,
 }
 
 type builtinFunc func(Node, []Expr) ([]Item, error)
@@ -217,6 +220,45 @@ func callSubstringBefore(ctx Node, args []Expr) ([]Item, error) {
 	return singleValue(str), nil
 }
 
+func callTokenize(ctx Node, args []Expr) ([]Item, error) {
+	if len(args) != 2 {
+		return nil, errArgument
+	}
+	fst, err := getStringFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	snd, err := getStringFromExpr(args[1], ctx)
+	if err != nil {
+		return nil, err
+	}
+	re, err := regexp.Compile(snd)
+	if err != nil {
+		return nil, err
+	}
+	var items []Item
+	for _, str := range re.Split(fst, -1) {
+		items = append(items, createLiteral(str))
+	}
+	return items, nil
+}
+
+func callMatches(ctx Node, args []Expr) ([]Item, error) {
+	if len(args) != 2 {
+		return nil, errArgument
+	}
+	fst, err := getStringFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	snd, err := getStringFromExpr(args[1], ctx)
+	if err != nil {
+		return nil, err
+	}
+	ok, err := regexp.MatchString(snd, fst)
+	return singleValue(ok), err
+}
+
 func callSubstringAfter(ctx Node, args []Expr) ([]Item, error) {
 	if len(args) != 2 {
 		return nil, errArgument
@@ -395,15 +437,18 @@ func getStringFromExpr(expr Expr, ctx Node) (string, error) {
 	if len(items) != 1 {
 		return "", errType
 	}
-	v, ok := items[0].(literalItem)
-	if !ok {
+	switch v := items[0].(type) {
+	case literalItem:
+		str, ok := v.Value().(string)
+		if !ok {
+			return "", errType
+		}
+		return str, nil
+	case nodeItem:
+		return v.Node().Value(), nil
+	default:
 		return "", errType
 	}
-	str, ok := v.Value().(string)
-	if !ok {
-		return "", errType
-	}
-	return str, nil
 }
 
 func getBooleanFromItem(item Item) (bool, error) {

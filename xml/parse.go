@@ -186,13 +186,29 @@ func (c *compiler) compileReservedPrefix() (Expr, error) {
 	}
 }
 
+func (c *compiler) compileCdt() (Expr, error) {
+	if !c.is(begGrp) {
+		return nil, errSyntax
+	}
+	c.next()
+	expr, err := c.compileExpr(powLowest)
+	if err != nil {
+		return nil, err
+	}
+	if !c.is(endGrp) {
+		return nil, errSyntax
+	}
+	c.next()
+	return expr, nil
+}
+
 func (c *compiler) compileIf() (Expr, error) {
 	c.next()
 	var (
 		cdt conditional
 		err error
 	)
-	if cdt.test, err = c.compileExpr(powLowest); err != nil {
+	if cdt.test, err = c.compileCdt(); err != nil {
 		return nil, err
 	}
 	if !c.is(reserved) && c.curr.Literal != kwThen {
@@ -334,11 +350,11 @@ func (c *compiler) compileSequence() (Expr, error) {
 		case c.is(opSeq):
 			c.next()
 			if c.is(endGrp) {
-				return nil, fmt.Errorf("%w: comma not allowed before end of sequence", errSyntax)
+				return nil, errSyntax
 			}
 		case c.is(endGrp):
 		default:
-			return nil, fmt.Errorf("%w: unexpected operator after expression", errSyntax)
+			return nil, errSyntax
 		}
 	}
 	if !c.is(endGrp) {
@@ -502,7 +518,7 @@ func (c *compiler) compileName() (Expr, error) {
 	}
 	a := axis{
 		kind: descendantAxis,
-		next:  expr,
+		next: expr,
 	}
 	return a, nil
 }

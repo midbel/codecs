@@ -93,7 +93,7 @@ func (_ root) Next(curr Node) ([]Item, error) {
 
 type axis struct {
 	kind string
-	next  Expr
+	next Expr
 }
 
 func (a axis) Next(curr Node) ([]Item, error) {
@@ -141,6 +141,9 @@ func (a axis) Next(curr Node) ([]Item, error) {
 
 func (a axis) descendant(curr Node) ([]Item, error) {
 	list, _ := a.next.Next(curr)
+	if len(list) > 0 {
+		return list, nil
+	}
 	nodes, err := a.get(curr)
 	if err != nil {
 		return nil, err
@@ -329,9 +332,25 @@ func (b binary) Next(node Node) ([]Item, error) {
 			return math.Mod(left, right), nil
 		})
 	case opAnd:
-		res = toBool(left) && toBool(right)
+		res1, err := getBooleanFromItem(left[0])
+		if err != nil {
+			return nil, err
+		}
+		res2, err := getBooleanFromItem(right[0])
+		if err != nil {
+			return nil, err
+		}
+		res = res1 && res2
 	case opOr:
-		res = toBool(left) || toBool(right)
+		res1, err := getBooleanFromItem(left[0])
+		if err != nil {
+			return nil, err
+		}
+		res2, err := getBooleanFromItem(right[0])
+		if err != nil {
+			return nil, err
+		}
+		res = res1 || res2
 	case opEq:
 		res, err = isEqual(left, right)
 	case opNe:
@@ -555,7 +574,22 @@ type conditional struct {
 }
 
 func (c conditional) Next(curr Node) ([]Item, error) {
-	return nil, nil
+	res, err := c.test.Next(curr)
+	if err != nil {
+		return nil, err
+	}
+	if len(res) == 0 {
+		return res, nil
+	}
+	fmt.Println("conditional", res, err)
+	ok, err := getBooleanFromItem(res[0])
+	if err != nil {
+		return nil, err
+	}
+	if ok {
+		return c.csq.Next(curr)
+	}
+	return c.alt.Next(curr)
 }
 
 type quantified struct {
@@ -631,6 +665,8 @@ func toString(value any) (string, error) {
 		return v, nil
 	case float64:
 		return strconv.FormatFloat(v, 'f', -1, 64), nil
+	case bool:
+		return strconv.FormatBool(v), nil
 	default:
 		return "", errType
 	}
