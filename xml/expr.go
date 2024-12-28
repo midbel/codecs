@@ -509,17 +509,17 @@ func (f filter) Next(curr Node) ([]Item, error) {
 		if isEmpty(res) {
 			return nil, errType
 		}
+		var keep bool
 		switch x := res[0].Value().(type) {
 		case float64:
-			if int(x) == j {
-				ret = append(ret, n)
-			}
+			keep = int(x) == j
 		case bool:
-			if x {
-				ret = append(ret, n)
-			}
+			keep = j
 		default:
 			return nil, errType
+		}
+		if keep {
+			ret = append(ret, n)
 		}
 	}
 	return ret, nil
