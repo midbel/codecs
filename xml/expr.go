@@ -40,9 +40,9 @@ func (q query) Next(node Node) ([]Item, error) {
 	return q.expr.Next(node)
 }
 
-type all struct{}
+type wildcard struct{}
 
-func (_ all) Next(curr Node) ([]Item, error) {
+func (_ wildcard) Next(curr Node) ([]Item, error) {
 	if _, ok := curr.(*Element); !ok {
 		return nil, ErrNode
 	}
@@ -509,8 +509,8 @@ func (f filter) Next(curr Node) ([]Item, error) {
 
 type conditional struct {
 	test Expr
-	csq Expr
-	alt Expr
+	csq  Expr
+	alt  Expr
 }
 
 func (c conditional) Next(curr Node) ([]Item, error) {

@@ -28,7 +28,7 @@ func Empty() Environ {
 }
 
 func Enclosed(parent Environ) Environ {
-	e := Env {
+	e := Env{
 		values: make(map[string]xml.Expr),
 		parent: parent,
 	}
@@ -46,7 +46,6 @@ func (e *Env) Resolve(ident string) (xml.Expr, error) {
 type Schema struct {
 	Title string
 	Environ
-
 
 	Patterns  []*Pattern
 	Spaces    []*Namespace
@@ -82,9 +81,9 @@ type Rule struct {
 }
 
 type Pattern struct {
-	Title     string
+	Title string
 	Environ
-	Rules     []*Rule
+	Rules []*Rule
 }
 
 func main() {

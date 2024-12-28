@@ -510,7 +510,7 @@ func (c *compiler) compileName() (Expr, error) {
 func (c *compiler) compileNameBase() (Expr, error) {
 	if c.is(opMul) {
 		c.next()
-		var a all
+		var a wildcard
 		return a, nil
 	}
 	n := name{
