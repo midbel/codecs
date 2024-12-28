@@ -514,7 +514,7 @@ func (f filter) Next(curr Node) ([]Item, error) {
 		case float64:
 			keep = int(x) == j
 		case bool:
-			keep = j
+			keep = x
 		default:
 			return nil, errType
 		}
