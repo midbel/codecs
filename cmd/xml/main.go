@@ -170,7 +170,7 @@ func search(doc *xml.Document, query, root string) (*xml.Document, error) {
 		return nil, err
 	}
 	if len(list) == 0 {
-		return nil, nil
+		return nil, fmt.Errorf("query gives no result")
 	}
 	var node xml.Node
 	if len(list) == 1 {

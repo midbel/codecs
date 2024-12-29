@@ -43,10 +43,20 @@ func (q query) Next(node Node) ([]Item, error) {
 type wildcard struct{}
 
 func (_ wildcard) Next(curr Node) ([]Item, error) {
-	if curr.Type() == TypeDocument {
+	if curr.Type() != TypeElement {
 		return nil, errDiscard
 	}
-	return createSingle(createNode(curr)), nil
+	var (
+		list []Item
+		elem = curr.(*Element)
+	)
+	for i := range elem.Nodes {
+		if elem.Nodes[i].Type() != TypeElement {
+			continue
+		}
+		list = append(list, createNode(elem.Nodes[i]))
+	}
+	return list, nil
 }
 
 type current struct{}

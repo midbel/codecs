@@ -98,8 +98,20 @@ func callStringLength(ctx Node, args []Expr) ([]Item, error) {
 }
 
 func callNormalizeSpace(ctx Node, args []Expr) ([]Item, error) {
-	if len(args) != 1 {
-		return nil, errArgument
+	var (
+		str string
+		err error
+	)
+	switch len(args) {
+	case 0:
+		str = ctx.Value()
+	case 1:
+		str, err = getStringFromExpr(args[0], ctx)
+	default:
+		err = errArgument
+	}
+	if err != nil {
+		return nil, err
 	}
 	var prev rune
 	clear := func(r rune) rune {
@@ -108,11 +120,6 @@ func callNormalizeSpace(ctx Node, args []Expr) ([]Item, error) {
 		}
 		prev = r
 		return r
-	}
-
-	str, err := getStringFromExpr(args[0], ctx)
-	if err != nil {
-		return nil, err
 	}
 	str = strings.TrimSpace(str)
 	return singleValue(strings.Map(clear, str)), nil
