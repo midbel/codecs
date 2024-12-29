@@ -581,7 +581,6 @@ func (c conditional) Next(curr Node) ([]Item, error) {
 	if len(res) == 0 {
 		return res, nil
 	}
-	fmt.Println("conditional", res, err)
 	ok, err := getBooleanFromItem(res[0])
 	if err != nil {
 		return nil, err

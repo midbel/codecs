@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"strings"
 )
 
 type NodeType int8
@@ -289,14 +290,12 @@ func (e *Element) Empty() bool {
 }
 
 func (e *Element) Value() string {
-	if len(e.Nodes) != 1 {
-		return ""
+	var list []string
+	for _, n := range e.Nodes {
+		str := n.Value()
+		list = append(list, str)
 	}
-	el, ok := e.Nodes[0].(*Text)
-	if !ok {
-		return ""
-	}
-	return el.Content
+	return strings.Join(list, " ")
 }
 
 func (e *Element) Has(name string) bool {

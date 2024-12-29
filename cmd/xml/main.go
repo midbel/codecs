@@ -21,7 +21,7 @@ func main() {
 		Schema  string
 		Compact bool
 		Check   bool
-		List bool
+		List    bool
 	}{}
 	flag.StringVar(&options.Root, "r", "document", "root element name to use when using a query")
 	flag.StringVar(&options.Query, "q", "", "search for element in document")
@@ -66,10 +66,10 @@ func main() {
 		root := doc.Root()
 		elem, ok := root.(*xml.Element)
 		if !ok {
-			return 
+			return
 		}
 		for i, n := range elem.Nodes {
-			fmt.Println(i+1, n.Type(), n.QualifiedName(), n.Value())
+			fmt.Println(i+1, n.QualifiedName(), n.Value())
 		}
 	} else {
 		if err := writeDocument(doc, options.Compact); err != nil {
