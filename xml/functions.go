@@ -1,6 +1,7 @@
 package xml
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 )

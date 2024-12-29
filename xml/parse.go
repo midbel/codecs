@@ -133,42 +133,6 @@ func (c *compiler) Compile() (Expr, error) {
 	return expr, err
 }
 
-func (c *compiler) compile2() (Expr, error) {
-	var (
-		expr union
-		do   = func() (Expr, error) {
-			if c.is(currLevel) {
-				return c.compileRoot()
-			}
-			if c.is(anyLevel) {
-				return c.compileDescendantFromRoot()
-			}
-			return c.compileExpr(powLowest)
-		}
-	)
-	for !c.done() {
-		e, err := do()
-		if err != nil {
-			return nil, err
-		}
-		expr.all = append(expr.all, e)
-		switch {
-		case c.is(opAlt):
-			c.next()
-			if c.done() {
-				return nil, errSyntax
-			}
-		case c.done():
-		default:
-			return nil, errSyntax
-		}
-	}
-	if len(expr.all) == 1 {
-		return expr.all[0], nil
-	}
-	return expr, nil
-}
-
 func (c *compiler) compile() (Expr, error) {
 	return c.compileExpr(powLowest)
 }

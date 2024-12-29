@@ -21,12 +21,14 @@ func main() {
 		Schema  string
 		Compact bool
 		Check   bool
+		List bool
 	}{}
 	flag.StringVar(&options.Root, "r", "document", "root element name to use when using a query")
 	flag.StringVar(&options.Query, "q", "", "search for element in document")
 	flag.StringVar(&options.Schema, "s", "", "relax schema to validate XML document")
 	flag.BoolVar(&options.Compact, "c", false, "write compact output")
 	flag.BoolVar(&options.Check, "k", false, "validate only the document")
+	flag.BoolVar(&options.List, "l", false, "print results as list")
 	flag.Parse()
 
 	schema, err := parseSchema(options.Schema)
@@ -60,9 +62,20 @@ func main() {
 			return
 		}
 	}
-	if err := writeDocument(doc, options.Compact); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(5)
+	if options.List {
+		root := doc.Root()
+		elem, ok := root.(*xml.Element)
+		if !ok {
+			return 
+		}
+		for i, n := range elem.Nodes {
+			fmt.Println(i+1, n.Type(), n.QualifiedName(), n.Value())
+		}
+	} else {
+		if err := writeDocument(doc, options.Compact); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(5)
+		}
 	}
 }
 

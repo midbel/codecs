@@ -83,7 +83,6 @@ func main() {
 		}
 		var total int
 		if expr != nil {
-
 			items, err := expr.Next(doc)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "failure retrieving nodes from document: %s", err)
