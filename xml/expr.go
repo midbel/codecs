@@ -43,8 +43,8 @@ func (q query) Next(node Node) ([]Item, error) {
 type wildcard struct{}
 
 func (_ wildcard) Next(curr Node) ([]Item, error) {
-	if _, ok := curr.(*Element); !ok {
-		return nil, ErrNode
+	if curr.Type() == TypeDocument {
+		return nil, errDiscard
 	}
 	return createSingle(createNode(curr)), nil
 }
@@ -140,6 +140,10 @@ func (a axis) Next(curr Node) ([]Item, error) {
 }
 
 func (a axis) descendant(curr Node) ([]Item, error) {
+	if curr.Type() == TypeDocument {
+		doc := curr.(*Document)
+		return a.descendant(doc.Root())
+	}
 	list, _ := a.next.Next(curr)
 	if len(list) > 0 {
 		return list, nil
@@ -173,20 +177,18 @@ func (a axis) child(curr Node) ([]Item, error) {
 }
 
 func (a axis) get(curr Node) ([]Node, error) {
-	var nodes []Node
 	switch c := curr.(type) {
 	case *Element:
-		nodes = slices.Concat(nodes, c.Nodes)
+		return c.Nodes, nil
 	case *Document:
 		root := c.Root()
 		if root == nil {
 			return nil, ErrRoot
 		}
-		nodes = append(nodes, root)
+		return []Node{root}, nil
 	default:
 		return nil, ErrNode
 	}
-	return nodes, nil
 }
 
 type identifier struct {
@@ -246,6 +248,9 @@ func (d descendant) Next(node Node) ([]Item, error) {
 			continue
 		}
 		list = slices.Concat(list, xs)
+	}
+	if _, ok := d.curr.(root); ok && len(list) > 1 {
+		list = list[1:]
 	}
 	return list, nil
 }
