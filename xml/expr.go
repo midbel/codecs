@@ -129,7 +129,7 @@ func (a axis) Next(curr Node) ([]Item, error) {
 		if p != nil {
 			return a.next.Next(p)
 		}
-		return nil, errDiscard
+		return nil, nil
 	case ancestorAxis, ancestorSelfAxis:
 		for p := curr.Parent(); p != nil; {
 			other, err := a.next.Next(p)
@@ -432,13 +432,13 @@ func (c call) Next(curr Node) ([]Item, error) {
 	)
 	switch c.ident {
 	case "node":
-		_, keep = curr.(*Element)
+		keep = curr.Type() == TypeElement
 	case "text":
-		_, keep = curr.(*Text)
+		keep = curr.Type() == TypeText
 	case "processing-instruction":
-		_, keep = curr.(*Instruction)
+		keep = curr.Type() == TypeInstruction
 	case "comment":
-		_, keep = curr.(*Comment)
+		keep = curr.Type() == TypeComment
 	default:
 		return c.eval(curr)
 	}
