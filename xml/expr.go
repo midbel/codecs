@@ -44,7 +44,7 @@ type wildcard struct{}
 
 func (_ wildcard) Next(curr Node) ([]Item, error) {
 	if curr.Type() != TypeElement {
-		return nil, errDiscard
+		return nil, nil
 	}
 	var (
 		list []Item
@@ -138,12 +138,7 @@ func (a axis) Next(curr Node) ([]Item, error) {
 			}
 		}
 	case descendantAxis, descendantSelfAxis:
-		var start Node = curr
-		if curr.Type() == TypeDocument {
-			doc := curr.(*Document)
-			start = doc.Root()
-		}
-		others, err := a.descendant(start)
+		others, err := a.descendant(getNode(curr))
 		if err != nil {
 			return nil, err
 		}
@@ -156,16 +151,12 @@ func (a axis) Next(curr Node) ([]Item, error) {
 
 func (a axis) descendant(curr Node) ([]Item, error) {
 	if curr.Type() != TypeElement {
-		return nil, errDiscard
+		return nil, nil
 	}
-	list, err := a.next.Next(curr)
-	if err == nil && len(list) > 0 {
-		return list, nil
-	}
-	nodes, err := a.get(curr)
-	if err != nil {
-		return nil, err
-	}
+	var (
+		list  []Item
+		nodes = getChildrenNodes(curr)
+	)
 	for i := range nodes {
 		others, err := a.descendant(nodes[i])
 		if err == nil {
@@ -176,11 +167,13 @@ func (a axis) descendant(curr Node) ([]Item, error) {
 }
 
 func (a axis) child(curr Node) ([]Item, error) {
-	nodes, err := a.get(curr)
-	if err != nil {
-		return nil, err
+	if curr.Type() != TypeElement {
+		return nil, nil
 	}
-	var list []Item
+	var (
+		list  []Item
+		nodes = getChildrenNodes(curr)
+	)
 	for _, c := range nodes {
 		other, err := a.next.Next(c)
 		if err == nil {
@@ -281,19 +274,7 @@ func (d *descendant) traverse(n Node) ([]Item, error) {
 	if !d.deep {
 		return list, nil
 	}
-	var nodes []Node
-	switch c := n.(type) {
-	case *Element:
-		nodes = slices.Concat(nodes, c.Nodes)
-	case *Document:
-		root := c.Root()
-		if root == nil {
-			return nil, ErrRoot
-		}
-		nodes = append(nodes, root)
-	default:
-		return nil, ErrNode
-	}
+	nodes := getChildrenNodes(n)
 	for i := range nodes {
 		tmp, err := d.traverse(nodes[i])
 		if err == nil {
@@ -705,4 +686,28 @@ func toBool(v any) bool {
 	default:
 		return false
 	}
+}
+
+func getNode(node Node) Node {
+	if node.Type() == TypeDocument {
+		doc := node.(*Document)
+		return doc.Root()
+	}
+	return node
+}
+
+func getChildrenNodes(node Node) []Node {
+	var nodes []Node
+	switch c := node.(type) {
+	case *Element:
+		nodes = c.Nodes
+	case *Document:
+		root := c.Root()
+		if root == nil {
+			return nil
+		}
+		nodes = append(nodes, root)
+	default:
+	}
+	return nodes
 }
