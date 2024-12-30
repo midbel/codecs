@@ -32,7 +32,7 @@ const (
 	powNe
 	powEq
 	powCmp
-	powConcat,
+	powConcat
 	powAdd
 	powMul
 	powPrefix
