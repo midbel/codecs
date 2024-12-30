@@ -32,6 +32,7 @@ const (
 	powNe
 	powEq
 	powCmp
+	powConcat,
 	powAdd
 	powMul
 	powPrefix
@@ -45,6 +46,7 @@ var bindings = map[rune]int{
 	currLevel: powLevel,
 	anyLevel:  powLevel,
 	opAlt:     powAlt,
+	opConcat:  powConcat,
 	opEq:      powEq,
 	opNe:      powNe,
 	opGt:      powCmp,
@@ -247,11 +249,6 @@ func (c *compiler) compileQuantified(every bool) (Expr, error) {
 	}
 	q.test = test
 	return q, nil
-}
-
-func (c *compiler) compileEvery() (Expr, error) {
-	c.next()
-	return nil, errImplemented
 }
 
 func (c *compiler) compileReservedInfix(left Expr) (Expr, error) {
@@ -647,6 +644,7 @@ const (
 	endPred
 	begGrp
 	endGrp
+	opConcat
 	opAdd
 	opSub
 	opMul
@@ -778,6 +776,10 @@ func (s *QueryScanner) scanDelimiter(tok *Token) {
 		tok.Type = opSeq
 	case pipe:
 		tok.Type = opAlt
+		if k == s.char {
+			s.read()
+			tok.Type = opConcat
+		}
 	case lsquare:
 		tok.Type = begPred
 		s.enterPredicate()
