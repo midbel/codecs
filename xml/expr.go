@@ -65,16 +65,6 @@ func (_ current) Next(curr Node) ([]Item, error) {
 	return createSingle(createNode(curr)), nil
 }
 
-type parent struct{}
-
-func (_ parent) Next(curr Node) ([]Item, error) {
-	n := curr.Parent()
-	if n == nil {
-		return nil, fmt.Errorf("root element has no parent")
-	}
-	return createSingle(createNode(curr)), nil
-}
-
 type absolute struct {
 	expr Expr
 }

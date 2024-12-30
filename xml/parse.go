@@ -513,21 +513,49 @@ func (c *compiler) compileCurrent() (Expr, error) {
 
 func (c *compiler) compileParent() (Expr, error) {
 	c.next()
-	return parent{}, nil
+	next := call{
+		ident: "node",
+	}
+	expr := axis{
+		kind: parentAxis,
+		next: next,
+
+	}
+	return expr, nil
 }
 
 func (c *compiler) compileDescendant(left Expr) (Expr, error) {
-	d := descendant{
-		curr: left,
-		deep: c.is(anyLevel),
-	}
+	any := c.is(anyLevel)
 	c.next()
+
 	next, err := c.compileExpr(powLevel)
 	if err != nil {
 		return nil, err
 	}
-	d.next = next
-	return d, nil
+
+	var expr descendant
+	if any {
+		c := call {
+			ident: "node",
+		}
+		a := axis{
+			kind: descendantSelfAxis,
+			next: c,
+		}
+		expr = descendant{
+			curr: left,
+			next: descendant{
+				curr: a,
+				next: next,
+			},
+		}
+	} else {
+		expr = descendant{
+			curr: left,
+			next: next,
+		}
+	}
+	return expr, nil
 }
 
 func (c *compiler) compileDescendantFromRoot() (Expr, error) {
