@@ -138,7 +138,12 @@ func (a axis) Next(curr Node) ([]Item, error) {
 			}
 		}
 	case descendantAxis, descendantSelfAxis:
-		others, err := a.descendant(curr)
+		var start Node = curr
+		if curr.Type() == TypeDocument {
+			doc := curr.(*Document)
+			start = doc.Root()
+		}
+		others, err := a.descendant(start)
 		if err != nil {
 			return nil, err
 		}
@@ -150,12 +155,11 @@ func (a axis) Next(curr Node) ([]Item, error) {
 }
 
 func (a axis) descendant(curr Node) ([]Item, error) {
-	if curr.Type() == TypeDocument {
-		doc := curr.(*Document)
-		return a.descendant(doc.Root())
+	if curr.Type() != TypeElement {
+		return nil, errDiscard
 	}
-	list, _ := a.next.Next(curr)
-	if len(list) > 0 {
+	list, err := a.next.Next(curr)
+	if err == nil && len(list) > 0 {
 		return list, nil
 	}
 	nodes, err := a.get(curr)
@@ -247,6 +251,10 @@ type descendant struct {
 }
 
 func (d descendant) Next(node Node) ([]Item, error) {
+	if node.Type() == TypeDocument {
+		doc := node.(*Document)
+		return d.traverse(doc.Root())
+	}
 	ns, err := d.curr.Next(node)
 	if err != nil {
 		return nil, err
@@ -267,8 +275,8 @@ func (d descendant) Next(node Node) ([]Item, error) {
 
 func (d *descendant) traverse(n Node) ([]Item, error) {
 	list, err := d.next.Next(n)
-	if err != nil {
-		return nil, err
+	if len(list) > 0 || err != nil {
+		return list, err
 	}
 	if !d.deep {
 		return list, nil

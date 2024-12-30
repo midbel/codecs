@@ -2,6 +2,7 @@ package xml
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -33,6 +34,17 @@ var builtins = map[string]builtinFunc{
 	"substring-after":  callSubstringAfter,
 	"matches":          callMatches,
 	"tokenize":         callTokenize,
+	"sum":              callSum,
+	"count":            callCount,
+	"avg":              callAvg,
+	"min":              callMin,
+	"max":              callMax,
+	"zero-or-more":     callZeroOrOne,
+	"one-or-more":      callOneOrMore,
+	"exactly-one":      callExactlyOne,
+	"position":         callPosition,
+	"last":             callLast,
+	"current-date":     callCurrentDate,
 }
 
 type builtinFunc func(Node, []Expr) ([]Item, error)
@@ -45,6 +57,90 @@ func checkArity(argCount int, fn builtinFunc) builtinFunc {
 		return fn(node, args)
 	}
 	return do
+}
+
+func callSum(ctx Node, args []Expr) ([]Item, error) {
+	if len(args) != 1 {
+		return nil, errArgument
+	}
+	items, err := expandArgs(ctx, args)
+	if err != nil {
+		return nil, err
+	}
+	var result float64
+	for _, n := range items {
+		v, err := strconv.ParseFloat(n.Node().Value(), 64)
+		if err != nil {
+			return nil, err
+		}
+		result += v
+	}
+	return singleValue(result), nil
+}
+
+func callAvg(ctx Node, args []Expr) ([]Item, error) {
+	if len(args) != 1 {
+		return nil, errArgument
+	}
+	items, err := expandArgs(ctx, args)
+	if err != nil {
+		return nil, err
+	}
+	if len(items) == 0 {
+		return nil, errArgument
+	}
+	var result float64
+	for _, n := range items {
+		v, err := strconv.ParseFloat(n.Node().Value(), 64)
+		if err != nil {
+			return nil, err
+		}
+		result += v
+	}
+	return singleValue(result / float64(len(items))), nil
+}
+
+func callCount(ctx Node, args []Expr) ([]Item, error) {
+	if len(args) != 1 {
+		return nil, errArgument
+	}
+	items, err := expandArgs(ctx, args)
+	if err != nil {
+		return nil, err
+	}
+	return singleValue(float64(len(items))), nil
+}
+
+func callMin(ctx Node, args []Expr) ([]Item, error) {
+	return nil, nil
+}
+
+func callMax(ctx Node, args []Expr) ([]Item, error) {
+	return nil, nil
+}
+
+func callZeroOrOne(ctx Node, args []Expr) ([]Item, error) {
+	return nil, nil
+}
+
+func callOneOrMore(ctx Node, args []Expr) ([]Item, error) {
+	return nil, nil
+}
+
+func callExactlyOne(ctx Node, args []Expr) ([]Item, error) {
+	return nil, nil
+}
+
+func callPosition(ctx Node, args []Expr) ([]Item, error) {
+	return nil, nil
+}
+
+func callLast(ctx Node, args []Expr) ([]Item, error) {
+	return nil, nil
+}
+
+func callCurrentDate(ctx Node, args []Expr) ([]Item, error) {
+	return nil, nil
 }
 
 func callCompare(ctx Node, args []Expr) ([]Item, error) {
