@@ -478,7 +478,7 @@ func (c *compiler) compileName() (Expr, error) {
 		return nil, err
 	}
 	a := axis{
-		kind: descendantAxis,
+		kind: childAxis,
 		next: expr,
 	}
 	return a, nil

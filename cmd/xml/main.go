@@ -176,7 +176,7 @@ func search(doc *xml.Document, query, root string) (*xml.Document, error) {
 	if err != nil {
 		return nil, err
 	}
-	list, err := expr.Next(doc)
+	list, err := expr.Next(doc, xml.Empty())
 	if err != nil {
 		return nil, err
 	}

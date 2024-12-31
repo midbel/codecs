@@ -74,7 +74,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(3)
 	}
-	var count int
+	var (
+		count int
+		env = xml.Enclosed(sch)
+	)
 	for a := range getAssertions(sch, strings.TrimSpace(*level), strings.TrimSpace(*group)) {
 		expr, err := xml.Compile(strings.NewReader(a.Context))
 		if err != nil {
@@ -83,7 +86,7 @@ func main() {
 		}
 		var total int
 		if expr != nil {
-			items, err := expr.Next(doc)
+			items, err := expr.Next(doc, env)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "failure retrieving nodes from document: %s", err)
 				fmt.Fprintln(os.Stderr)

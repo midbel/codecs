@@ -47,23 +47,23 @@ var builtins = map[string]builtinFunc{
 	"current-date":     callCurrentDate,
 }
 
-type builtinFunc func(Node, []Expr) ([]Item, error)
+type builtinFunc func(Node, []Expr, Environ) ([]Item, error)
 
 func checkArity(argCount int, fn builtinFunc) builtinFunc {
-	do := func(node Node, args []Expr) ([]Item, error) {
+	do := func(node Node, args []Expr, env Environ) ([]Item, error) {
 		if len(args) < argCount {
 			return nil, errArgument
 		}
-		return fn(node, args)
+		return fn(node, args, env)
 	}
 	return do
 }
 
-func callSum(ctx Node, args []Expr) ([]Item, error) {
+func callSum(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	if len(args) != 1 {
 		return nil, errArgument
 	}
-	items, err := expandArgs(ctx, args)
+	items, err := expandArgs(ctx, args, env)
 	if err != nil {
 		return nil, err
 	}
@@ -78,11 +78,11 @@ func callSum(ctx Node, args []Expr) ([]Item, error) {
 	return singleValue(result), nil
 }
 
-func callAvg(ctx Node, args []Expr) ([]Item, error) {
+func callAvg(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	if len(args) != 1 {
 		return nil, errArgument
 	}
-	items, err := expandArgs(ctx, args)
+	items, err := expandArgs(ctx, args, env)
 	if err != nil {
 		return nil, err
 	}
@@ -100,82 +100,82 @@ func callAvg(ctx Node, args []Expr) ([]Item, error) {
 	return singleValue(result / float64(len(items))), nil
 }
 
-func callCount(ctx Node, args []Expr) ([]Item, error) {
+func callCount(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	if len(args) != 1 {
 		return nil, errArgument
 	}
-	items, err := expandArgs(ctx, args)
+	items, err := expandArgs(ctx, args, env)
 	if err != nil {
 		return nil, err
 	}
 	return singleValue(float64(len(items))), nil
 }
 
-func callMin(ctx Node, args []Expr) ([]Item, error) {
-	return nil, nil
+func callMin(ctx Node, args []Expr, env Environ) ([]Item, error) {
+	return nil, errImplemented
 }
 
-func callMax(ctx Node, args []Expr) ([]Item, error) {
-	return nil, nil
+func callMax(ctx Node, args []Expr, env Environ) ([]Item, error) {
+	return nil, errImplemented
 }
 
-func callZeroOrOne(ctx Node, args []Expr) ([]Item, error) {
-	return nil, nil
+func callZeroOrOne(ctx Node, args []Expr, env Environ) ([]Item, error) {
+	return nil, errImplemented
 }
 
-func callOneOrMore(ctx Node, args []Expr) ([]Item, error) {
-	return nil, nil
+func callOneOrMore(ctx Node, args []Expr, env Environ) ([]Item, error) {
+	return nil, errImplemented
 }
 
-func callExactlyOne(ctx Node, args []Expr) ([]Item, error) {
-	return nil, nil
+func callExactlyOne(ctx Node, args []Expr, env Environ) ([]Item, error) {
+	return nil, errImplemented
 }
 
-func callPosition(ctx Node, args []Expr) ([]Item, error) {
-	return nil, nil
+func callPosition(ctx Node, args []Expr, env Environ) ([]Item, error) {
+	return nil, errImplemented
 }
 
-func callLast(ctx Node, args []Expr) ([]Item, error) {
-	return nil, nil
+func callLast(ctx Node, args []Expr, env Environ) ([]Item, error) {
+	return nil, errImplemented
 }
 
-func callCurrentDate(ctx Node, args []Expr) ([]Item, error) {
-	return nil, nil
+func callCurrentDate(ctx Node, args []Expr, env Environ) ([]Item, error) {
+	return nil, errImplemented
 }
 
-func callCompare(ctx Node, args []Expr) ([]Item, error) {
+func callCompare(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	if len(args) != 2 {
 		return nil, errArgument
 	}
-	fst, err := getStringFromExpr(args[0], ctx)
+	fst, err := getStringFromExpr(args[0], ctx, env)
 	if err != nil {
 		return nil, err
 	}
-	snd, err := getStringFromExpr(args[1], ctx)
+	snd, err := getStringFromExpr(args[1], ctx, env)
 	if err != nil {
 		return nil, err
 	}
 	cmp := strings.Compare(fst, snd)
 	return singleValue(float64(cmp)), nil
 }
-func callConcat(ctx Node, args []Expr) ([]Item, error) {
+func callConcat(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	return nil, errImplemented
 }
 
-func callStringJoin(ctx Node, args []Expr) ([]Item, error) {
+func callStringJoin(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	return nil, errImplemented
 }
 
-func callSubstring(ctx Node, args []Expr) ([]Item, error) {
+func callSubstring(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	return nil, errImplemented
 }
 
-func callStringLength(ctx Node, args []Expr) ([]Item, error) {
+func callStringLength(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	if len(args) == 0 {
 		str := ctx.Value()
 		return singleValue(float64(len(str))), nil
 	}
-	items, err := expandArgs(ctx, args)
+	items, err := expandArgs(ctx, args, env)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +193,7 @@ func callStringLength(ctx Node, args []Expr) ([]Item, error) {
 	return singleValue(float64(len(str))), nil
 }
 
-func callNormalizeSpace(ctx Node, args []Expr) ([]Item, error) {
+func callNormalizeSpace(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	var (
 		str string
 		err error
@@ -202,7 +202,7 @@ func callNormalizeSpace(ctx Node, args []Expr) ([]Item, error) {
 	case 0:
 		str = ctx.Value()
 	case 1:
-		str, err = getStringFromExpr(args[0], ctx)
+		str, err = getStringFromExpr(args[0], ctx, env)
 	default:
 		err = errArgument
 	}
@@ -221,41 +221,41 @@ func callNormalizeSpace(ctx Node, args []Expr) ([]Item, error) {
 	return singleValue(strings.Map(clear, str)), nil
 }
 
-func callUppercase(ctx Node, args []Expr) ([]Item, error) {
+func callUppercase(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	if len(args) != 1 {
 		return nil, errArgument
 	}
-	str, err := getStringFromExpr(args[0], ctx)
+	str, err := getStringFromExpr(args[0], ctx, env)
 	if err != nil {
 		return nil, err
 	}
 	return singleValue(strings.ToUpper(str)), nil
 }
 
-func callLowercase(ctx Node, args []Expr) ([]Item, error) {
+func callLowercase(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	if len(args) != 1 {
 		return nil, errArgument
 	}
-	str, err := getStringFromExpr(args[0], ctx)
+	str, err := getStringFromExpr(args[0], ctx, env)
 	if err != nil {
 		return nil, err
 	}
 	return singleValue(strings.ToLower(str)), nil
 }
 
-func callTranslate(ctx Node, args []Expr) ([]Item, error) {
+func callTranslate(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	return nil, errImplemented
 }
 
-func callContains(ctx Node, args []Expr) ([]Item, error) {
+func callContains(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	if len(args) != 2 {
 		return nil, errArgument
 	}
-	fst, err := getStringFromExpr(args[0], ctx)
+	fst, err := getStringFromExpr(args[0], ctx, env)
 	if err != nil {
 		return nil, err
 	}
-	snd, err := getStringFromExpr(args[1], ctx)
+	snd, err := getStringFromExpr(args[1], ctx, env)
 	if err != nil {
 		return nil, err
 	}
@@ -263,59 +263,59 @@ func callContains(ctx Node, args []Expr) ([]Item, error) {
 	return singleValue(res), nil
 }
 
-func callStartsWith(ctx Node, args []Expr) ([]Item, error) {
+func callStartsWith(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	if len(args) != 2 {
 		return nil, errArgument
 	}
-	fst, err := getStringFromExpr(args[0], ctx)
+	fst, err := getStringFromExpr(args[0], ctx, env)
 	if err != nil {
 		return nil, err
 	}
-	snd, err := getStringFromExpr(args[1], ctx)
+	snd, err := getStringFromExpr(args[1], ctx, env)
 	if err != nil {
 		return nil, err
 	}
 	if snd == "" {
-		return callTrue(ctx, args)
+		return callTrue(ctx, args, env)
 	}
 	if fst == "" && snd != "" {
-		return callFalse(ctx, args)
+		return callFalse(ctx, args, env)
 	}
 	res := strings.HasPrefix(fst, snd)
 	return singleValue(res), nil
 }
 
-func callEndsWith(ctx Node, args []Expr) ([]Item, error) {
+func callEndsWith(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	if len(args) != 2 {
 		return nil, errArgument
 	}
-	fst, err := getStringFromExpr(args[0], ctx)
+	fst, err := getStringFromExpr(args[0], ctx, env)
 	if err != nil {
 		return nil, err
 	}
-	snd, err := getStringFromExpr(args[1], ctx)
+	snd, err := getStringFromExpr(args[1], ctx, env)
 	if err != nil {
 		return nil, err
 	}
 	if snd == "" {
-		return callTrue(ctx, args)
+		return callTrue(ctx, args, env)
 	}
 	if fst == "" && snd != "" {
-		return callFalse(ctx, args)
+		return callFalse(ctx, args, env)
 	}
 	res := strings.HasSuffix(fst, snd)
 	return singleValue(res), nil
 }
 
-func callSubstringBefore(ctx Node, args []Expr) ([]Item, error) {
+func callSubstringBefore(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	if len(args) != 2 {
 		return nil, errArgument
 	}
-	fst, err := getStringFromExpr(args[0], ctx)
+	fst, err := getStringFromExpr(args[0], ctx, env)
 	if err != nil {
 		return nil, err
 	}
-	snd, err := getStringFromExpr(args[1], ctx)
+	snd, err := getStringFromExpr(args[1], ctx, env)
 	if err != nil {
 		return nil, err
 	}
@@ -323,15 +323,15 @@ func callSubstringBefore(ctx Node, args []Expr) ([]Item, error) {
 	return singleValue(str), nil
 }
 
-func callTokenize(ctx Node, args []Expr) ([]Item, error) {
+func callTokenize(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	if len(args) != 2 {
 		return nil, errArgument
 	}
-	fst, err := getStringFromExpr(args[0], ctx)
+	fst, err := getStringFromExpr(args[0], ctx, env)
 	if err != nil {
 		return nil, err
 	}
-	snd, err := getStringFromExpr(args[1], ctx)
+	snd, err := getStringFromExpr(args[1], ctx, env)
 	if err != nil {
 		return nil, err
 	}
@@ -346,15 +346,15 @@ func callTokenize(ctx Node, args []Expr) ([]Item, error) {
 	return items, nil
 }
 
-func callMatches(ctx Node, args []Expr) ([]Item, error) {
+func callMatches(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	if len(args) != 2 {
 		return nil, errArgument
 	}
-	fst, err := getStringFromExpr(args[0], ctx)
+	fst, err := getStringFromExpr(args[0], ctx, env)
 	if err != nil {
 		return nil, err
 	}
-	snd, err := getStringFromExpr(args[1], ctx)
+	snd, err := getStringFromExpr(args[1], ctx, env)
 	if err != nil {
 		return nil, err
 	}
@@ -362,15 +362,15 @@ func callMatches(ctx Node, args []Expr) ([]Item, error) {
 	return singleValue(ok), err
 }
 
-func callSubstringAfter(ctx Node, args []Expr) ([]Item, error) {
+func callSubstringAfter(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	if len(args) != 2 {
 		return nil, errArgument
 	}
-	fst, err := getStringFromExpr(args[0], ctx)
+	fst, err := getStringFromExpr(args[0], ctx, env)
 	if err != nil {
 		return nil, err
 	}
-	snd, err := getStringFromExpr(args[1], ctx)
+	snd, err := getStringFromExpr(args[1], ctx, env)
 	if err != nil {
 		return nil, err
 	}
@@ -378,12 +378,12 @@ func callSubstringAfter(ctx Node, args []Expr) ([]Item, error) {
 	return singleValue(str), nil
 }
 
-func callName(ctx Node, args []Expr) ([]Item, error) {
+func callName(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	if len(args) == 0 {
 		n := ctx.QualifiedName()
 		return singleValue(n), nil
 	}
-	items, err := expandArgs(ctx, args)
+	items, err := expandArgs(ctx, args, env)
 	if err != nil {
 		return nil, err
 	}
@@ -397,11 +397,11 @@ func callName(ctx Node, args []Expr) ([]Item, error) {
 	return singleValue(n.Node().QualifiedName()), nil
 }
 
-func callLocalName(ctx Node, args []Expr) ([]Item, error) {
+func callLocalName(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	if len(args) == 0 {
 		return singleValue(ctx.LocalName()), nil
 	}
-	items, err := expandArgs(ctx, args)
+	items, err := expandArgs(ctx, args, env)
 	if err != nil {
 		return nil, err
 	}
@@ -415,7 +415,7 @@ func callLocalName(ctx Node, args []Expr) ([]Item, error) {
 	return singleValue(n.Node().LocalName()), nil
 }
 
-func callRoot(ctx Node, args []Expr) ([]Item, error) {
+func callRoot(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	var get func(Node) Node
 
 	get = func(n Node) Node {
@@ -429,7 +429,7 @@ func callRoot(ctx Node, args []Expr) ([]Item, error) {
 		n := get(ctx)
 		return singleNode(n), nil
 	}
-	items, err := expandArgs(ctx, args)
+	items, err := expandArgs(ctx, args, env)
 	if err != nil {
 		return nil, err
 	}
@@ -441,7 +441,7 @@ func callRoot(ctx Node, args []Expr) ([]Item, error) {
 	return singleNode(root), nil
 }
 
-func callPath(ctx Node, args []Expr) ([]Item, error) {
+func callPath(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	var get func(n Node) []string
 
 	get = func(n Node) []string {
@@ -458,7 +458,7 @@ func callPath(ctx Node, args []Expr) ([]Item, error) {
 		list := get(ctx)
 		return singleValue(strings.Join(list, "/")), nil
 	}
-	items, err := expandArgs(ctx, args)
+	items, err := expandArgs(ctx, args, env)
 	if err != nil {
 		return nil, err
 	}
@@ -466,10 +466,10 @@ func callPath(ctx Node, args []Expr) ([]Item, error) {
 	if !ok {
 		return nil, errType
 	}
-	return callPath(n.Node(), nil)
+	return callPath(n.Node(), nil, env)
 }
 
-func callHasChildren(ctx Node, args []Expr) ([]Item, error) {
+func callHasChildren(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	if len(args) == 0 {
 		el, ok := ctx.(*Element)
 		if !ok {
@@ -477,7 +477,7 @@ func callHasChildren(ctx Node, args []Expr) ([]Item, error) {
 		}
 		return singleValue(len(el.Nodes) > 0), nil
 	}
-	items, err := expandArgs(ctx, args)
+	items, err := expandArgs(ctx, args, env)
 	if err != nil {
 		return nil, err
 	}
@@ -485,24 +485,24 @@ func callHasChildren(ctx Node, args []Expr) ([]Item, error) {
 	if !ok {
 		return nil, errType
 	}
-	return callHasChildren(n.Node(), nil)
+	return callHasChildren(n.Node(), nil, env)
 }
 
-func callInnermost(ctx Node, args []Expr) ([]Item, error) {
+func callInnermost(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	return nil, errImplemented
 }
 
-func callOutermost(ctx Node, args []Expr) ([]Item, error) {
+func callOutermost(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	return nil, errImplemented
 }
 
-func callBoolean(ctx Node, args []Expr) ([]Item, error) {
-	items, err := expandArgs(ctx, args)
+func callBoolean(ctx Node, args []Expr, env Environ) ([]Item, error) {
+	items, err := expandArgs(ctx, args, env)
 	if err != nil {
 		return nil, err
 	}
 	if len(items) == 0 {
-		return callFalse(ctx, args)
+		return callFalse(ctx, args, env)
 	}
 	ok, err := getBooleanFromItem(items[0])
 	if err != nil {
@@ -511,8 +511,8 @@ func callBoolean(ctx Node, args []Expr) ([]Item, error) {
 	return singleValue(ok), nil
 }
 
-func callNot(ctx Node, args []Expr) ([]Item, error) {
-	items, err := callBoolean(ctx, args)
+func callNot(ctx Node, args []Expr, env Environ) ([]Item, error) {
+	items, err := callBoolean(ctx, args, env)
 	if err != nil {
 		return nil, err
 	}
@@ -524,16 +524,16 @@ func callNot(ctx Node, args []Expr) ([]Item, error) {
 	return items, nil
 }
 
-func callTrue(_ Node, _ []Expr) ([]Item, error) {
+func callTrue(_ Node, _ []Expr, _ Environ) ([]Item, error) {
 	return singleValue(true), nil
 }
 
-func callFalse(_ Node, _ []Expr) ([]Item, error) {
+func callFalse(_ Node, _ []Expr, _ Environ) ([]Item, error) {
 	return singleValue(false), nil
 }
 
-func getStringFromExpr(expr Expr, ctx Node) (string, error) {
-	items, err := expr.Next(ctx)
+func getStringFromExpr(expr Expr, ctx Node, env Environ) (string, error) {
+	items, err := expr.Next(ctx, env)
 	if err != nil {
 		return "", err
 	}
@@ -572,10 +572,10 @@ func getBooleanFromItem(item Item) (bool, error) {
 	return res, nil
 }
 
-func expandArgs(ctx Node, args []Expr) ([]Item, error) {
+func expandArgs(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	var list []Item
 	for _, a := range args {
-		i, err := a.Next(ctx)
+		i, err := a.Next(ctx, env)
 		if err != nil {
 			return nil, err
 		}

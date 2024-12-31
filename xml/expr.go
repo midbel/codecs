@@ -15,7 +15,7 @@ var (
 )
 
 type Expr interface {
-	Next(Node) ([]Item, error)
+	Next(Node, Environ) ([]Item, error)
 }
 
 const (
@@ -36,13 +36,13 @@ type query struct {
 	expr Expr
 }
 
-func (q query) Next(node Node) ([]Item, error) {
-	return q.expr.Next(node)
+func (q query) Next(node Node, env Environ) ([]Item, error) {
+	return q.expr.Next(node, env)
 }
 
 type wildcard struct{}
 
-func (_ wildcard) Next(curr Node) ([]Item, error) {
+func (_ wildcard) Next(curr Node, env Environ) ([]Item, error) {
 	if curr.Type() != TypeElement {
 		return nil, nil
 	}
@@ -61,7 +61,7 @@ func (_ wildcard) Next(curr Node) ([]Item, error) {
 
 type current struct{}
 
-func (_ current) Next(curr Node) ([]Item, error) {
+func (_ current) Next(curr Node, env Environ) ([]Item, error) {
 	return createSingle(createNode(curr)), nil
 }
 
@@ -69,8 +69,8 @@ type absolute struct {
 	expr Expr
 }
 
-func (a absolute) Next(curr Node) ([]Item, error) {
-	return a.expr.Next(a.root(curr))
+func (a absolute) Next(curr Node, env Environ) ([]Item, error) {
+	return a.expr.Next(a.root(curr), env)
 }
 
 func (a absolute) root(node Node) Node {
@@ -83,9 +83,8 @@ func (a absolute) root(node Node) Node {
 
 type root struct{}
 
-func (_ root) Next(curr Node) ([]Item, error) {
-	n := curr.Parent()
-	if n != nil {
+func (_ root) Next(curr Node, env Environ) ([]Item, error) {
+	if curr.Type() != TypeDocument {
 		return nil, ErrRoot
 	}
 	return createSingle(createNode(curr)), nil
@@ -96,10 +95,10 @@ type axis struct {
 	next Expr
 }
 
-func (a axis) Next(curr Node) ([]Item, error) {
+func (a axis) Next(curr Node, env Environ) ([]Item, error) {
 	var list []Item
 	if a.kind == selfAxis || a.kind == descendantSelfAxis || a.kind == ancestorSelfAxis {
-		other, err := a.next.Next(curr)
+		other, err := a.next.Next(curr, env)
 		if err != nil {
 			return nil, err
 		}
@@ -109,7 +108,7 @@ func (a axis) Next(curr Node) ([]Item, error) {
 	case selfAxis:
 		return list, nil
 	case childAxis:
-		others, err := a.child(curr)
+		others, err := a.child(curr, env)
 		if err != nil {
 			return nil, err
 		}
@@ -117,18 +116,18 @@ func (a axis) Next(curr Node) ([]Item, error) {
 	case parentAxis:
 		p := curr.Parent()
 		if p != nil {
-			return a.next.Next(p)
+			return a.next.Next(p, env)
 		}
 		return nil, nil
 	case ancestorAxis, ancestorSelfAxis:
 		for p := curr.Parent(); p != nil; {
-			other, err := a.next.Next(p)
+			other, err := a.next.Next(p, env)
 			if err == nil {
 				list = slices.Concat(list, other)
 			}
 		}
 	case descendantAxis, descendantSelfAxis:
-		others, err := a.descendant(getNode(curr))
+		others, err := a.descendant(getNode(curr), env)
 		if err != nil {
 			return nil, err
 		}
@@ -139,7 +138,7 @@ func (a axis) Next(curr Node) ([]Item, error) {
 	return list, nil
 }
 
-func (a axis) descendant(curr Node) ([]Item, error) {
+func (a axis) descendant(curr Node, env Environ) ([]Item, error) {
 	if curr.Type() != TypeElement {
 		return nil, nil
 	}
@@ -148,7 +147,7 @@ func (a axis) descendant(curr Node) ([]Item, error) {
 		nodes = getChildrenNodes(curr)
 	)
 	for i := range nodes {
-		others, err := a.descendant(nodes[i])
+		others, err := a.descendant(nodes[i], env)
 		if err == nil {
 			list = slices.Concat(list, others)
 		}
@@ -156,7 +155,7 @@ func (a axis) descendant(curr Node) ([]Item, error) {
 	return list, nil
 }
 
-func (a axis) child(curr Node) ([]Item, error) {
+func (a axis) child(curr Node, env Environ) ([]Item, error) {
 	if curr.Type() != TypeElement {
 		return nil, nil
 	}
@@ -165,7 +164,7 @@ func (a axis) child(curr Node) ([]Item, error) {
 		nodes = getChildrenNodes(curr)
 	)
 	for _, c := range nodes {
-		other, err := a.next.Next(c)
+		other, err := a.next.Next(c, env)
 		if err == nil {
 			list = slices.Concat(list, other)
 		}
@@ -173,26 +172,11 @@ func (a axis) child(curr Node) ([]Item, error) {
 	return list, nil
 }
 
-func (a axis) get(curr Node) ([]Node, error) {
-	switch c := curr.(type) {
-	case *Element:
-		return c.Nodes, nil
-	case *Document:
-		root := c.Root()
-		if root == nil {
-			return nil, ErrRoot
-		}
-		return []Node{root}, nil
-	default:
-		return nil, ErrNode
-	}
-}
-
 type identifier struct {
 	ident string
 }
 
-func (i identifier) Next(curr Node) ([]Item, error) {
+func (i identifier) Next(curr Node, env Environ) ([]Item, error) {
 	return nil, nil
 }
 
@@ -208,7 +192,7 @@ func (n name) QualifiedName() string {
 	return fmt.Sprintf("%s:%s", n.space, n.ident)
 }
 
-func (n name) Next(curr Node) ([]Item, error) {
+func (n name) Next(curr Node, env Environ) ([]Item, error) {
 	if curr.QualifiedName() != n.QualifiedName() {
 		return nil, errDiscard
 	}
@@ -233,18 +217,18 @@ type descendant struct {
 	deep bool
 }
 
-func (d descendant) Next(node Node) ([]Item, error) {
+func (d descendant) Next(node Node, env Environ) ([]Item, error) {
 	if node.Type() == TypeDocument {
 		doc := node.(*Document)
-		return d.traverse(doc.Root())
+		return d.traverse(doc.Root(), env)
 	}
-	ns, err := d.curr.Next(node)
+	ns, err := d.curr.Next(node, env)
 	if err != nil {
 		return nil, err
 	}
 	var list []Item
 	for _, n := range ns {
-		xs, err := d.traverse(n.Node())
+		xs, err := d.traverse(n.Node(), env)
 		if err != nil {
 			continue
 		}
@@ -256,8 +240,8 @@ func (d descendant) Next(node Node) ([]Item, error) {
 	return list, nil
 }
 
-func (d *descendant) traverse(n Node) ([]Item, error) {
-	list, err := d.next.Next(n)
+func (d *descendant) traverse(n Node, env Environ) ([]Item, error) {
+	list, err := d.next.Next(n, env)
 	if len(list) > 0 || err != nil {
 		return list, err
 	}
@@ -266,7 +250,7 @@ func (d *descendant) traverse(n Node) ([]Item, error) {
 	}
 	nodes := getChildrenNodes(n)
 	for i := range nodes {
-		tmp, err := d.traverse(nodes[i])
+		tmp, err := d.traverse(nodes[i], env)
 		if err == nil {
 			list = slices.Concat(list, tmp)
 		}
@@ -278,7 +262,7 @@ type sequence struct {
 	all []Expr
 }
 
-func (s sequence) Next(_ Node) ([]Item, error) {
+func (s sequence) Next(_ Node, env Environ) ([]Item, error) {
 	return nil, nil
 }
 
@@ -288,12 +272,12 @@ type binary struct {
 	op    rune
 }
 
-func (b binary) Next(node Node) ([]Item, error) {
-	left, err := b.left.Next(node)
+func (b binary) Next(node Node, env Environ) ([]Item, error) {
+	left, err := b.left.Next(node, env)
 	if err != nil {
 		return nil, err
 	}
-	right, err := b.right.Next(node)
+	right, err := b.right.Next(node, env)
 	if err != nil {
 		return nil, err
 	}
@@ -326,6 +310,10 @@ func (b binary) Next(node Node) ([]Item, error) {
 			return math.Mod(left, right), nil
 		})
 	case opAnd:
+		if len(left) == 0 || len(right) == 0 {
+			res = false
+			break
+		}
 		res1, err := getBooleanFromItem(left[0])
 		if err != nil {
 			return nil, err
@@ -382,8 +370,8 @@ type reverse struct {
 	expr Expr
 }
 
-func (r reverse) Next(node Node) ([]Item, error) {
-	v, err := r.expr.Next(node)
+func (r reverse) Next(node Node, env Environ) ([]Item, error) {
+	v, err := r.expr.Next(node, env)
 	if err != nil {
 		return nil, err
 	}
@@ -398,7 +386,7 @@ type literal struct {
 	expr string
 }
 
-func (i literal) Next(_ Node) ([]Item, error) {
+func (i literal) Next(_ Node, env Environ) ([]Item, error) {
 	return createSingle(createLiteral(i.expr)), nil
 }
 
@@ -406,7 +394,7 @@ type number struct {
 	expr float64
 }
 
-func (n number) Next(_ Node) ([]Item, error) {
+func (n number) Next(_ Node, env Environ) ([]Item, error) {
 	return createSingle(createLiteral(n.expr)), nil
 }
 
@@ -415,7 +403,7 @@ type call struct {
 	args  []Expr
 }
 
-func (c call) Next(curr Node) ([]Item, error) {
+func (c call) Next(curr Node, env Environ) ([]Item, error) {
 	var (
 		list []Item
 		keep bool
@@ -430,7 +418,7 @@ func (c call) Next(curr Node) ([]Item, error) {
 	case "comment":
 		keep = curr.Type() == TypeComment
 	default:
-		return c.eval(curr)
+		return c.eval(curr, env)
 	}
 	if keep {
 		list = append(list, createNode(curr))
@@ -438,7 +426,7 @@ func (c call) Next(curr Node) ([]Item, error) {
 	return list, nil
 }
 
-func (c call) eval(node Node) ([]Item, error) {
+func (c call) eval(node Node, env Environ) ([]Item, error) {
 	fn, ok := builtins[c.ident]
 	if !ok {
 		return nil, fmt.Errorf("%s: %w function", c.ident, ErrUndefined)
@@ -446,14 +434,14 @@ func (c call) eval(node Node) ([]Item, error) {
 	if fn == nil {
 		return nil, errImplemented
 	}
-	return fn(node, c.args)
+	return fn(node, c.args, env)
 }
 
 type attr struct {
 	ident string
 }
 
-func (a attr) Next(node Node) ([]Item, error) {
+func (a attr) Next(node Node, env Environ) ([]Item, error) {
 	return nil, errImplemented
 }
 
@@ -475,7 +463,7 @@ type except struct {
 	all []Expr
 }
 
-func (e except) Next(node Node) ([]Item, error) {
+func (e except) Next(node Node, env Environ) ([]Item, error) {
 	return nil, nil
 }
 
@@ -483,7 +471,7 @@ type intersect struct {
 	all []Expr
 }
 
-func (i intersect) Next(node Node) ([]Item, error) {
+func (i intersect) Next(node Node, env Environ) ([]Item, error) {
 	return nil, nil
 }
 
@@ -491,10 +479,10 @@ type union struct {
 	all []Expr
 }
 
-func (u union) Next(node Node) ([]Item, error) {
+func (u union) Next(node Node, env Environ) ([]Item, error) {
 	var list []Item
 	for i := range u.all {
-		res, err := u.all[i].Next(node)
+		res, err := u.all[i].Next(node, env)
 		if err != nil {
 			continue
 		}
@@ -508,14 +496,14 @@ type filter struct {
 	check Expr
 }
 
-func (f filter) Next(curr Node) ([]Item, error) {
-	list, err := f.expr.Next(curr)
+func (f filter) Next(curr Node, env Environ) ([]Item, error) {
+	list, err := f.expr.Next(curr, env)
 	if err != nil {
 		return nil, err
 	}
 	var ret []Item
 	for j, n := range list {
-		res, err := f.check.Next(n.Node())
+		res, err := f.check.Next(n.Node(), env)
 		if err != nil {
 			continue
 		}
@@ -543,7 +531,7 @@ type Let struct {
 	expr  Expr
 }
 
-func (e Let) Next(curr Node) ([]Item, error) {
+func (e Let) Next(curr Node, env Environ) ([]Item, error) {
 	return nil, nil
 }
 
@@ -557,7 +545,7 @@ type loop struct {
 	body  Expr
 }
 
-func (o loop) Next(curr Node) ([]Item, error) {
+func (o loop) Next(curr Node, env Environ) ([]Item, error) {
 	return nil, nil
 }
 
@@ -567,8 +555,8 @@ type conditional struct {
 	alt  Expr
 }
 
-func (c conditional) Next(curr Node) ([]Item, error) {
-	res, err := c.test.Next(curr)
+func (c conditional) Next(curr Node, env Environ) ([]Item, error) {
+	res, err := c.test.Next(curr, env)
 	if err != nil {
 		return nil, err
 	}
@@ -580,9 +568,9 @@ func (c conditional) Next(curr Node) ([]Item, error) {
 		return nil, err
 	}
 	if ok {
-		return c.csq.Next(curr)
+		return c.csq.Next(curr, env)
 	}
-	return c.alt.Next(curr)
+	return c.alt.Next(curr, env)
 }
 
 type quantified struct {
@@ -591,7 +579,7 @@ type quantified struct {
 	every bool
 }
 
-func (q quantified) Next(curr Node) ([]Item, error) {
+func (q quantified) Next(curr Node, env Environ) ([]Item, error) {
 	return nil, nil
 }
 
