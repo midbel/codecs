@@ -22,7 +22,9 @@ func main() {
 		Compact bool
 		Check   bool
 		List    bool
+		File    string
 	}{}
+	flag.StringVar(&options.File, "f", "", "output file")
 	flag.StringVar(&options.Root, "r", "document", "root element name to use when using a query")
 	flag.StringVar(&options.Query, "q", "", "search for element in document")
 	flag.StringVar(&options.Schema, "s", "", "relax schema to validate XML document")
@@ -72,7 +74,7 @@ func main() {
 			fmt.Println(i+1, n.QualifiedName(), n.Value())
 		}
 	} else {
-		if err := writeDocument(doc, options.Compact); err != nil {
+		if err := writeDocument(doc, options.File, options.Compact); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(5)
 		}
@@ -107,11 +109,20 @@ func parseDocument(file string) (*xml.Document, error) {
 	return p.Parse()
 }
 
-func writeDocument(doc *xml.Document, compact bool) error {
+func writeDocument(doc *xml.Document, file string, compact bool) error {
 	if doc == nil {
 		return nil
 	}
-	ws := xml.NewWriter(os.Stdout)
+	var w io.Writer = os.Stdout
+	if file != "" {
+		f, err := os.Create(file)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		w = f
+	}
+	ws := xml.NewWriter(w)
 	ws.Compact = compact
 	return ws.Write(doc)
 }
