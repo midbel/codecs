@@ -76,7 +76,7 @@ func main() {
 	}
 	var (
 		count int
-		env = xml.Enclosed(sch)
+		env   = xml.Enclosed(sch)
 	)
 	for a := range getAssertions(sch, strings.TrimSpace(*level), strings.TrimSpace(*group)) {
 		expr, err := xml.Compile(strings.NewReader(a.Context))

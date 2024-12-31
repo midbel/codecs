@@ -519,7 +519,6 @@ func (c *compiler) compileParent() (Expr, error) {
 	expr := axis{
 		kind: parentAxis,
 		next: next,
-
 	}
 	return expr, nil
 }
@@ -535,7 +534,7 @@ func (c *compiler) compileDescendant(left Expr) (Expr, error) {
 
 	var expr descendant
 	if any {
-		c := call {
+		c := call{
 			ident: "node",
 		}
 		a := axis{

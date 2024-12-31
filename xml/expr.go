@@ -42,7 +42,7 @@ func (q query) Next(node Node, env Environ) ([]Item, error) {
 
 type wildcard struct{}
 
-func (_ wildcard) Next(curr Node, env Environ) ([]Item, error) {
+func (w wildcard) Next(curr Node, env Environ) ([]Item, error) {
 	if curr.Type() != TypeElement {
 		return nil, nil
 	}
@@ -54,7 +54,12 @@ func (_ wildcard) Next(curr Node, env Environ) ([]Item, error) {
 		if elem.Nodes[i].Type() != TypeElement {
 			continue
 		}
-		list = append(list, createNode(elem.Nodes[i]))
+		if elem.Nodes[i].Leaf() {
+			list = append(list, createNode(elem.Nodes[i]))
+		} else {
+			others, _ := w.Next(elem.Nodes[i], env)
+			list = slices.Concat(list, others)
+		}
 	}
 	return list, nil
 }
