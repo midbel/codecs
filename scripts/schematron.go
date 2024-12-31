@@ -75,17 +75,26 @@ func main() {
 		os.Exit(3)
 	}
 	var (
-		count int
-		env   = xml.Enclosed(sch)
+		count   int
+		env     = xml.Enclosed(sch)
+		counter = struct {
+			Success int
+			Failure int
+			Unknown int
+		}{}
 	)
 	for a := range getAssertions(sch, strings.TrimSpace(*level), strings.TrimSpace(*group)) {
 		expr, err := xml.Compile(strings.NewReader(a.Context))
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "fail to compile assertion context: %s (%s)", err, a.Context)
-			fmt.Fprintln(os.Stderr)
-		}
-		var total int
-		if expr != nil {
+		// if err != nil {
+		// 	fmt.Fprintf(os.Stderr, "fail to compile assertion context: %s (%s)", err, a.Context)
+		// 	fmt.Fprintln(os.Stderr)
+		// }
+		var (
+			total int
+			res   bool
+			state string
+		)
+		if expr != nil && err == nil {
 			items, err := expr.Next(doc, env)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "failure retrieving nodes from document: %s", err)
@@ -93,13 +102,61 @@ func main() {
 			} else {
 				total = len(items)
 			}
+			res, err = testAssert(a, env, items)
+			if err != nil {
+				state = "?"
+				counter.Unknown++
+			} else if res {
+				state = "v"
+				counter.Success++
+			} else {
+				state = "x"
+				counter.Failure++
+			}
 		}
-		fmt.Printf("%7s | %-20s | %3d | %-s", a.Flag, a.Ident, total, a.Message)
+		fmt.Printf("%s | %7s | %-20s | %3d | %-s", state, a.Flag, a.Ident, total, a.Message)
 		fmt.Println()
 		count++
 	}
 	fmt.Printf("%d assertions defined", count)
 	fmt.Println()
+	fmt.Printf("%d assertions pass", counter.Success)
+	fmt.Println()
+	fmt.Printf("%d assertions fail", counter.Failure)
+	fmt.Println()
+	fmt.Printf("%d assertions to be fixed", counter.Unknown)
+	fmt.Println()
+}
+
+func testAssert(assert *Assert, env xml.Environ, items []xml.Item) (bool, error) {
+	test, err := xml.CompileString(assert.Test)
+	if err != nil {
+		fmt.Println(assert.Context, assert.Test)
+		return false, err
+	}
+	for i := range items {
+		res, err := items[i].Assert(test, env)
+		if err != nil {
+			return false, err
+		}
+		if len(res) == 0 {
+			return false, nil
+		}
+		var ok bool
+		switch v := res[0].Value().(type) {
+		case bool:
+			ok = v
+		case float64:
+			ok = v != 0
+		case string:
+			ok = v != ""
+		default:
+		}
+		if !ok {
+			return ok, nil
+		}
+	}
+	return true, nil
 }
 
 func parseDocument(file string) (*xml.Document, error) {
@@ -209,7 +266,7 @@ func readTop(rs *xml.Reader, node *xml.Element, sch *Schema) error {
 		if err == nil {
 			sch.Define(let.Ident, expr)
 		} else {
-			fmt.Println("compilation fail", let.Value, err)
+			// fmt.Println("compilation fail", let.Value, err)
 		}
 		return nil
 	case "ns":
@@ -247,7 +304,7 @@ func readPattern(rs *xml.Reader, sch *Schema) error {
 			if err == nil {
 				pat.Define(let.Ident, expr)
 			} else {
-				fmt.Println("compilation fail", let.Value, err)
+				// fmt.Println("compilation fail", let.Value, err)
 			}
 		case "rule":
 			rule, err := readRule(rs, el, pat)
@@ -275,6 +332,7 @@ func readRule(rs *xml.Reader, elem *xml.Element, env xml.Environ) (*Rule, error)
 	if rule.Context, err = getAttribute(elem, "context"); err != nil {
 		return nil, err
 	}
+	rule.Context = normalizeSpace(rule.Context)
 	for {
 		el, err := getElementFromReaderMaybeClosed(rs, "rule")
 		if err != nil {
@@ -290,7 +348,7 @@ func readRule(rs *xml.Reader, elem *xml.Element, env xml.Environ) (*Rule, error)
 			if err == nil {
 				rule.Define(let.Ident, expr)
 			} else {
-				fmt.Println("compilation fail", let.Value, err)
+				// fmt.Println("compilation fail", let.Value, err)
 			}
 		case "assert":
 			ass, err := readAssert(rs, el)

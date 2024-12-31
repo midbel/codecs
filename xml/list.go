@@ -45,7 +45,7 @@ type Item interface {
 	Node() Node
 	Value() any
 	Atomic() bool
-	// Type() string
+	Assert(Expr, Environ) ([]Item, error)
 }
 
 func createSingle(item Item) []Item {
@@ -81,6 +81,10 @@ func createLiteral(value any) Item {
 	}
 }
 
+func (i literalItem) Assert(_ Expr, _ Environ) ([]Item, error) {
+	return nil, fmt.Errorf("can not assert on literal item")
+}
+
 func (i literalItem) Atomic() bool {
 	return true
 }
@@ -95,7 +99,6 @@ func (i literalItem) Node() Node {
 	str, _ := toString(i.value)
 	res.Append(NewText(str))
 	return res
-
 }
 
 func (i literalItem) Value() any {
@@ -110,6 +113,14 @@ func createNode(node Node) Item {
 	return nodeItem{
 		node: node,
 	}
+}
+
+func (i nodeItem) Assert(expr Expr, env Environ) ([]Item, error) {
+	return expr.Next(i.node, env)
+}
+
+func (i nodeItem) Atomic() bool {
+	return false
 }
 
 func (i nodeItem) Node() Node {
@@ -134,8 +145,4 @@ func (i nodeItem) Value() any {
 		return arr
 	}
 	return traverse(i.node)
-}
-
-func (i nodeItem) Atomic() bool {
-	return false
 }

@@ -144,9 +144,6 @@ func (a axis) Next(curr Node, env Environ) ([]Item, error) {
 }
 
 func (a axis) descendant(curr Node, env Environ) ([]Item, error) {
-	if curr.Type() != TypeElement {
-		return nil, nil
-	}
 	var (
 		list  []Item
 		nodes = getChildrenNodes(curr)
@@ -161,9 +158,6 @@ func (a axis) descendant(curr Node, env Environ) ([]Item, error) {
 }
 
 func (a axis) child(curr Node, env Environ) ([]Item, error) {
-	if curr.Type() != TypeElement {
-		return nil, nil
-	}
 	var (
 		list  []Item
 		nodes = getChildrenNodes(curr)
@@ -182,7 +176,11 @@ type identifier struct {
 }
 
 func (i identifier) Next(curr Node, env Environ) ([]Item, error) {
-	return nil, nil
+	expr, err := env.Resolve(i.ident)
+	if err != nil {
+		return nil, err
+	}
+	return expr.Next(curr, env)
 }
 
 type name struct {
@@ -286,6 +284,9 @@ func (b binary) Next(node Node, env Environ) ([]Item, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(left) == 0 || len(right) == 0 {
+		return nil, fmt.Errorf("empty sequences")
+	}
 	var res any
 	switch b.op {
 	case opAdd:
@@ -339,9 +340,9 @@ func (b binary) Next(node Node, env Environ) ([]Item, error) {
 		}
 		res = res1 || res2
 	case opEq:
-		res, err = isEqual(left, right)
+		res, err = isEqual(left[0].Value(), right[0].Value())
 	case opNe:
-		ok, err1 := isEqual(left, right)
+		ok, err1 := isEqual(left[0].Value(), right[0].Value())
 		res, err = !ok, err1
 	case opLt:
 		res, err = isLess(left, right)
@@ -513,7 +514,7 @@ func (f filter) Next(curr Node, env Environ) ([]Item, error) {
 			continue
 		}
 		if isEmpty(res) {
-			return nil, errType
+			continue
 		}
 		var keep bool
 		switch x := res[0].Value().(type) {
