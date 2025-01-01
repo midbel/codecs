@@ -203,6 +203,9 @@ func (q QName) isDocumentNode() bool {
 type Attribute struct {
 	QName
 	Value string
+
+	parent   Node
+	position int
 }
 
 func NewAttribute(name QName, value string) Attribute {
@@ -214,6 +217,30 @@ func NewAttribute(name QName, value string) Attribute {
 
 func (_ *Attribute) Type() NodeType {
 	return TypeAttribute
+}
+
+func (_ *Attribute) Leaf() bool {
+	return true
+}
+
+func (a *Attribute) Position() int {
+	return a.position
+}
+
+func (a *Attribute) Parent() Node {
+	return a.parent
+}
+
+// func (a *Attribute) Value() string {
+// 	return a.Value
+// }
+
+func (a *Attribute) setParent(node Node) {
+	a.parent = node
+}
+
+func (a *Attribute) setPosition(pos int) {
+	a.position = pos
 }
 
 type Element struct {
