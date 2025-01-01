@@ -18,6 +18,7 @@ var builtins = map[string]builtinFunc{
 	"has-children":     callHasChildren,
 	"innermost":        callInnermost,
 	"outermost":        callOutermost,
+	"string":           callString,
 	"compare":          callCompare,
 	"concat":           callConcat,
 	"string-join":      callStringJoin,
@@ -141,6 +142,34 @@ func callLast(ctx Node, args []Expr, env Environ) ([]Item, error) {
 
 func callCurrentDate(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	return nil, errImplemented
+}
+
+func callString(ctx Node, args []Expr, env Environ) ([]Item, error) {
+	if len(args) == 0 {
+		return singleValue(ctx.Value()), nil
+	}
+	items, err := expandArgs(ctx, args, env)
+	if err != nil {
+		return nil, err
+	}
+	if len(items) == 0 {
+		return singleValue(""), nil
+	}
+	if !items[0].Atomic() {
+		return callString(items[0].Node(), args, env)
+	}
+	var str string
+	switch v := items[0].Value().(type) {
+	case bool:
+		str = strconv.FormatBool(v)
+	case float64:
+		str = strconv.FormatFloat(v, 'f', -1, 64)
+	case string:
+		str = v
+	default:
+		return nil, errType
+	}
+	return singleValue(str), nil
 }
 
 func callCompare(ctx Node, args []Expr, env Environ) ([]Item, error) {
