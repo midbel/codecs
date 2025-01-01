@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var builtins = map[string]builtinFunc{
@@ -45,19 +46,26 @@ var builtins = map[string]builtinFunc{
 	"exactly-one":      callExactlyOne,
 	"position":         callPosition,
 	"last":             callLast,
+	"date":             callDate,
 	"current-date":     callCurrentDate,
+	"decimal":          callDecimal,
 }
 
 type builtinFunc func(Node, []Expr, Environ) ([]Item, error)
 
-func checkArity(argCount int, fn builtinFunc) builtinFunc {
-	do := func(node Node, args []Expr, env Environ) ([]Item, error) {
-		if len(args) < argCount {
-			return nil, errArgument
-		}
-		return fn(node, args, env)
+func callDecimal(ctx Node, args []Expr, env Environ) ([]Item, error) {
+	if len(args) != 1 {
+		return nil, errArgument
 	}
-	return do
+	str, err := getStringFromExpr(args[0], ctx, env)
+	if err != nil {
+		return nil, err
+	}
+	v, err := strconv.ParseFloat(str, 64)
+	if err != nil {
+		return nil, ErrCast
+	}
+	return singleValue(v), nil
 }
 
 func callSum(ctx Node, args []Expr, env Environ) ([]Item, error) {
@@ -142,6 +150,21 @@ func callLast(ctx Node, args []Expr, env Environ) ([]Item, error) {
 
 func callCurrentDate(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	return nil, errImplemented
+}
+
+func callDate(ctx Node, args []Expr, env Environ) ([]Item, error) {
+	if len(args) != 1 {
+		return nil, errArgument
+	}
+	str, err := getStringFromExpr(args[0], ctx, env)
+	if err != nil {
+		return nil, err
+	}
+	v, err := time.Parse("2006-01-02", str)
+	if err != nil {
+		return nil, ErrCast
+	}
+	return singleValue(v), nil
 }
 
 func callString(ctx Node, args []Expr, env Environ) ([]Item, error) {
