@@ -527,11 +527,61 @@ func (c *compiler) compileVariable() (Expr, error) {
 	return v, nil
 }
 
+func (c *compiler) compileAxis() (Expr, error) {
+	a := axis{
+		kind: c.curr.Literal,
+	}
+	c.next()
+	c.next()
+	expr, err := c.compileNameBase()
+	if err != nil {
+		return nil, err
+	}
+	a.next = expr
+	return a, nil
+}
+
+func (c *compiler) compileKind() (Expr, error) {
+	var k kind
+	switch c.curr.Literal {
+	case "node", "element":
+		k.kind = TypeElement
+	case "text":
+		k.kind = TypeText
+	case "comment":
+		k.kind = TypeComment
+	case "processing-instruction":
+		k.kind = TypeInstruction
+	case "document-node":
+		k.kind = TypeDocument
+	default:
+		return nil, fmt.Errorf("kind test not supported")
+	}
+	c.next()
+	if !c.is(begGrp) {
+		return nil, errSyntax
+	}
+	c.next()
+	if !c.is(endGrp) {
+		return nil, errSyntax
+	}
+	c.next()
+	return k, nil
+}
+
 func (c *compiler) compileName() (Expr, error) {
 	if c.peek.Type == opAxis {
 		return c.compileAxis()
 	}
-	expr, err := c.compileNameBase()
+	var (
+		expr Expr
+		err  error
+	)
+	if isKind(c.curr.Literal) && c.peek.Type == begGrp {
+		expr, err = c.compileKind()
+	} else {
+		expr, err = c.compileNameBase()
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -632,20 +682,6 @@ func (c *compiler) compileRoot() (Expr, error) {
 	a := absolute{
 		expr: next,
 	}
-	return a, nil
-}
-
-func (c *compiler) compileAxis() (Expr, error) {
-	a := axis{
-		kind: c.curr.Literal,
-	}
-	c.next()
-	c.next()
-	expr, err := c.compileNameBase()
-	if err != nil {
-		return nil, err
-	}
-	a.next = expr
 	return a, nil
 }
 

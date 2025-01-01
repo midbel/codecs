@@ -156,7 +156,7 @@ func callString(ctx Node, args []Expr, env Environ) ([]Item, error) {
 		return singleValue(""), nil
 	}
 	if !items[0].Atomic() {
-		return callString(items[0].Node(), args, env)
+		return callString(items[0].Node(), nil, env)
 	}
 	var str string
 	switch v := items[0].Value().(type) {

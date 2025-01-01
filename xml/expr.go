@@ -404,6 +404,19 @@ func (n number) Next(_ Node, env Environ) ([]Item, error) {
 	return createSingle(createLiteral(n.expr)), nil
 }
 
+func isKind(str string) bool {
+	switch str {
+	case "node", "element":
+	case "text":
+	case "comment":
+	case "document-node":
+	case "processing-instruction":
+	default:
+		return false
+	}
+	return true
+}
+
 type kind struct {
 	kind NodeType
 }
@@ -606,7 +619,11 @@ type Type struct {
 	QName
 }
 
-func (t Type) IsCastable(str string) Item {
+func (t Type) IsCastable(value any) Item {
+	str, ok := value.(string)
+	if !ok {
+		return createLiteral(ok)
+	}
 	_, err := t.Cast(str)
 	if err == nil {
 		return createLiteral(true)
@@ -667,7 +684,7 @@ func (c castable) Next(curr Node, env Environ) ([]Item, error) {
 		if !is[i].Atomic() {
 			return nil, errType
 		}
-		is[i] = c.kind.IsCastable(is[i].Value().(string))
+		is[i] = c.kind.IsCastable(is[i].Value())
 	}
 	return is, nil
 }
