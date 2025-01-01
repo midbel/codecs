@@ -48,6 +48,7 @@ var builtins = map[string]builtinFunc{
 	"last":             callLast,
 	"date":             callDate,
 	"current-date":     callCurrentDate,
+	"current-datetime": callCurrentDatetime,
 	"decimal":          callDecimal,
 }
 
@@ -129,15 +130,45 @@ func callMax(ctx Node, args []Expr, env Environ) ([]Item, error) {
 }
 
 func callZeroOrOne(ctx Node, args []Expr, env Environ) ([]Item, error) {
-	return nil, errImplemented
+	if len(args) != 1 {
+		return nil, errArgument
+	}
+	items, err := expandArgs(ctx, args, env)
+	if err != nil {
+		return nil, err
+	}
+	if len(items) > 1 {
+		return nil, fmt.Errorf("too many elements")
+	}
+	return items, errImplemented
 }
 
 func callOneOrMore(ctx Node, args []Expr, env Environ) ([]Item, error) {
-	return nil, errImplemented
+	if len(args) != 1 {
+		return nil, errArgument
+	}
+	items, err := expandArgs(ctx, args, env)
+	if err != nil {
+		return nil, err
+	}
+	if len(items) < 1 {
+		return nil, fmt.Errorf("not enough elements")
+	}
+	return items, errImplemented
 }
 
 func callExactlyOne(ctx Node, args []Expr, env Environ) ([]Item, error) {
-	return nil, errImplemented
+	if len(args) != 1 {
+		return nil, errArgument
+	}
+	items, err := expandArgs(ctx, args, env)
+	if err != nil {
+		return nil, err
+	}
+	if len(items) != 1 {
+		return nil, fmt.Errorf("only one element expected")
+	}
+	return items, errImplemented
 }
 
 func callPosition(ctx Node, args []Expr, env Environ) ([]Item, error) {
@@ -149,7 +180,11 @@ func callLast(ctx Node, args []Expr, env Environ) ([]Item, error) {
 }
 
 func callCurrentDate(ctx Node, args []Expr, env Environ) ([]Item, error) {
-	return nil, errImplemented
+	return callCurrentDatetime(ctx, args, env)
+}
+
+func callCurrentDatetime(ctx Node, args []Expr, env Environ) ([]Item, error) {
+	return singleValue(time.Now()), nil
 }
 
 func callDate(ctx Node, args []Expr, env Environ) ([]Item, error) {
