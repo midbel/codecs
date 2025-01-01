@@ -46,12 +46,12 @@ type Assert struct {
 func (a Assert) Eval(env xml.Environ, items []xml.Item) (bool, error) {
 	test, err := xml.CompileString(a.Test)
 	if err != nil {
-		fmt.Println(a.Context, a.Test)
 		return false, err
 	}
 	for i := range items {
 		res, err := items[i].Assert(test, env)
 		if err != nil {
+			fmt.Println(a.Context, a.Test)
 			return false, err
 		}
 		if len(res) == 0 {

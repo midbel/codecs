@@ -265,8 +265,16 @@ type sequence struct {
 	all []Expr
 }
 
-func (s sequence) Next(_ Node, env Environ) ([]Item, error) {
-	return nil, nil
+func (s sequence) Next(curr Node, env Environ) ([]Item, error) {
+	var list []Item
+	for i := range s.all {
+		is, err := s.all[i].Next(curr, env)
+		if err != nil {
+			return nil, err
+		}
+		list = slices.Concat(list, is)
+	}
+	return list, nil
 }
 
 type binary struct {
@@ -345,24 +353,24 @@ func (b binary) Next(node Node, env Environ) ([]Item, error) {
 		ok, err1 := isEqual(left[0].Value(), right[0].Value())
 		res, err = !ok, err1
 	case opLt:
-		res, err = isLess(left, right)
+		res, err = isLess(left[0].Value(), right[0].Value())
 	case opLe:
-		ok, err1 := isEqual(left, right)
+		ok, err1 := isEqual(left[0].Value(), right[0].Value())
 		if !ok {
-			ok, err1 = isLess(left, right)
+			ok, err1 = isLess(left[0].Value(), right[0].Value())
 		}
 		res, err = ok, err1
 	case opGt:
-		ok, err1 := isEqual(left, right)
+		ok, err1 := isEqual(left[0].Value(), right[0].Value())
 		if !ok {
-			ok, err1 = isLess(left, right)
+			ok, err1 = isLess(left[0].Value(), right[0].Value())
 			ok = !ok
 		}
 		res, err = ok, err1
 	case opGe:
-		ok, err1 := isEqual(left, right)
+		ok, err1 := isEqual(left[0].Value(), right[0].Value())
 		if !ok {
-			ok, err1 = isLess(left, right)
+			ok, err1 = isLess(left[0].Value(), right[0].Value())
 			ok = !ok
 		}
 		res, err = ok, err1

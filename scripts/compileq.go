@@ -45,7 +45,7 @@ func scanExpr(rs io.Reader) error {
 func compileExpr(rs io.Reader) error {
 	expr, err := xml.Compile(rs)
 	if err == nil {
-		fmt.Printf("%+v\n", expr)
+		fmt.Printf("%#v\n", expr)
 	}
 	return err
 }

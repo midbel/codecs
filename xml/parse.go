@@ -25,10 +25,10 @@ var (
 
 const (
 	powLowest = iota
-	powReserv
 	powAlt
 	powOr
 	powAnd
+	powReserv
 	powNe
 	powEq
 	powCmp
@@ -621,8 +621,8 @@ func (c *compiler) compileCurrent() (Expr, error) {
 
 func (c *compiler) compileParent() (Expr, error) {
 	c.next()
-	next := call{
-		ident: "node",
+	next := kind{
+		kind: TypeElement,
 	}
 	expr := axis{
 		kind: parentAxis,
