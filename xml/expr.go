@@ -18,6 +18,12 @@ type Expr interface {
 	Next(Node, Environ) ([]Item, error)
 }
 
+type Context struct {
+	Node
+	Position int
+	Size     int
+}
+
 const (
 	childAxis          = "child"
 	parentAxis         = "parent"
@@ -93,6 +99,30 @@ func (_ root) Next(curr Node, env Environ) ([]Item, error) {
 		return nil, ErrRoot
 	}
 	return createSingle(createNode(curr)), nil
+}
+
+type keeper interface {
+	Keep(Node) bool
+}
+
+type step struct {
+	expr Expr
+	keeper
+}
+
+func (s step) Next(curr Node, env Environ) ([]Item, error) {
+	nodes, err := s.expr.Next(curr, env)
+	if err != nil {
+		return nil, err
+	}
+	var list []Item
+	for i := range nodes {
+		if !s.Keep(nodes[i].Node()) {
+			continue
+		}
+		list = append(list, nodes[i])
+	}
+	return list, nil
 }
 
 type axis struct {
