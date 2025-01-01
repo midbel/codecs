@@ -255,29 +255,87 @@ func (c *compiler) compileReservedInfix(left Expr) (Expr, error) {
 	keyword := c.curr.Literal
 	c.next()
 
-	expr, err := c.compileExpr(powLowest)
-	if err != nil {
-		return nil, err
-	}
+	var (
+		expr Expr
+		err  error
+	)
 	switch keyword {
+	case kwCast:
+		return c.compileCast(left)
+	case kwCastable:
+		return c.compileCastable(left)
 	case kwUnion:
+		expr, err = c.compileExpr(powLowest)
+		if err != nil {
+			break
+		}
 		var res union
 		res.all = []Expr{left, expr}
 
 		expr = res
 	case kwIntersect:
+		expr, err = c.compileExpr(powLowest)
+		if err != nil {
+			break
+		}
 		var res intersect
 		res.all = []Expr{left, expr}
 
 		expr = res
 	case kwExcept:
+		expr, err = c.compileExpr(powLowest)
+		if err != nil {
+			break
+		}
 		var res except
 		res.all = []Expr{left, expr}
 		expr = res
 	default:
 		return nil, fmt.Errorf("%s: reserved word can not be used as infix operator", keyword)
 	}
+	return expr, err
+}
+
+func (c *compiler) compileCast(left Expr) (Expr, error) {
+	t, err := c.compileType()
+	if err != nil {
+		return nil, err
+	}
+	expr := cast{
+		expr: left,
+		kind: t,
+	}
 	return expr, nil
+}
+
+func (c *compiler) compileCastable(left Expr) (Expr, error) {
+	t, err := c.compileType()
+	if err != nil {
+		return nil, err
+	}
+	expr := castable{
+		expr: left,
+		kind: t,
+	}
+	return expr, nil
+}
+
+func (c *compiler) compileType() (Type, error) {
+	var t Type
+	if !c.is(reserved) && c.curr.Literal != kwAs {
+		return t, fmt.Errorf("as expected")
+	}
+	c.next()
+
+	t.Name = c.curr.Literal
+	c.next()
+	if c.is(Namespace) {
+		c.next()
+		t.Space = t.Name
+		t.Name = c.curr.Literal
+		c.next()
+	}
+	return t, nil
 }
 
 func (c *compiler) compileFilter(left Expr) (Expr, error) {
@@ -448,6 +506,7 @@ func (c *compiler) compileExpr(pow int) (Expr, error) {
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println(">>>", c.curr, c.peek)
 	for !(c.done() || c.endExpr()) && pow < bindings[c.curr.Type] {
 		fn, ok := c.infix[c.curr.Type]
 		if !ok {
@@ -637,6 +696,9 @@ const (
 	kwOr        = "or"
 	kwDiv       = "div"
 	kwMod       = "mod"
+	kwAs        = "as"
+	kwCast      = "cast"
+	kwCastable  = "castable"
 )
 
 func isReserved(str string) bool {
@@ -653,6 +715,9 @@ func isReserved(str string) bool {
 	case kwSome:
 	case kwEvery:
 	case kwSatisfies:
+	case kwCast:
+	case kwCastable:
+	case kwAs:
 	default:
 		return false
 	}

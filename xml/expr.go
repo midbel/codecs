@@ -591,6 +591,76 @@ func (q quantified) Next(curr Node, env Environ) ([]Item, error) {
 	return nil, nil
 }
 
+type Type struct {
+	QName
+}
+
+func (t Type) IsCastable(str string) Item {
+	_, err := t.Cast(str)
+	if err == nil {
+		return createLiteral(true)
+	}
+	return createLiteral(false)
+}
+
+func (t Type) Cast(str string) (Item, error) {
+	var (
+		val any
+		err error
+	)
+	switch t.QualifiedName() {
+	case "xs:date", "date":
+		val, err = castToDate(str)
+	default:
+		return nil, ErrCast
+	}
+	if err != nil {
+		return nil, err
+	}
+	return createLiteral(val), nil
+}
+
+type cast struct {
+	expr Expr
+	kind Type
+}
+
+func (c cast) Next(curr Node, env Environ) ([]Item, error) {
+	is, err := c.expr.Next(curr, env)
+	if err != nil {
+		return nil, err
+	}
+	for i := range is {
+		if !is[i].Atomic() {
+			return nil, errType
+		}
+		is[i], err = c.kind.Cast(is[i].Value().(string))
+		if err != nil {
+			return nil, err
+		}
+	}
+	return is, nil
+}
+
+type castable struct {
+	expr Expr
+	kind Type
+}
+
+func (c castable) Next(curr Node, env Environ) ([]Item, error) {
+	is, err := c.expr.Next(curr, env)
+	if err != nil {
+		return nil, err
+	}
+	for i := range is {
+		if !is[i].Atomic() {
+			return nil, errType
+		}
+		is[i] = c.kind.IsCastable(is[i].Value().(string))
+	}
+	return is, nil
+}
+
 func apply(left, right any, do func(left, right float64) (float64, error)) (any, error) {
 	x, err := toFloat(left)
 	if err != nil {
