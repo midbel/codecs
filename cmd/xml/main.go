@@ -16,13 +16,15 @@ import (
 
 func main() {
 	options := struct {
-		Root    string
-		Query   string
-		Schema  string
-		Compact bool
-		Check   bool
-		List    bool
-		File    string
+		Root      string
+		Query     string
+		Schema    string
+		Compact   bool
+		Check     bool
+		List      bool
+		File      string
+		NoSpace   bool
+		NoComment bool
 	}{}
 	flag.StringVar(&options.File, "f", "", "output file")
 	flag.StringVar(&options.Root, "r", "document", "root element name to use when using a query")
@@ -31,6 +33,8 @@ func main() {
 	flag.BoolVar(&options.Compact, "c", false, "write compact output")
 	flag.BoolVar(&options.Check, "k", false, "validate only the document")
 	flag.BoolVar(&options.List, "l", false, "print results as list")
+	flag.BoolVar(&options.NoComment, "no-comment", false, "do not write comment in output")
+	flag.BoolVar(&options.NoSpace, "no-namespace", false, "do not write xmlns attributes and namespace in output")
 	flag.Parse()
 
 	schema, err := parseSchema(options.Schema)
@@ -74,7 +78,7 @@ func main() {
 			fmt.Println(i+1, n.QualifiedName(), n.Value())
 		}
 	} else {
-		if err := writeDocument(doc, options.File, options.Compact); err != nil {
+		if err := writeDocument(doc, options.File, options.Compact, options.NoComment, options.NoSpace); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(5)
 		}
@@ -109,7 +113,7 @@ func parseDocument(file string) (*xml.Document, error) {
 	return p.Parse()
 }
 
-func writeDocument(doc *xml.Document, file string, compact bool) error {
+func writeDocument(doc *xml.Document, file string, compact, noComment, noNamespace bool) error {
 	if doc == nil {
 		return nil
 	}
@@ -123,8 +127,8 @@ func writeDocument(doc *xml.Document, file string, compact bool) error {
 		w = f
 	}
 	ws := xml.NewWriter(w)
-	ws.NoNamespace = true
-	ws.NoComment = true
+	ws.NoNamespace = noNamespace
+	ws.NoComment = noComment
 	ws.Compact = compact
 	return ws.Write(doc)
 }

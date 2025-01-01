@@ -12,11 +12,11 @@ import (
 type Writer struct {
 	writer *bufio.Writer
 
-	Compact  bool
-	Indent   string
-	NoProlog bool
+	Compact     bool
+	Indent      string
+	NoProlog    bool
 	NoNamespace bool
-	NoComment bool
+	NoComment   bool
 }
 
 func WriteNode(node Node) string {

@@ -182,11 +182,10 @@ func callStringLength(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	if len(items) == 0 {
 		return singleValue(0.0), nil
 	}
-	v, ok := items[0].(literalItem)
-	if !ok {
+	if !items[0].Atomic() {
 		return nil, errType
 	}
-	str, ok := v.Value().(string)
+	str, ok := items[0].Value().(string)
 	if !ok {
 		return nil, errType
 	}

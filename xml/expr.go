@@ -423,6 +423,8 @@ func (c call) Next(curr Node, env Environ) ([]Item, error) {
 		keep = curr.Type() == TypeInstruction
 	case "comment":
 		keep = curr.Type() == TypeComment
+	case "document-node":
+		keep = curr.Type() == TypeDocument
 	default:
 		return c.eval(curr, env)
 	}
