@@ -247,7 +247,6 @@ func (n name) Eval(curr Node) (any, error) {
 type descendant struct {
 	curr Expr
 	next Expr
-	deep bool
 }
 
 func (d descendant) Next(node Node, env Environ) ([]Item, error) {
@@ -278,9 +277,9 @@ func (d *descendant) traverse(n Node, env Environ) ([]Item, error) {
 	if len(list) > 0 || err != nil {
 		return list, err
 	}
-	if !d.deep {
-		return list, nil
-	}
+	// if !d.deep {
+	// 	return list, nil
+	// }
 	nodes := getChildrenNodes(n)
 	for i := range nodes {
 		tmp, err := d.traverse(nodes[i], env)

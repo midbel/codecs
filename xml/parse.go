@@ -642,8 +642,8 @@ func (c *compiler) compileDescendant(left Expr) (Expr, error) {
 
 	var expr descendant
 	if any {
-		c := call{
-			ident: "node",
+		c := kind{
+			kind: TypeElement,
 		}
 		a := axis{
 			kind: descendantSelfAxis,
