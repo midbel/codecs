@@ -123,6 +123,8 @@ func writeDocument(doc *xml.Document, file string, compact bool) error {
 		w = f
 	}
 	ws := xml.NewWriter(w)
+	ws.NoNamespace = true
+	ws.NoComment = true
 	ws.Compact = compact
 	return ws.Write(doc)
 }

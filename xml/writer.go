@@ -15,6 +15,8 @@ type Writer struct {
 	Compact  bool
 	Indent   string
 	NoProlog bool
+	NoNamespace bool
+	NoComment bool
 }
 
 func WriteNode(node Node) string {
@@ -70,7 +72,11 @@ func (w *Writer) writeElement(node *Element, depth int) error {
 		w.writer.WriteString(prefix)
 	}
 	w.writer.WriteRune(langle)
-	w.writer.WriteString(node.QualifiedName())
+	if w.NoNamespace {
+		w.writer.WriteString(node.LocalName())
+	} else {
+		w.writer.WriteString(node.QualifiedName())
+	}
 	level := depth + 1
 	if len(node.Attrs) == 1 {
 		level = 0
@@ -98,7 +104,11 @@ func (w *Writer) writeElement(node *Element, depth int) error {
 	}
 	w.writer.WriteRune(langle)
 	w.writer.WriteRune(slash)
-	w.writer.WriteString(node.QualifiedName())
+	if w.NoNamespace {
+		w.writer.WriteString(node.LocalName())
+	} else {
+		w.writer.WriteString(node.QualifiedName())
+	}
 	w.writer.WriteRune(rangle)
 	return w.writer.Flush()
 }
@@ -122,6 +132,9 @@ func (w *Writer) writeCharData(node *CharData, _ int) error {
 }
 
 func (w *Writer) writeComment(node *Comment, depth int) error {
+	if w.NoComment {
+		return nil
+	}
 	w.writeNL()
 	prefix := w.getIndent(depth)
 	w.writer.WriteString(prefix)
@@ -170,6 +183,9 @@ func (w *Writer) writeProlog() error {
 func (w *Writer) writeAttributes(attrs []Attribute, depth int) error {
 	prefix := w.getIndent(depth)
 	for _, a := range attrs {
+		if w.NoNamespace && (a.Space == "xmlns" || a.Name == "xmlns") && a.Value != "" {
+			continue
+		}
 		if depth == 0 || w.Compact {
 			w.writer.WriteRune(' ')
 		} else {

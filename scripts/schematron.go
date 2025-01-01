@@ -43,6 +43,37 @@ type Assert struct {
 	Context string
 }
 
+func (a Assert) Eval(env xml.Environ, items []xml.Item) (bool, error) {
+	test, err := xml.CompileString(a.Test)
+	if err != nil {
+		fmt.Println(a.Context, a.Test)
+		return false, err
+	}
+	for i := range items {
+		res, err := items[i].Assert(test, env)
+		if err != nil {
+			return false, err
+		}
+		if len(res) == 0 {
+			return false, fmt.Errorf(a.Message)
+		}
+		var ok bool
+		switch v := res[0].Value().(type) {
+		case bool:
+			ok = v
+		case float64:
+			ok = v != 0
+		case string:
+			ok = v != ""
+		default:
+		}
+		if !ok {
+			return ok, fmt.Errorf(a.Message)
+		}
+	}
+	return true, nil
+}
+
 type Rule struct {
 	xml.Environ
 
@@ -102,7 +133,7 @@ func main() {
 			} else {
 				total = len(items)
 			}
-			res, err = testAssert(a, env, items)
+			res, err = a.Eval(env, items)
 			if err != nil {
 				state = "?"
 				counter.Unknown++
@@ -126,37 +157,6 @@ func main() {
 	fmt.Println()
 	fmt.Printf("%d assertions to be fixed", counter.Unknown)
 	fmt.Println()
-}
-
-func testAssert(assert *Assert, env xml.Environ, items []xml.Item) (bool, error) {
-	test, err := xml.CompileString(assert.Test)
-	if err != nil {
-		fmt.Println(assert.Context, assert.Test)
-		return false, err
-	}
-	for i := range items {
-		res, err := items[i].Assert(test, env)
-		if err != nil {
-			return false, err
-		}
-		if len(res) == 0 {
-			return false, nil
-		}
-		var ok bool
-		switch v := res[0].Value().(type) {
-		case bool:
-			ok = v
-		case float64:
-			ok = v != 0
-		case string:
-			ok = v != ""
-		default:
-		}
-		if !ok {
-			return ok, nil
-		}
-	}
-	return true, nil
 }
 
 func parseDocument(file string) (*xml.Document, error) {
