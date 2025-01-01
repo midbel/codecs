@@ -212,7 +212,7 @@ func callStringLength(ctx Node, args []Expr, env Environ) ([]Item, error) {
 		return singleValue(0.0), nil
 	}
 	if !items[0].Atomic() {
-		return nil, errType
+		return callStringLength(items[0].Node(), nil, env)
 	}
 	str, ok := items[0].Value().(string)
 	if !ok {

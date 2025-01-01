@@ -404,6 +404,17 @@ func (n number) Next(_ Node, env Environ) ([]Item, error) {
 	return createSingle(createLiteral(n.expr)), nil
 }
 
+type kind struct {
+	kind NodeType
+}
+
+func (k kind) Next(curr Node, env Environ) ([]Item, error) {
+	if curr.Type() == k.kind {
+		return createSingle(createNode(curr)), nil
+	}
+	return nil, errDiscard
+}
+
 type call struct {
 	ident string
 	args  []Expr

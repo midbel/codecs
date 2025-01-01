@@ -506,7 +506,6 @@ func (c *compiler) compileExpr(pow int) (Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(">>>", c.curr, c.peek)
 	for !(c.done() || c.endExpr()) && pow < bindings[c.curr.Type] {
 		fn, ok := c.infix[c.curr.Type]
 		if !ok {
