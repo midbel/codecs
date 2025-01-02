@@ -490,22 +490,18 @@ type attr struct {
 	ident string
 }
 
-func (a attr) Next(node Node, env Environ) ([]Item, error) {
-	return nil, errImplemented
-}
-
-func (a attr) eval(node Node) ([]Item, error) {
-	el, ok := node.(*Element)
-	if !ok {
-		return nil, ErrNode
+func (a attr) Next(curr Node, env Environ) ([]Item, error) {
+	if curr.Type() != TypeElement {
+		return nil, nil
 	}
+	el := curr.(*Element)
 	ix := slices.IndexFunc(el.Attrs, func(attr Attribute) bool {
 		return attr.Name == a.ident
 	})
-	if ix >= 0 {
-		return createSingle(createLiteral(el.Attrs[ix].Value())), nil
+	if ix < 0 {
+		return nil, nil
 	}
-	return createSingle(createLiteral("")), nil
+	return singleNode(&el.Attrs[ix]), nil
 }
 
 type except struct {

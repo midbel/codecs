@@ -2,6 +2,7 @@ package xml
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -153,21 +154,25 @@ func (i nodeItem) True() bool {
 }
 
 func (i nodeItem) Value() any {
-	var traverse func(Node) any
-	traverse = func(n Node) any {
+	if i.node.Type() == TypeAttribute {
+		return i.node.Value()
+	}
+	var traverse func(Node) []string
+	traverse = func(n Node) []string {
 		el, ok := n.(*Element)
 		if !ok {
-			return n.Value()
+			return []string{n.Value()}
 		}
-		var arr []any
+		var arr []string
 		for _, n := range el.Nodes {
 			if n.Leaf() {
 				arr = append(arr, n.Value())
 				continue
 			}
-			arr = append(arr, traverse(n))
+			arr = append(arr, traverse(n)...)
 		}
 		return arr
 	}
-	return traverse(i.node)
+	str := traverse(i.node)
+	return strings.Join(str, "")
 }
