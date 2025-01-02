@@ -550,7 +550,7 @@ func getAttribute(elem *xml.Element, name string) (string, error) {
 	if ix < 0 {
 		return "", fmt.Errorf("%s: attribute %q is missing", elem.QualifiedName(), name)
 	}
-	value := elem.Attrs[ix].Value
+	value := elem.Attrs[ix].Value()
 	value = strings.Map(func(r rune) rune {
 		if r == '\r' || r == '\t' {
 			return -1
