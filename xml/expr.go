@@ -12,6 +12,7 @@ var (
 	ErrNode      = errors.New("element node expected")
 	ErrRoot      = errors.New("root element expected")
 	ErrUndefined = errors.New("undefined")
+	ErrEmpty     = errors.New("sequence is empty")
 )
 
 type Expr interface {
@@ -323,9 +324,6 @@ func (b binary) Next(node Node, env Environ) ([]Item, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(left) == 0 || len(right) == 0 {
-		return nil, fmt.Errorf("empty sequences")
-	}
 	var res any
 	switch b.op {
 	case opAdd:
@@ -355,53 +353,33 @@ func (b binary) Next(node Node, env Environ) ([]Item, error) {
 			return math.Mod(left, right), nil
 		})
 	case opAnd:
-		if len(left) == 0 || len(right) == 0 {
-			res = false
-			break
-		}
-		res1, err := getBooleanFromItem(left[0])
-		if err != nil {
-			return nil, err
-		}
-		res2, err := getBooleanFromItem(right[0])
-		if err != nil {
-			return nil, err
-		}
-		res = res1 && res2
+		res = isTrue(left) && isTrue(right)
 	case opOr:
-		res1, err := getBooleanFromItem(left[0])
-		if err != nil {
-			return nil, err
-		}
-		res2, err := getBooleanFromItem(right[0])
-		if err != nil {
-			return nil, err
-		}
-		res = res1 || res2
+		res = isTrue(left) || isTrue(right)
 	case opEq:
-		res, err = isEqual(left[0].Value(), right[0].Value())
+		res, err = isEqual(left, right)
 	case opNe:
-		ok, err1 := isEqual(left[0].Value(), right[0].Value())
+		ok, err1 := isEqual(left, right)
 		res, err = !ok, err1
 	case opLt:
-		res, err = isLess(left[0].Value(), right[0].Value())
+		res, err = isLess(left, right)
 	case opLe:
-		ok, err1 := isEqual(left[0].Value(), right[0].Value())
+		ok, err1 := isEqual(left, right)
 		if !ok {
-			ok, err1 = isLess(left[0].Value(), right[0].Value())
+			ok, err1 = isLess(left, right)
 		}
 		res, err = ok, err1
 	case opGt:
-		ok, err1 := isEqual(left[0].Value(), right[0].Value())
+		ok, err1 := isEqual(left, right)
 		if !ok {
-			ok, err1 = isLess(left[0].Value(), right[0].Value())
+			ok, err1 = isLess(left, right)
 			ok = !ok
 		}
 		res, err = ok, err1
 	case opGe:
-		ok, err1 := isEqual(left[0].Value(), right[0].Value())
+		ok, err1 := isEqual(left, right)
 		if !ok {
-			ok, err1 = isLess(left[0].Value(), right[0].Value())
+			ok, err1 = isLess(left, right)
 			ok = !ok
 		}
 		res, err = ok, err1
@@ -581,7 +559,7 @@ func (f filter) Next(curr Node, env Environ) ([]Item, error) {
 		if isEmpty(res) {
 			continue
 		}
-		if !res[0].Atomic() {
+		if !res[0].Atomic() && isTrue(res) {
 			ret = append(ret, n)
 			continue
 		}
@@ -732,47 +710,65 @@ func (c castable) Next(curr Node, env Environ) ([]Item, error) {
 	return is, nil
 }
 
-func apply(left, right any, do func(left, right float64) (float64, error)) (any, error) {
-	x, err := toFloat(left)
+func apply(left, right []Item, do func(left, right float64) (float64, error)) (any, error) {
+	if isEmpty(left) {
+		return math.NaN(), nil
+	}
+	if isEmpty(right) {
+		return math.NaN(), nil
+	}
+	x, err := toFloat(left[0].Value())
 	if err != nil {
 		return nil, err
 	}
-	y, err := toFloat(right)
+	y, err := toFloat(right[0].Value())
 	if err != nil {
 		return nil, err
 	}
 	return do(x, y)
 }
 
-func isLess(left, right any) (bool, error) {
-	switch x := left.(type) {
+func isLess(left, right []Item) (bool, error) {
+	if isEmpty(left) {
+		return false, nil
+	}
+	if isEmpty(right) {
+		return false, nil
+	}
+	switch x := left[0].Value().(type) {
 	case float64:
-		y, err := toFloat(right)
+		y, err := toFloat(right[0].Value())
 		return x < y, err
 	case string:
-		y, err := toString(right)
+		y, err := toString(right[0].Value())
 		return x < y, err
 	default:
 		return false, errType
 	}
 }
 
-func isEqual(left, right any) (bool, error) {
-	switch x := left.(type) {
+func isEqual(left, right []Item) (bool, error) {
+	if isEmpty(left) {
+		return false, nil
+	}
+	if isEmpty(right) {
+		return false, nil
+	}
+	switch x := left[0].Value().(type) {
 	case float64:
-		y, err := toFloat(right)
+		y, err := toFloat(right[0].Value())
 		if err != nil {
 			return false, err
 		}
 		return x == y, nil
 	case string:
-		y, err := toString(right)
+		y, err := toString(right[0].Value())
 		if err != nil {
 			return false, err
 		}
 		return x == y, nil
 	case bool:
-		return x == toBool(right), nil
+		return x == toBool(right[0].Value()), nil
 	default:
 		return false, errType
 	}

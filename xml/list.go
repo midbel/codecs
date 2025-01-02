@@ -2,6 +2,7 @@ package xml
 
 import (
 	"fmt"
+	"time"
 )
 
 type Environ interface {
@@ -44,6 +45,7 @@ func (e *Env) Resolve(ident string) (Expr, error) {
 type Item interface {
 	Node() Node
 	Value() any
+	True() bool
 	Atomic() bool
 	Assert(Expr, Environ) ([]Item, error)
 }
@@ -71,6 +73,10 @@ func isEmpty(list []Item) bool {
 	return len(list) == 0
 }
 
+func isTrue(list []Item) bool {
+	return len(list) > 0 && list[0].True()
+}
+
 type literalItem struct {
 	value any
 }
@@ -87,6 +93,21 @@ func (i literalItem) Assert(_ Expr, _ Environ) ([]Item, error) {
 
 func (i literalItem) Atomic() bool {
 	return true
+}
+
+func (i literalItem) True() bool {
+	switch v := i.value.(type) {
+	case float64:
+		return v != 0
+	case string:
+		return v != ""
+	case bool:
+		return v
+	case time.Time:
+		return !v.IsZero()
+	default:
+		return false
+	}
 }
 
 func (i literalItem) Node() Node {
@@ -125,6 +146,10 @@ func (i nodeItem) Atomic() bool {
 
 func (i nodeItem) Node() Node {
 	return i.node
+}
+
+func (i nodeItem) True() bool {
+	return true
 }
 
 func (i nodeItem) Value() any {

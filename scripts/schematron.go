@@ -51,7 +51,7 @@ func (a Assert) Eval(env xml.Environ, items []xml.Item) (bool, error) {
 	for i := range items {
 		res, err := items[i].Assert(test, env)
 		if err != nil {
-			fmt.Println(a.Context, a.Test)
+			fmt.Println(a.Context, a.Test, err)
 			return false, err
 		}
 		if len(res) == 0 {
