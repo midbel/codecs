@@ -56,6 +56,7 @@ func (w wildcard) Next(curr Node, env Environ) ([]Item, error) {
 		list []Item
 		elem = curr.(*Element)
 	)
+	list = append(list, createNode(curr))
 	for i := range elem.Nodes {
 		if elem.Nodes[i].Type() != TypeElement {
 			continue
