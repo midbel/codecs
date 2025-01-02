@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -28,9 +29,25 @@ type Node interface {
 	Position() int
 	Parent() Node
 	Value() string
+	Identity() string
 
 	setParent(Node)
 	setPosition(int)
+	path() []int
+}
+
+type BaseNode struct {
+	Nodes    []Node
+	parent   Node
+	position int
+}
+
+func (n *BaseNode) setParent(node Node) {
+	n.parent = node
+}
+
+func (n *BaseNode) setPosition(pos int) {
+	n.position = pos
 }
 
 var ErrElement = errors.New("element expected")
@@ -165,6 +182,14 @@ func (d *Document) attach(node Node) {
 	d.Nodes = append(d.Nodes, node)
 }
 
+func (_ *Document) Identity() string {
+	return "document"
+}
+
+func (_ *Document) path() []int {
+	return nil
+}
+
 func (d *Document) setParent(_ Node) {}
 
 func (d *Document) setPosition(_ int) {}
@@ -202,7 +227,7 @@ func (q QName) isDocumentNode() bool {
 
 type Attribute struct {
 	QName
-	Value string
+	Datum string
 
 	parent   Node
 	position int
@@ -211,7 +236,7 @@ type Attribute struct {
 func NewAttribute(name QName, value string) Attribute {
 	return Attribute{
 		QName: name,
-		Value: value,
+		Datum: value,
 	}
 }
 
@@ -231,9 +256,25 @@ func (a *Attribute) Parent() Node {
 	return a.parent
 }
 
-// func (a *Attribute) Value() string {
-// 	return a.Value
-// }
+func (a *Attribute) Value() string {
+	return a.Datum
+}
+
+func (a *Attribute) Identity() string {
+	var list []string
+	for _, p := range a.path() {
+		list = append(list, strconv.Itoa(p))
+	}
+	return fmt.Sprintf("%s[%s]", a.QualifiedName(), strings.Join(list, "/"))
+}
+
+func (a *Attribute) path() []int {
+	if a.parent == nil {
+		return []int{a.position}
+	}
+	steps := a.parent.path()
+	return append(steps, a.position)
+}
 
 func (a *Attribute) setParent(node Node) {
 	a.parent = node
@@ -357,7 +398,7 @@ func (e *Element) GetElementById(id string) (Node, error) {
 			continue
 		}
 		x := slices.IndexFunc(sub.Attrs, func(a Attribute) bool {
-			return a.Name == "id" && a.Value == id
+			return a.Name == "id" && a.Value() == id
 		})
 		if x >= 0 {
 			return sub, nil
@@ -417,6 +458,22 @@ func (e *Element) Position() int {
 
 func (e *Element) Parent() Node {
 	return e.parent
+}
+
+func (e *Element) Identity() string {
+	var list []string
+	for _, p := range e.path() {
+		list = append(list, strconv.Itoa(p))
+	}
+	return fmt.Sprintf("%s[%s]", e.QualifiedName(), strings.Join(list, "/"))
+}
+
+func (e *Element) path() []int {
+	if e.parent == nil {
+		return []int{e.position}
+	}
+	steps := e.parent.path()
+	return append(steps, e.position)
 }
 
 func (e *Element) setPosition(pos int) {
@@ -485,6 +542,22 @@ func (i *Instruction) Parent() Node {
 	return i.parent
 }
 
+func (i *Instruction) Identity() string {
+	var list []string
+	for _, p := range i.path() {
+		list = append(list, strconv.Itoa(p))
+	}
+	return fmt.Sprintf("%s[%s]", i.QualifiedName(), strings.Join(list, "/"))
+}
+
+func (i *Instruction) path() []int {
+	if i.parent == nil {
+		return []int{i.position}
+	}
+	steps := i.parent.path()
+	return append(steps, i.position)
+}
+
 func (i *Instruction) setPosition(pos int) {
 	i.position = pos
 }
@@ -532,6 +605,22 @@ func (c *CharData) Position() int {
 
 func (c *CharData) Parent() Node {
 	return c.parent
+}
+
+func (c *CharData) Identity() string {
+	var list []string
+	for _, p := range c.path() {
+		list = append(list, strconv.Itoa(p))
+	}
+	return fmt.Sprintf("%s[%s]", "chardata", strings.Join(list, "/"))
+}
+
+func (c *CharData) path() []int {
+	if c.parent == nil {
+		return []int{c.position}
+	}
+	steps := c.parent.path()
+	return append(steps, c.position)
 }
 
 func (c *CharData) setPosition(pos int) {
@@ -583,6 +672,22 @@ func (t *Text) Parent() Node {
 	return t.parent
 }
 
+func (t *Text) Identity() string {
+	var list []string
+	for _, p := range t.path() {
+		list = append(list, strconv.Itoa(p))
+	}
+	return fmt.Sprintf("%s[%s]", "comment", strings.Join(list, "/"))
+}
+
+func (t *Text) path() []int {
+	if t.parent == nil {
+		return []int{t.position}
+	}
+	steps := t.parent.path()
+	return append(steps, t.position)
+}
+
 func (t *Text) setPosition(pos int) {
 	t.position = pos
 }
@@ -630,6 +735,22 @@ func (c *Comment) Position() int {
 
 func (c *Comment) Parent() Node {
 	return c.parent
+}
+
+func (c *Comment) Identity() string {
+	var list []string
+	for _, p := range c.path() {
+		list = append(list, strconv.Itoa(p))
+	}
+	return fmt.Sprintf("%s[%s]", "comment", strings.Join(list, "/"))
+}
+
+func (c *Comment) path() []int {
+	if c.parent == nil {
+		return []int{c.position}
+	}
+	steps := c.parent.path()
+	return append(steps, c.position)
 }
 
 func (c *Comment) setPosition(pos int) {

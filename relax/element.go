@@ -176,7 +176,7 @@ func (a Attribute) validate(node xml.Node, _ Resolver) error {
 	if !ok {
 		return fmt.Errorf("pattern not applicatble for attribute")
 	}
-	return v.validateValue(el.Attrs[ix].Value)
+	return v.validateValue(el.Attrs[ix].Value())
 }
 
 type Group struct {

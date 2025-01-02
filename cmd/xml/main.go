@@ -92,7 +92,7 @@ func piInclude(_ string, attrs []xml.Attribute) (xml.Node, error) {
 	if ix < 0 {
 		return nil, fmt.Errorf("filename: attribute is missing")
 	}
-	doc, err := parseDocument(attrs[ix].Value)
+	doc, err := parseDocument(attrs[ix].Value())
 	if err != nil {
 		return nil, err
 	}

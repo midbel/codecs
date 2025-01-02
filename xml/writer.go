@@ -183,7 +183,7 @@ func (w *Writer) writeProlog() error {
 func (w *Writer) writeAttributes(attrs []Attribute, depth int) error {
 	prefix := w.getIndent(depth)
 	for _, a := range attrs {
-		if w.NoNamespace && (a.Space == "xmlns" || a.Name == "xmlns") && a.Value != "" {
+		if w.NoNamespace && (a.Space == "xmlns" || a.Name == "xmlns") && a.Value() != "" {
 			continue
 		}
 		if depth == 0 || w.Compact {
@@ -195,7 +195,7 @@ func (w *Writer) writeAttributes(attrs []Attribute, depth int) error {
 		w.writer.WriteString(a.QualifiedName())
 		w.writer.WriteRune(equal)
 		w.writer.WriteRune(quote)
-		w.writer.WriteString(escapeText(a.Value))
+		w.writer.WriteString(escapeText(a.Value()))
 		w.writer.WriteRune(quote)
 	}
 	return nil

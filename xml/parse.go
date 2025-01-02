@@ -1198,7 +1198,7 @@ func (p *Parser) parseProlog() (Node, error) {
 		return nil, p.createError("document", "expected xml prolog")
 	}
 	ok = slices.ContainsFunc(pi.Attrs, func(a Attribute) bool {
-		return a.LocalName() == "version" && a.Value == SupportedVersion
+		return a.LocalName() == "version" && a.Value() == SupportedVersion
 	})
 	if !ok {
 		return nil, p.createError("document", "xml version not supported")
@@ -1206,7 +1206,7 @@ func (p *Parser) parseProlog() (Node, error) {
 	ix := slices.IndexFunc(pi.Attrs, func(a Attribute) bool {
 		return a.LocalName() == "encoding"
 	})
-	if ix >= 0 && pi.Attrs[ix].Value != SupportedEncoding {
+	if ix >= 0 && pi.Attrs[ix].Value() != SupportedEncoding {
 		return nil, p.createError("document", "xml encoding not supported")
 	}
 	return pi, nil
@@ -1372,7 +1372,7 @@ func (p *Parser) parseAttr() (Attribute, error) {
 	if !p.is(Literal) {
 		return attr, p.createError("attribute", "value is missing")
 	}
-	attr.Value = p.curr.Literal
+	attr.Datum = p.curr.Literal
 	p.next()
 	return attr, nil
 }

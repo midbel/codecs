@@ -161,7 +161,7 @@ func (r *Reader) readAttr() (Attribute, error) {
 	if !r.is(Literal) {
 		return attr, r.createError("attribute", "value is missing")
 	}
-	attr.Value = r.curr.Literal
+	attr.Datum = r.curr.Literal
 	r.next()
 	return attr, nil
 }
