@@ -58,6 +58,9 @@ func (a Assert) Eval(env xml.Environ, items []xml.Item) (bool, error) {
 			return false, fmt.Errorf(a.Message)
 		}
 		var ok bool
+		if !res[0].Atomic() {
+			return true, nil
+		}
 		switch v := res[0].Value().(type) {
 		case bool:
 			ok = v
@@ -116,10 +119,6 @@ func main() {
 	)
 	for a := range getAssertions(sch, strings.TrimSpace(*level), strings.TrimSpace(*group)) {
 		expr, err := xml.Compile(strings.NewReader(a.Context))
-		// if err != nil {
-		// 	fmt.Fprintf(os.Stderr, "fail to compile assertion context: %s (%s)", err, a.Context)
-		// 	fmt.Fprintln(os.Stderr)
-		// }
 		var (
 			total int
 			res   bool

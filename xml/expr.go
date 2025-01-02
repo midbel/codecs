@@ -20,6 +20,7 @@ type Expr interface {
 
 type Context struct {
 	Node
+	Type     NodeType
 	Position int
 	Size     int
 }
@@ -524,7 +525,7 @@ func (a attr) eval(node Node) ([]Item, error) {
 		return attr.Name == a.ident
 	})
 	if ix >= 0 {
-		return createSingle(createLiteral(el.Attrs[ix].Value)), nil
+		return createSingle(createLiteral(el.Attrs[ix].Value())), nil
 	}
 	return createSingle(createLiteral("")), nil
 }
@@ -578,6 +579,10 @@ func (f filter) Next(curr Node, env Environ) ([]Item, error) {
 			continue
 		}
 		if isEmpty(res) {
+			continue
+		}
+		if !res[0].Atomic() {
+			ret = append(ret, n)
 			continue
 		}
 		var keep bool

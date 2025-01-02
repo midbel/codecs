@@ -75,7 +75,7 @@ func main() {
 			return
 		}
 		for i, n := range elem.Nodes {
-			fmt.Println(i+1, n.QualifiedName(), n.Value())
+			fmt.Println(i+1, n.Identity(), n.Value())
 		}
 	} else {
 		if err := writeDocument(doc, options.File, options.Compact, options.NoComment, options.NoSpace); err != nil {

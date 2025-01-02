@@ -677,7 +677,7 @@ func (t *Text) Identity() string {
 	for _, p := range t.path() {
 		list = append(list, strconv.Itoa(p))
 	}
-	return fmt.Sprintf("%s[%s]", "comment", strings.Join(list, "/"))
+	return fmt.Sprintf("%s[%s]", "text", strings.Join(list, "/"))
 }
 
 func (t *Text) path() []int {
