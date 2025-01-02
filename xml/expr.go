@@ -777,7 +777,7 @@ func toFloat(value any) (float64, error) {
 	case string:
 		return strconv.ParseFloat(v, 64)
 	default:
-		return 0, errType
+		return math.NaN(), nil
 	}
 }
 

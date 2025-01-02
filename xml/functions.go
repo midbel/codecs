@@ -2,6 +2,7 @@ package xml
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -62,6 +63,9 @@ func callDecimal(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	str, err := getStringFromExpr(args[0], ctx, env)
 	if err != nil {
 		return nil, err
+	}
+	if str == "" {
+		return singleValue(math.NaN()), nil
 	}
 	v, err := strconv.ParseFloat(str, 64)
 	if err != nil {
@@ -588,14 +592,10 @@ func callBoolean(ctx Node, args []Expr, env Environ) ([]Item, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(items) == 0 {
+	if isEmpty(items) {
 		return callFalse(ctx, args, env)
 	}
-	ok, err := getBooleanFromItem(items[0])
-	if err != nil {
-		return nil, err
-	}
-	return singleValue(ok), nil
+	return singleValue(items[0].True()), nil
 }
 
 func callNot(ctx Node, args []Expr, env Environ) ([]Item, error) {
@@ -625,7 +625,7 @@ func getStringFromExpr(expr Expr, ctx Node, env Environ) (string, error) {
 		return "", err
 	}
 	if len(items) != 1 {
-		return "", errType
+		return "", nil
 	}
 	switch v := items[0].(type) {
 	case literalItem:
