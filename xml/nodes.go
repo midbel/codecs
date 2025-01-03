@@ -265,7 +265,7 @@ func (a *Attribute) Identity() string {
 	for _, p := range a.path() {
 		list = append(list, strconv.Itoa(p))
 	}
-	return fmt.Sprintf("%s[%s]", a.QualifiedName(), strings.Join(list, "/"))
+	return fmt.Sprintf("attr(%s)[%s]", a.QualifiedName(), strings.Join(list, "/"))
 }
 
 func (a *Attribute) path() []int {
@@ -465,7 +465,7 @@ func (e *Element) Identity() string {
 	for _, p := range e.path() {
 		list = append(list, strconv.Itoa(p))
 	}
-	return fmt.Sprintf("%s[%s]", e.QualifiedName(), strings.Join(list, "/"))
+	return fmt.Sprintf("node(%s)[%s]", e.QualifiedName(), strings.Join(list, "/"))
 }
 
 func (e *Element) path() []int {
@@ -547,7 +547,7 @@ func (i *Instruction) Identity() string {
 	for _, p := range i.path() {
 		list = append(list, strconv.Itoa(p))
 	}
-	return fmt.Sprintf("%s[%s]", i.QualifiedName(), strings.Join(list, "/"))
+	return fmt.Sprintf("instr(%s)[%s]", i.QualifiedName(), strings.Join(list, "/"))
 }
 
 func (i *Instruction) path() []int {

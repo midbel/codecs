@@ -21,9 +21,16 @@ type Expr interface {
 
 type Context struct {
 	Node
-	Type     NodeType
 	Position int
 	Size     int
+}
+
+func createContext(n Node, pos, size int) Context {
+	return Context{
+		Node:     n,
+		Position: pos,
+		Size:     size,
+	}
 }
 
 const (
@@ -51,25 +58,11 @@ func (q query) Next(node Node, env Environ) ([]Item, error) {
 type wildcard struct{}
 
 func (w wildcard) Next(curr Node, env Environ) ([]Item, error) {
-	if curr.Type() != TypeElement {
-		return nil, nil
-	}
-	var (
-		list []Item
-		elem = curr.(*Element)
-	)
+	// if curr.Type() != TypeElement {
+	// 	return nil, nil
+	// }
+	var list []Item
 	list = append(list, createNode(curr))
-	for i := range elem.Nodes {
-		if elem.Nodes[i].Type() != TypeElement {
-			continue
-		}
-		if elem.Nodes[i].Leaf() {
-			list = append(list, createNode(elem.Nodes[i]))
-		} else {
-			others, _ := w.Next(elem.Nodes[i], env)
-			list = slices.Concat(list, others)
-		}
-	}
 	return list, nil
 }
 
@@ -104,30 +97,6 @@ func (_ root) Next(curr Node, env Environ) ([]Item, error) {
 	return createSingle(createNode(curr)), nil
 }
 
-type keeper interface {
-	Keep(Node) bool
-}
-
-type step struct {
-	expr Expr
-	keeper
-}
-
-func (s step) Next(curr Node, env Environ) ([]Item, error) {
-	nodes, err := s.expr.Next(curr, env)
-	if err != nil {
-		return nil, err
-	}
-	var list []Item
-	for i := range nodes {
-		if !s.Keep(nodes[i].Node()) {
-			continue
-		}
-		list = append(list, nodes[i])
-	}
-	return list, nil
-}
-
 type axis struct {
 	kind string
 	next Expr
@@ -136,11 +105,11 @@ type axis struct {
 func (a axis) Next(curr Node, env Environ) ([]Item, error) {
 	var list []Item
 	if a.kind == selfAxis || a.kind == descendantSelfAxis || a.kind == ancestorSelfAxis {
-		other, err := a.next.Next(curr, env)
+		others, err := a.next.Next(curr, env)
 		if err != nil {
 			return nil, err
 		}
-		list = slices.Concat(list, other)
+		list = slices.Concat(list, others)
 	}
 	switch a.kind {
 	case selfAxis:
@@ -280,9 +249,6 @@ func (d *descendant) traverse(n Node, env Environ) ([]Item, error) {
 	if len(list) > 0 || err != nil {
 		return list, err
 	}
-	// if !d.deep {
-	// 	return list, nil
-	// }
 	nodes := getChildrenNodes(n)
 	for i := range nodes {
 		tmp, err := d.traverse(nodes[i], env)
