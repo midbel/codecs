@@ -69,6 +69,8 @@ type compiler struct {
 	curr Token
 	peek Token
 
+	defaultAxis string
+
 	infix  map[rune]func(Expr) (Expr, error)
 	prefix map[rune]func() (Expr, error)
 }
@@ -79,7 +81,8 @@ func CompileString(q string) (Expr, error) {
 
 func Compile(r io.Reader) (Expr, error) {
 	cp := compiler{
-		scan: ScanQuery(r),
+		scan:        ScanQuery(r),
+		defaultAxis: childAxis,
 	}
 
 	cp.infix = map[rune]func(Expr) (Expr, error){
@@ -122,6 +125,14 @@ func Compile(r io.Reader) (Expr, error) {
 	cp.next()
 	cp.next()
 	return cp.Compile()
+}
+
+func (c *compiler) SetDefaultAxis(axis string) {
+	switch axis {
+	case descendantAxis, childAxis:
+		c.defaultAxis = axis
+	default:
+	}
 }
 
 func (c *compiler) Compile() (Expr, error) {
