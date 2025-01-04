@@ -640,7 +640,7 @@ func (c *compiler) compileDescendant(left Expr) (Expr, error) {
 		return nil, err
 	}
 
-	var expr descendant
+	var expr step
 	if any {
 		c := kind{
 			kind: TypeElement,
@@ -649,15 +649,15 @@ func (c *compiler) compileDescendant(left Expr) (Expr, error) {
 			kind: descendantSelfAxis,
 			next: c,
 		}
-		expr = descendant{
+		expr = step{
 			curr: left,
-			next: descendant{
+			next: step{
 				curr: a,
 				next: next,
 			},
 		}
 	} else {
-		expr = descendant{
+		expr = step{
 			curr: left,
 			next: next,
 		}
@@ -666,14 +666,24 @@ func (c *compiler) compileDescendant(left Expr) (Expr, error) {
 }
 
 func (c *compiler) compileDescendantFromRoot() (Expr, error) {
-	var expr root
-	return c.compileDescendant(expr)
+	var expr current
+	next, err := c.compileDescendant(expr)
+	if err != nil {
+		return nil, err
+	}
+	abs := absolute{
+		expr: next,
+	}
+	return abs, nil
 }
 
 func (c *compiler) compileRoot() (Expr, error) {
 	c.next()
 	if c.done() {
-		return root{}, nil
+		expr := absolute{
+			expr: current{},
+		}
+		return expr, nil
 	}
 	next, err := c.compileExpr(powLowest)
 	if err != nil {

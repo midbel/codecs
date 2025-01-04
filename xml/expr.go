@@ -58,11 +58,15 @@ func (q query) Next(node Node, env Environ) ([]Item, error) {
 type wildcard struct{}
 
 func (w wildcard) Next(curr Node, env Environ) ([]Item, error) {
-	// if curr.Type() != TypeElement {
-	// 	return nil, nil
-	// }
+	if curr.Type() != TypeElement {
+		return nil, nil
+	}
 	var list []Item
 	list = append(list, createNode(curr))
+	for _, n := range getChildrenNodes(curr) {
+		others, _ := w.Next(n, env)
+		list = slices.Concat(list, others)
+	}
 	return list, nil
 }
 
@@ -88,13 +92,29 @@ func (a absolute) root(node Node) Node {
 	return a.root(n)
 }
 
-type root struct{}
+type step struct {
+	curr Expr
+	next Expr
+}
 
-func (_ root) Next(curr Node, env Environ) ([]Item, error) {
-	if curr.Type() != TypeDocument {
-		return nil, ErrRoot
+func (s step) Next(curr Node, env Environ) ([]Item, error) {
+	if curr.Type() == TypeDocument {
+		doc := curr.(*Document)
+		return s.Next(doc.Root(), env)
 	}
-	return createSingle(createNode(curr)), nil
+	is, err := s.curr.Next(curr, env)
+	if err != nil {
+		return nil, err
+	}
+	var list []Item
+	for _, i := range is {
+		others, err := s.next.Next(i.Node(), env)
+		if err != nil {
+			continue
+		}
+		list = slices.Concat(list, others)
+	}
+	return list, nil
 }
 
 type axis struct {
@@ -202,61 +222,6 @@ func (n name) Next(curr Node, env Environ) ([]Item, error) {
 		return nil, errDiscard
 	}
 	return createSingle(createNode(curr)), nil
-}
-
-func (n name) Eval(curr Node) (any, error) {
-	el, ok := curr.(*Element)
-	if !ok {
-		return nil, ErrNode
-	}
-	child := el.Find(n.ident)
-	if child == nil {
-		return "", nil
-	}
-	return child.Value(), nil
-}
-
-type descendant struct {
-	curr Expr
-	next Expr
-}
-
-func (d descendant) Next(node Node, env Environ) ([]Item, error) {
-	if node.Type() == TypeDocument {
-		doc := node.(*Document)
-		return d.traverse(doc.Root(), env)
-	}
-	ns, err := d.curr.Next(node, env)
-	if err != nil {
-		return nil, err
-	}
-	var list []Item
-	for _, n := range ns {
-		xs, err := d.traverse(n.Node(), env)
-		if err != nil {
-			continue
-		}
-		list = slices.Concat(list, xs)
-	}
-	if _, ok := d.curr.(root); ok && len(list) > 1 {
-		list = list[1:]
-	}
-	return list, nil
-}
-
-func (d *descendant) traverse(n Node, env Environ) ([]Item, error) {
-	list, err := d.next.Next(n, env)
-	if len(list) > 0 || err != nil {
-		return list, err
-	}
-	nodes := getChildrenNodes(n)
-	for i := range nodes {
-		tmp, err := d.traverse(nodes[i], env)
-		if err == nil {
-			list = slices.Concat(list, tmp)
-		}
-	}
-	return list, nil
 }
 
 type sequence struct {
@@ -417,31 +382,6 @@ type call struct {
 }
 
 func (c call) Next(curr Node, env Environ) ([]Item, error) {
-	var (
-		list []Item
-		keep bool
-	)
-	switch c.ident {
-	case "node":
-		keep = curr.Type() == TypeElement
-	case "text":
-		keep = curr.Type() == TypeText
-	case "processing-instruction":
-		keep = curr.Type() == TypeInstruction
-	case "comment":
-		keep = curr.Type() == TypeComment
-	case "document-node":
-		keep = curr.Type() == TypeDocument
-	default:
-		return c.eval(curr, env)
-	}
-	if keep {
-		list = append(list, createNode(curr))
-	}
-	return list, nil
-}
-
-func (c call) eval(node Node, env Environ) ([]Item, error) {
 	fn, ok := builtins[c.ident]
 	if !ok {
 		return nil, fmt.Errorf("%s: %w function", c.ident, ErrUndefined)
@@ -449,7 +389,7 @@ func (c call) eval(node Node, env Environ) ([]Item, error) {
 	if fn == nil {
 		return nil, errImplemented
 	}
-	return fn(node, c.args, env)
+	return fn(curr, c.args, env)
 }
 
 type attr struct {
