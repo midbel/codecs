@@ -125,7 +125,17 @@ func main() {
 			state string
 		)
 		if expr != nil && err == nil {
-			items, err := expr.Find(doc, env)
+			var (
+				items []xml.Item
+				err   error
+			)
+			if f, ok := expr.(interface {
+				FindWithEnv(xml.Node, xml.Environ) ([]xml.Item, error)
+			}); ok {
+				items, err = f.FindWithEnv(doc, env)
+			} else {
+				items, err = expr.Find(doc)
+			}
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "failure retrieving nodes from document: %s", err)
 				fmt.Fprintln(os.Stderr)

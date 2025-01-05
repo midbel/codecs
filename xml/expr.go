@@ -89,6 +89,12 @@ type query struct {
 	expr Expr
 }
 
+func (q query) FindWithEnv(node Node, env Environ) ([]Item, error) {
+	ctx := createContext(node, 1, 1)
+	ctx.Environ = env
+	return q.find(ctx)
+}
+
 func (q query) Find(node Node) ([]Item, error) {
 	return q.expr.find(defaultContext(node))
 }
