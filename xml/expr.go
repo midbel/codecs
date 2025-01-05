@@ -45,6 +45,20 @@ func (c Context) Sub(n Node, pos int, size int) Context {
 	return ctx
 }
 
+func (c Context) Root() Context {
+	curr := c.Node
+	for {
+		root := curr.Parent()
+		if root == nil {
+			break
+		}
+		curr = root
+	}
+	ctx := createContext(curr, 1, 1)
+	ctx.Environ = Empty()
+	return ctx
+}
+
 func (c Context) Nodes() []Node {
 	var nodes []Node
 	if c.Type() == TypeDocument {
