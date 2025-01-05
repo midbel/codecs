@@ -16,10 +16,6 @@ var (
 )
 
 type Expr interface {
-	Next(Node, Environ) ([]Item, error)
-}
-
-type Expr2 interface {
 	Find(Node) ([]Item, error)
 	find(Context) ([]Item, error)
 }
@@ -29,6 +25,12 @@ type Context struct {
 	Index int
 	Size  int
 	Environ
+}
+
+func defaultContext(n Node) Context {
+	ctx := createContext(n, 1, 1)
+	ctx.Environ = Empty()
+	return ctx
 }
 
 func createContext(n Node, pos, size int) Context {
@@ -87,19 +89,30 @@ type query struct {
 	expr Expr
 }
 
-func (q query) Next(node Node, env Environ) ([]Item, error) {
-	return q.expr.Next(node, env)
+func (q query) Find(node Node) ([]Item, error) {
+	return q.expr.find(defaultContext(node))
+}
+
+func (q query) find(ctx Context) ([]Item, error) {
+	return q.expr.find(ctx)
 }
 
 type wildcard struct{}
 
-func (w wildcard) Next(curr Node, env Environ) ([]Item, error) {
-	if curr.Type() != TypeElement {
+func (w wildcard) Find(node Node) ([]Item, error) {
+	return w.find(defaultContext(node))
+}
+
+func (w wildcard) find(ctx Context) ([]Item, error) {
+	if ctx.Type() != TypeElement {
 		return nil, nil
 	}
-	list := singleNode(curr)
-	for _, n := range getChildrenNodes(curr) {
-		others, _ := w.Next(n, env)
+	var (
+		list = singleNode(ctx.Node)
+		nodes = ctx.Nodes()
+	)
+	for i, n := range nodes {
+		others, _ := w.find(ctx.Sub(n, i+1, len(nodes)))
 		list = slices.Concat(list, others)
 	}
 	return list, nil
@@ -107,24 +120,24 @@ func (w wildcard) Next(curr Node, env Environ) ([]Item, error) {
 
 type current struct{}
 
-func (_ current) Next(curr Node, env Environ) ([]Item, error) {
-	return singleNode(curr), nil
+func (c current) Find(node Node) ([]Item, error) {
+	return c.find(defaultContext(node))
+}
+
+func (_ current) find(ctx Context) ([]Item, error) {
+	return singleNode(ctx.Node), nil
 }
 
 type absolute struct {
 	expr Expr
 }
 
-func (a absolute) Next(curr Node, env Environ) ([]Item, error) {
-	return a.expr.Next(a.root(curr), env)
+func (a absolute) Find(node Node) ([]Item, error) {
+	return a.find(defaultContext(node).Root())
 }
 
-func (a absolute) root(node Node) Node {
-	n := node.Parent()
-	if n == nil {
-		return node
-	}
-	return a.root(n)
+func (a absolute) find(ctx Context) ([]Item, error) {
+	return a.expr.find(ctx)
 }
 
 type step struct {
@@ -132,18 +145,22 @@ type step struct {
 	next Expr
 }
 
-func (s step) Next(curr Node, env Environ) ([]Item, error) {
-	if curr.Type() == TypeDocument {
-		doc := curr.(*Document)
-		return s.Next(doc.Root(), env)
+func (s step) Find(node Node) ([]Item, error) {
+	return s.find(defaultContext(node))
+}
+
+func (s step) find(ctx Context) ([]Item, error) {
+	if ctx.Type() == TypeDocument {
+		doc := ctx.Node.(*Document)
+		return s.find(ctx.Sub(doc.Root(), 1, 1))
 	}
-	is, err := s.curr.Next(curr, env)
+	is, err := s.curr.find(ctx)
 	if err != nil {
 		return nil, err
 	}
 	var list []Item
-	for _, i := range is {
-		others, err := s.next.Next(i.Node(), env)
+	for i, n := range is {
+		others, err := s.next.find(ctx.Sub(n.Node(), i+1, len(is)))
 		if err != nil {
 			continue
 		}
@@ -157,10 +174,14 @@ type axis struct {
 	next Expr
 }
 
-func (a axis) Next(curr Node, env Environ) ([]Item, error) {
+func (a axis) Find(node Node) ([]Item, error) {
+	return a.find(defaultContext(node))
+}
+
+func (a axis) find(ctx Context) ([]Item, error) {
 	var list []Item
 	if a.kind == selfAxis || a.kind == descendantSelfAxis || a.kind == ancestorSelfAxis {
-		others, err := a.next.Next(curr, env)
+		others, err := a.next.find(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -170,26 +191,26 @@ func (a axis) Next(curr Node, env Environ) ([]Item, error) {
 	case selfAxis:
 		return list, nil
 	case childAxis:
-		others, err := a.child(curr, env)
+		others, err := a.child(ctx)
 		if err != nil {
 			return nil, err
 		}
 		list = slices.Concat(list, others)
 	case parentAxis:
-		p := curr.Parent()
+		p := ctx.Node.Parent()
 		if p != nil {
-			return a.next.Next(p, env)
+			return a.next.find(createContext(p, 1, 1))
 		}
 		return nil, nil
 	case ancestorAxis, ancestorSelfAxis:
-		for p := curr.Parent(); p != nil; {
-			other, err := a.next.Next(p, env)
+		for p := ctx.Node.Parent(); p != nil; {
+			other, err := a.next.find(createContext(p, 1, 1))
 			if err == nil {
 				list = slices.Concat(list, other)
 			}
 		}
 	case descendantAxis, descendantSelfAxis:
-		others, err := a.descendant(getNode(curr), env)
+		others, err := a.descendant(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -200,13 +221,13 @@ func (a axis) Next(curr Node, env Environ) ([]Item, error) {
 	return list, nil
 }
 
-func (a axis) descendant(curr Node, env Environ) ([]Item, error) {
+func (a axis) descendant(ctx Context) ([]Item, error) {
 	var (
 		list  []Item
-		nodes = getChildrenNodes(curr)
+		nodes = ctx.Nodes()
 	)
-	for i := range nodes {
-		others, err := a.descendant(nodes[i], env)
+	for i, n := range nodes {
+		others, err := a.descendant(ctx.Sub(n, i+1, len(nodes)))
 		if err == nil {
 			list = slices.Concat(list, others)
 		}
@@ -214,15 +235,15 @@ func (a axis) descendant(curr Node, env Environ) ([]Item, error) {
 	return list, nil
 }
 
-func (a axis) child(curr Node, env Environ) ([]Item, error) {
+func (a axis) child(ctx Context) ([]Item, error) {
 	var (
 		list  []Item
-		nodes = getChildrenNodes(curr)
+		nodes = ctx.Nodes()
 	)
-	for _, c := range nodes {
-		other, err := a.next.Next(c, env)
+	for i, c := range nodes {
+		others, err := a.next.find(ctx.Sub(c, i+1, len(nodes)))
 		if err == nil {
-			list = slices.Concat(list, other)
+			list = slices.Concat(list, others)
 		}
 	}
 	return list, nil
@@ -232,17 +253,32 @@ type identifier struct {
 	ident string
 }
 
-func (i identifier) Next(curr Node, env Environ) ([]Item, error) {
-	expr, err := env.Resolve(i.ident)
+func (i identifier) Find(node Node) ([]Item, error) {
+	return i.find(defaultContext(node))
+}
+
+func (i identifier) find(ctx Context) ([]Item, error) {
+	expr, err := ctx.Resolve(i.ident)
 	if err != nil {
 		return nil, err
 	}
-	return expr.Next(curr, env)
+	return expr.find(ctx)
 }
 
 type name struct {
 	space string
 	ident string
+}
+
+func (n name) Find(node Node) ([]Item, error) {
+	return n.find(defaultContext(node))
+}
+
+func (n name) find(ctx Context) ([]Item, error) {
+	if ctx.QualifiedName() != n.QualifiedName() {
+		return nil, errDiscard
+	}
+	return singleNode(ctx.Node), nil
 }
 
 func (n name) QualifiedName() string {
@@ -252,21 +288,18 @@ func (n name) QualifiedName() string {
 	return fmt.Sprintf("%s:%s", n.space, n.ident)
 }
 
-func (n name) Next(curr Node, env Environ) ([]Item, error) {
-	if curr.QualifiedName() != n.QualifiedName() {
-		return nil, errDiscard
-	}
-	return singleNode(curr), nil
-}
-
 type sequence struct {
 	all []Expr
 }
 
-func (s sequence) Next(curr Node, env Environ) ([]Item, error) {
+func (s sequence) Find(node Node) ([]Item, error) {
+	return s.find(defaultContext(node))
+}
+
+func (s sequence) find(ctx Context) ([]Item, error) {
 	var list []Item
 	for i := range s.all {
-		is, err := s.all[i].Next(curr, env)
+		is, err := s.all[i].find(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -281,12 +314,16 @@ type binary struct {
 	op    rune
 }
 
-func (b binary) Next(node Node, env Environ) ([]Item, error) {
-	left, err := b.left.Next(node, env)
+func (b binary) Find(node Node) ([]Item, error) {
+	return b.find(defaultContext(node))
+}
+
+func (b binary) find(ctx Context) ([]Item, error) {
+	left, err := b.left.find(ctx)
 	if err != nil {
 		return nil, err
 	}
-	right, err := b.right.Next(node, env)
+	right, err := b.right.find(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -359,8 +396,12 @@ type reverse struct {
 	expr Expr
 }
 
-func (r reverse) Next(node Node, env Environ) ([]Item, error) {
-	v, err := r.expr.Next(node, env)
+func (r reverse) Find(node Node) ([]Item, error) {
+	return r.find(defaultContext(node))
+}
+
+func (r reverse) find(ctx Context) ([]Item, error) {
+	v, err := r.expr.find(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -375,7 +416,11 @@ type literal struct {
 	expr string
 }
 
-func (i literal) Next(_ Node, env Environ) ([]Item, error) {
+func (i literal) Find(node Node) ([]Item, error) {
+	return i.find(defaultContext(node))
+}
+
+func (i literal) find(_ Context) ([]Item, error) {
 	return singleValue(i.expr), nil
 }
 
@@ -383,7 +428,11 @@ type number struct {
 	expr float64
 }
 
-func (n number) Next(_ Node, env Environ) ([]Item, error) {
+func (n number) Find(node Node) ([]Item, error) {
+	return n.find(defaultContext(node))
+}
+
+func (n number) find(_ Context) ([]Item, error) {
 	return singleValue(n.expr), nil
 }
 
@@ -404,9 +453,13 @@ type kind struct {
 	kind NodeType
 }
 
-func (k kind) Next(curr Node, env Environ) ([]Item, error) {
-	if k.kind == typeAll || curr.Type() == k.kind {
-		return singleNode(curr), nil
+func (k kind) Find(node Node) ([]Item, error) {
+	return k.find(defaultContext(node))
+}
+
+func (k kind) find(ctx Context) ([]Item, error) {
+	if k.kind == typeAll || ctx.Type() == k.kind {
+		return singleNode(ctx.Node), nil
 	}
 	return nil, errDiscard
 }
@@ -416,7 +469,11 @@ type call struct {
 	args  []Expr
 }
 
-func (c call) Next(curr Node, env Environ) ([]Item, error) {
+func (c call) Find(node Node) ([]Item, error) {
+	return c.find(defaultContext(node))
+}
+
+func (c call) find(ctx Context) ([]Item, error) {
 	fn, ok := builtins[c.ident]
 	if !ok {
 		return nil, fmt.Errorf("%s: %w function", c.ident, ErrUndefined)
@@ -424,18 +481,22 @@ func (c call) Next(curr Node, env Environ) ([]Item, error) {
 	if fn == nil {
 		return nil, errImplemented
 	}
-	return fn(curr, c.args, env)
+	return fn(ctx.Node, c.args, ctx.Environ)
 }
 
 type attr struct {
 	ident string
 }
 
-func (a attr) Next(curr Node, env Environ) ([]Item, error) {
-	if curr.Type() != TypeElement {
+func (a attr) Find(node Node) ([]Item, error) {
+	return a.find(defaultContext(node))
+}
+
+func (a attr) find(ctx Context) ([]Item, error) {
+	if ctx.Type() != TypeElement {
 		return nil, nil
 	}
-	el := curr.(*Element)
+	el := ctx.Node.(*Element)
 	ix := slices.IndexFunc(el.Attrs, func(attr Attribute) bool {
 		return attr.Name == a.ident
 	})
@@ -449,7 +510,11 @@ type except struct {
 	all []Expr
 }
 
-func (e except) Next(node Node, env Environ) ([]Item, error) {
+func (e except) Find(node Node) ([]Item, error) {
+	return e.find(defaultContext(node))
+}
+
+func (e except) find(ctx Context) ([]Item, error) {
 	return nil, nil
 }
 
@@ -457,7 +522,11 @@ type intersect struct {
 	all []Expr
 }
 
-func (i intersect) Next(node Node, env Environ) ([]Item, error) {
+func (i intersect) Find(node Node) ([]Item, error) {
+	return i.find(defaultContext(node))
+}
+
+func (i intersect) find(ctx Context) ([]Item, error) {
 	return nil, nil
 }
 
@@ -465,10 +534,14 @@ type union struct {
 	all []Expr
 }
 
-func (u union) Next(node Node, env Environ) ([]Item, error) {
+func (u union) Find(node Node) ([]Item, error) {
+	return u.find(defaultContext(node))
+}
+
+func (u union) find(ctx Context) ([]Item, error) {
 	var list []Item
 	for i := range u.all {
-		res, err := u.all[i].Next(node, env)
+		res, err := u.all[i].find(ctx)
 		if err != nil {
 			continue
 		}
@@ -482,14 +555,18 @@ type filter struct {
 	check Expr
 }
 
-func (f filter) Next(curr Node, env Environ) ([]Item, error) {
-	list, err := f.expr.Next(curr, env)
+func (f filter) Find(node Node) ([]Item, error) {
+	return f.find(defaultContext(node))
+}
+
+func (f filter) find(ctx Context) ([]Item, error) {
+	list, err := f.expr.find(ctx)
 	if err != nil {
 		return nil, err
 	}
 	var ret []Item
 	for j, n := range list {
-		res, err := f.check.Next(n.Node(), env)
+		res, err := f.check.find(ctx.Sub(n.Node(), j+1, len(list)))
 		if err != nil {
 			continue
 		}
@@ -521,7 +598,11 @@ type Let struct {
 	expr  Expr
 }
 
-func (e Let) Next(curr Node, env Environ) ([]Item, error) {
+func (e Let) Find(node Node) ([]Item, error) {
+	return e.find(defaultContext(node))
+}
+
+func (e Let) find(ctx Context) ([]Item, error) {
 	return nil, nil
 }
 
@@ -535,7 +616,11 @@ type loop struct {
 	body  Expr
 }
 
-func (o loop) Next(curr Node, env Environ) ([]Item, error) {
+func (o loop) Find(node Node) ([]Item, error) {
+	return o.find(defaultContext(node))
+}
+
+func (o loop) find(ctx Context) ([]Item, error) {
 	return nil, nil
 }
 
@@ -545,16 +630,20 @@ type conditional struct {
 	alt  Expr
 }
 
-func (c conditional) Next(curr Node, env Environ) ([]Item, error) {
-	res, err := c.test.Next(curr, env)
+func (c conditional) Find(node Node) ([]Item, error) {
+	return c.find(defaultContext(node))
+}
+
+func (c conditional) find(ctx Context) ([]Item, error) {
+	res, err := c.test.find(ctx)
 	if err != nil {
 		return nil, err
 	}
 	ok := isTrue(res)
 	if ok {
-		return c.csq.Next(curr, env)
+		return c.csq.find(ctx)
 	}
-	return c.alt.Next(curr, env)
+	return c.alt.find(ctx)
 }
 
 type quantified struct {
@@ -563,7 +652,11 @@ type quantified struct {
 	every bool
 }
 
-func (q quantified) Next(curr Node, env Environ) ([]Item, error) {
+func (q quantified) Find(node Node) ([]Item, error) {
+	return q.find(defaultContext(node))
+}
+
+func (q quantified) find(ctx Context) ([]Item, error) {
 	return nil, nil
 }
 
@@ -605,8 +698,12 @@ type cast struct {
 	kind Type
 }
 
-func (c cast) Next(curr Node, env Environ) ([]Item, error) {
-	is, err := c.expr.Next(curr, env)
+func (c cast) Find(node Node) ([]Item, error) {
+	return c.find(defaultContext(node))
+}
+
+func (c cast) find(ctx Context) ([]Item, error) {
+	is, err := c.expr.find(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -627,8 +724,12 @@ type castable struct {
 	kind Type
 }
 
-func (c castable) Next(curr Node, env Environ) ([]Item, error) {
-	is, err := c.expr.Next(curr, env)
+func (c castable) Find(node Node) ([]Item, error) {
+	return c.find(defaultContext(node))
+}
+
+func (c castable) find(ctx Context) ([]Item, error) {
+	is, err := c.expr.find(ctx)
 	if err != nil {
 		return nil, err
 	}

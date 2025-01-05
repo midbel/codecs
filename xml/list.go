@@ -138,7 +138,9 @@ func createNode(node Node) Item {
 }
 
 func (i nodeItem) Assert(expr Expr, env Environ) ([]Item, error) {
-	return expr.Next(i.node, env)
+	ctx := createContext(i.node, 1, 1)
+	ctx.Environ = env
+	return expr.find(ctx)
 }
 
 func (i nodeItem) Atomic() bool {
