@@ -54,9 +54,7 @@ func (c Context) Root() Context {
 		}
 		curr = root
 	}
-	ctx := createContext(curr, 1, 1)
-	ctx.Environ = Empty()
-	return ctx
+	return c.Sub(curr, 1, 1)
 }
 
 func (c Context) Nodes() []Node {
