@@ -108,7 +108,7 @@ func (w wildcard) find(ctx Context) ([]Item, error) {
 		return nil, nil
 	}
 	var (
-		list = singleNode(ctx.Node)
+		list  = singleNode(ctx.Node)
 		nodes = ctx.Nodes()
 	)
 	for i, n := range nodes {
@@ -481,7 +481,7 @@ func (c call) find(ctx Context) ([]Item, error) {
 	if fn == nil {
 		return nil, errImplemented
 	}
-	return fn(ctx.Node, c.args, ctx.Environ)
+	return fn(ctx, c.args)
 }
 
 type attr struct {

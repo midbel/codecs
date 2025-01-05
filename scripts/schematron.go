@@ -125,7 +125,7 @@ func main() {
 			state string
 		)
 		if expr != nil && err == nil {
-			items, err := expr.Next(doc, env)
+			items, err := expr.Find(doc, env)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "failure retrieving nodes from document: %s", err)
 				fmt.Fprintln(os.Stderr)

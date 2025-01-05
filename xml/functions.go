@@ -219,7 +219,7 @@ func callString(ctx Context, args []Expr) ([]Item, error) {
 		return singleValue(""), nil
 	}
 	if !items[0].Atomic() {
-		return callString(items[0].Node(), nil)
+		return callString(defaultContext(items[0].Node()), nil)
 	}
 	var str string
 	switch v := items[0].Value().(type) {
@@ -591,7 +591,7 @@ func callBoolean(ctx Context, args []Expr) ([]Item, error) {
 		return nil, err
 	}
 	if isEmpty(items) {
-		return callFalse(ctx, args, env)
+		return callFalse(ctx, args)
 	}
 	return singleValue(items[0].True()), nil
 }
