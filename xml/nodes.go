@@ -19,6 +19,7 @@ const (
 	TypeAttribute
 	TypeInstruction
 	TypeText
+	typeAll
 )
 
 type Node interface {

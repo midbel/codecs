@@ -19,18 +19,42 @@ type Expr interface {
 	Next(Node, Environ) ([]Item, error)
 }
 
+type Expr2 interface {
+	Find(Node) ([]Item, error)
+	find(Context) ([]Item, error)
+}
+
 type Context struct {
 	Node
-	Position int
-	Size     int
+	Index int
+	Size  int
+	Environ
 }
 
 func createContext(n Node, pos, size int) Context {
 	return Context{
-		Node:     n,
-		Position: pos,
-		Size:     size,
+		Node:  n,
+		Index: pos,
+		Size:  size,
 	}
+}
+
+func (c Context) Sub(n Node, pos int, size int) Context {
+	ctx := createContext(n, pos, size)
+	ctx.Environ = Enclosed(c)
+	return ctx
+}
+
+func (c Context) Nodes() []Node {
+	var nodes []Node
+	if c.Type() == TypeDocument {
+		doc := c.Node.(*Document)
+		nodes = append(nodes, doc.Root())
+	} else if c.Type() == TypeElement {
+		el := c.Node.(*Element)
+		nodes = slices.Clone(el.Nodes)
+	}
+	return nodes
 }
 
 const (
@@ -61,8 +85,7 @@ func (w wildcard) Next(curr Node, env Environ) ([]Item, error) {
 	if curr.Type() != TypeElement {
 		return nil, nil
 	}
-	var list []Item
-	list = append(list, createNode(curr))
+	list := singleNode(curr)
 	for _, n := range getChildrenNodes(curr) {
 		others, _ := w.Next(n, env)
 		list = slices.Concat(list, others)
@@ -73,7 +96,7 @@ func (w wildcard) Next(curr Node, env Environ) ([]Item, error) {
 type current struct{}
 
 func (_ current) Next(curr Node, env Environ) ([]Item, error) {
-	return createSingle(createNode(curr)), nil
+	return singleNode(curr), nil
 }
 
 type absolute struct {
@@ -221,7 +244,7 @@ func (n name) Next(curr Node, env Environ) ([]Item, error) {
 	if curr.QualifiedName() != n.QualifiedName() {
 		return nil, errDiscard
 	}
-	return createSingle(createNode(curr)), nil
+	return singleNode(curr), nil
 }
 
 type sequence struct {
@@ -333,7 +356,7 @@ func (r reverse) Next(node Node, env Environ) ([]Item, error) {
 	if err == nil {
 		x = -x
 	}
-	return createSingle(createLiteral(x)), err
+	return singleValue(x), err
 }
 
 type literal struct {
@@ -341,7 +364,7 @@ type literal struct {
 }
 
 func (i literal) Next(_ Node, env Environ) ([]Item, error) {
-	return createSingle(createLiteral(i.expr)), nil
+	return singleValue(i.expr), nil
 }
 
 type number struct {
@@ -349,7 +372,7 @@ type number struct {
 }
 
 func (n number) Next(_ Node, env Environ) ([]Item, error) {
-	return createSingle(createLiteral(n.expr)), nil
+	return singleValue(n.expr), nil
 }
 
 func isKind(str string) bool {
@@ -370,8 +393,8 @@ type kind struct {
 }
 
 func (k kind) Next(curr Node, env Environ) ([]Item, error) {
-	if curr.Type() == k.kind {
-		return createSingle(createNode(curr)), nil
+	if k.kind == typeAll || curr.Type() == k.kind {
+		return singleNode(curr), nil
 	}
 	return nil, errDiscard
 }
@@ -515,13 +538,7 @@ func (c conditional) Next(curr Node, env Environ) ([]Item, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(res) == 0 {
-		return res, nil
-	}
-	ok, err := getBooleanFromItem(res[0])
-	if err != nil {
-		return nil, err
-	}
+	ok := isTrue(res)
 	if ok {
 		return c.csq.Next(curr, env)
 	}

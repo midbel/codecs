@@ -555,7 +555,9 @@ func (c *compiler) compileAxis() (Expr, error) {
 func (c *compiler) compileKind() (Expr, error) {
 	var k kind
 	switch c.curr.Literal {
-	case "node", "element":
+	case "node":
+		k.kind = typeAll
+	case "element":
 		k.kind = TypeElement
 	case "text":
 		k.kind = TypeText
