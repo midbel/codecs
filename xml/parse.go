@@ -1281,7 +1281,7 @@ func (p *Parser) parseElement() (Node, error) {
 	elem.Name = p.curr.Literal
 	p.next()
 
-	elem.Attrs, err = p.parseAttributes(func() bool {
+	elem.Attrs, err = p.parseAttributes(&elem, func() bool {
 		return p.is(EndTag) || p.is(EmptyElemTag)
 	})
 	if err != nil {
@@ -1346,7 +1346,7 @@ func (p *Parser) parseProcessingInstr() (Node, error) {
 	elem.Name = p.curr.Literal
 	p.next()
 	var err error
-	elem.Attrs, err = p.parseAttributes(func() bool {
+	elem.Attrs, err = p.parseAttributes(&elem, func() bool {
 		return p.is(ProcInstTag)
 	})
 	if err != nil {
@@ -1363,9 +1363,9 @@ func (p *Parser) parseProcessingInstr() (Node, error) {
 	return &elem, nil
 }
 
-func (p *Parser) parseAttributes(done func() bool) ([]Attribute, error) {
+func (p *Parser) parseAttributes(parent Node, done func() bool) ([]Attribute, error) {
 	var attrs []Attribute
-	for !p.done() && !done() {
+	for i := 0; !p.done() && !done(); i++ {
 		attr, err := p.parseAttr()
 		if err != nil {
 			return nil, err
@@ -1376,6 +1376,8 @@ func (p *Parser) parseAttributes(done func() bool) ([]Attribute, error) {
 		if ok {
 			return nil, p.createError("attribute", "attribute is already defined")
 		}
+		attr.setParent(parent)
+		attr.setPosition(i)
 		attrs = append(attrs, attr)
 	}
 	return attrs, nil

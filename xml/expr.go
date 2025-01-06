@@ -841,5 +841,3 @@ func toBool(v any) bool {
 		return false
 	}
 }
-
-
