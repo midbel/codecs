@@ -96,7 +96,7 @@ func (q query) FindWithEnv(node Node, env Environ) ([]Item, error) {
 }
 
 func (q query) Find(node Node) ([]Item, error) {
-	return q.expr.find(defaultContext(node))
+	return q.find(defaultContext(node))
 }
 
 func (q query) find(ctx Context) ([]Item, error) {
@@ -110,9 +110,6 @@ func (w wildcard) Find(node Node) ([]Item, error) {
 }
 
 func (w wildcard) find(ctx Context) ([]Item, error) {
-	if ctx.Type() != TypeElement {
-		return nil, nil
-	}
 	var (
 		list  = singleNode(ctx.Node)
 		nodes = ctx.Nodes()
@@ -156,10 +153,6 @@ func (s step) Find(node Node) ([]Item, error) {
 }
 
 func (s step) find(ctx Context) ([]Item, error) {
-	if ctx.Type() == TypeDocument {
-		doc := ctx.Node.(*Document)
-		return s.find(ctx.Sub(doc.Root(), 1, 1))
-	}
 	is, err := s.curr.find(ctx)
 	if err != nil {
 		return nil, err
@@ -187,11 +180,11 @@ func (a axis) Find(node Node) ([]Item, error) {
 func (a axis) find(ctx Context) ([]Item, error) {
 	var list []Item
 	if a.kind == selfAxis || a.kind == descendantSelfAxis || a.kind == ancestorSelfAxis {
-		others, err := a.next.find(ctx)
-		if err != nil {
-			return nil, err
-		}
-		list = slices.Concat(list, others)
+		// others, err := a.next.find(ctx)
+		// if err != nil {
+		// 	return nil, err
+		// }
+		list = slices.Concat(list, singleNode(ctx.Node))
 	}
 	switch a.kind {
 	case selfAxis:
@@ -849,26 +842,4 @@ func toBool(v any) bool {
 	}
 }
 
-func getNode(node Node) Node {
-	if node.Type() == TypeDocument {
-		doc := node.(*Document)
-		return doc.Root()
-	}
-	return node
-}
 
-func getChildrenNodes(node Node) []Node {
-	var nodes []Node
-	switch c := node.(type) {
-	case *Element:
-		nodes = c.Nodes
-	case *Document:
-		root := c.Root()
-		if root == nil {
-			return nil
-		}
-		nodes = append(nodes, root)
-	default:
-	}
-	return nodes
-}
