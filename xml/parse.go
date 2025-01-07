@@ -189,14 +189,14 @@ func (c *compiler) compileIf() (Expr, error) {
 		return nil, fmt.Errorf("then keyword expected")
 	}
 	c.next()
-	if cdt.csq, err = c.compileExpr(powLowest); err != nil {
+	if cdt.csq, err = c.compile(); err != nil {
 		return nil, err
 	}
 	if !c.is(reserved) && c.curr.Literal != kwElse {
 		return nil, fmt.Errorf("else keyword expected")
 	}
 	c.next()
-	if cdt.alt, err = c.compileExpr(powLowest); err != nil {
+	if cdt.alt, err = c.compile(); err != nil {
 		return nil, err
 	}
 	return cdt, nil

@@ -256,7 +256,7 @@ func (a axis) descendant(ctx Context) ([]Item, error) {
 	var (
 		list  []Item
 		nodes = ctx.Nodes()
-		size = len(nodes)
+		size  = len(nodes)
 	)
 	for i, n := range nodes {
 		sub := ctx.Sub(n, i+1, size)
