@@ -61,6 +61,8 @@ func (w *Writer) writeNode(node Node, depth int) error {
 		return w.writeInstruction(node, depth+1)
 	case *Comment:
 		return w.writeComment(node, depth+1)
+	case *Attribute:
+		return w.writeAttributeAsNode(node, depth+1)
 	default:
 		return fmt.Errorf("node: unknown type (%T)", node)
 	}
@@ -180,6 +182,12 @@ func (w *Writer) writeProlog() error {
 		NewAttribute(LocalName("encoding"), SupportedEncoding),
 	}
 	return w.writeInstruction(prolog, 0)
+}
+
+func (w *Writer) writeAttributeAsNode(attr *Attribute, depth int) error {
+	el := NewElement(attr.QName)
+	el.Append(NewText(attr.Value()))
+	return w.writeNode(el, depth)
 }
 
 func (w *Writer) writeAttributes(attrs []Attribute, depth int) error {
