@@ -17,6 +17,10 @@ var (
 
 type StepMode int8
 
+func isXsl(mode StepMode) bool {
+	return mode == ModeXsl2 || mode == ModeXsl3
+}
+
 const (
 	ModeXpath3 StepMode = 1 << iota
 	ModeXsl2
@@ -25,6 +29,7 @@ const (
 
 const (
 	ModeDefault = ModeXpath3
+	ModeXpath   = ModeXpath3
 	ModeXsl     = ModeXsl3
 )
 
@@ -97,6 +102,10 @@ const (
 	nextAxis           = "following"
 	nextSiblingAxis    = "following-sibling"
 )
+
+func isSelf(axis string) bool {
+	return axis == selfAxis || axis == ancestorSelfAxis || axis == descendantSelfAxis
+}
 
 type query struct {
 	expr Expr
@@ -203,12 +212,12 @@ func (a axis) Find(node Node) ([]Item, error) {
 
 func (a axis) find(ctx Context) ([]Item, error) {
 	var list []Item
-	if a.kind == selfAxis || a.kind == descendantSelfAxis || a.kind == ancestorSelfAxis {
-		// others, err := a.next.find(ctx)
-		// if err != nil {
-		// 	return nil, err
-		// }
-		list = slices.Concat(list, singleNode(ctx.Node))
+	if isSelf(a.kind) && ctx.Type() != TypeDocument {
+		others, err := a.next.find(ctx)
+		if err == nil {
+			list = slices.Concat(list, others)
+		}
+		// list = slices.Concat(list, singleNode(ctx.Node))
 	}
 	switch a.kind {
 	case selfAxis:
@@ -234,10 +243,9 @@ func (a axis) find(ctx Context) ([]Item, error) {
 		}
 	case descendantAxis, descendantSelfAxis:
 		others, err := a.descendant(ctx)
-		if err != nil {
-			return nil, err
+		if err == nil {
+			list = slices.Concat(list, others)
 		}
-		list = slices.Concat(list, others)
 	default:
 		return nil, errImplemented
 	}
@@ -248,12 +256,15 @@ func (a axis) descendant(ctx Context) ([]Item, error) {
 	var (
 		list  []Item
 		nodes = ctx.Nodes()
+		size = len(nodes)
 	)
 	for i, n := range nodes {
-		others, err := a.descendant(ctx.Sub(n, i+1, len(nodes)))
-		if err == nil {
-			list = slices.Concat(list, others)
+		sub := ctx.Sub(n, i+1, size)
+		others, err := a.next.find(sub)
+		if err != nil {
+			others, err = a.descendant(sub)
 		}
+		list = slices.Concat(list, others)
 	}
 	return list, nil
 }
@@ -462,7 +473,8 @@ func (n number) find(_ Context) ([]Item, error) {
 
 func isKind(str string) bool {
 	switch str {
-	case "node", "element":
+	case "node":
+	case "element":
 	case "text":
 	case "comment":
 	case "document-node":

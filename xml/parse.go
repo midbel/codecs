@@ -69,7 +69,8 @@ type compiler struct {
 	curr Token
 	peek Token
 
-	mode StepMode
+	mode  StepMode
+	depth int
 
 	infix  map[rune]func(Expr) (Expr, error)
 	prefix map[rune]func() (Expr, error)
@@ -505,6 +506,9 @@ func (c *compiler) compileCall(left Expr) (Expr, error) {
 }
 
 func (c *compiler) compileExpr(pow int) (Expr, error) {
+	c.enter()
+	defer c.leave()
+
 	fn, ok := c.prefix[c.curr.Type]
 	if !ok {
 		return nil, fmt.Errorf("unexpected prefix expression")
@@ -602,6 +606,9 @@ func (c *compiler) compileName() (Expr, error) {
 		kind: childAxis,
 		next: expr,
 	}
+	if c.begin() && isXsl(c.mode) {
+		a.kind = descendantSelfAxis
+	}
 	return a, nil
 }
 
@@ -680,14 +687,7 @@ func (c *compiler) compileStep(left Expr) (Expr, error) {
 
 func (c *compiler) compileStepFromRoot() (Expr, error) {
 	var expr root
-	next, err := c.compileStep(expr)
-	if err != nil {
-		return nil, err
-	}
-	// abs := absolute{
-	// 	expr: next,
-	// }
-	return next, nil
+	return c.compileStep(expr)
 }
 
 func (c *compiler) compileRoot() (Expr, error) {
@@ -704,6 +704,18 @@ func (c *compiler) compileRoot() (Expr, error) {
 		next: next,
 	}
 	return expr, nil
+}
+
+func (c *compiler) begin() bool {
+	return c.depth <= 1
+}
+
+func (c *compiler) enter() {
+	c.depth++
+}
+
+func (c *compiler) leave() {
+	c.depth--
 }
 
 func (c *compiler) is(kind rune) bool {

@@ -49,6 +49,8 @@ func (w *Writer) Write(doc *Document) error {
 
 func (w *Writer) writeNode(node Node, depth int) error {
 	switch node := node.(type) {
+	case *Document:
+		return w.writeNode(node.Root(), depth)
 	case *Element:
 		return w.writeElement(node, depth+1)
 	case *CharData:
@@ -60,7 +62,7 @@ func (w *Writer) writeNode(node Node, depth int) error {
 	case *Comment:
 		return w.writeComment(node, depth+1)
 	default:
-		return fmt.Errorf("node: unknown type")
+		return fmt.Errorf("node: unknown type (%T)", node)
 	}
 }
 
