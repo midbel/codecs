@@ -177,11 +177,11 @@ func callExactlyOne(ctx Context, args []Expr) ([]Item, error) {
 }
 
 func callPosition(ctx Context, args []Expr) ([]Item, error) {
-	return nil, errImplemented
+	return singleValue(float64(ctx.Index)), nil
 }
 
 func callLast(ctx Context, args []Expr) ([]Item, error) {
-	return nil, errImplemented
+	return singleValue(float64(ctx.Size)), nil
 }
 
 func callCurrentDate(ctx Context, args []Expr) ([]Item, error) {

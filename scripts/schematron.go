@@ -44,7 +44,7 @@ type Assert struct {
 }
 
 func (a Assert) Eval(env xml.Environ, items []xml.Item) (bool, error) {
-	test, err := xml.CompileString(a.Test)
+	test, err := xml.CompileMode(strings.NewReader(a.Test), xml.ModeXsl)
 	if err != nil {
 		return false, err
 	}
@@ -118,7 +118,7 @@ func main() {
 		}{}
 	)
 	for a := range getAssertions(sch, strings.TrimSpace(*level), strings.TrimSpace(*group)) {
-		expr, err := xml.Compile(strings.NewReader(a.Context))
+		expr, err := xml.CompileMode(strings.NewReader(a.Context), ModeXsl)
 		var (
 			total int
 			res   bool
@@ -271,7 +271,7 @@ func readTop(rs *xml.Reader, node *xml.Element, sch *Schema) error {
 		if err != nil {
 			return err
 		}
-		expr, err := xml.CompileString(let.Value)
+		expr, err := xml.CompileMode(strings.NewReader(let.Value), xml.ModeXsl)
 		if err == nil {
 			sch.Define(let.Ident, expr)
 		} else {
@@ -309,7 +309,7 @@ func readPattern(rs *xml.Reader, sch *Schema) error {
 			if err != nil && !errors.Is(err, xml.ErrClosed) {
 				return err
 			}
-			expr, err := xml.CompileString(let.Value)
+			expr, err := xml.CompileMode(strings.NewReader(let.Value), xml.ModeXsl)
 			if err == nil {
 				pat.Define(let.Ident, expr)
 			} else {
@@ -353,7 +353,7 @@ func readRule(rs *xml.Reader, elem *xml.Element, env xml.Environ) (*Rule, error)
 			if err != nil && !errors.Is(err, xml.ErrClosed) {
 				return nil, err
 			}
-			expr, err := xml.CompileString(let.Value)
+			expr, err := xml.CompileMode(strings.NewReader(let.Value), xml.ModeXsl)
 			if err == nil {
 				rule.Define(let.Ident, expr)
 			} else {
