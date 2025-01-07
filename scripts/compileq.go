@@ -35,7 +35,7 @@ func scanExpr(rs io.Reader) error {
 	for {
 		tok := scan.Scan()
 		fmt.Println(tok)
-		if tok.Type == xml.EOF {
+		if tok.Type == xml.EOF || tok.Type == xml.Invalid {
 			break
 		}
 	}

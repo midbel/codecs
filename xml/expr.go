@@ -121,6 +121,17 @@ func (w wildcard) find(ctx Context) ([]Item, error) {
 	return list, nil
 }
 
+type root struct{}
+
+func (r root) Find(node Node) ([]Item, error) {
+	return r.find(defaultContext(node).Root())
+}
+
+func (_ root) find(ctx Context) ([]Item, error) {
+	root := ctx.Root()
+	return singleNode(root.Node), nil
+}
+
 type current struct{}
 
 func (c current) Find(node Node) ([]Item, error) {
@@ -131,17 +142,17 @@ func (_ current) find(ctx Context) ([]Item, error) {
 	return singleNode(ctx.Node), nil
 }
 
-type absolute struct {
-	expr Expr
-}
+// type absolute struct {
+// 	expr Expr
+// }
 
-func (a absolute) Find(node Node) ([]Item, error) {
-	return a.find(defaultContext(node).Root())
-}
+// func (a absolute) Find(node Node) ([]Item, error) {
+// 	return a.find(defaultContext(node).Root())
+// }
 
-func (a absolute) find(ctx Context) ([]Item, error) {
-	return a.expr.find(ctx)
-}
+// func (a absolute) find(ctx Context) ([]Item, error) {
+// 	return a.expr.find(ctx)
+// }
 
 type step struct {
 	curr Expr
@@ -261,7 +272,8 @@ func (i identifier) find(ctx Context) ([]Item, error) {
 	if err != nil {
 		return nil, err
 	}
-	return expr.find(ctx)
+	res, err := expr.find(ctx)
+	return res, err
 }
 
 type name struct {

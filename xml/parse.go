@@ -69,8 +69,6 @@ type compiler struct {
 	curr Token
 	peek Token
 
-	defaultAxis string
-
 	infix  map[rune]func(Expr) (Expr, error)
 	prefix map[rune]func() (Expr, error)
 }
@@ -81,13 +79,12 @@ func CompileString(q string) (Expr, error) {
 
 func Compile(r io.Reader) (Expr, error) {
 	cp := compiler{
-		scan:        ScanQuery(r),
-		defaultAxis: childAxis,
+		scan: ScanQuery(r),
 	}
 
 	cp.infix = map[rune]func(Expr) (Expr, error){
-		currLevel: cp.compileDescendant,
-		anyLevel:  cp.compileDescendant,
+		currLevel: cp.compileStep,
+		anyLevel:  cp.compileStep,
 		begPred:   cp.compileFilter,
 		opAdd:     cp.compileBinary,
 		opSub:     cp.compileBinary,
@@ -108,7 +105,7 @@ func Compile(r io.Reader) (Expr, error) {
 	}
 	cp.prefix = map[rune]func() (Expr, error){
 		currLevel:  cp.compileRoot,
-		anyLevel:   cp.compileDescendantFromRoot,
+		anyLevel:   cp.compileStepFromRoot,
 		Name:       cp.compileName,
 		variable:   cp.compileVariable,
 		currNode:   cp.compileCurrent,
@@ -125,14 +122,6 @@ func Compile(r io.Reader) (Expr, error) {
 	cp.next()
 	cp.next()
 	return cp.Compile()
-}
-
-func (c *compiler) SetDefaultAxis(axis string) {
-	switch axis {
-	case descendantAxis, childAxis:
-		c.defaultAxis = axis
-	default:
-	}
 }
 
 func (c *compiler) Compile() (Expr, error) {
@@ -168,7 +157,7 @@ func (c *compiler) compileCdt() (Expr, error) {
 		return nil, errSyntax
 	}
 	c.next()
-	expr, err := c.compileExpr(powLowest)
+	expr, err := c.compile()
 	if err != nil {
 		return nil, err
 	}
@@ -517,7 +506,7 @@ func (c *compiler) compileExpr(pow int) (Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	for !(c.done() || c.endExpr()) && pow < bindings[c.curr.Type] {
+	for !(c.done() || c.endExpr()) && pow < c.power() {
 		fn, ok := c.infix[c.curr.Type]
 		if !ok {
 			return nil, fmt.Errorf("unexpected infix expression")
@@ -528,6 +517,10 @@ func (c *compiler) compileExpr(pow int) (Expr, error) {
 		}
 	}
 	return left, nil
+}
+
+func (c *compiler) power() int {
+	return bindings[c.curr.Type]
 }
 
 func (c *compiler) compileVariable() (Expr, error) {
@@ -644,7 +637,7 @@ func (c *compiler) compileParent() (Expr, error) {
 	return expr, nil
 }
 
-func (c *compiler) compileDescendant(left Expr) (Expr, error) {
+func (c *compiler) compileStep(left Expr) (Expr, error) {
 	any := c.is(anyLevel)
 	c.next()
 
@@ -678,34 +671,32 @@ func (c *compiler) compileDescendant(left Expr) (Expr, error) {
 	return expr, nil
 }
 
-func (c *compiler) compileDescendantFromRoot() (Expr, error) {
-	var expr current
-	next, err := c.compileDescendant(expr)
+func (c *compiler) compileStepFromRoot() (Expr, error) {
+	var expr root
+	next, err := c.compileStep(expr)
 	if err != nil {
 		return nil, err
 	}
-	abs := absolute{
-		expr: next,
-	}
-	return abs, nil
+	// abs := absolute{
+	// 	expr: next,
+	// }
+	return next, nil
 }
 
 func (c *compiler) compileRoot() (Expr, error) {
 	c.next()
 	if c.done() {
-		expr := absolute{
-			expr: current{},
-		}
-		return expr, nil
+		return root{}, nil
 	}
-	next, err := c.compileExpr(powLowest)
+	next, err := c.compileExpr(powLevel)
 	if err != nil {
 		return nil, err
 	}
-	a := absolute{
-		expr: next,
+	expr := step{
+		curr: root{},
+		next: next,
 	}
-	return a, nil
+	return expr, nil
 }
 
 func (c *compiler) is(kind rune) bool {
