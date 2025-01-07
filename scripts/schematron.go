@@ -45,7 +45,6 @@ type Assert struct {
 
 func (a Assert) Eval(env xml.Environ, items []xml.Item) (bool, error) {
 	test, err := compileExpr(a.Test)
-	fmt.Println("compile test", a.Test)
 	if err != nil {
 		return false, err
 	}

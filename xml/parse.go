@@ -71,6 +71,7 @@ type compiler struct {
 
 	mode  StepMode
 	depth int
+	stack []int
 
 	infix  map[rune]func(Expr) (Expr, error)
 	prefix map[rune]func() (Expr, error)
@@ -708,6 +709,20 @@ func (c *compiler) compileRoot() (Expr, error) {
 
 func (c *compiler) begin() bool {
 	return c.depth <= 1
+}
+
+func (c *compiler) push() {
+	c.stack = append(c.stack, c.depth)
+	c.depth = 0
+}
+
+func (c *compiler) pop() {
+	var depth int
+	if n := len(c.stack); n > 0 {
+		depth = c.stack[n-1]
+		c.stack = c.stack[:n-1]
+	}
+	c.depth = depth
 }
 
 func (c *compiler) enter() {
