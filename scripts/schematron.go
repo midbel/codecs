@@ -44,7 +44,8 @@ type Assert struct {
 }
 
 func (a Assert) Eval(env xml.Environ, items []xml.Item) (bool, error) {
-	test, err := xml.CompileMode(strings.NewReader(a.Test), xml.ModeXsl)
+	test, err := compileExpr(a.Test)
+	fmt.Println("compile test", a.Test)
 	if err != nil {
 		return false, err
 	}
@@ -71,7 +72,7 @@ func (a Assert) Eval(env xml.Environ, items []xml.Item) (bool, error) {
 		default:
 		}
 		if !ok {
-			return ok, fmt.Errorf(a.Message)
+			return ok, nil
 		}
 	}
 	return true, nil
@@ -92,8 +93,9 @@ type Pattern struct {
 
 func main() {
 	var (
-		level = flag.String("l", "", "severity level")
-		group = flag.String("g", "", "group")
+		level    = flag.String("l", "", "severity level")
+		group    = flag.String("g", "", "group")
+		failFast = flag.Bool("fail-fast", false, "stop processing on first error")
 	)
 
 	flag.Parse()
@@ -118,7 +120,7 @@ func main() {
 		}{}
 	)
 	for a := range getAssertions(sch, strings.TrimSpace(*level), strings.TrimSpace(*group)) {
-		expr, err := xml.CompileMode(strings.NewReader(a.Context), ModeXsl)
+		expr, err := compileExpr(a.Context)
 		var (
 			total int
 			res   bool
@@ -157,6 +159,10 @@ func main() {
 		fmt.Printf("%s | %7s | %-20s | %3d | %-s", state, a.Flag, a.Ident, total, a.Message)
 		fmt.Println()
 		count++
+
+		if *failFast && counter.Failure > 0 {
+			break
+		}
 	}
 	fmt.Printf("%d assertions defined", count)
 	fmt.Println()
@@ -271,7 +277,7 @@ func readTop(rs *xml.Reader, node *xml.Element, sch *Schema) error {
 		if err != nil {
 			return err
 		}
-		expr, err := xml.CompileMode(strings.NewReader(let.Value), xml.ModeXsl)
+		expr, err := compileExpr(let.Value)
 		if err == nil {
 			sch.Define(let.Ident, expr)
 		} else {
@@ -309,7 +315,7 @@ func readPattern(rs *xml.Reader, sch *Schema) error {
 			if err != nil && !errors.Is(err, xml.ErrClosed) {
 				return err
 			}
-			expr, err := xml.CompileMode(strings.NewReader(let.Value), xml.ModeXsl)
+			expr, err := compileExpr(let.Value)
 			if err == nil {
 				pat.Define(let.Ident, expr)
 			} else {
@@ -353,7 +359,7 @@ func readRule(rs *xml.Reader, elem *xml.Element, env xml.Environ) (*Rule, error)
 			if err != nil && !errors.Is(err, xml.ErrClosed) {
 				return nil, err
 			}
-			expr, err := xml.CompileMode(strings.NewReader(let.Value), xml.ModeXsl)
+			expr, err := compileExpr(let.Value)
 			if err == nil {
 				rule.Define(let.Ident, expr)
 			} else {
@@ -585,4 +591,8 @@ func getTitleElement(rs *xml.Reader) (string, error) {
 		return "", err
 	}
 	return title, isClosed(rs, "title")
+}
+
+func compileExpr(expr string) (xml.Expr, error) {
+	return xml.CompileMode(strings.NewReader(expr), xml.ModeXsl)
 }
