@@ -15,6 +15,19 @@ var (
 	ErrEmpty     = errors.New("sequence is empty")
 )
 
+type StepMode int8
+
+const (
+	ModeXpath3 StepMode = 1 << iota
+	ModeXsl2
+	ModeXsl3
+)
+
+const (
+	ModeDefault = ModeXpath3
+	ModeXsl     = ModeXsl3
+)
+
 type Expr interface {
 	Find(Node) ([]Item, error)
 	find(Context) ([]Item, error)

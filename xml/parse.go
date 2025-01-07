@@ -69,6 +69,8 @@ type compiler struct {
 	curr Token
 	peek Token
 
+	mode StepMode
+
 	infix  map[rune]func(Expr) (Expr, error)
 	prefix map[rune]func() (Expr, error)
 }
@@ -78,8 +80,13 @@ func CompileString(q string) (Expr, error) {
 }
 
 func Compile(r io.Reader) (Expr, error) {
+	return CompileMode(r, ModeDefault)
+}
+
+func CompileMode(r io.Reader, mode StepMode) (Expr, error) {
 	cp := compiler{
 		scan: ScanQuery(r),
+		mode: mode,
 	}
 
 	cp.infix = map[rune]func(Expr) (Expr, error){
