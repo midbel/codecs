@@ -25,10 +25,12 @@ func main() {
 		File      string
 		NoSpace   bool
 		NoComment bool
+		Mode      string
 	}{}
 	flag.StringVar(&options.File, "f", "", "output file")
 	flag.StringVar(&options.Root, "r", "document", "root element name to use when using a query")
 	flag.StringVar(&options.Query, "q", "", "search for element in document")
+	flag.StringVar(&options.Mode, "m", "", "compile mode for xpath query (xsl, xpath)")
 	flag.StringVar(&options.Schema, "s", "", "relax schema to validate XML document")
 	flag.BoolVar(&options.Compact, "c", false, "write compact output")
 	flag.BoolVar(&options.Check, "k", false, "validate only the document")
@@ -48,7 +50,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
-	if doc, err = search(doc, options.Query, options.Root); err != nil {
+	if doc, err = search(doc, options.Query, options.Mode, options.Root); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(3)
 	}
@@ -174,11 +176,21 @@ func open(file string) (io.ReadCloser, error) {
 	}
 }
 
-func search(doc *xml.Document, query, root string) (*xml.Document, error) {
+func search(doc *xml.Document, query, mode, root string) (*xml.Document, error) {
 	if query == "" {
 		return doc, nil
 	}
-	expr, err := xml.Compile(strings.NewReader(query))
+	var cpMode xml.StepMode
+	switch mode := strings.ToLower(mode); mode {
+	case "", "xpath":
+		cpMode = xml.ModeDefault
+	case "xsl", "xsl2", "xsl3":
+		cpMode = xml.ModeXsl
+	default:
+		return nil, fmt.Errorf("%s: mode not supported", mode)
+	}
+
+	expr, err := xml.CompileMode(strings.NewReader(query), cpMode)
 	if err != nil {
 		return nil, err
 	}
