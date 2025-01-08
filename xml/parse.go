@@ -70,7 +70,6 @@ type compiler struct {
 	peek Token
 
 	mode  StepMode
-	depth int
 	stack []int
 
 	infix  map[rune]func(Expr) (Expr, error)
@@ -472,7 +471,8 @@ func (c *compiler) compileCall(left Expr) (Expr, error) {
 		}
 		c.next()
 		for !c.done() && !c.is(endGrp) {
-			arg, err := c.compileExpr(powLowest)
+			// arg, err := c.compileExpr(powLowest)
+			arg, err := c.compile()
 			if err != nil {
 				return fn, err
 			}
@@ -708,29 +708,32 @@ func (c *compiler) compileRoot() (Expr, error) {
 }
 
 func (c *compiler) begin() bool {
-	return c.depth <= 1
+	if n := len(c.stack); n > 0 {
+		return c.stack[n-1] <= 1
+	}
+	return false
 }
 
 func (c *compiler) push() {
-	c.stack = append(c.stack, c.depth)
-	c.depth = 0
+	c.stack = append(c.stack, 0)
 }
 
 func (c *compiler) pop() {
-	var depth int
 	if n := len(c.stack); n > 0 {
-		depth = c.stack[n-1]
 		c.stack = c.stack[:n-1]
 	}
-	c.depth = depth
 }
 
 func (c *compiler) enter() {
-	c.depth++
+	if n := len(c.stack); n > 0 {
+		c.stack[n-1]++
+	}
 }
 
 func (c *compiler) leave() {
-	c.depth--
+	if n := len(c.stack); n > 0 {
+		c.stack[n-1]--
+	}
 }
 
 func (c *compiler) is(kind rune) bool {

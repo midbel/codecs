@@ -11,7 +11,10 @@ import (
 )
 
 func main() {
-	compile := flag.Bool("c", false, "compile expression")
+	var (
+		compile = flag.Bool("c", false, "compile expression")
+		mode    = flag.String("m", "", "compile mode")
+	)
 	flag.Parse()
 
 	var (
@@ -19,7 +22,7 @@ func main() {
 		err error
 	)
 	if *compile {
-		err = compileExpr(rs)
+		err = compileExpr(rs, *mode)
 	} else {
 		err = scanExpr(rs)
 	}
@@ -42,8 +45,17 @@ func scanExpr(rs io.Reader) error {
 	return nil
 }
 
-func compileExpr(rs io.Reader) error {
-	expr, err := xml.Compile(rs)
+func compileExpr(rs io.Reader, mode string) error {
+	var cpMode xml.StepMode
+	switch mode {
+	case "xsl", "xsl2", "xsl3":
+		cpMode = xml.ModeXsl
+	case "", "xpath", "xpath3":
+		cpMode = xml.ModeDefault
+	default:
+		return fmt.Errorf("%s: mode not supported", mode)
+	}
+	expr, err := xml.CompileMode(rs, cpMode)
 	if err == nil {
 		fmt.Printf("%#v\n", expr)
 	}
