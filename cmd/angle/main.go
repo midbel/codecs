@@ -201,13 +201,11 @@ func search(doc *xml.Document, query, mode, root string) (*xml.Document, error) 
 	if len(list) == 0 {
 		return nil, fmt.Errorf("query gives no result")
 	}
-	var node xml.Node
+	node := xml.NewElement(xml.LocalName(root))
 	if len(list) == 1 {
-		node = list[0].Node()
+		node.Append(list[0].Node())
 	} else {
-		el := xml.NewElement(xml.LocalName(root))
-		el.Nodes = getNodesFromList(list)
-		node = el
+		node.Nodes = getNodesFromList(list)
 	}
 	return xml.NewDocument(node), nil
 }
