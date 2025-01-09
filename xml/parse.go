@@ -471,7 +471,6 @@ func (c *compiler) compileCall(left Expr) (Expr, error) {
 		}
 		c.next()
 		for !c.done() && !c.is(endGrp) {
-			// arg, err := c.compileExpr(powLowest)
 			arg, err := c.compile()
 			if err != nil {
 				return fn, err
@@ -507,9 +506,6 @@ func (c *compiler) compileCall(left Expr) (Expr, error) {
 }
 
 func (c *compiler) compileExpr(pow int) (Expr, error) {
-	c.enter()
-	defer c.leave()
-
 	fn, ok := c.prefix[c.curr.Type]
 	if !ok {
 		return nil, fmt.Errorf("unexpected prefix expression")
@@ -606,9 +602,6 @@ func (c *compiler) compileName() (Expr, error) {
 	a := axis{
 		kind: childAxis,
 		next: expr,
-	}
-	if c.begin() && isXsl(c.mode) {
-		a.kind = descendantSelfAxis
 	}
 	return a, nil
 }

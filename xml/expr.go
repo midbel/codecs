@@ -101,6 +101,9 @@ const (
 	prevSiblingAxis    = "preceding-sibling"
 	nextAxis           = "following"
 	nextSiblingAxis    = "following-sibling"
+
+	childTopAxis = "child-or-top"
+	attrTopAxis  = "attribute-or-top"
 )
 
 func isSelf(axis string) bool {
@@ -163,18 +166,6 @@ func (c current) Find(node Node) ([]Item, error) {
 func (_ current) find(ctx Context) ([]Item, error) {
 	return singleNode(ctx.Node), nil
 }
-
-// type absolute struct {
-// 	expr Expr
-// }
-
-// func (a absolute) Find(node Node) ([]Item, error) {
-// 	return a.find(defaultContext(node).Root())
-// }
-
-// func (a absolute) find(ctx Context) ([]Item, error) {
-// 	return a.expr.find(ctx)
-// }
 
 type step struct {
 	curr Expr
