@@ -118,7 +118,11 @@ func main() {
 			Unknown int
 		}{}
 	)
-	for a := range getAssertions(sch, strings.TrimSpace(*level), strings.TrimSpace(*group)) {
+	it := getAssertions(sch, strings.TrimSpace(*level), strings.TrimSpace(*group))
+	// list := slices.SortedFunc(it, func(a1, a2 *Assert) int {
+	// 	return strings.Compare(a1.Ident, a2.Ident)
+	// })
+	for a := range it {
 		expr, err := compileExpr(a.Context)
 		var (
 			total int
@@ -126,6 +130,7 @@ func main() {
 			state string
 		)
 		if expr != nil && err == nil {
+			expr = xml.FromRoot(expr)
 			var (
 				items []xml.Item
 				err   error

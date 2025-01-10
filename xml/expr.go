@@ -15,6 +15,68 @@ var (
 	ErrEmpty     = errors.New("sequence is empty")
 )
 
+func FromRoot(expr Expr) Expr {
+	var base current
+	return fromBase(expr, base)
+}
+
+func fromBase(expr, base Expr) Expr {
+	switch e := expr.(type) {
+	case query:
+		e.expr = fromBase(e.expr, base)
+		return e
+	case union:
+		for i := range e.all {
+			e.all[i] = fromBase(e.all[i], base)
+		}
+		return e
+	case intersect:
+		for i := range e.all {
+			e.all[i] = fromBase(e.all[i], base)
+		}
+		return e
+	case except:
+		for i := range e.all {
+			e.all[i] = fromBase(e.all[i], base)
+		}
+		return e
+	case step:
+		if _, ok := e.curr.(root); ok {
+			return expr
+		}
+		e.curr = transform(e.curr, base)
+		return e
+	case axis:
+		e.next = transform(e.next, base)
+		return e
+	case call:
+		for i := range e.args {
+			e.args[i] = fromBase(e.args[i], base)
+		}
+		return e
+	default:
+		return expr
+	}
+}
+
+func transform(expr Expr, base Expr) Expr {
+	c := kind{
+		kind: TypeElement,
+	}
+	a := axis{
+		kind: descendantSelfAxis,
+		next: c,
+	}
+	expr = step{
+		curr: base,
+		next: step{
+			curr: a,
+			next: expr,
+		},
+	}
+	return expr
+}
+
 type StepMode int8
 
 func isXsl(mode StepMode) bool {
