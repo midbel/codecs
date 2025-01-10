@@ -183,7 +183,8 @@ func (s step) find(ctx Context) ([]Item, error) {
 	}
 	var list []Item
 	for i, n := range is {
-		others, err := s.next.find(ctx.Sub(n.Node(), i+1, len(is)))
+		sub := ctx.Sub(n.Node(), i+1, len(is))
+		others, err := s.next.find(sub)
 		if err != nil {
 			continue
 		}
@@ -253,7 +254,7 @@ func (a axis) descendant(ctx Context) ([]Item, error) {
 		sub := ctx.Sub(n, i+1, size)
 		others, err := a.next.find(sub)
 		if err != nil {
-			others, err = a.descendant(sub)
+			others, _ = a.descendant(sub)
 		}
 		list = slices.Concat(list, others)
 	}

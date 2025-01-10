@@ -134,16 +134,18 @@ func CompileMode(r io.Reader, mode StepMode) (Expr, error) {
 
 func (c *compiler) Compile() (Expr, error) {
 	expr, err := c.compile()
-	if err == nil {
-		q := query{
-			expr: expr,
-		}
-		expr = q
+	if err != nil {
+		return nil, err
 	}
-	return expr, err
+	q := query{
+		expr: expr,
+	}
+	return q, err
 }
 
 func (c *compiler) compile() (Expr, error) {
+	c.push()
+	defer c.pop()
 	return c.compileExpr(powLowest)
 }
 
@@ -273,7 +275,7 @@ func (c *compiler) compileReservedInfix(left Expr) (Expr, error) {
 	case kwCastable:
 		return c.compileCastable(left)
 	case kwUnion:
-		expr, err = c.compileExpr(powLowest)
+		expr, err = c.compile()
 		if err != nil {
 			break
 		}
@@ -282,7 +284,7 @@ func (c *compiler) compileReservedInfix(left Expr) (Expr, error) {
 
 		expr = res
 	case kwIntersect:
-		expr, err = c.compileExpr(powLowest)
+		expr, err = c.compile()
 		if err != nil {
 			break
 		}
@@ -291,7 +293,7 @@ func (c *compiler) compileReservedInfix(left Expr) (Expr, error) {
 
 		expr = res
 	case kwExcept:
-		expr, err = c.compileExpr(powLowest)
+		expr, err = c.compile()
 		if err != nil {
 			break
 		}
@@ -348,7 +350,7 @@ func (c *compiler) compileType() (Type, error) {
 
 func (c *compiler) compileFilter(left Expr) (Expr, error) {
 	c.next()
-	expr, err := c.compileExpr(powLowest)
+	expr, err := c.compile()
 	if err != nil {
 		return nil, err
 	}
@@ -368,7 +370,7 @@ func (c *compiler) compileSequence() (Expr, error) {
 	c.next()
 	var seq sequence
 	for !c.done() && !c.is(endGrp) {
-		expr, err := c.compileExpr(powLowest)
+		expr, err := c.compile()
 		if err != nil {
 			return nil, err
 		}
@@ -393,7 +395,7 @@ func (c *compiler) compileSequence() (Expr, error) {
 
 func (c *compiler) compileAlt(left Expr) (Expr, error) {
 	c.next()
-	expr, err := c.compileExpr(powLowest)
+	expr, err := c.compile()
 	if err != nil {
 		return nil, err
 	}
@@ -506,6 +508,9 @@ func (c *compiler) compileCall(left Expr) (Expr, error) {
 }
 
 func (c *compiler) compileExpr(pow int) (Expr, error) {
+	c.enter()
+	defer c.leave()
+
 	fn, ok := c.prefix[c.curr.Type]
 	if !ok {
 		return nil, fmt.Errorf("unexpected prefix expression")
