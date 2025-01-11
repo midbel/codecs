@@ -615,7 +615,7 @@ func (e except) find(ctx Context) ([]Item, error) {
 			ok := slices.ContainsFunc(list, func(item Item) bool {
 				return item.Node().Identity() == res[i].Node().Identity()
 			})
-			if !ok {
+			if ok {
 				continue
 			}
 			list = append(list, res[i])
