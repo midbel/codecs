@@ -606,14 +606,14 @@ func (e except) Find(node Node) ([]Item, error) {
 
 func (e except) find(ctx Context) ([]Item, error) {
 	var list []Item
-	for i := range u.all {
-		res, err := u.all[i].find(ctx)
+	for i := range e.all {
+		res, err := e.all[i].find(ctx)
 		if err != nil {
 			continue
 		}
 		for i := range res {
 			ok := slices.ContainsFunc(list, func(item Item) bool {
-				return item.Identity() == res[i].Identity()
+				return item.Node().Identity() == res[i].Node().Identity()
 			})
 			if !ok {
 				continue
@@ -632,17 +632,17 @@ func (i intersect) Find(node Node) ([]Item, error) {
 	return i.find(defaultContext(node))
 }
 
-func (i intersect) find(ctx Context) ([]Item, error) {
+func (e intersect) find(ctx Context) ([]Item, error) {
 	var list []Item
-	for i := range u.all {
-		res, err := u.all[i].find(ctx)
+	for i := range e.all {
+		res, err := e.all[i].find(ctx)
 		if err != nil {
 			continue
 		}
 
 		for i := range res {
 			ok := slices.ContainsFunc(list, func(item Item) bool {
-				return item.Identity() == res[i].Identity()
+				return item.Node().Identity() == res[i].Node().Identity()
 			})
 			if !ok {
 				continue
@@ -668,15 +668,7 @@ func (u union) find(ctx Context) ([]Item, error) {
 		if err != nil {
 			continue
 		}
-		for i := range res {
-			ok := slices.ContainsFunc(list, func(item Item) bool {
-				return item.Identity() == res[i].Identity()
-			})
-			if ok {
-				continue
-			}
-			list = append(list, res[i])
-		}
+		list = slices.Concat(list, res)
 	}
 	return list, nil
 }
