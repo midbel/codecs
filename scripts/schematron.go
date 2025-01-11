@@ -130,7 +130,7 @@ func main() {
 			state string
 		)
 		if expr != nil && err == nil {
-			expr = xml.FromRoot(expr)
+			// expr = xml.FromRoot(expr)
 			var (
 				items []xml.Item
 				err   error

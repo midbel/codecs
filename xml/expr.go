@@ -605,7 +605,23 @@ func (e except) Find(node Node) ([]Item, error) {
 }
 
 func (e except) find(ctx Context) ([]Item, error) {
-	return nil, nil
+	var list []Item
+	for i := range u.all {
+		res, err := u.all[i].find(ctx)
+		if err != nil {
+			continue
+		}
+		for i := range res {
+			ok := slices.ContainsFunc(list, func(item Item) bool {
+				return item.Identity() == res[i].Identity()
+			})
+			if !ok {
+				continue
+			}
+			list = append(list, res[i])
+		}
+	}
+	return list, nil
 }
 
 type intersect struct {
@@ -617,7 +633,24 @@ func (i intersect) Find(node Node) ([]Item, error) {
 }
 
 func (i intersect) find(ctx Context) ([]Item, error) {
-	return nil, nil
+	var list []Item
+	for i := range u.all {
+		res, err := u.all[i].find(ctx)
+		if err != nil {
+			continue
+		}
+
+		for i := range res {
+			ok := slices.ContainsFunc(list, func(item Item) bool {
+				return item.Identity() == res[i].Identity()
+			})
+			if !ok {
+				continue
+			}
+			list = append(list, res[i])
+		}
+	}
+	return list, nil
 }
 
 type union struct {
@@ -635,7 +668,15 @@ func (u union) find(ctx Context) ([]Item, error) {
 		if err != nil {
 			continue
 		}
-		list = slices.Concat(list, res)
+		for i := range res {
+			ok := slices.ContainsFunc(list, func(item Item) bool {
+				return item.Identity() == res[i].Identity()
+			})
+			if ok {
+				continue
+			}
+			list = append(list, res[i])
+		}
 	}
 	return list, nil
 }
