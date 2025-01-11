@@ -49,6 +49,9 @@ func fromBase(expr, base Expr) Expr {
 		}
 		e.curr = transform(e.curr, base)
 		return e
+	case filter:
+		e.expr = fromBase(e.expr, base)
+		return e
 	case axis:
 		return transform(e.next, base)
 	case call:
@@ -199,15 +202,16 @@ func (w wildcard) Find(node Node) ([]Item, error) {
 }
 
 func (w wildcard) find(ctx Context) ([]Item, error) {
-	var (
-		list  = singleNode(ctx.Node)
-		nodes = ctx.Nodes()
-	)
-	for i, n := range nodes {
-		others, _ := w.find(ctx.Sub(n, i+1, len(nodes)))
-		list = slices.Concat(list, others)
-	}
-	return list, nil
+	// var (
+	// 	list  = singleNode(ctx.Node)
+	// 	nodes = ctx.Nodes()
+	// )
+	// for i, n := range nodes {
+	// 	others, _ := w.find(ctx.Sub(n, i+1, len(nodes)))
+	// 	list = slices.Concat(list, others)
+	// }
+	// return list, nil
+	return singleNode(ctx.Node), nil
 }
 
 type root struct{}
@@ -309,9 +313,9 @@ func (a axis) find(ctx Context) ([]Item, error) {
 }
 
 func (a axis) descendant(ctx Context) ([]Item, error) {
-	if !isNode(ctx.Node)  {
+	if !isNode(ctx.Node) {
 		return nil, nil
-	} 
+	}
 	var (
 		list  []Item
 		nodes = ctx.Nodes()
