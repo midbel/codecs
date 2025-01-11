@@ -194,9 +194,6 @@ func search(doc *xml.Document, query, mode, root string) (*xml.Document, error) 
 	if err != nil {
 		return nil, err
 	}
-	// if cpMode == xml.ModeXsl {
-	// 	expr = xml.FromRoot(expr)
-	// }
 	list, err := expr.Find(doc)
 	if err != nil {
 		return nil, err

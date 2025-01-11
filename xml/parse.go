@@ -146,7 +146,15 @@ func (c *compiler) Compile() (Expr, error) {
 func (c *compiler) compile() (Expr, error) {
 	c.push()
 	defer c.pop()
-	return c.compileExpr(powLowest)
+	expr, err := c.compileExpr(powLowest)
+	if err != nil {
+		return nil, err
+	}
+	if isXsl(c.mode) {
+		var base current
+		expr = fromBase(expr, base)
+	}
+	return expr, nil
 }
 
 func (c *compiler) compileReservedPrefix() (Expr, error) {

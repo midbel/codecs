@@ -22,6 +22,12 @@ const (
 	typeAll
 )
 
+const typeNode = TypeDocument | TypeElement | TypeComment | TypeAttribute | TypeInstruction
+
+func isNode(n Node) bool {
+	return n.Type()&typeNode > 0
+}
+
 type Node interface {
 	Type() NodeType
 	LocalName() string

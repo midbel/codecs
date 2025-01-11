@@ -123,14 +123,13 @@ func main() {
 	// 	return strings.Compare(a1.Ident, a2.Ident)
 	// })
 	for a := range it {
-		expr, err := compileExpr(a.Context)
+		expr, err := compileContext(a.Context)
 		var (
 			total int
 			res   bool
 			state string
 		)
 		if expr != nil && err == nil {
-			// expr = xml.FromRoot(expr)
 			var (
 				items []xml.Item
 				err   error
@@ -597,6 +596,10 @@ func getTitleElement(rs *xml.Reader) (string, error) {
 	return title, isClosed(rs, "title")
 }
 
-func compileExpr(expr string) (xml.Expr, error) {
+func compileContext(expr string) (xml.Expr, error) {
 	return xml.CompileMode(strings.NewReader(expr), xml.ModeXsl)
+}
+
+func compileExpr(expr string) (xml.Expr, error) {
+	return xml.Compile(strings.NewReader(expr))
 }

@@ -41,14 +41,16 @@ func fromBase(expr, base Expr) Expr {
 		}
 		return e
 	case step:
+		if _, ok := e.curr.(current); ok {
+			return expr
+		}
 		if _, ok := e.curr.(root); ok {
 			return expr
 		}
 		e.curr = transform(e.curr, base)
 		return e
 	case axis:
-		e.next = transform(e.next, base)
-		return e
+		return transform(e.next, base)
 	case call:
 		for i := range e.args {
 			e.args[i] = fromBase(e.args[i], base)
@@ -61,7 +63,7 @@ func fromBase(expr, base Expr) Expr {
 
 func transform(expr Expr, base Expr) Expr {
 	c := kind{
-		kind: TypeElement,
+		kind: typeAll,
 	}
 	a := axis{
 		kind: descendantSelfAxis,
@@ -307,6 +309,9 @@ func (a axis) find(ctx Context) ([]Item, error) {
 }
 
 func (a axis) descendant(ctx Context) ([]Item, error) {
+	if !isNode(ctx.Node)  {
+		return nil, nil
+	} 
 	var (
 		list  []Item
 		nodes = ctx.Nodes()
@@ -314,11 +319,8 @@ func (a axis) descendant(ctx Context) ([]Item, error) {
 	)
 	for i, n := range nodes {
 		sub := ctx.Sub(n, i+1, size)
-		others, err := a.next.find(sub)
-		if err != nil {
-			others, _ = a.descendant(sub)
-		}
-		list = slices.Concat(list, others)
+		res, _ := a.find(sub)
+		list = slices.Concat(list, res)
 	}
 	return list, nil
 }
