@@ -370,6 +370,9 @@ func (n name) Find(node Node) ([]Item, error) {
 }
 
 func (n name) find(ctx Context) ([]Item, error) {
+	if n.space == "*" && n.ident == ctx.LocalName() {
+		return singleNode(ctx.Node), nil
+	}
 	if ctx.QualifiedName() != n.QualifiedName() {
 		return nil, errDiscard
 	}

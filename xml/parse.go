@@ -620,13 +620,16 @@ func (c *compiler) compileName() (Expr, error) {
 }
 
 func (c *compiler) compileNameBase() (Expr, error) {
-	if c.is(opMul) {
+	if c.is(opMul) && c.peek.Type != Namespace {
 		c.next()
 		var a wildcard
 		return a, nil
 	}
 	n := name{
 		ident: c.curr.Literal,
+	}
+	if c.is(opMul) {
+		n.ident = "*"
 	}
 	c.next()
 	if c.is(Namespace) {
