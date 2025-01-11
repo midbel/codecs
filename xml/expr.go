@@ -453,6 +453,15 @@ func (b binary) find(ctx Context) ([]Item, error) {
 			}
 			return math.Mod(left, right), nil
 		})
+	case opConcat:
+		var str1, str2 string
+		if !isEmpty(left) {
+			str1, _ = toString(left[0].Value())
+		}
+		if !isEmpty(right) {
+			str2, _ = toString(right[0].Value())
+		}
+		res = str1 + str2
 	case opAnd:
 		res = isTrue(left) && isTrue(right)
 	case opOr:
