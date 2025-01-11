@@ -69,8 +69,8 @@ type compiler struct {
 	curr Token
 	peek Token
 
-	mode  StepMode
-	stack []int
+	mode       StepMode
+	strictMode bool
 
 	infix  map[rune]func(Expr) (Expr, error)
 	prefix map[rune]func() (Expr, error)
@@ -86,8 +86,9 @@ func Compile(r io.Reader) (Expr, error) {
 
 func CompileMode(r io.Reader, mode StepMode) (Expr, error) {
 	cp := compiler{
-		scan: ScanQuery(r),
-		mode: mode,
+		scan:       ScanQuery(r),
+		mode:       mode,
+		strictMode: true,
 	}
 
 	cp.infix = map[rune]func(Expr) (Expr, error){
@@ -144,8 +145,6 @@ func (c *compiler) Compile() (Expr, error) {
 }
 
 func (c *compiler) compile() (Expr, error) {
-	c.push()
-	defer c.pop()
 	expr, err := c.compileExpr(powLowest)
 	if err != nil {
 		return nil, err
@@ -479,6 +478,9 @@ func (c *compiler) compileCall(left Expr) (Expr, error) {
 		fn := call{
 			ident: n.ident,
 		}
+		if _, ok := builtins[fn.ident]; c.strictMode && !ok {
+			return fn, fmt.Errorf("%s: function %w", fn.ident, ErrUndefined)
+		}
 		c.next()
 		for !c.done() && !c.is(endGrp) {
 			arg, err := c.compile()
@@ -516,9 +518,6 @@ func (c *compiler) compileCall(left Expr) (Expr, error) {
 }
 
 func (c *compiler) compileExpr(pow int) (Expr, error) {
-	c.enter()
-	defer c.leave()
-
 	fn, ok := c.prefix[c.curr.Type]
 	if !ok {
 		return nil, fmt.Errorf("unexpected prefix expression")
@@ -714,35 +713,6 @@ func (c *compiler) compileRoot() (Expr, error) {
 		next: next,
 	}
 	return expr, nil
-}
-
-func (c *compiler) begin() bool {
-	if n := len(c.stack); n > 0 {
-		return c.stack[n-1] <= 1
-	}
-	return false
-}
-
-func (c *compiler) push() {
-	c.stack = append(c.stack, 0)
-}
-
-func (c *compiler) pop() {
-	if n := len(c.stack); n > 0 {
-		c.stack = c.stack[:n-1]
-	}
-}
-
-func (c *compiler) enter() {
-	if n := len(c.stack); n > 0 {
-		c.stack[n-1]++
-	}
-}
-
-func (c *compiler) leave() {
-	if n := len(c.stack); n > 0 {
-		c.stack[n-1]--
-	}
 }
 
 func (c *compiler) is(kind rune) bool {

@@ -94,6 +94,7 @@ func main() {
 	var (
 		level    = flag.String("l", "", "severity level")
 		group    = flag.String("g", "", "group")
+		skipZero = flag.Bool("skip-zero", false, "skip tests with no nodes matching rules context")
 		failFast = flag.Bool("fail-fast", false, "stop processing on first error")
 	)
 
@@ -146,6 +147,9 @@ func main() {
 				fmt.Fprintln(os.Stderr)
 			} else {
 				total = len(items)
+			}
+			if total == 0 && *skipZero {
+				continue
 			}
 			res, err = a.Eval(env, items)
 			if err != nil {

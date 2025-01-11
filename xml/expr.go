@@ -107,8 +107,9 @@ type Expr interface {
 
 type Context struct {
 	Node
-	Index int
-	Size  int
+	Index         int
+	Size          int
+	PrincipalType NodeType
 	Environ
 }
 
@@ -129,6 +130,7 @@ func createContext(n Node, pos, size int) Context {
 func (c Context) Sub(n Node, pos int, size int) Context {
 	ctx := createContext(n, pos, size)
 	ctx.Environ = Enclosed(c)
+	ctx.PrincipalType = c.PrincipalType
 	return ctx
 }
 
@@ -270,8 +272,18 @@ func (a axis) Find(node Node) ([]Item, error) {
 	return a.find(defaultContext(node))
 }
 
+func (a axis) principalType() NodeType {
+	switch a.kind {
+	case TypeAttribute:
+		return TypeAttribute
+	default:
+		return TypeElement
+	}
+}
+
 func (a axis) find(ctx Context) ([]Item, error) {
 	var list []Item
+	ctx.PrincipalType = a.principalType()
 	if isSelf(a.kind) && ctx.Type() != TypeDocument {
 		others, err := a.next.find(ctx)
 		if err == nil {
@@ -559,6 +571,9 @@ func isKind(str string) bool {
 
 type kind struct {
 	kind NodeType
+
+	localName string
+	localType string
 }
 
 func (k kind) Find(node Node) ([]Item, error) {
