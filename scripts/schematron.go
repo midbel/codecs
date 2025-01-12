@@ -41,15 +41,16 @@ type Assert struct {
 	Message string
 
 	Context string
+	xml.Environ
 }
 
-func (a Assert) Eval(env xml.Environ, items []xml.Item) (bool, error) {
+func (a Assert) Eval(items []xml.Item) (bool, error) {
 	test, err := compileExpr(a.Test)
 	if err != nil {
 		return false, err
 	}
 	for i := range items {
-		res, err := items[i].Assert(test, env)
+		res, err := items[i].Assert(test, a)
 		if err != nil {
 			fmt.Println(a.Context, a.Test, err)
 			return false, err
@@ -112,7 +113,6 @@ func main() {
 	}
 	var (
 		count   int
-		env     = xml.Enclosed(sch)
 		counter = struct {
 			Success int
 			Failure int
@@ -138,7 +138,7 @@ func main() {
 			if f, ok := expr.(interface {
 				FindWithEnv(xml.Node, xml.Environ) ([]xml.Item, error)
 			}); ok {
-				items, err = f.FindWithEnv(doc, env)
+				items, err = f.FindWithEnv(doc, a.Environ)
 			} else {
 				items, err = expr.Find(doc)
 			}
@@ -151,7 +151,7 @@ func main() {
 			if total == 0 && *skipZero {
 				continue
 			}
-			res, err = a.Eval(env, items)
+			res, err = a.Eval(items)
 			if err != nil {
 				state = "?"
 				counter.Unknown++
@@ -224,6 +224,7 @@ func getAssertions(sch *Schema, level, group string) iter.Seq[*Assert] {
 						continue
 					}
 					a.Context = r.Context
+					a.Environ = r
 					if !yield(a) {
 						return
 					}

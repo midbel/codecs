@@ -274,7 +274,7 @@ func (a axis) Find(node Node) ([]Item, error) {
 
 func (a axis) principalType() NodeType {
 	switch a.kind {
-	case TypeAttribute:
+	case "attribueAxis":
 		return TypeAttribute
 	default:
 		return TypeElement
@@ -813,7 +813,43 @@ func (q quantified) Find(node Node) ([]Item, error) {
 }
 
 func (q quantified) find(ctx Context) ([]Item, error) {
-	return nil, nil
+	env := ctx.Environ
+	ctx.Environ = Enclosed(ctx)
+	defer func() {
+		ctx.Environ = env
+	}()
+	items, err := q.binds[0].expr.find(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, i := range items {
+		val := value{
+			item: i,
+		}
+		ctx.Environ.Define(q.binds[0].ident, val)
+		res, err := q.test.find(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if !isTrue(res) && q.every {
+			return singleValue(false), nil
+		} else if isTrue(res) && !q.every {
+			return singleValue(true), nil
+		}
+	}
+	return singleValue(true), nil
+}
+
+type value struct {
+	item Item
+}
+
+func (v value) Find(node Node) ([]Item, error) {
+	return v.find(defaultContext(node))
+}
+
+func (v value) find(ctx Context) ([]Item, error) {
+	return []Item{v.item}, nil
 }
 
 type Type struct {
