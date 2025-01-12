@@ -478,9 +478,9 @@ func (c *compiler) compileCall(left Expr) (Expr, error) {
 		fn := call{
 			ident: n.ident,
 		}
-		if _, ok := builtins[fn.ident]; c.strictMode && !ok {
-			return fn, fmt.Errorf("%s: function %w", fn.ident, ErrUndefined)
-		}
+		// if _, ok := builtins[fn.ident]; c.strictMode && !ok {
+		// 	return fn, fmt.Errorf("%s: function %w", fn.ident, ErrUndefined)
+		// }
 		c.next()
 		for !c.done() && !c.is(endGrp) {
 			arg, err := c.compile()
