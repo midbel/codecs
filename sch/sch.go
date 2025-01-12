@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"os"
 	"slices"
 	"strings"
@@ -11,13 +12,26 @@ import (
 	"github.com/midbel/codecs/xml"
 )
 
-type Schema struct {
-	Title string
-	xml.Environ
+var ErrAssert = errors.New("assertion error")
 
-	Patterns  []*Pattern
-	Spaces    []*Namespace
-	Functions []*Function
+type ListError struct {
+	Errors []error
+}
+
+func (e *ListError) Zero() bool {
+	return len(e.Errors) == 0
+}
+
+func (e *ListError) Push(err error) {
+	if e1, ok := err.(*ListError); ok {
+		e.Errors = slices.Concat(e.Errors, e1.Errors)
+	} else {
+		e.Errors = append(e.Errors, err)
+	}
+}
+
+func (e *ListError) Error() string {
+	return fmt.Sprintf("%d errors detected", len(e.Errors))
 }
 
 type Namespace struct {
@@ -30,6 +44,29 @@ type Let struct {
 	Value string
 }
 
+type Schema struct {
+	Title string
+	xml.Environ
+
+	Patterns  []*Pattern
+	Spaces    []*Namespace
+	Functions []*Function
+}
+
+func (s *Schema) Asserts() iter.Seq[*Assert] {
+	it := func(yield func(*Assert) bool) {
+		for _, p := range s.Patterns {
+			for a := range p.Asserts() {
+				ok := yield(a)
+				if !ok {
+					return
+				}
+			}
+		}
+	}
+	return it
+}
+
 type Function struct{}
 
 type Pattern struct {
@@ -39,16 +76,95 @@ type Pattern struct {
 	Rules []*Rule
 }
 
+func (p *Pattern) Exec(doc *xml.Document) error {
+	var list ListError
+	for _, r := range p.Rules {
+		err := r.Exec(doc)
+		if err != nil {
+			list.Push(err)
+			continue
+		}
+	}
+	if list.Zero() {
+		return nil
+	}
+	return &list
+}
+
+func (p *Pattern) Asserts() iter.Seq[*Assert] {
+	it := func(yield func(*Assert) bool) {
+		for _, r := range p.Rules {
+			for _, a := range r.Asserts {
+				ok := yield(a)
+				if !ok {
+					return
+				}
+			}
+		}
+	}
+	return it
+}
+
 type Rule struct {
 	xml.Environ
 
-	Context    string
-	Expr       xml.Expr
-	Assertions []*Assert
+	Title   string
+	Context string
+	Asserts []*Assert
 }
 
-func (r *Rule) Eval() (bool, error) {
-	return false, nil
+func (r *Rule) Count(doc *xml.Document) (int, error) {
+	expr, err := compileContext(r.Context)
+	if err != nil {
+		return 0, err
+	}
+	var items []xml.Item
+	if f, ok := expr.(interface {
+		FindWithEnv(xml.Node, xml.Environ) ([]xml.Item, error)
+	}); ok {
+		items, err = f.FindWithEnv(doc, xml.Enclosed(r))
+	} else {
+		items, err = expr.Find(doc)
+	}
+	return len(items), err
+}
+
+func (r *Rule) Exec(doc *xml.Document) error {
+	items, err := r.getItems(doc)
+	if err != nil {
+		return err
+	}
+	var list ListError
+	for _, a := range r.Asserts {
+		ok, err := a.Eval(items, r)
+		if err != nil {
+			if !errors.Is(err, ErrAssert) {
+				return err
+			}
+			list.Push(err)
+		}
+		_ = ok
+	}
+	if list.Zero() {
+		return nil
+	}
+	return &list
+}
+
+func (r *Rule) getItems(doc *xml.Document) ([]xml.Item, error) {
+	expr, err := compileContext(r.Context)
+	if err != nil {
+		return nil, err
+	}
+	var items []xml.Item
+	if f, ok := expr.(interface {
+		FindWithEnv(xml.Node, xml.Environ) ([]xml.Item, error)
+	}); ok {
+		items, err = f.FindWithEnv(doc, r)
+	} else {
+		items, err = expr.Find(doc)
+	}
+	return items, err
 }
 
 type Assert struct {
@@ -58,8 +174,37 @@ type Assert struct {
 	Message string
 }
 
-func (a *Assert) Eval(items []Item) (bool, error) {
-	return false, nil
+func (a *Assert) Eval(items []xml.Item, env xml.Environ) (bool, error) {
+	test, err := compileExpr(a.Test)
+	if err != nil {
+		return false, err
+	}
+	for i := range items {
+		res, err := items[i].Assert(test, env)
+		if err != nil {
+			return false, err
+		}
+		if len(res) == 0 {
+			return false, fmt.Errorf("%w: %s", ErrAssert, a.Message)
+		}
+		var ok bool
+		if !res[0].Atomic() {
+			return true, nil
+		}
+		switch res := res[0].Value().(type) {
+		case bool:
+			ok = res
+		case float64:
+			ok = res != 0
+		case string:
+			ok = res != ""
+		default:
+		}
+		if !ok {
+			return ok, fmt.Errorf("%w: %s", ErrAssert, a.Message)
+		}
+	}
+	return true, nil
 }
 
 func Open(file string) (*Schema, error) {
@@ -208,7 +353,7 @@ func readRule(rs *xml.Reader, elem *xml.Element, env xml.Environ) (*Rule, error)
 			if err != nil {
 				return nil, err
 			}
-			rule.Assertions = append(rule.Assertions, ass)
+			rule.Asserts = append(rule.Asserts, ass)
 		default:
 			return nil, unexpectedElement("rule", el)
 		}
