@@ -18,6 +18,13 @@ type ListError struct {
 	Errors []error
 }
 
+func (e *ListError) ErrOrNil() error {
+	if e.Zero() {
+		return nil
+	}
+	return e
+}
+
 func (e *ListError) Zero() bool {
 	return len(e.Errors) == 0
 }
@@ -53,6 +60,15 @@ type Schema struct {
 	Functions []*Function
 }
 
+func Open(file string) (*Schema, error) {
+	r, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	return parseSchema(r)
+}
+
 func (s *Schema) Asserts() iter.Seq[*Assert] {
 	it := func(yield func(*Assert) bool) {
 		for _, p := range s.Patterns {
@@ -85,10 +101,7 @@ func (p *Pattern) Exec(doc *xml.Document) error {
 			continue
 		}
 	}
-	if list.Zero() {
-		return nil
-	}
-	return &list
+	return list.ErrOrNil()
 }
 
 func (p *Pattern) Asserts() iter.Seq[*Assert] {
@@ -145,10 +158,7 @@ func (r *Rule) Exec(doc *xml.Document) error {
 		}
 		_ = ok
 	}
-	if list.Zero() {
-		return nil
-	}
-	return &list
+	return list.ErrOrNil()
 }
 
 func (r *Rule) getItems(doc *xml.Document) ([]xml.Item, error) {
@@ -184,22 +194,7 @@ func (a *Assert) Eval(items []xml.Item, env xml.Environ) (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		if len(res) == 0 {
-			return false, fmt.Errorf("%w: %s", ErrAssert, a.Message)
-		}
-		var ok bool
-		if !res[0].Atomic() {
-			return true, nil
-		}
-		switch res := res[0].Value().(type) {
-		case bool:
-			ok = res
-		case float64:
-			ok = res != 0
-		case string:
-			ok = res != ""
-		default:
-		}
+		ok := isTrue(res)
 		if !ok {
 			return ok, fmt.Errorf("%w: %s", ErrAssert, a.Message)
 		}
@@ -207,13 +202,24 @@ func (a *Assert) Eval(items []xml.Item, env xml.Environ) (bool, error) {
 	return true, nil
 }
 
-func Open(file string) (*Schema, error) {
-	r, err := os.Open(file)
-	if err != nil {
-		return nil, err
+func isTrue(res []xml.Item) bool {
+	if len(res) == 0 {
+		return false
 	}
-	defer r.Close()
-	return parseSchema(r)
+	var ok bool
+	if !res[0].Atomic() {
+		return true
+	}
+	switch res := res[0].Value().(type) {
+	case bool:
+		ok = res
+	case float64:
+		ok = res != 0
+	case string:
+		ok = res != ""
+	default:
+	}
+	return ok	
 }
 
 func parseSchema(r io.Reader) (*Schema, error) {
