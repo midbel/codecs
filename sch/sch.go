@@ -228,7 +228,7 @@ func isTrue(res []xml.Item) bool {
 		ok = res != ""
 	default:
 	}
-	return ok	
+	return ok
 }
 
 func parseSchema(r io.Reader) (*Schema, error) {
@@ -289,6 +289,8 @@ func readTop(rs *xml.Reader, node *xml.Element, sch *Schema) error {
 		}
 		sch.Spaces = append(sch.Spaces, ns)
 		return nil
+	case "phase":
+		return readPhase(rs, node)
 	case "function":
 		return readFunction(rs, node)
 	default:
@@ -428,6 +430,16 @@ func readNS(rs *xml.Reader, elem *xml.Element) (*Namespace, error) {
 		return nil, err
 	}
 	return &ns, nil
+}
+
+func readPhase(rs *xml.Reader, elem *xml.Element) error {
+	for {
+		el, err := rs.Read()
+		if errors.Is(err, xml.ErrClosed) && el.QualifiedName() == "phase" {
+			break
+		}
+	}
+	return nil
 }
 
 func readFunction(rs *xml.Reader, elem *xml.Element) error {

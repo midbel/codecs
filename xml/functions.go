@@ -52,9 +52,14 @@ var builtins = map[string]builtinFunc{
 	"current-date":     callCurrentDate,
 	"current-datetime": callCurrentDatetime,
 	"decimal":          callDecimal,
+	"exists":           callExists,
 }
 
 type builtinFunc func(Context, []Expr) ([]Item, error)
+
+func callExists(ctx Context, args []Expr) ([]Item, error) {
+	return nil, errImplemented
+}
 
 func callDecimal(ctx Context, args []Expr) ([]Item, error) {
 	if len(args) != 1 {

@@ -138,6 +138,10 @@ func (c *compiler) Compile() (Expr, error) {
 	if err != nil {
 		return nil, err
 	}
+	if isXsl(c.mode) {
+		var base current
+		expr = fromBase(expr, base)
+	}
 	q := query{
 		expr: expr,
 	}
@@ -145,15 +149,7 @@ func (c *compiler) Compile() (Expr, error) {
 }
 
 func (c *compiler) compile() (Expr, error) {
-	expr, err := c.compileExpr(powLowest)
-	if err != nil {
-		return nil, err
-	}
-	if isXsl(c.mode) {
-		var base current
-		expr = fromBase(expr, base)
-	}
-	return expr, nil
+	return c.compileExpr(powLowest)
 }
 
 func (c *compiler) compileReservedPrefix() (Expr, error) {

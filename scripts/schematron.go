@@ -163,9 +163,9 @@ func main() {
 				counter.Failure++
 			}
 		}
-		fmt.Printf("%s | %7s | %-20s | %3d | %-s", state, a.Flag, a.Ident, total, a.Message)
-		fmt.Println()
 		count++
+		fmt.Printf("%3d | %s | %7s | %-20s | %3d | %-s", count, state, a.Flag, a.Ident, total, a.Message)
+		fmt.Println()
 
 		if *failFast && counter.Failure > 0 {
 			break

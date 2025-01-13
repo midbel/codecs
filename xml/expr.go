@@ -20,6 +20,23 @@ func FromRoot(expr Expr) Expr {
 	return fromBase(expr, base)
 }
 
+func atRoot(expr Expr) bool {
+	e, ok := expr.(step)
+	if !ok {
+		return false
+	}
+	switch e := e.curr.(type) {
+	case step:
+		return atRoot(e)
+	case current:
+		return true
+	case root:
+		return true
+	default:
+		return false
+	}
+}
+
 func fromBase(expr, base Expr) Expr {
 	switch e := expr.(type) {
 	case query:
@@ -41,15 +58,15 @@ func fromBase(expr, base Expr) Expr {
 		}
 		return e
 	case step:
-		if _, ok := e.curr.(current); ok {
-			return expr
-		}
-		if _, ok := e.curr.(root); ok {
-			return expr
+		if atRoot(e) {
+			return e
 		}
 		e.curr = transform(e.curr, base)
 		return e
 	case filter:
+		if atRoot(e.expr) {
+			return e
+		}
 		e.expr = fromBase(e.expr, base)
 		return e
 	case axis:
