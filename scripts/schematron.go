@@ -292,6 +292,8 @@ func readTop(rs *xml.Reader, node *xml.Element, sch *Schema) error {
 			// fmt.Println("compilation fail", let.Value, err)
 		}
 		return nil
+	case "phase":
+		return readPhase(rs, node)
 	case "ns":
 		ns, err := readNS(rs, node)
 		if err != nil {
@@ -438,6 +440,16 @@ func readNS(rs *xml.Reader, elem *xml.Element) (*Namespace, error) {
 		return nil, err
 	}
 	return &ns, nil
+}
+
+func readPhase(rs *xml.Reader, elem *xml.Element) error {
+	for {
+		el, err := rs.Read()
+		if errors.Is(err, xml.ErrClosed) && el.QualifiedName() == "phase" {
+			break
+		}
+	}
+	return nil
 }
 
 func readFunction(rs *xml.Reader, elem *xml.Element) error {

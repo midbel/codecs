@@ -60,6 +60,15 @@ type Schema struct {
 	Functions []*Function
 }
 
+func Exec(file string) error {
+	schema, err := Open(file)
+	if err != nil {
+		return err
+	}
+	_ = schema
+	return nil
+}
+
 func Open(file string) (*Schema, error) {
 	r, err := os.Open(file)
 	if err != nil {
