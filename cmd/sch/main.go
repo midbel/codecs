@@ -14,6 +14,7 @@ func main() {
 	var (
 		level = flag.String("l", "", "severity level")
 		group = flag.String("g", "", "group")
+		list  = flag.Bool("p", false, "print assertions defined in schema")
 		// skipZero = flag.Bool("skip-zero", false, "skip tests with no nodes matching rules context")
 		// failFast = flag.Bool("fail-fast", false, "stop processing on first error")
 	)
@@ -23,16 +24,21 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
-
-	doc, err := parseDocument(flag.Arg(1))
+	if *list {
+		print(schema, *group, *level)
+		return
+	}
+	err = execute(schema, flag.Arg(1), *group, *level)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(3)
+		os.Exit(2)
 	}
-	_ = doc
 
+}
+
+func print(schema *sch.Schema, group, level string) {
 	var (
-		keep  = keepAssert(*group, *level)
+		keep  = keepAssert(group, level)
 		count int
 	)
 	for a := range schema.Asserts() {
@@ -46,6 +52,15 @@ func main() {
 	}
 	fmt.Printf("%d assertions defined", count)
 	fmt.Println()
+}
+
+func execute(schema *sch.Schema, file, group, level string) error {
+	doc, err := parseDocument(file)
+	if err != nil {
+		return err
+	}
+	_ = doc
+	return nil
 }
 
 func keepAssert(group, level string) func(*sch.Assert) bool {
