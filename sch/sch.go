@@ -15,6 +15,8 @@ import (
 
 var ErrAssert = errors.New("assertion error")
 
+type FilterFunc func(*Assert) bool
+
 type Namespace struct {
 	URI    string
 	Prefix string
@@ -68,14 +70,14 @@ func Open(file string) (*Schema, error) {
 	return parseSchema(r)
 }
 
-func (s *Schema) Exec(doc *xml.Document) iter.Seq[Result] {
-	return s.ExecContext(context.Background(), doc)
+func (s *Schema) Exec(doc *xml.Document, keep FilterFunc) iter.Seq[Result] {
+	return s.ExecContext(context.Background(), doc, keep)
 }
 
-func (s *Schema) ExecContext(ctx context.Context, doc *xml.Document) iter.Seq[Result] {
+func (s *Schema) ExecContext(ctx context.Context, doc *xml.Document, keep FilterFunc) iter.Seq[Result] {
 	fn := func(yield func(Result) bool) {
 		for _, p := range s.Patterns {
-			for r := range p.ExecContext(ctx, doc) {
+			for r := range p.ExecContext(ctx, doc, keep) {
 				ok := yield(r)
 				if !ok {
 					return
@@ -107,14 +109,14 @@ type Pattern struct {
 	Rules []*Rule
 }
 
-func (p *Pattern) Exec(doc *xml.Document) iter.Seq[Result] {
-	return p.ExecContext(context.Background(), doc)
+func (p *Pattern) Exec(doc *xml.Document, keep FilterFunc) iter.Seq[Result] {
+	return p.ExecContext(context.Background(), doc, keep)
 }
 
-func (p *Pattern) ExecContext(ctx context.Context, doc *xml.Document) iter.Seq[Result] {
+func (p *Pattern) ExecContext(ctx context.Context, doc *xml.Document, keep FilterFunc) iter.Seq[Result] {
 	fn := func(yield func(Result) bool) {
 		for _, r := range p.Rules {
-			for r := range r.ExecContext(ctx, doc) {
+			for r := range r.ExecContext(ctx, doc, keep) {
 				ok := yield(r)
 				if !ok {
 					return
@@ -163,11 +165,11 @@ func (r *Rule) Count(doc *xml.Document) (int, error) {
 	return len(items), err
 }
 
-func (r *Rule) Exec(doc *xml.Document) iter.Seq[Result] {
-	return r.ExecContext(context.Background(), doc)
+func (r *Rule) Exec(doc *xml.Document, keep FilterFunc) iter.Seq[Result] {
+	return r.ExecContext(context.Background(), doc, keep)
 }
 
-func (r *Rule) ExecContext(ctx context.Context, doc *xml.Document) iter.Seq[Result] {
+func (r *Rule) ExecContext(ctx context.Context, doc *xml.Document, keep FilterFunc) iter.Seq[Result] {
 	fn := func(yield func(Result) bool) {
 		items, err := r.getItems(doc)
 		if err != nil {
@@ -190,6 +192,9 @@ func (r *Rule) ExecContext(ctx context.Context, doc *xml.Document) iter.Seq[Resu
 				}
 				yield(res)
 				return
+			}
+			if ok := keep(a); !ok {
+				continue
 			}
 			pass, err := a.Eval(items, r)
 

@@ -43,7 +43,7 @@ func execute(schema *sch.Schema, file, group, level string) error {
 		return err
 	}
 	var ix int
-	for res := range schema.Exec(doc) {
+	for res := range schema.Exec(doc, keepAssert(group, level)) {
 		ix++
 		var msg string
 		if res.Failed() {
@@ -106,7 +106,7 @@ func shorten(str string, maxLength int) string {
 	return str[:maxLength+x] + "..."
 }
 
-func keepAssert(group, level string) func(*sch.Assert) bool {
+func keepAssert(group, level string) sch.FilterFunc {
 	var groups []string
 	if len(group) > 0 {
 		groups = strings.Split(group, "-")
