@@ -33,7 +33,37 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
+}
 
+const pattern = "%-4d | %8s | %-32s | %3d/%-3d | %s"
+
+func execute(schema *sch.Schema, file, group, level string) error {
+	doc, err := parseDocument(file)
+	if err != nil {
+		return err
+	}
+	it, err := schema.Exec(doc)
+	if err != nil {
+		return err
+	}
+	var ix int
+	for res := range it {
+		ix++
+		var msg string
+		if res.Failed() {
+			msg = res.Error.Error()
+			msg = shorten(msg, 48)
+		} else {
+			msg = "ok"
+		}
+		fmt.Print(getColor(res))
+		fmt.Printf(pattern, ix, res.Level, res.Ident, res.Pass, res.Total, msg)
+		if res.Failed() {
+			fmt.Print("\033[0m")
+		}
+		fmt.Println()
+	}
+	return nil
 }
 
 func print(schema *sch.Schema, group, level string) {
@@ -54,13 +84,30 @@ func print(schema *sch.Schema, group, level string) {
 	fmt.Println()
 }
 
-func execute(schema *sch.Schema, file, group, level string) error {
-	doc, err := parseDocument(file)
-	if err != nil {
-		return err
+func getColor(res sch.Result) string {
+	if !res.Failed() {
+		return ""
 	}
-	_ = doc
-	return nil
+	switch res.Level {
+	case "warning":
+		return "\033[33m"
+	case "fatal":
+		return "\033[31m"
+	default:
+		return ""
+	}
+}
+
+func shorten(str string, maxLength int) string {
+	z := len(str)
+	if z <= maxLength {
+		return str
+	}
+	x := strings.IndexRune(str[maxLength:], ' ')
+	if x < 0 {
+		return str
+	}
+	return str[:maxLength+x] + "..."
 }
 
 func keepAssert(group, level string) func(*sch.Assert) bool {

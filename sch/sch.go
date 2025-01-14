@@ -51,6 +51,31 @@ type Let struct {
 	Value string
 }
 
+type Function struct{}
+
+type Result struct {
+	Ident   string
+	Level   string
+	Message string
+	Total   int
+	Pass    int
+	Error   error
+}
+
+func (r Result) Failed() bool {
+	return r.Error != nil
+}
+
+func (r Result) Status() string {
+	if r.Error == nil {
+		return "V"
+	}
+	if errors.Is(r.Error, ErrAssert) {
+		return "X"
+	}
+	return "?"
+}
+
 type Schema struct {
 	Title string
 	xml.Environ
@@ -58,15 +83,6 @@ type Schema struct {
 	Patterns  []*Pattern
 	Spaces    []*Namespace
 	Functions []*Function
-}
-
-func Exec(file string) error {
-	schema, err := Open(file)
-	if err != nil {
-		return err
-	}
-	_ = schema
-	return nil
 }
 
 func Open(file string) (*Schema, error) {
@@ -78,8 +94,26 @@ func Open(file string) (*Schema, error) {
 	return parseSchema(r)
 }
 
+func (s *Schema) Exec(doc *xml.Document) (iter.Seq[Result], error) {
+	fn := func(yield func(Result) bool) {
+		for _, p := range s.Patterns {
+			it, err := p.Exec(doc)
+			if err != nil {
+				return
+			}
+			for r := range it {
+				ok := yield(r)
+				if !ok {
+					return
+				}
+			}
+		}
+	}
+	return fn, nil
+}
+
 func (s *Schema) Asserts() iter.Seq[*Assert] {
-	it := func(yield func(*Assert) bool) {
+	fn := func(yield func(*Assert) bool) {
 		for _, p := range s.Patterns {
 			for a := range p.Asserts() {
 				ok := yield(a)
@@ -89,10 +123,8 @@ func (s *Schema) Asserts() iter.Seq[*Assert] {
 			}
 		}
 	}
-	return it
+	return fn
 }
-
-type Function struct{}
 
 type Pattern struct {
 	Title string
@@ -101,16 +133,22 @@ type Pattern struct {
 	Rules []*Rule
 }
 
-func (p *Pattern) Exec(doc *xml.Document) error {
-	var list ListError
-	for _, r := range p.Rules {
-		err := r.Exec(doc)
-		if err != nil {
-			list.Push(err)
-			continue
+func (p *Pattern) Exec(doc *xml.Document) (iter.Seq[Result], error) {
+	fn := func(yield func(Result) bool) {
+		for _, r := range p.Rules {
+			it, err := r.Exec(doc)
+			if err != nil {
+				return
+			}
+			for r := range it {
+				ok := yield(r)
+				if !ok {
+					return
+				}
+			}
 		}
 	}
-	return list.ErrOrNil()
+	return fn, nil
 }
 
 func (p *Pattern) Asserts() iter.Seq[*Assert] {
@@ -151,23 +189,31 @@ func (r *Rule) Count(doc *xml.Document) (int, error) {
 	return len(items), err
 }
 
-func (r *Rule) Exec(doc *xml.Document) error {
+func (r *Rule) Exec(doc *xml.Document) (iter.Seq[Result], error) {
 	items, err := r.getItems(doc)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	var list ListError
-	for _, a := range r.Asserts {
-		ok, err := a.Eval(items, r)
-		if err != nil {
-			if !errors.Is(err, ErrAssert) {
-				return err
+	fn := func(yield func(Result) bool) {
+		for _, a := range r.Asserts {
+			pass, err := a.Eval(items, r)
+
+			res := Result{
+				Ident:   a.Ident,
+				Level:   a.Flag,
+				Message: a.Message,
+				Total:   len(items),
+				Pass:    pass,
+				Error:   err,
 			}
-			list.Push(err)
+
+			ok := yield(res)
+			if !ok {
+				break
+			}
 		}
-		_ = ok
 	}
-	return list.ErrOrNil()
+	return fn, nil
 }
 
 func (r *Rule) getItems(doc *xml.Document) ([]xml.Item, error) {
@@ -193,22 +239,24 @@ type Assert struct {
 	Message string
 }
 
-func (a *Assert) Eval(items []xml.Item, env xml.Environ) (bool, error) {
+func (a *Assert) Eval(items []xml.Item, env xml.Environ) (int, error) {
 	test, err := compileExpr(a.Test)
 	if err != nil {
-		return false, err
+		return 0, err
 	}
+	var pass int
 	for i := range items {
 		res, err := items[i].Assert(test, env)
 		if err != nil {
-			return false, err
+			return 0, err
 		}
 		ok := isTrue(res)
 		if !ok {
-			return ok, fmt.Errorf("%w: %s", ErrAssert, a.Message)
+			return pass, fmt.Errorf("%w: %s", ErrAssert, a.Message)
 		}
+		pass++
 	}
-	return true, nil
+	return pass, nil
 }
 
 func isTrue(res []xml.Item) bool {

@@ -230,6 +230,9 @@ func (w wildcard) find(ctx Context) ([]Item, error) {
 	// 	list = slices.Concat(list, others)
 	// }
 	// return list, nil
+	if ctx.Type() != TypeElement {
+		return nil, nil
+	}
 	return singleNode(ctx.Node), nil
 }
 
