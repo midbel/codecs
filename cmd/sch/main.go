@@ -3,10 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
+	"io"
 	"net/http"
 	"net/url"
-	"io"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/midbel/codecs/sch"
@@ -15,11 +16,11 @@ import (
 
 func main() {
 	var (
-		level = flag.String("l", "", "severity level")
-		group = flag.String("g", "", "group")
-		list  = flag.Bool("p", false, "print assertions defined in schema")
+		level    = flag.String("l", "", "severity level")
+		group    = flag.String("g", "", "group")
+		list     = flag.Bool("p", false, "print assertions defined in schema")
 		failFast = flag.Bool("fail-fast", false, "stop processing on first error")
-		quiet = flag.Bool("q", false, "produce small output")
+		quiet    = flag.Bool("q", false, "produce small output")
 	)
 	flag.Parse()
 	schema, err := parseSchema(flag.Arg(0))
@@ -31,10 +32,12 @@ func main() {
 		print(schema, *group, *level)
 		return
 	}
-	err = execute(schema, flag.Arg(1), *group, *level, *quiet, *failFast)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
+	for i := 1; i < flag.NArg(); i++ {
+		err := execute(schema, flag.Arg(i), *group, *level, *quiet, *failFast)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s: %s", flag.Arg(i), err)
+			fmt.Fprintln(os.Stderr)
+		}
 	}
 }
 
@@ -56,7 +59,7 @@ func parseSchema(file string) (*sch.Schema, error) {
 	return sch.Parse(res.Body)
 }
 
-const pattern = "%-4d | %8s | %-32s | %3d/%-3d | %s"
+const pattern = "%s | %-4d | %8s | %-32s | %3d/%-3d | %s"
 
 func execute(schema *sch.Schema, file, group, level string, quiet, failFast bool) error {
 	doc, err := parseDocument(file)
@@ -65,15 +68,17 @@ func execute(schema *sch.Schema, file, group, level string, quiet, failFast bool
 	}
 	var (
 		count int
-		pass int
+		pass  int
 	)
+	file = filepath.Base(file)
+	file = strings.TrimSuffix(file, ".xml")
 	for res := range schema.Exec(doc, keepAssert(group, level)) {
 		count++
 		if !res.Failed() {
 			pass++
 		}
 		if !quiet {
-			printResult(res, count)
+			printResult(res, file, count)
 		}
 		if failFast && res.Failed() {
 			break
@@ -91,7 +96,7 @@ func execute(schema *sch.Schema, file, group, level string, quiet, failFast bool
 	return nil
 }
 
-func printResult(res sch.Result, ix int) {
+func printResult(res sch.Result, file string, ix int) {
 	var msg string
 	if res.Failed() {
 		msg = res.Error.Error()
@@ -100,7 +105,7 @@ func printResult(res sch.Result, ix int) {
 		msg = "ok"
 	}
 	fmt.Print(getColor(res))
-	fmt.Printf(pattern, ix, res.Level, res.Ident, res.Pass, res.Total, msg)
+	fmt.Printf(pattern, file, ix, res.Level, res.Ident, res.Pass, res.Total, msg)
 	fmt.Println("\033[0m")
 }
 
