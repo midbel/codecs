@@ -72,6 +72,10 @@ func Open(file string) (*Schema, error) {
 		return nil, err
 	}
 	defer r.Close()
+	return Parse(r)
+}
+
+func Parse(r io.Reader) (*Schema, error) {
 	return parseSchema(r)
 }
 

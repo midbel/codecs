@@ -4,6 +4,9 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"net/http"
+	"net/url"
+	"io"
 	"strings"
 
 	"github.com/midbel/codecs/sch"
@@ -15,11 +18,11 @@ func main() {
 		level = flag.String("l", "", "severity level")
 		group = flag.String("g", "", "group")
 		list  = flag.Bool("p", false, "print assertions defined in schema")
-		// skipZero = flag.Bool("skip-zero", false, "skip tests with no nodes matching rules context")
 		failFast = flag.Bool("fail-fast", false, "stop processing on first error")
+		quiet = flag.Bool("q", false, "produce small output")
 	)
 	flag.Parse()
-	schema, err := sch.Open(flag.Arg(0))
+	schema, err := parseSchema(flag.Arg(0))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
@@ -28,27 +31,62 @@ func main() {
 		print(schema, *group, *level)
 		return
 	}
-	err = execute(schema, flag.Arg(1), *group, *level, *failFast)
+	err = execute(schema, flag.Arg(1), *group, *level, *quiet, *failFast)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
 }
 
+func parseSchema(file string) (*sch.Schema, error) {
+	u, err := url.Parse(file)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+		return sch.Open(file)
+	}
+	res, err := http.Get(file)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		var str strings.Builder
+		io.Copy(&str, res.Body)
+		return nil, fmt.Errorf(str.String())
+	}
+	return sch.Parse(res.Body)
+}
+
 const pattern = "%-4d | %8s | %-32s | %3d/%-3d | %s"
 
-func execute(schema *sch.Schema, file, group, level string, failFast bool) error {
+func execute(schema *sch.Schema, file, group, level string, quiet, failFast bool) error {
 	doc, err := parseDocument(file)
 	if err != nil {
 		return err
 	}
-	var ix int
+	var (
+		count int
+		pass int
+	)
 	for res := range schema.Exec(doc, keepAssert(group, level)) {
-		ix++
-		printResult(res, ix)
+		count++
+		if !res.Failed() {
+			pass++
+		}
+		if !quiet {
+			printResult(res, count)
+		}
 		if failFast && res.Failed() {
 			break
 		}
+	}
+	fmt.Printf("%d assertions", count)
+	fmt.Println()
+	fmt.Printf("%d pass", pass)
+	fmt.Println()
+	fmt.Printf("%d failed", count-pass)
+	fmt.Println()
+	if count != pass {
+		return fmt.Errorf("document is not valid")
 	}
 	return nil
 }
