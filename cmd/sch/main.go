@@ -21,6 +21,7 @@ func main() {
 		list     = flag.Bool("p", false, "print assertions defined in schema")
 		failFast = flag.Bool("fail-fast", false, "stop processing on first error")
 		quiet    = flag.Bool("q", false, "produce small output")
+		// report   = flag.String("o", "", "report format (html, csv, xml)")
 	)
 	flag.Parse()
 	schema, err := parseSchema(flag.Arg(0))
@@ -28,12 +29,13 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
+	keep := keepAssert(*group, *level)
 	if *list {
-		print(schema, *group, *level)
+		print(schema, keep)
 		return
 	}
 	for i := 1; i < flag.NArg(); i++ {
-		err := execute(schema, flag.Arg(i), *group, *level, *quiet, *failFast)
+		err := execute(schema, flag.Arg(i), *quiet, *failFast, keep)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s: %s", flag.Arg(i), err)
 			fmt.Fprintln(os.Stderr)
@@ -61,7 +63,7 @@ func parseSchema(file string) (*sch.Schema, error) {
 
 const pattern = "%s | %-4d | %8s | %-32s | %3d/%-3d | %s"
 
-func execute(schema *sch.Schema, file, group, level string, quiet, failFast bool) error {
+func execute(schema *sch.Schema, file string, quiet, failFast bool, keep sch.FilterFunc) error {
 	doc, err := parseDocument(file)
 	if err != nil {
 		return err
@@ -109,11 +111,8 @@ func printResult(res sch.Result, file string, ix int) {
 	fmt.Println("\033[0m")
 }
 
-func print(schema *sch.Schema, group, level string) {
-	var (
-		keep  = keepAssert(group, level)
-		count int
-	)
+func print(schema *sch.Schema, keep sch.FilterFunc) {
+	var count int
 	for a := range schema.Asserts() {
 		if !keep(a) {
 			continue
