@@ -1,6 +1,7 @@
 package sch
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -13,33 +14,6 @@ import (
 )
 
 var ErrAssert = errors.New("assertion error")
-
-type ListError struct {
-	Errors []error
-}
-
-func (e *ListError) ErrOrNil() error {
-	if e.Zero() {
-		return nil
-	}
-	return e
-}
-
-func (e *ListError) Zero() bool {
-	return len(e.Errors) == 0
-}
-
-func (e *ListError) Push(err error) {
-	if e1, ok := err.(*ListError); ok {
-		e.Errors = slices.Concat(e.Errors, e1.Errors)
-	} else {
-		e.Errors = append(e.Errors, err)
-	}
-}
-
-func (e *ListError) Error() string {
-	return fmt.Sprintf("%d errors detected", len(e.Errors))
-}
 
 type Namespace struct {
 	URI    string
@@ -94,14 +68,14 @@ func Open(file string) (*Schema, error) {
 	return parseSchema(r)
 }
 
-func (s *Schema) Exec(doc *xml.Document) (iter.Seq[Result], error) {
+func (s *Schema) Exec(doc *xml.Document) iter.Seq[Result] {
+	return s.ExecContext(context.Background(), doc)
+}
+
+func (s *Schema) ExecContext(ctx context.Context, doc *xml.Document) iter.Seq[Result] {
 	fn := func(yield func(Result) bool) {
 		for _, p := range s.Patterns {
-			it, err := p.Exec(doc)
-			if err != nil {
-				return
-			}
-			for r := range it {
+			for r := range p.ExecContext(ctx, doc) {
 				ok := yield(r)
 				if !ok {
 					return
@@ -109,7 +83,7 @@ func (s *Schema) Exec(doc *xml.Document) (iter.Seq[Result], error) {
 			}
 		}
 	}
-	return fn, nil
+	return fn
 }
 
 func (s *Schema) Asserts() iter.Seq[*Assert] {
@@ -133,14 +107,14 @@ type Pattern struct {
 	Rules []*Rule
 }
 
-func (p *Pattern) Exec(doc *xml.Document) (iter.Seq[Result], error) {
+func (p *Pattern) Exec(doc *xml.Document) iter.Seq[Result] {
+	return p.ExecContext(context.Background(), doc)
+}
+
+func (p *Pattern) ExecContext(ctx context.Context, doc *xml.Document) iter.Seq[Result] {
 	fn := func(yield func(Result) bool) {
 		for _, r := range p.Rules {
-			it, err := r.Exec(doc)
-			if err != nil {
-				return
-			}
-			for r := range it {
+			for r := range r.ExecContext(ctx, doc) {
 				ok := yield(r)
 				if !ok {
 					return
@@ -148,7 +122,7 @@ func (p *Pattern) Exec(doc *xml.Document) (iter.Seq[Result], error) {
 			}
 		}
 	}
-	return fn, nil
+	return fn
 }
 
 func (p *Pattern) Asserts() iter.Seq[*Assert] {
@@ -189,13 +163,34 @@ func (r *Rule) Count(doc *xml.Document) (int, error) {
 	return len(items), err
 }
 
-func (r *Rule) Exec(doc *xml.Document) (iter.Seq[Result], error) {
-	items, err := r.getItems(doc)
-	if err != nil {
-		return nil, err
-	}
+func (r *Rule) Exec(doc *xml.Document) iter.Seq[Result] {
+	return r.ExecContext(context.Background(), doc)
+}
+
+func (r *Rule) ExecContext(ctx context.Context, doc *xml.Document) iter.Seq[Result] {
 	fn := func(yield func(Result) bool) {
+		items, err := r.getItems(doc)
+		if err != nil {
+			res := Result{
+				Ident: "rule",
+				Level: "fatal",
+				Error: err,
+			}
+			yield(res)
+			return
+		}
 		for _, a := range r.Asserts {
+			if err := ctx.Err(); err != nil {
+				res := Result{
+					Ident:   a.Ident,
+					Level:   "fatal",
+					Message: "cancel",
+					Total:   len(items),
+					Error:   err,
+				}
+				yield(res)
+				return
+			}
 			pass, err := a.Eval(items, r)
 
 			res := Result{
@@ -213,7 +208,7 @@ func (r *Rule) Exec(doc *xml.Document) (iter.Seq[Result], error) {
 			}
 		}
 	}
-	return fn, nil
+	return fn
 }
 
 func (r *Rule) getItems(doc *xml.Document) ([]xml.Item, error) {

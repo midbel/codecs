@@ -42,12 +42,8 @@ func execute(schema *sch.Schema, file, group, level string) error {
 	if err != nil {
 		return err
 	}
-	it, err := schema.Exec(doc)
-	if err != nil {
-		return err
-	}
 	var ix int
-	for res := range it {
+	for res := range schema.Exec(doc) {
 		ix++
 		var msg string
 		if res.Failed() {
