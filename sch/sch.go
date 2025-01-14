@@ -15,6 +15,11 @@ import (
 
 var ErrAssert = errors.New("assertion error")
 
+const (
+	LevelFatal = "fatal"
+	LevelWarn = "warning"
+)
+
 type FilterFunc func(*Assert) bool
 
 type Namespace struct {
@@ -174,8 +179,8 @@ func (r *Rule) ExecContext(ctx context.Context, doc *xml.Document, keep FilterFu
 		items, err := r.getItems(doc)
 		if err != nil {
 			res := Result{
-				Ident: "rule",
-				Level: "fatal",
+				Ident: "RULE",
+				Level: LevelFatal,
 				Error: err,
 			}
 			yield(res)
@@ -185,7 +190,7 @@ func (r *Rule) ExecContext(ctx context.Context, doc *xml.Document, keep FilterFu
 			if err := ctx.Err(); err != nil {
 				res := Result{
 					Ident:   a.Ident,
-					Level:   "fatal",
+					Level:   LevelFatal,
 					Message: "cancel",
 					Total:   len(items),
 					Error:   err,

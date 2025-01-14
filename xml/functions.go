@@ -58,7 +58,11 @@ var builtins = map[string]builtinFunc{
 type builtinFunc func(Context, []Expr) ([]Item, error)
 
 func callExists(ctx Context, args []Expr) ([]Item, error) {
-	return nil, errImplemented
+	items, err := expandArgs(ctx, args)
+	if err != nil {
+		return nil, err
+	}
+	return singleValue(!isEmpty(items)), nil
 }
 
 func callDecimal(ctx Context, args []Expr) ([]Item, error) {

@@ -16,7 +16,7 @@ func main() {
 		group = flag.String("g", "", "group")
 		list  = flag.Bool("p", false, "print assertions defined in schema")
 		// skipZero = flag.Bool("skip-zero", false, "skip tests with no nodes matching rules context")
-		// failFast = flag.Bool("fail-fast", false, "stop processing on first error")
+		failFast = flag.Bool("fail-fast", false, "stop processing on first error")
 	)
 	flag.Parse()
 	schema, err := sch.Open(flag.Arg(0))
@@ -28,7 +28,7 @@ func main() {
 		print(schema, *group, *level)
 		return
 	}
-	err = execute(schema, flag.Arg(1), *group, *level)
+	err = execute(schema, flag.Arg(1), *group, *level, *failFast)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
@@ -37,7 +37,7 @@ func main() {
 
 const pattern = "%-4d | %8s | %-32s | %3d/%-3d | %s"
 
-func execute(schema *sch.Schema, file, group, level string) error {
+func execute(schema *sch.Schema, file, group, level string, failFast bool) error {
 	doc, err := parseDocument(file)
 	if err != nil {
 		return err
@@ -45,6 +45,15 @@ func execute(schema *sch.Schema, file, group, level string) error {
 	var ix int
 	for res := range schema.Exec(doc, keepAssert(group, level)) {
 		ix++
+		printResult(res, ix)
+		if failFast && res.Failed() {
+			break
+		}
+	}
+	return nil
+}
+
+func printResult(res sch.Result, ix int) {
 		var msg string
 		if res.Failed() {
 			msg = res.Error.Error()
@@ -54,12 +63,7 @@ func execute(schema *sch.Schema, file, group, level string) error {
 		}
 		fmt.Print(getColor(res))
 		fmt.Printf(pattern, ix, res.Level, res.Ident, res.Pass, res.Total, msg)
-		if res.Failed() {
-			fmt.Print("\033[0m")
-		}
-		fmt.Println()
-	}
-	return nil
+		fmt.Println("\033[0m")
 }
 
 func print(schema *sch.Schema, group, level string) {
@@ -85,9 +89,9 @@ func getColor(res sch.Result) string {
 		return ""
 	}
 	switch res.Level {
-	case "warning":
+	case sch.LevelWarn:
 		return "\033[33m"
-	case "fatal":
+	case sch.LevelFatal:
 		return "\033[31m"
 	default:
 		return ""
