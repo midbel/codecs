@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -53,6 +54,10 @@ var builtins = map[string]builtinFunc{
 	"current-datetime": callCurrentDatetime,
 	"decimal":          callDecimal,
 	"exists":           callExists,
+	"empty":            callEmpty,
+	"tail":             callTail,
+	"head":             callHead,
+	"reverse":          callReverse,
 }
 
 type builtinFunc func(Context, []Expr) ([]Item, error)
@@ -63,6 +68,45 @@ func callExists(ctx Context, args []Expr) ([]Item, error) {
 		return nil, err
 	}
 	return singleValue(!isEmpty(items)), nil
+}
+
+func callEmpty(ctx Context, args []Expr) ([]Item, error) {
+	items, err := expandArgs(ctx, args)
+	if err != nil {
+		return nil, err
+	}
+	return singleValue(isEmpty(items)), nil
+}
+
+func callHead(ctx Context, args []Expr) ([]Item, error) {
+	items, err := expandArgs(ctx, args)
+	if err != nil {
+		return nil, err
+	}
+	if isEmpty(items) {
+		return nil, nil
+	}
+	return createSingle(items[0]), nil
+}
+
+func callTail(ctx Context, args []Expr) ([]Item, error) {
+	items, err := expandArgs(ctx, args)
+	if err != nil {
+		return nil, err
+	}
+	if isEmpty(items) {
+		return nil, nil
+	}
+	return items[1:], nil
+}
+
+func callReverse(ctx Context, args []Expr) ([]Item, error) {
+	items, err := expandArgs(ctx, args)
+	if err != nil {
+		return nil, err
+	}
+	slices.Reverse(items)
+	return items, nil
 }
 
 func callDecimal(ctx Context, args []Expr) ([]Item, error) {

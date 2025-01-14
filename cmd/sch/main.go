@@ -54,16 +54,16 @@ func execute(schema *sch.Schema, file, group, level string, failFast bool) error
 }
 
 func printResult(res sch.Result, ix int) {
-		var msg string
-		if res.Failed() {
-			msg = res.Error.Error()
-			msg = shorten(msg, 48)
-		} else {
-			msg = "ok"
-		}
-		fmt.Print(getColor(res))
-		fmt.Printf(pattern, ix, res.Level, res.Ident, res.Pass, res.Total, msg)
-		fmt.Println("\033[0m")
+	var msg string
+	if res.Failed() {
+		msg = res.Error.Error()
+		msg = shorten(msg, 48)
+	} else {
+		msg = "ok"
+	}
+	fmt.Print(getColor(res))
+	fmt.Printf(pattern, ix, res.Level, res.Ident, res.Pass, res.Total, msg)
+	fmt.Println("\033[0m")
 }
 
 func print(schema *sch.Schema, group, level string) {

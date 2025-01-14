@@ -17,7 +17,7 @@ var ErrAssert = errors.New("assertion error")
 
 const (
 	LevelFatal = "fatal"
-	LevelWarn = "warning"
+	LevelWarn  = "warning"
 )
 
 type FilterFunc func(*Assert) bool
