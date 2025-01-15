@@ -20,6 +20,7 @@ func main() {
 		group    = flag.String("g", "", "group")
 		list     = flag.Bool("p", false, "print assertions defined in schema")
 		failFast = flag.Bool("fail-fast", false, "stop processing on first error")
+		skipZero = flag.Bool("ignore-zero", false, "discard line with zero items")
 		quiet    = flag.Bool("q", false, "produce small output")
 		// report   = flag.String("o", "", "report format (html, csv, xml)")
 	)
@@ -35,7 +36,7 @@ func main() {
 		return
 	}
 	for i := 1; i < flag.NArg(); i++ {
-		err := execute(schema, flag.Arg(i), *quiet, *failFast, keep)
+		err := execute(schema, flag.Arg(i), *quiet, *failFast, *skipZero, keep)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s: %s", flag.Arg(i), err)
 			fmt.Fprintln(os.Stderr)
@@ -63,7 +64,7 @@ func parseSchema(file string) (*sch.Schema, error) {
 
 const pattern = "%s | %-4d | %8s | %-32s | %3d/%-3d | %s"
 
-func execute(schema *sch.Schema, file string, quiet, failFast bool, keep sch.FilterFunc) error {
+func execute(schema *sch.Schema, file string, quiet, failFast, ignoreZero bool, keep sch.FilterFunc) error {
 	doc, err := parseDocument(file)
 	if err != nil {
 		return err
@@ -78,6 +79,9 @@ func execute(schema *sch.Schema, file string, quiet, failFast bool, keep sch.Fil
 		count++
 		if !res.Failed() {
 			pass++
+		}
+		if res.Total == 0 && ignoreZero {
+			continue
 		}
 		if !quiet {
 			printResult(res, file, count)

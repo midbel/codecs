@@ -63,6 +63,9 @@ var builtins = map[string]builtinFunc{
 type builtinFunc func(Context, []Expr) ([]Item, error)
 
 func callExists(ctx Context, args []Expr) ([]Item, error) {
+	if len(args) != 1 {
+		return nil, errArgument
+	}
 	items, err := expandArgs(ctx, args)
 	if err != nil {
 		return nil, err
@@ -71,6 +74,9 @@ func callExists(ctx Context, args []Expr) ([]Item, error) {
 }
 
 func callEmpty(ctx Context, args []Expr) ([]Item, error) {
+	if len(args) != 1 {
+		return nil, errArgument
+	}
 	items, err := expandArgs(ctx, args)
 	if err != nil {
 		return nil, err
@@ -79,6 +85,9 @@ func callEmpty(ctx Context, args []Expr) ([]Item, error) {
 }
 
 func callHead(ctx Context, args []Expr) ([]Item, error) {
+	if len(args) != 1 {
+		return nil, errArgument
+	}
 	items, err := expandArgs(ctx, args)
 	if err != nil {
 		return nil, err
@@ -90,6 +99,9 @@ func callHead(ctx Context, args []Expr) ([]Item, error) {
 }
 
 func callTail(ctx Context, args []Expr) ([]Item, error) {
+	if len(args) != 1 {
+		return nil, errArgument
+	}
 	items, err := expandArgs(ctx, args)
 	if err != nil {
 		return nil, err
@@ -101,6 +113,9 @@ func callTail(ctx Context, args []Expr) ([]Item, error) {
 }
 
 func callReverse(ctx Context, args []Expr) ([]Item, error) {
+	if len(args) != 1 {
+		return nil, errArgument
+	}
 	items, err := expandArgs(ctx, args)
 	if err != nil {
 		return nil, err
