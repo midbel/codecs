@@ -59,6 +59,7 @@ func (r Result) Status() string {
 
 type Schema struct {
 	Title string
+	Mode  xml.StepMode
 	xml.Environ
 
 	Patterns  []*Pattern
@@ -291,10 +292,11 @@ func isTrue(res []xml.Item) bool {
 func parseSchema(r io.Reader) (*Schema, error) {
 	var (
 		rs  = xml.NewReader(r)
+		err error
 		sch Schema
 	)
 	sch.Environ = xml.Empty()
-	if err := readIntro(rs); err != nil {
+	if sch.Mode, err = readIntro(rs); err != nil {
 		return nil, err
 	}
 	for {
@@ -509,10 +511,10 @@ func readFunction(rs *xml.Reader, elem *xml.Element) error {
 	return nil
 }
 
-func readIntro(rs *xml.Reader) error {
+func readIntro(rs *xml.Reader) (xml.StepMode, error) {
 	node, err := rs.Read()
 	if err != nil && !errors.Is(err, xml.ErrClosed) {
-		return err
+		return 0, err
 	}
 	switch node := node.(type) {
 	case *xml.Instruction:
@@ -521,14 +523,27 @@ func readIntro(rs *xml.Reader) error {
 		return readIntro(rs)
 	case *xml.Element:
 		if node.QualifiedName() != "schema" {
-			return unexpectedElement("intro", node)
+			return 0, unexpectedElement("intro", node)
 		}
 		if _, err := getTitleElement(rs); err != nil {
-			return err
+			return 0, err
 		}
-		return nil
+		ix := slices.IndexFunc(node.Attrs, func(a xml.Attribute) bool {
+			return a.Name == "queryBinding"
+		})
+		if ix < 0 {
+			return xml.ModeDefault, nil
+		}
+		switch binding := node.Attrs[ix].Value(); binding {
+		case "xslt2", "xslt3":
+			return xml.ModeXsl, nil
+		case "xpath2", "xpath3":
+			return xml.ModeXpath, nil
+		default:
+			return 0, fmt.Errorf("%s: unsupported query binding value", binding)
+		}
 	default:
-		return unexpectedElement("intro", node)
+		return 0, unexpectedElement("intro", node)
 	}
 }
 

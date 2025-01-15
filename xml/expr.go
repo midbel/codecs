@@ -61,7 +61,7 @@ func fromBase(expr, base Expr) Expr {
 		if atRoot(e) {
 			return e
 		}
-		e.curr = transform(e.curr, base)
+		e.curr = fromBase(e.curr, base)
 		return e
 	case filter:
 		if atRoot(e.expr) {

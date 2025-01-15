@@ -74,7 +74,7 @@ func execute(schema *sch.Schema, file string, quiet, failFast bool, keep sch.Fil
 	)
 	file = filepath.Base(file)
 	file = strings.TrimSuffix(file, ".xml")
-	for res := range schema.Exec(doc, keepAssert(group, level)) {
+	for res := range schema.Exec(doc, keep) {
 		count++
 		if !res.Failed() {
 			pass++
