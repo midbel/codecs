@@ -78,15 +78,36 @@ func callRound(ctx Context, args []Expr) ([]Item, error) {
 }
 
 func callFloor(ctx Context, args []Expr) ([]Item, error) {
-	return nil, errImplemented
+	if len(args) != 1 {
+		return nil, errArgument
+	}
+	val, err := getFloatFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	return singleValue(math.Floor(val)), nil
 }
 
 func callCeil(ctx Context, args []Expr) ([]Item, error) {
-	return nil, errImplemented
+	if len(args) != 1 {
+		return nil, errArgument
+	}
+	val, err := getFloatFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	return singleValue(math.Ceil(val)), nil
 }
 
 func callAbs(ctx Context, args []Expr) ([]Item, error) {
-	return nil, errImplemented
+	if len(args) != 1 {
+		return nil, errArgument
+	}
+	val, err := getFloatFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	return singleValue(math.Abs(val)), nil
 }
 
 func callExists(ctx Context, args []Expr) ([]Item, error) {

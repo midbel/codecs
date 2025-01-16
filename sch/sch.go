@@ -32,7 +32,12 @@ type Let struct {
 	Value string
 }
 
-type Function struct{}
+type Function struct {
+	xml.QName
+	Return string
+	args   []string
+	body   []xml.Expr
+}
 
 type Result struct {
 	Ident   string
@@ -351,7 +356,8 @@ func readTop(rs *xml.Reader, node *xml.Element, sch *Schema) error {
 	case "phase":
 		return readPhase(rs, node)
 	case "function":
-		return readFunction(rs, node)
+		_, err := readFunction(rs, node)
+		return err
 	default:
 		return unexpectedElement("top", node)
 	}
@@ -501,14 +507,133 @@ func readPhase(rs *xml.Reader, elem *xml.Element) error {
 	return nil
 }
 
-func readFunction(rs *xml.Reader, elem *xml.Element) error {
+func readFunction(rs *xml.Reader, elem *xml.Element) (*Function, error) {
+	var (
+		fn  Function
+		err error
+	)
+	fn.QName.Name, err = getAttribute(elem, "name")
+	if err != nil {
+		return nil, err
+	}
+	fn.Return, err = getAttribute(elem, "as")
+	if err != nil {
+		return nil, err
+	}
 	for {
-		el, err := rs.Read()
-		if errors.Is(err, xml.ErrClosed) && el.QualifiedName() == "function" {
+		node, err := rs.Read()
+		if errors.Is(err, xml.ErrClosed) && node.QualifiedName() == "function" {
+			break
+		}
+		el, ok := node.(*xml.Element)
+		if !ok {
+			return nil, unexpectedElement("function", node)
+		}
+		switch el.QualifiedName() {
+		case "param":
+			n, err1 := getAttribute(el, "name")
+			fmt.Println("param", n, err1)
+			if err1 != nil {
+				return nil, err1
+			}
+			ok := slices.Contains(fn.args, n)
+			if ok {
+				return nil, fmt.Errorf("function: duplicate argument %s", n)
+			}
+			fn.args = append(fn.args, n)
+			if !errors.Is(err, xml.ErrClosed) {
+				return nil, fmt.Errorf("param should be self closing element")
+			}
+		case "variable":
+			_, selfClosed, err1 := readVariable(rs, el)
+			if err1 != nil {
+				return nil, err1
+			}
+			if selfClosed && !errors.Is(err, xml.ErrClosed) {
+				return nil, fmt.Errorf("variable should be self closing element")
+			}
+		case "value-of":
+			q, err1 := getAttribute(el, "select")
+			fmt.Println("value-of/select", q, err1)
+			if err1 != nil {
+				return nil, err1
+			}
+			// expr, err := compileExpr(q)
+			// if err != nil {
+			// 	return nil, err
+			// }
+			// _ = expr
+			if !errors.Is(err, xml.ErrClosed) {
+				return nil, fmt.Errorf("value-of should be self closing element")
+			}
+		case "sequence":
+			q, err1 := getAttribute(el, "select")
+			fmt.Println("sequence/select", q, err1)
+			if err1 != nil {
+				return nil, err1
+			}
+			// expr, err := compileExpr(q)
+			// if err != nil {
+			// 	return nil, err
+			// }
+			// _ = expr
+			if !errors.Is(err, xml.ErrClosed) {
+				return nil, fmt.Errorf("sequence should be self closing element")
+			}
+		case "choose":
+			err := readChoose(rs)
+			fmt.Println("after choose", err)
+			if err != nil {
+				return nil, err
+			}
+		default:
+			return nil, unexpectedElement("function", node)
+		}
+	}
+	return &fn, nil
+}
+
+func readChoose(rs *xml.Reader) error {
+	for {
+		node, err := rs.Read()
+		if errors.Is(err, xml.ErrClosed) && node.QualifiedName() == "choose" {
 			break
 		}
 	}
 	return nil
+}
+
+func readVariable(rs *xml.Reader, el *xml.Element) (xml.Expr, bool, error) {
+	n, err := getAttribute(el, "name")
+	fmt.Println("variable/name", n, err)
+	if err != nil {
+		return nil, false, err
+	}
+	var selfClosed bool
+	_ = n
+	q, err := getAttribute(el, "select")
+	if err != nil {
+		node, err := rs.Read()
+		if err != nil {
+			return nil, selfClosed, err
+		}
+		if node.Type() != xml.TypeText {
+			return nil, selfClosed, unexpectedElement("variable", node)
+		}
+		q = node.Value()
+		if err := isClosed(rs, "variable"); err != nil {
+			return nil, selfClosed, err
+		}
+	} else {
+		selfClosed = true
+	}
+	fmt.Println("variable/select", q, err)
+	// expr, err := compileExpr(q)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// _ = expr
+	return nil, selfClosed, nil
 }
 
 func readIntro(rs *xml.Reader) (xml.StepMode, error) {

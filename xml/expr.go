@@ -117,6 +117,10 @@ const (
 	ModeXsl     = ModeXsl3
 )
 
+type Callable interface {
+	Call(ctx Context, args []Expr) ([]Item, error)
+}
+
 type Expr interface {
 	Find(Node) ([]Item, error)
 	find(Context) ([]Item, error)
