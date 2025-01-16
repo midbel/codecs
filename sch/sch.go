@@ -258,7 +258,7 @@ func (a *Assert) Eval(items []xml.Item, env xml.Environ) (int, error) {
 	for i := range items {
 		res, err := items[i].Assert(test, env)
 		if err != nil {
-			return 0, err
+			return 0, fmt.Errorf("%s (%s)", a.Message, err)
 		}
 		ok := isTrue(res)
 		if !ok {

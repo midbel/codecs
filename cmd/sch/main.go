@@ -22,6 +22,7 @@ func main() {
 		failFast = flag.Bool("fail-fast", false, "stop processing on first error")
 		skipZero = flag.Bool("ignore-zero", false, "discard line with zero items")
 		quiet    = flag.Bool("q", false, "produce small output")
+		rootNs = flag.String("root-namespace", "", "modify namespace of root element")
 		// report   = flag.String("o", "", "report format (html, csv, xml)")
 	)
 	flag.Parse()
@@ -36,7 +37,7 @@ func main() {
 		return
 	}
 	for i := 1; i < flag.NArg(); i++ {
-		err := execute(schema, flag.Arg(i), *quiet, *failFast, *skipZero, keep)
+		err := execute(schema, flag.Arg(i), *rootNs, *quiet, *failFast, *skipZero, keep)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s: %s", flag.Arg(i), err)
 			fmt.Fprintln(os.Stderr)
@@ -64,8 +65,8 @@ func parseSchema(file string) (*sch.Schema, error) {
 
 const pattern = "%s | %-4d | %8s | %-32s | %3d/%-3d | %s"
 
-func execute(schema *sch.Schema, file string, quiet, failFast, ignoreZero bool, keep sch.FilterFunc) error {
-	doc, err := parseDocument(file)
+func execute(schema *sch.Schema, file, rootns string, quiet, failFast, ignoreZero bool, keep sch.FilterFunc) error {
+	doc, err := parseDocument(file, rootns)
 	if err != nil {
 		return err
 	}
@@ -183,7 +184,7 @@ func keepAssert(group, level string) sch.FilterFunc {
 	return keep
 }
 
-func parseDocument(file string) (*xml.Document, error) {
+func parseDocument(file, rootns string) (*xml.Document, error) {
 	r, err := os.Open(file)
 	if err != nil {
 		return nil, err
@@ -191,5 +192,8 @@ func parseDocument(file string) (*xml.Document, error) {
 	defer r.Close()
 
 	doc, err := xml.NewParser(r).Parse()
+	if err == nil {
+		doc.SetRootNamespace(rootns)
+	}
 	return doc, err
 }

@@ -88,6 +88,19 @@ func (d *Document) WriteString() (string, error) {
 	return buf.String(), err
 }
 
+func (d *Document) SetRootNamespace(ns string) {
+	if ns == "" {
+		return
+	}
+	root := d.Root()
+	if root == nil {
+		return
+	}
+	if el, ok := root.(*Element); ok {
+		el.Space = ns
+	}
+}
+
 func (d *Document) GetElementById(id string) (Node, error) {
 	root := d.Root()
 	if el, ok := root.(*Element); ok {
