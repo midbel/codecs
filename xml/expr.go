@@ -327,11 +327,20 @@ func (a axis) find(ctx Context) ([]Item, error) {
 		}
 		return nil, nil
 	case ancestorAxis, ancestorSelfAxis:
-		for p := ctx.Node.Parent(); p != nil; {
+		node := ctx.Node.Parent()
+		for {
+			if node == nil {
+				break
+			}
+			p := node.Parent()
+			if p == nil {
+				break
+			}
 			other, err := a.next.find(createContext(p, 1, 1))
 			if err == nil {
 				list = slices.Concat(list, other)
 			}
+			node = p
 		}
 	case descendantAxis, descendantSelfAxis:
 		others, err := a.descendant(ctx)
