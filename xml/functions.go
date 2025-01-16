@@ -58,9 +58,36 @@ var builtins = map[string]builtinFunc{
 	"tail":             callTail,
 	"head":             callHead,
 	"reverse":          callReverse,
+	"round":            callRound,
+	"floor":            callFloor,
+	"ceil":             callCeil,
+	"abs":              callAbs,
 }
 
 type builtinFunc func(Context, []Expr) ([]Item, error)
+
+func callRound(ctx Context, args []Expr) ([]Item, error) {
+	if len(args) < 1 && len(args) > 2 {
+		return nil, errArgument
+	}
+	val, err := getFloatFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	return singleValue(math.Round(val)), nil
+}
+
+func callFloor(ctx Context, args []Expr) ([]Item, error) {
+	return nil, errImplemented
+}
+
+func callCeil(ctx Context, args []Expr) ([]Item, error) {
+	return nil, errImplemented
+}
+
+func callAbs(ctx Context, args []Expr) ([]Item, error) {
+	return nil, errImplemented
+}
 
 func callExists(ctx Context, args []Expr) ([]Item, error) {
 	if len(args) != 1 {
@@ -320,7 +347,26 @@ func callCompare(ctx Context, args []Expr) ([]Item, error) {
 }
 
 func callConcat(ctx Context, args []Expr) ([]Item, error) {
-	return nil, errImplemented
+	if len(args) < 2 {
+		return nil, errArgument
+	}
+	items, err := expandArgs(ctx, args)
+	if err != nil {
+		return nil, err
+	}
+	var list []string
+	for _, i := range items {
+		if !i.Atomic() {
+			return nil, fmt.Errorf("literal value expected")
+		}
+		str, err := toString(i.Value())
+		if err != nil {
+			return nil, err
+		}
+		list = append(list, str)
+	}
+	str := strings.Join(list, "")
+	return singleValue(str), nil
 }
 
 func callStringJoin(ctx Context, args []Expr) ([]Item, error) {
@@ -683,6 +729,14 @@ func callTrue(_ Context, _ []Expr) ([]Item, error) {
 
 func callFalse(_ Context, _ []Expr) ([]Item, error) {
 	return singleValue(false), nil
+}
+
+func getFloatFromExpr(expr Expr, ctx Context) (float64, error) {
+	items, err := expr.find(ctx)
+	if err != nil || len(items) != 1 {
+		return math.NaN(), err
+	}
+	return toFloat(items[0].Value())
 }
 
 func getStringFromExpr(expr Expr, ctx Context) (string, error) {

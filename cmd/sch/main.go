@@ -22,7 +22,7 @@ func main() {
 		failFast = flag.Bool("fail-fast", false, "stop processing on first error")
 		skipZero = flag.Bool("ignore-zero", false, "discard line with zero items")
 		quiet    = flag.Bool("q", false, "produce small output")
-		rootNs = flag.String("root-namespace", "", "modify namespace of root element")
+		rootNs   = flag.String("root-namespace", "", "modify namespace of root element")
 		// report   = flag.String("o", "", "report format (html, csv, xml)")
 	)
 	flag.Parse()

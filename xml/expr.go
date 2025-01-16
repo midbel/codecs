@@ -631,7 +631,7 @@ func (c call) find(ctx Context) ([]Item, error) {
 		return nil, fmt.Errorf("%s: %w function", c.ident, ErrUndefined)
 	}
 	if fn == nil {
-		return nil, fmt.Errorf("%s: %s", c.ident, errImplemented)
+		return nil, fmt.Errorf("%s: %s", errImplemented, c.ident)
 	}
 	items, err := fn(ctx, c.args)
 	if err != nil {
