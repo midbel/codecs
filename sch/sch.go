@@ -211,7 +211,7 @@ func (r *Rule) ExecContext(ctx context.Context, doc *xml.Document, keep FilterFu
 			if ok := keep(a); !ok {
 				continue
 			}
-			pass, err := a.Eval(items, r)
+			pass, err := a.Eval(ctx, items, r)
 
 			res := Result{
 				Ident:   a.Ident,
@@ -254,13 +254,16 @@ type Assert struct {
 	Message string
 }
 
-func (a *Assert) Eval(items []xml.Item, env xml.Environ) (int, error) {
+func (a *Assert) Eval(ctx context.Context, items []xml.Item, env xml.Environ) (int, error) {
 	test, err := compileExpr(a.Test)
 	if err != nil {
 		return 0, err
 	}
 	var pass int
 	for i := range items {
+		if err := ctx.Err(); err != nil {
+			return pass, err
+		}
 		res, err := items[i].Assert(test, env)
 		if err != nil {
 			return 0, fmt.Errorf("%s (%s)", a.Message, err)
