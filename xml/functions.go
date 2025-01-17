@@ -534,22 +534,6 @@ func callEndsWith(ctx Context, args []Expr) ([]Item, error) {
 	return singleValue(res), nil
 }
 
-func callSubstringBefore(ctx Context, args []Expr) ([]Item, error) {
-	if len(args) != 2 {
-		return nil, errArgument
-	}
-	fst, err := getStringFromExpr(args[0], ctx)
-	if err != nil {
-		return nil, err
-	}
-	snd, err := getStringFromExpr(args[1], ctx)
-	if err != nil {
-		return nil, err
-	}
-	str, _ := strings.CutPrefix(fst, snd)
-	return singleValue(str), nil
-}
-
 func callTokenize(ctx Context, args []Expr) ([]Item, error) {
 	if len(args) != 2 {
 		return nil, errArgument
@@ -601,7 +585,29 @@ func callSubstringAfter(ctx Context, args []Expr) ([]Item, error) {
 	if err != nil {
 		return nil, err
 	}
-	str, _ := strings.CutSuffix(fst, snd)
+	_, str, ok := strings.Cut(fst, snd)
+	if !ok {
+		return singleValue(""), nil
+	}
+	return singleValue(str), nil
+}
+
+func callSubstringBefore(ctx Context, args []Expr) ([]Item, error) {
+	if len(args) != 2 {
+		return nil, errArgument
+	}
+	fst, err := getStringFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	snd, err := getStringFromExpr(args[1], ctx)
+	if err != nil {
+		return nil, err
+	}
+	str, _, ok := strings.Cut(fst, snd)
+	if !ok {
+		return singleValue(""), nil
+	}
 	return singleValue(str), nil
 }
 
