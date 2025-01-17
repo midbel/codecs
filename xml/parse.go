@@ -36,9 +36,9 @@ const (
 	powAdd
 	powMul
 	powPrefix
-	powCall
 	powPred
 	powLevel
+	powCall
 )
 
 var bindings = map[rune]int{
