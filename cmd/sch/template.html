@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>schema</title>
+  <style>
+    table{
+      width: 100%;
+      border-collapse:collapse
+    }
+    table tbody th{
+      width: 30%
+    }
+    table tbody td, table tbody th{
+      padding: 4px 2px;
+      border: 1px solid grey
+    }
+    table tbody tr.warn{
+      background-color: orange; color: white
+    }
+    table tbody tr.fail{
+      background-color: red; color: white
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <h1>{{.File}}</h1>
+    <table>
+      <thead>
+      </thead>
+      <tbody>
+        {{range $ix, $el := .List}}
+          <tr {{ if $el.Failed }}class="fail"{{ end }}>
+            <td>{{$ix}}</td>
+            <th>{{$el.Ident}}</th>
+            <td>{{$el.Level}}</td>
+            <td>{{$el.Pass}}</td>
+            <td>{{$el.Pass}}</td>
+            <td>{{$el.Error}}</td>
+          </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </main>
+</body>
+
+</html>

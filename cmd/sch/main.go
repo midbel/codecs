@@ -17,6 +17,7 @@ func main() {
 	var (
 		opts ReportOptions
 		list bool
+		// report string
 	)
 	flag.BoolVar(&list, "p", false, "print assertions defined in schema")
 	flag.StringVar(&opts.Level, "l", "", "severity level")
@@ -27,10 +28,8 @@ func main() {
 	flag.StringVar(&opts.RootSpace, "root-namespace", "", "modify namespace of root element")
 	flag.BoolVar(&opts.ErrorOnly, "only-error", false, "print only errorneous assertions")
 	flag.DurationVar(&opts.Timeout, "timeout", time.Second*30, "timeout before stopping")
-	var (
-	// report   = flag.String("o", "", "report format (html, csv, xml)")
-	)
 	flag.Parse()
+
 	schema, err := parseSchema(flag.Arg(0))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -40,7 +39,7 @@ func main() {
 		print(schema, opts.Keep())
 		return
 	}
-	report := StdoutReport(opts)
+	report := HtmlReport(opts)
 	for i := 1; i < flag.NArg(); i++ {
 		err := report.Run(schema, flag.Arg(i))
 		if err != nil {

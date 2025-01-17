@@ -2,17 +2,22 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"html/template"
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/midbel/codecs/sch"
 	"github.com/midbel/codecs/xml"
 )
+
+//go:embed template.html
+var htmlTemplate string
 
 type ReportOptions struct {
 	Timeout time.Duration
@@ -36,6 +41,11 @@ type ReportStatus struct {
 	Pass  int
 }
 
+func (r *ReportStatus) SetFile(file string) {
+	file = filepath.Base(file)
+	r.File = strings.TrimSuffix(file, ".xml")
+}
+
 func (r *ReportStatus) Update(res sch.Result) {
 	r.Count++
 	if !res.Failed() {
@@ -56,12 +66,67 @@ type Reporter interface {
 }
 
 type htmlReport struct {
-	Dir string
+	ReportOptions
+	status ReportStatus
 	*template.Template
 }
 
+func HtmlReport(opts ReportOptions) Reporter {
+	tpl, _ := template.New("template").Parse(htmlTemplate)
+	return htmlReport{
+		ReportOptions: opts,
+		Template: tpl,
+	}
+}
+
 func (r htmlReport) Run(schema *sch.Schema, file string) error {
-	return nil
+	ctx, _ := context.WithTimeout(context.Background(), r.Timeout)
+	doc, err := parseDocument(file, r.RootSpace)
+	if err != nil {
+		return err
+	}
+	r.status.SetFile(file)
+
+	it := r.run(ctx, schema, doc)
+	return r.generateReport(file, it)
+}
+
+func (r htmlReport) generateReport(file string, list []sch.Result) error {
+	dir := filepath.Join(filepath.Dir(file), "reports")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}	
+	out := filepath.Join(dir, filepath.Base(r.status.File+".html"))
+	w, err := os.Create(out)
+	if err != nil {
+		return err
+	}
+	defer w.Close()
+
+	data := struct{
+		File string
+		List []sch.Result
+	} {
+		File: file,
+		List: list,
+	}
+	return r.Execute(w, data)
+}
+
+func (r htmlReport) run(ctx context.Context, schema *sch.Schema, doc *xml.Document) []sch.Result {
+	fn := func(yield func(sch.Result) bool) {
+		it := schema.ExecContext(ctx, doc, r.Keep())
+		for res := range it {
+			if err := ctx.Err(); err != nil {
+				return
+			}
+			r.status.Update(res)
+			if !yield(res) {
+				break
+			}
+		}
+	}
+	return slices.Collect(fn)
 }
 
 type fileReport struct {
@@ -86,8 +151,7 @@ func (r fileReport) Run(schema *sch.Schema, file string) error {
 	if err != nil {
 		return err
 	}
-	file = filepath.Base(file)
-	r.status.File = strings.TrimSuffix(file, ".xml")
+	r.status.SetFile(file)
 	for res := range schema.ExecContext(ctx, doc, r.Keep()) {
 		if err := ctx.Err(); err != nil {
 			return err
