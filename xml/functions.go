@@ -10,6 +10,45 @@ import (
 	"time"
 )
 
+type registeredBuiltin struct {
+	QName
+	MinArg int
+	MaxArg int
+	Func   builtinFunc
+}
+
+func registerFunc(name, space string, fn builtinFunc) registeredBuiltin {
+	qn := QName{
+		Name:  name,
+		Space: space,
+	}
+	return registeredBuiltin{
+		QName: qn,
+		Func:  fn,
+	}
+}
+
+var builtins2 = []registeredBuiltin{
+	registerFunc("true", "", callTrue),
+	registerFunc("true", "fn", callTrue),
+	registerFunc("false", "", callFalse),
+	registerFunc("false", "fn", callFalse),
+	registerFunc("boolean", "", callBoolean),
+	registerFunc("boolean", "fn", callBoolean),
+	registerFunc("not", "", callNot),
+	registerFunc("not", "fn", callNot),
+}
+
+func findBuiltin(qn QName) (builtinFunc, error) {
+	ix := slices.IndexFunc(builtins2, func(rg registeredBuiltin) bool {
+		return qn.QualifiedName() == rg.QualifiedName()
+	})
+	if ix < 0 {
+		return nil, fmt.Errorf("%s: %s function", qn.QualifiedName(), ErrUndefined) 
+	}
+	return builtins2[ix].Func, nil
+}
+
 var builtins = map[string]builtinFunc{
 	"true":             callTrue,
 	"false":            callFalse,
@@ -395,7 +434,40 @@ func callStringJoin(ctx Context, args []Expr) ([]Item, error) {
 }
 
 func callSubstring(ctx Context, args []Expr) ([]Item, error) {
-	return nil, errImplemented
+	if len(args) < 2 || len(args) > 3 {
+		return nil, errArgument
+	}
+	str, err := getStringFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	if str == "" {
+		return nil, nil
+	}
+	beg, err := getFloatFromExpr(args[1], ctx)
+	if err != nil {
+		return nil, err
+	}
+	beg -= 1
+
+	var size float64
+	if len(args) == 3 {
+		size, err = getFloatFromExpr(args[2], ctx)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		size = float64(len(str))
+	}
+	if beg < 0 {
+		size += beg
+		beg = 0
+	}
+	if z := len(str); int(beg + size) >= z {
+		size = float64(z) - beg
+	}
+	str = str[int(beg):int(beg)+int(size)]
+	return singleValue(str), nil
 }
 
 func callStringLength(ctx Context, args []Expr) ([]Item, error) {

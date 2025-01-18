@@ -5,7 +5,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>schema</title>
-  <style>
+  <style type="text/css">
+    body {
+      font-family: system-ui;
+      font-size: 0.9em;
+    }
     table{
       width: 100%;
       border-collapse:collapse
@@ -16,15 +20,17 @@
     table tbody td:first-child {
       width: 10%;
     }
-    table tbody td, table tbody th{
+    table td, table th{
       padding: 4px 8px;
-      border: 1px solid grey
+      border: 1px solid #E0E0E0
     }
     table tbody tr.warn{
-      background-color: orange; color: white
+      background-color: #FB8C00; 
+      color: white
     }
     table tbody tr.fail{
-      background-color: red; color: white
+      background-color: #E53935; 
+      color: white
     }
     .text-center{
       text-align:center;
@@ -37,6 +43,8 @@
     <header>
       <h1>{{.File}}</h1>
     </header>
+    <form>
+    </form>
     <table>
       <thead>
         <tr>
@@ -46,12 +54,13 @@
           <th>Passing Node</th>
           <th>Matching Node</th>
           <th>Error</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
         {{range $ix, $el := .List}}
           <tr {{ if $el.Failed }}class="fail"{{ end }}>
-            <td class="text-center">{{$ix}}</td>
+            <td class="text-center">{{ increment $ix}}</td>
             <th>{{$el.Ident}}</th>
             <td class="text-center">{{$el.Level}}</td>
             <td class="text-center">{{$el.Pass}}</td>

@@ -76,7 +76,12 @@ type htmlReport struct {
 }
 
 var fnmap = template.FuncMap{
-	"stringify": xml.WriteNode,
+	"stringify": func(n xml.Node) string {
+		return strings.TrimSpace(xml.WriteNode(n))
+	},
+	"increment": func(n int) int {
+		return n+1
+	},
 }
 
 func HtmlReport(opts ReportOptions) Reporter {
@@ -127,7 +132,14 @@ func (r htmlReport) createDetailReport(dir string, res sch.Result) error {
 	}
 	defer w.Close()
 
-	return r.one.Execute(w, res)
+	ctx := struct {
+		Back string
+		sch.Result
+	} {
+		Back: r.status.File,
+		Result: res,
+	}
+	return r.one.Execute(w, ctx)
 }
 
 func (r htmlReport) createOverviewReport(dir, file string, list []sch.Result) error {
@@ -142,7 +154,7 @@ func (r htmlReport) createOverviewReport(dir, file string, list []sch.Result) er
 		File string
 		List []sch.Result
 	}{
-		File: file,
+		File: filepath.Clean(file),
 		List: list,
 	}
 	return r.all.Execute(w, data)

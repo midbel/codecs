@@ -59,16 +59,6 @@ func (r Result) Failed() bool {
 	return r.Error != nil
 }
 
-func (r Result) Status() string {
-	if r.Error == nil {
-		return "V"
-	}
-	if errors.Is(r.Error, ErrAssert) {
-		return "X"
-	}
-	return "?"
-}
-
 type Schema struct {
 	Title string
 	Mode  xml.StepMode

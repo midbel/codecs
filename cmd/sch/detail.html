@@ -5,15 +5,25 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>schema</title>
-  <style>
+  <style type="text/css">
+    body {
+      font-family: system-ui;
+      font-size: 0.9em;
+    }
     main {
       width: 70%;
       margin: 0 auto;
     }
     p.xpath, pre {
-      border: 1px solid grey;
-      background-color: light-grey;
-      padding: 8px 4px;
+      border: 1px solid #E0E0E0;
+      background-color: #F5F5F5;
+      padding: 8px;
+    }
+    pre {
+      font-size: 1.15em;
+    }
+    p.xpath {
+      color: #039BE5;
     }
   </style>
 </head>
@@ -24,12 +34,13 @@
       <h1>{{ .Ident }}</h1>
     </header>
     <aside>
-      <a href="/">back</a>
+      <a href="/{{ .Back }}/">back</a>
     </aside>
     <section>
       <header>
         <h2>Context</h2>
       </header>
+      <p>{{ .Message }}</p>
       <p class="xpath">{{.Rule}}</p>
     </section>
     <section>
@@ -38,6 +49,14 @@
       </header>
       <p class="xpath">{{.Test}}</p>
     </section>
+    {{ if .Failed }}
+      <section>
+        <header>
+          <h2>Error</h2>
+        </header>
+        <p>{{.Error}}</p>
+      </section>
+    {{ end }}
     <section>
       <header>
         <h2>Nodes</h2>
@@ -46,7 +65,7 @@
       {{ with $n := .Node }}
         <section>
           <header>
-            <h3>{{$n.Identity}}</h3>
+            <h3>{{$n.QualifiedName}} - {{$n.Identity}}</h3>
           </header>
           <pre> {{ stringify $n }}</pre>
         </section>
@@ -56,7 +75,7 @@
       {{ end }}
     </section>
     <footer>
-      <a href="/">back</a>
+      <a href="/{{ .Back }}/">back</a>
     </footer>
   </main>
 </body>
