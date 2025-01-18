@@ -16,8 +16,11 @@ import (
 	"github.com/midbel/codecs/xml"
 )
 
-//go:embed template.html
-var htmlTemplate string
+//go:embed overview.html
+var allTemplate string
+
+//go:embed detail.html
+var oneTemplate string
 
 type ReportOptions struct {
 	Timeout time.Duration
@@ -68,14 +71,23 @@ type Reporter interface {
 type htmlReport struct {
 	ReportOptions
 	status ReportStatus
-	*template.Template
+	all *template.Template
+	one *template.Template
+}
+
+var fnmap = template.FuncMap{
+	"stringify": xml.WriteNode,
 }
 
 func HtmlReport(opts ReportOptions) Reporter {
-	tpl, _ := template.New("template").Parse(htmlTemplate)
+	var (
+		all, _ = template.New("template").Funcs(fnmap).Parse(allTemplate)
+		one, _ = template.New("template").Funcs(fnmap).Parse(oneTemplate)
+	)
 	return htmlReport{
 		ReportOptions: opts,
-		Template: tpl,
+		all:      all,
+		one: one,
 	}
 }
 
@@ -95,7 +107,30 @@ func (r htmlReport) generateReport(file string, list []sch.Result) error {
 	dir := filepath.Join(filepath.Dir(file), "reports")
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
-	}	
+	}
+	if err := r.createOverviewReport(dir, file, list); err != nil {
+		return err
+	}
+	for _, res := range list {
+		if err := r.createDetailReport(dir, res); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r htmlReport) createDetailReport(dir string, res sch.Result) error {
+	out := filepath.Join(dir, filepath.Base(res.Ident+".html"))
+	w, err := os.Create(out)
+	if err != nil {
+		return err
+	}
+	defer w.Close()
+
+	return r.one.Execute(w, res)	
+}
+
+func (r htmlReport) createOverviewReport(dir, file string, list []sch.Result) error {
 	out := filepath.Join(dir, filepath.Base(r.status.File+".html"))
 	w, err := os.Create(out)
 	if err != nil {
@@ -103,14 +138,14 @@ func (r htmlReport) generateReport(file string, list []sch.Result) error {
 	}
 	defer w.Close()
 
-	data := struct{
+	data := struct {
 		File string
 		List []sch.Result
-	} {
+	}{
 		File: file,
 		List: list,
 	}
-	return r.Execute(w, data)
+	return r.all.Execute(w, data)
 }
 
 func (r htmlReport) run(ctx context.Context, schema *sch.Schema, doc *xml.Document) []sch.Result {

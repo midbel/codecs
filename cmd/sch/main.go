@@ -39,7 +39,8 @@ func main() {
 		print(schema, opts.Keep())
 		return
 	}
-	report := HtmlReport(opts)
+	// report := HtmlReport(opts)
+	report := StdoutReport(opts)
 	for i := 1; i < flag.NArg(); i++ {
 		err := report.Run(schema, flag.Arg(i))
 		if err != nil {

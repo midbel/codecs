@@ -46,6 +46,10 @@ type Result struct {
 	Total   int
 	Pass    int
 	Error   error
+
+	Items []xml.Item
+	Rule  string
+	Test  string
 }
 
 func (r Result) Failed() bool {
@@ -220,6 +224,9 @@ func (r *Rule) ExecContext(ctx context.Context, doc *xml.Document, keep FilterFu
 				Total:   len(items),
 				Pass:    pass,
 				Error:   err,
+				Items:   items,
+				Rule:    r.Context,
+				Test:    a.Test,
 			}
 
 			ok := yield(res)
