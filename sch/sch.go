@@ -9,6 +9,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/midbel/codecs/xml"
 )
@@ -50,6 +51,8 @@ type Result struct {
 	Items []xml.Item
 	Rule  string
 	Test  string
+
+	Elapsed time.Duration
 }
 
 func (r Result) Failed() bool {
@@ -215,6 +218,7 @@ func (r *Rule) ExecContext(ctx context.Context, doc *xml.Document, keep FilterFu
 			if ok := keep(a); !ok {
 				continue
 			}
+			now := time.Now()
 			pass, err := a.Eval(ctx, items, r)
 
 			res := Result{
@@ -227,6 +231,7 @@ func (r *Rule) ExecContext(ctx context.Context, doc *xml.Document, keep FilterFu
 				Items:   items,
 				Rule:    r.Context,
 				Test:    a.Test,
+				Elapsed: time.Since(now),
 			}
 
 			ok := yield(res)

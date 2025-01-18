@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>schema</title>
+  <style>
+    main {
+      width: 70%;
+      margin: 0 auto;
+    }
+    p.xpath, pre {
+      border: 1px solid grey;
+      background-color: light-grey;
+      padding: 8px 4px;
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <header>
+      <h1>{{ .Ident }}</h1>
+    </header>
+    <aside>
+      <a href="/">back</a>
+    </aside>
+    <section>
+      <header>
+        <h2>Context</h2>
+      </header>
+      <p class="xpath">{{.Rule}}</p>
+    </section>
+    <section>
+      <header>
+        <h2>Test</h2>
+      </header>
+      <p class="xpath">{{.Test}}</p>
+    </section>
+    <section>
+      <header>
+        <h2>Nodes</h2>
+      </header>
+      {{ range .Items }}
+      {{ with $n := .Node }}
+        <section>
+          <header>
+            <h3>{{$n.Identity}}</h3>
+          </header>
+          <pre> {{ stringify $n }}</pre>
+        </section>
+      {{else}}
+        <p>empty nodes set</p>
+      {{ end }}
+      {{ end }}
+    </section>
+    <footer>
+      <a href="/">back</a>
+    </footer>
+  </main>
+</body>
+
+</html>

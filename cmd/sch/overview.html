@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>schema</title>
+  <style>
+    table{
+      width: 100%;
+      border-collapse:collapse
+    }
+    table tbody th{
+      width: 30%
+    }
+    table tbody td:first-child {
+      width: 10%;
+    }
+    table tbody td, table tbody th{
+      padding: 4px 8px;
+      border: 1px solid grey
+    }
+    table tbody tr.warn{
+      background-color: orange; color: white
+    }
+    table tbody tr.fail{
+      background-color: red; color: white
+    }
+    .text-center{
+      text-align:center;
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <header>
+      <h1>{{.File}}</h1>
+    </header>
+    <table>
+      <thead>
+        <tr>
+          <th></th>
+          <th>Rule Identifier</th>
+          <th>Severity Level</th>
+          <th>Passing Node</th>
+          <th>Matching Node</th>
+          <th>Error</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range $ix, $el := .List}}
+          <tr {{ if $el.Failed }}class="fail"{{ end }}>
+            <td class="text-center">{{$ix}}</td>
+            <th>{{$el.Ident}}</th>
+            <td class="text-center">{{$el.Level}}</td>
+            <td class="text-center">{{$el.Pass}}</td>
+            <td class="text-center">{{$el.Total}}</td>
+            <td>{{$el.Error}}</td>
+            <td>
+              <a href="{{ $el.Ident }}.html">see</a>
+            </td>
+          </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </main>
+</body>
+
+</html>

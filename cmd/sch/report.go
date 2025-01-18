@@ -71,8 +71,8 @@ type Reporter interface {
 type htmlReport struct {
 	ReportOptions
 	status ReportStatus
-	all *template.Template
-	one *template.Template
+	all    *template.Template
+	one    *template.Template
 }
 
 var fnmap = template.FuncMap{
@@ -86,8 +86,8 @@ func HtmlReport(opts ReportOptions) Reporter {
 	)
 	return htmlReport{
 		ReportOptions: opts,
-		all:      all,
-		one: one,
+		all:           all,
+		one:           one,
 	}
 }
 
@@ -104,7 +104,7 @@ func (r htmlReport) Run(schema *sch.Schema, file string) error {
 }
 
 func (r htmlReport) generateReport(file string, list []sch.Result) error {
-	dir := filepath.Join(filepath.Dir(file), "reports")
+	dir := filepath.Join(filepath.Dir(file), "reports", r.status.File)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
@@ -127,11 +127,11 @@ func (r htmlReport) createDetailReport(dir string, res sch.Result) error {
 	}
 	defer w.Close()
 
-	return r.one.Execute(w, res)	
+	return r.one.Execute(w, res)
 }
 
 func (r htmlReport) createOverviewReport(dir, file string, list []sch.Result) error {
-	out := filepath.Join(dir, filepath.Base(r.status.File+".html"))
+	out := filepath.Join(dir, "index.html")
 	w, err := os.Create(out)
 	if err != nil {
 		return err

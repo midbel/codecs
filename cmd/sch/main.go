@@ -15,11 +15,12 @@ import (
 
 func main() {
 	var (
-		opts ReportOptions
-		list bool
-		// report string
+		opts   ReportOptions
+		list   bool
+		report string
 	)
 	flag.BoolVar(&list, "p", false, "print assertions defined in schema")
+	flag.StringVar(&report, "r", "", "print result in given format (stdout, html, csv, xml)")
 	flag.StringVar(&opts.Level, "l", "", "severity level")
 	flag.StringVar(&opts.Group, "g", "", "group")
 	flag.BoolVar(&opts.FailFast, "fail-fast", false, "stop processing on first error")
@@ -39,10 +40,19 @@ func main() {
 		print(schema, opts.Keep())
 		return
 	}
-	// report := HtmlReport(opts)
-	report := StdoutReport(opts)
+	var re Reporter
+	switch report {
+	case "html":
+		re = HtmlReport(opts)
+	case "stdout", "":
+		re = StdoutReport(opts)
+	case "csv":
+	case "xml":
+	default:
+		fmt.Fprintln(os.Stderr, "%s: unsupported report type")
+	}
 	for i := 1; i < flag.NArg(); i++ {
-		err := report.Run(schema, flag.Arg(i))
+		err := re.Run(schema, flag.Arg(i))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s: %s", flag.Arg(i), err)
 			fmt.Fprintln(os.Stderr)
