@@ -621,7 +621,7 @@ func (k kind) find(ctx Context) ([]Item, error) {
 }
 
 type call struct {
-	ident string
+	QName
 	args  []Expr
 }
 
@@ -630,16 +630,16 @@ func (c call) Find(node Node) ([]Item, error) {
 }
 
 func (c call) find(ctx Context) ([]Item, error) {
-	fn, ok := builtins[c.ident]
-	if !ok {
-		return nil, fmt.Errorf("%s: %w function", c.ident, ErrUndefined)
+	fn, err := findBuiltin(c.QName)
+	if err != nil {
+		return nil, err
 	}
 	if fn == nil {
-		return nil, fmt.Errorf("%s: %s", errImplemented, c.ident)
+		return nil, fmt.Errorf("%s: %s", errImplemented, c.QualifiedName())
 	}
 	items, err := fn(ctx, c.args)
 	if err != nil {
-		err = fmt.Errorf("%s: %s", c.ident, err)
+		err = fmt.Errorf("%s: %s", c.QualifiedName(), err)
 	}
 	return items, err
 }
