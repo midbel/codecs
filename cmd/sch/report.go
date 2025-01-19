@@ -16,11 +16,14 @@ import (
 	"github.com/midbel/codecs/xml"
 )
 
-//go:embed overview.html
+//go:embed templates/overview.html
 var allTemplate string
 
-//go:embed detail.html
+//go:embed templates/detail.html
 var oneTemplate string
+
+//go:embed templates/index.html
+var siteTemplate string
 
 type ReportOptions struct {
 	Timeout time.Duration
@@ -73,6 +76,7 @@ type htmlReport struct {
 	status ReportStatus
 	all    *template.Template
 	one    *template.Template
+	site   *template.Template
 }
 
 var fnmap = template.FuncMap{
@@ -80,20 +84,31 @@ var fnmap = template.FuncMap{
 		return strings.TrimSpace(xml.WriteNode(n))
 	},
 	"increment": func(n int) int {
-		return n+1
+		return n + 1
 	},
 }
 
 func HtmlReport(opts ReportOptions) Reporter {
 	var (
-		all, _ = template.New("template").Funcs(fnmap).Parse(allTemplate)
-		one, _ = template.New("template").Funcs(fnmap).Parse(oneTemplate)
+		all, _  = template.New("template").Funcs(fnmap).Parse(allTemplate)
+		one, _  = template.New("template").Funcs(fnmap).Parse(oneTemplate)
+		site, _ = template.New("template").Funcs(fnmap).Parse(siteTemplate)
 	)
 	return htmlReport{
 		ReportOptions: opts,
 		all:           all,
 		one:           one,
+		site:          site,
 	}
+}
+
+func (r htmlReport) Exec(schema *sch.Schema, files []string) error {
+	for i := range files {
+		if err := r.Run(schema, files[i]); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r htmlReport) Run(schema *sch.Schema, file string) error {
@@ -106,6 +121,22 @@ func (r htmlReport) Run(schema *sch.Schema, file string) error {
 
 	it := r.run(ctx, schema, doc)
 	return r.generateReport(file, it)
+}
+
+func (r htmlReport) run(ctx context.Context, schema *sch.Schema, doc *xml.Document) []sch.Result {
+	fn := func(yield func(sch.Result) bool) {
+		it := schema.ExecContext(ctx, doc, r.Keep())
+		for res := range it {
+			if err := ctx.Err(); err != nil {
+				return
+			}
+			r.status.Update(res)
+			if !yield(res) {
+				break
+			}
+		}
+	}
+	return slices.Collect(fn)
 }
 
 func (r htmlReport) generateReport(file string, list []sch.Result) error {
@@ -135,8 +166,8 @@ func (r htmlReport) createDetailReport(dir string, res sch.Result) error {
 	ctx := struct {
 		Back string
 		sch.Result
-	} {
-		Back: r.status.File,
+	}{
+		Back:   r.status.File,
 		Result: res,
 	}
 	return r.one.Execute(w, ctx)
@@ -158,22 +189,6 @@ func (r htmlReport) createOverviewReport(dir, file string, list []sch.Result) er
 		List: list,
 	}
 	return r.all.Execute(w, data)
-}
-
-func (r htmlReport) run(ctx context.Context, schema *sch.Schema, doc *xml.Document) []sch.Result {
-	fn := func(yield func(sch.Result) bool) {
-		it := schema.ExecContext(ctx, doc, r.Keep())
-		for res := range it {
-			if err := ctx.Err(); err != nil {
-				return
-			}
-			r.status.Update(res)
-			if !yield(res) {
-				break
-			}
-		}
-	}
-	return slices.Collect(fn)
 }
 
 type fileReport struct {

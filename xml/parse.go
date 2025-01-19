@@ -1033,6 +1033,18 @@ func (s *QueryScanner) scanIdent(tok *Token) {
 		tok.Type = opDiv
 	case kwMod:
 		tok.Type = opMod
+	case "eq":
+		tok.Type = opEq
+	case "ne":
+		tok.Type = opNe
+	case "lt":
+		tok.Type = opLt
+	case "le":
+		tok.Type = opLe
+	case "gt":
+		tok.Type = opGt
+	case "ge":
+		tok.Type = opGe
 	default:
 		tok.Type = Name
 		if isReserved(tok.Literal) {

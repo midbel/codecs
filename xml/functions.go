@@ -138,7 +138,7 @@ func findBuiltin(qn QName) (builtinFunc, error) {
 		return qn.QualifiedName() == rg.QualifiedName()
 	})
 	if ix < 0 {
-		return nil, fmt.Errorf("%s: %s function", qn.QualifiedName(), ErrUndefined) 
+		return nil, fmt.Errorf("%s: %s function", qn.QualifiedName(), ErrUndefined)
 	}
 	return builtins[ix].Func, nil
 }
@@ -503,10 +503,10 @@ func callSubstring(ctx Context, args []Expr) ([]Item, error) {
 		size += beg
 		beg = 0
 	}
-	if z := len(str); int(beg + size) >= z {
+	if z := len(str); int(beg+size) >= z {
 		size = float64(z) - beg
 	}
-	str = str[int(beg):int(beg)+int(size)]
+	str = str[int(beg) : int(beg)+int(size)]
 	return singleValue(str), nil
 }
 

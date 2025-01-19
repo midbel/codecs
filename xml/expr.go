@@ -622,7 +622,7 @@ func (k kind) find(ctx Context) ([]Item, error) {
 
 type call struct {
 	QName
-	args  []Expr
+	args []Expr
 }
 
 func (c call) Find(node Node) ([]Item, error) {
