@@ -25,6 +25,21 @@
     p.xpath {
       color: #039BE5;
     }
+    a.back {
+      display: inline-block;
+      outline: none;
+      cursor: pointer;
+      padding: 0 8px;
+      background-color: #fff;
+      border-radius: 0.25rem;
+      border: 1px solid #dddbda;
+      color: #0070d2;
+      font-size: 13px;
+      line-height: 30px;
+      font-weight: 400;
+      text-align: center;
+      text-decoration: none;
+    }
   </style>
 </head>
 
@@ -34,7 +49,7 @@
       <h1>{{ .Ident }}</h1>
     </header>
     <aside>
-      <a href="/{{ .Back }}/">back</a>
+      <a class="back" href="/{{ .Back }}/">back</a>
     </aside>
     <section>
       <header>
@@ -75,7 +90,7 @@
       {{ end }}
     </section>
     <footer>
-      <a href="/{{ .Back }}/">back</a>
+      <a class="back" href="/{{ .Back }}/">back</a>
     </footer>
   </main>
 </body>

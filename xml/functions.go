@@ -255,18 +255,11 @@ func callDecimal(ctx Context, args []Expr) ([]Item, error) {
 	if len(args) != 1 {
 		return nil, errArgument
 	}
-	str, err := getStringFromExpr(args[0], ctx)
+	val, err := getFloatFromExpr(args[0], ctx)
 	if err != nil {
 		return nil, err
 	}
-	if str == "" {
-		return singleValue(math.NaN()), nil
-	}
-	v, err := strconv.ParseFloat(str, 64)
-	if err != nil {
-		return nil, ErrCast
-	}
-	return singleValue(v), nil
+	return singleValue(val), nil
 }
 
 func callSum(ctx Context, args []Expr) ([]Item, error) {
@@ -874,6 +867,9 @@ func getFloatFromExpr(expr Expr, ctx Context) (float64, error) {
 	items, err := expr.find(ctx)
 	if err != nil || len(items) != 1 {
 		return math.NaN(), err
+	}
+	if !items[0].Atomic() {
+		return toFloat(items[0].Value())
 	}
 	return toFloat(items[0].Value())
 }

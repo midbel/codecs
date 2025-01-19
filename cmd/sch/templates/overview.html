@@ -24,16 +24,31 @@
       padding: 4px 8px;
       border: 1px solid #E0E0E0
     }
-    table tbody tr.warn{
+    table tbody tr.warning{
       background-color: #FB8C00; 
       color: white
     }
-    table tbody tr.fail{
+    table tbody tr.fatal{
       background-color: #E53935; 
       color: white
     }
     .text-center{
       text-align:center;
+    }
+    table td a {
+      display: inline-block;
+      outline: none;
+      cursor: pointer;
+      padding: 0 16px;
+      background-color: #fff;
+      border-radius: 0.25rem;
+      border: 1px solid #dddbda;
+      color: #0070d2;
+      font-size: 13px;
+      line-height: 30px;
+      font-weight: 400;
+      text-align: center;
+      text-decoration: none;
     }
   </style>
 </head>
@@ -59,7 +74,7 @@
       </thead>
       <tbody>
         {{range $ix, $el := .List}}
-          <tr {{ if $el.Failed }}class="fail"{{ end }}>
+          <tr {{ if $el.Failed }}class="{{ $el.Level }}"{{ end }}>
             <td class="text-center">{{ increment $ix}}</td>
             <th>{{$el.Ident}}</th>
             <td class="text-center">{{$el.Level}}</td>
