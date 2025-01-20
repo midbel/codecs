@@ -51,13 +51,23 @@ func main() {
 	default:
 		fmt.Fprintln(os.Stderr, "%s: unsupported report type")
 	}
-	for i := 1; i < flag.NArg(); i++ {
-		err := re.Run(schema, flag.Arg(i))
+	execDefault(re, schema, flag.Args())
+}
+
+func execDefault(re Reporter, schema *sch.Schema, files []string) error {
+	if ex, ok := re.(interface {
+		Exec(*sch.Schema, []string) error
+	}); ok {
+		return ex.Exec(schema, files[1:])
+	}
+	for i := 1; i < len(files); i++ {
+		err := re.Run(schema, files[i])
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s: %s", flag.Arg(i), err)
 			fmt.Fprintln(os.Stderr)
 		}
 	}
+	return nil
 }
 
 func parseSchema(file string) (*sch.Schema, error) {

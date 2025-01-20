@@ -14,11 +14,86 @@
       width: 70%;
       margin: 0 auto;
     }
+    table{
+      width: 100%;
+      border-collapse:collapse
+    }
+    table tbody th{
+      width: 50%
+    }
+    table tbody td:first-child {
+      width: 5%;
+    }
+    table td, table th{
+      padding: 4px 8px;
+      border: 1px solid #E0E0E0
+    }
+    table tbody tr.warning{
+      background-color: #FB8C00; 
+      color: white
+    }
+    table tbody tr.fatal{
+      background-color: #E53935; 
+      color: white
+    }
+    .text-center{
+      text-align:center;
+    }
+    table td a {
+      display: inline-block;
+      outline: none;
+      cursor: pointer;
+      padding: 0 16px;
+      background-color: #fff;
+      border-radius: 0.25rem;
+      border: 1px solid #dddbda;
+      color: #0070d2;
+      font-size: 13px;
+      line-height: 30px;
+      font-weight: 400;
+      text-align: center;
+      text-decoration: none;
+    }
+    tr.fail {
+      background-color: #B71C1C;
+      color: #FFFFFF;
+    }
+    tr.warn {
+      background-color: #FF8F00;
+      color: #FFFFFF;
+    }
   </style>
 </head>
 
 <body>
   <main>
+    <header>
+      <h1>{{ .Title }}</h1>
+    </header>
+    <table>
+      <thead>
+        <th></th>
+        <th>file</th>
+        <th>result</th>
+        <th></th>
+      </thead>
+      <tbody>
+        {{ range $ix, $el := .Files }}
+        <tr class="{{ statusClass $el.Status }}">
+          <td class="text-center">{{ increment $ix}}</td>
+          <th>{{ $el.Status.File }}</th>
+          <td width="30%" class="text-center">
+            {{ with $res := percent $el.Status}}
+              <span>{{ printf "%.2f" $res }}&percnt;</span>
+            {{ end }}
+          </td>
+          <td class="text-center">
+            <a href="{{ $el.Status.File }}/">see</a>
+          </td>
+        </tr>
+        {{ end }}
+      </tbody>
+    </table>
   </main>
 </body>
 
