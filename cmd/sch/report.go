@@ -103,12 +103,13 @@ func HtmlReport(opts ReportOptions) Reporter {
 }
 
 func (r htmlReport) Exec(schema *sch.Schema, files []string) error {
+	var stats []ReportStatus
 	for i := range files {
 		if err := r.Run(schema, files[i]); err != nil {
 			return err
 		}
 	}
-	return nil
+	return r.generateSite(files[0], stats)
 }
 
 func (r htmlReport) Run(schema *sch.Schema, file string) error {
@@ -137,6 +138,21 @@ func (r htmlReport) run(ctx context.Context, schema *sch.Schema, doc *xml.Docume
 		}
 	}
 	return slices.Collect(fn)
+}
+
+func (r htmlReport) generateSite(file string, results []ReportStatus) error {
+	dir := filepath.Join(filepath.Dir(file), "reports")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}	
+	out := filepath.Join(dir, "index.html")
+	w, err := os.Create(out)
+	if err != nil {
+		return err
+	}
+	defer w.Close()
+
+	return r.site.Execute(w, results)
 }
 
 func (r htmlReport) generateReport(file string, list []sch.Result) error {
