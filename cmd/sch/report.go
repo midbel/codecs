@@ -90,6 +90,8 @@ type htmlReport struct {
 	site   *template.Template
 }
 
+const reportTitle = "Execution Results"
+
 var fnmap = template.FuncMap{
 	"stringify": func(n xml.Node) string {
 		return strings.TrimSpace(xml.WriteNode(n))
@@ -142,7 +144,7 @@ func (r *htmlReport) Exec(schema *sch.Schema, files []string) error {
 		res = append(res, fr)
 	}
 	if schema.Title == "" {
-		schema.Title = "Final Results"
+		schema.Title = reportTitle
 	}
 	return r.generateSite(filepath.Dir(files[0]), schema.Title, res)
 }
