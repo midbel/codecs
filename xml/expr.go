@@ -225,15 +225,6 @@ func (w wildcard) Find(node Node) ([]Item, error) {
 }
 
 func (w wildcard) find(ctx Context) ([]Item, error) {
-	// var (
-	// 	list  = singleNode(ctx.Node)
-	// 	nodes = ctx.Nodes()
-	// )
-	// for i, n := range nodes {
-	// 	others, _ := w.find(ctx.Sub(n, i+1, len(nodes)))
-	// 	list = slices.Concat(list, others)
-	// }
-	// return list, nil
 	if ctx.Type() != TypeElement {
 		return nil, nil
 	}
@@ -313,7 +304,6 @@ func (a axis) find(ctx Context) ([]Item, error) {
 		if err == nil {
 			list = slices.Concat(list, others)
 		}
-		// list = slices.Concat(list, singleNode(ctx.Node))
 	}
 	switch a.kind {
 	case selfAxis:
