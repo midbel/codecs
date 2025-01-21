@@ -79,7 +79,7 @@
       </thead>
       <tbody>
         {{ range $ix, $el := .Files }}
-        <tr class="{{ statusClass $el.Status }}">
+        <tr id="{{ $el.Status.File }}" class="{{ statusClass $el.Status }}">
           <td class="text-center">{{ increment $ix}}</td>
           <th>{{ $el.Status.File }}</th>
           <td width="30%" class="text-center">

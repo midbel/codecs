@@ -10,6 +10,10 @@
       font-family: system-ui;
       font-size: 0.9em;
     }
+    main {
+      width: 70%;
+      margin: 0 auto;
+    }
     table{
       width: 100%;
       border-collapse:collapse
@@ -18,6 +22,9 @@
       width: 30%
     }
     table tbody td:first-child {
+      width: 5%;
+    }
+    table tbody td:last-child {
       width: 10%;
     }
     table td, table th{
@@ -50,6 +57,37 @@
       text-align: center;
       text-decoration: none;
     }
+    form {
+      display: flex;
+      margin-bottom: 32px;
+      gap: 16px;
+      flex-flow: row wrap;
+      align-items: center;
+    }
+    form div {
+      flex-grow: 1;
+      display: flex;
+      align-items: center;
+    }
+    form div:first-child {
+      flex-grow: 2;
+    }
+    form label {
+      display: inline-block;
+      font-weight: 400;
+      font-size: 1.2em;
+    }
+    form label:first-letter{
+      text-transform: uppercase;
+    }
+    form input, form select, form label {
+      flex-grow: 2;
+    }
+    form input, form select {
+      font-size: 1.15em;
+      padding: 8px;
+      border: 1px solid #BDBDBD;
+    }
   </style>
 </head>
 
@@ -59,6 +97,26 @@
       <h1>{{.File}}</h1>
     </header>
     <form>
+      <div>
+        <label>rule</label>
+        <input type="text"/>
+      </div>
+      <div>
+        <label>level</label>
+        <select>
+          <option value="">all</option>
+          <option value="warning">warning</option>
+          <option value="fatal">fatal</option>
+        </select>
+      </div>
+      <div>
+        <label>status</label>
+        <select>
+          <option value="">all</option>
+          <option value="succeed">success</option>
+          <option value="error">error</option>
+        </select>
+      </div>
     </form>
     <table>
       <thead>
@@ -74,14 +132,14 @@
       </thead>
       <tbody>
         {{range $ix, $el := .List}}
-          <tr {{ if $el.Failed }}class="{{ $el.Level }}"{{ end }}>
+          <tr id="{{ $el.Ident }}" {{ if $el.Failed }}class="{{ $el.Level }}"{{ end }}>
             <td class="text-center">{{ increment $ix}}</td>
             <th>{{$el.Ident}}</th>
             <td class="text-center">{{$el.Level}}</td>
             <td class="text-center">{{$el.Pass}}</td>
             <td class="text-center">{{$el.Total}}</td>
             <td>{{$el.Error}}</td>
-            <td>
+            <td class="text-center">
               <a href="{{ $el.Ident }}.html">see</a>
             </td>
           </tr>

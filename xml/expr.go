@@ -6,6 +6,7 @@ import (
 	"math"
 	"slices"
 	"strconv"
+	"time"
 )
 
 var (
@@ -409,7 +410,7 @@ func (n name) find(ctx Context) ([]Item, error) {
 		return singleNode(ctx.Node), nil
 	}
 	if ctx.QualifiedName() != n.QualifiedName() {
-		return nil, errDiscard
+		return nil, nil
 	}
 	return singleNode(ctx.Node), nil
 }
@@ -607,7 +608,7 @@ func (k kind) find(ctx Context) ([]Item, error) {
 	if k.kind == typeAll || ctx.Type() == k.kind {
 		return singleNode(ctx.Node), nil
 	}
-	return nil, errDiscard
+	return nil, nil
 }
 
 type call struct {
@@ -993,6 +994,9 @@ func isLess(left, right []Item) (bool, error) {
 	case string:
 		y, err := toString(right[0].Value())
 		return x < y, err
+	case time.Time:
+		y, err := toTime(right[0].Value())
+		return x.Before(y), err
 	default:
 		return false, errType
 	}
@@ -1008,20 +1012,31 @@ func isEqual(left, right []Item) (bool, error) {
 	switch x := left[0].Value().(type) {
 	case float64:
 		y, err := toFloat(right[0].Value())
-		if err != nil {
-			return false, err
-		}
-		return x == y, nil
+		return x == y, err
 	case string:
 		y, err := toString(right[0].Value())
-		if err != nil {
-			return false, err
-		}
-		return x == y, nil
+		return x == y, err
 	case bool:
 		return x == toBool(right[0].Value()), nil
+	case time.Time:
+		y, err := toTime(right[0].Value())
+		return x.Equal(y), err
 	default:
 		return false, errType
+	}
+}
+
+func toTime(value any) (time.Time, error) {
+	switch v := value.(type) {
+	case time.Time:
+		return v, nil
+	case string:
+		return time.Parse("2006-01-02", v)
+	case float64:
+		return time.UnixMilli(int64(v)), nil
+	default:
+		var zero time.Time
+		return zero, errType 
 	}
 }
 
