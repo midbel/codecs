@@ -7,21 +7,100 @@ import (
 	"strings"
 )
 
-var ErrClosed = errors.New("closed")
+var (
+	ErrClosed = errors.New("closed")
+	ErrBreak  = errors.New("break")
+)
+
+type (
+	OnElementFunc func(*Reader, *Element, bool) error
+	OnNodeFunc    func(*Reader, Node) error
+)
 
 type Reader struct {
 	scan *Scanner
 	curr Token
 	peek Token
+
+	elements map[QName][]OnElementFunc
+	nodes    map[NodeType][]OnNodeFunc
 }
 
 func NewReader(r io.Reader) *Reader {
 	rs := Reader{
-		scan: Scan(r),
+		scan:     Scan(r),
+		elements: make(map[QName][]OnElementFunc),
+		nodes:    make(map[NodeType][]OnNodeFunc),
 	}
 	rs.next()
 	rs.next()
 	return &rs
+}
+
+func (r *Reader) Sub() *Reader {
+	rs := Reader{
+		scan:     r.scan,
+		curr:     r.curr,
+		peek:     r.peek,
+		elements: make(map[QName][]OnElementFunc),
+		nodes:    make(map[NodeType][]OnNodeFunc),
+	}
+	return &rs
+}
+
+func (r *Reader) OnNode(kind NodeType, fn OnNodeFunc) {
+	r.nodes[kind] = append(r.nodes[kind], fn)
+}
+
+func (r *Reader) ClearNodeFunc(kind NodeType) {
+	delete(r.nodes, kind)
+}
+
+func (r *Reader) OnElement(name QName, fn OnElementFunc) {
+	r.elements[name] = append(r.elements[name], fn)
+}
+
+func (r *Reader) ClearElementFunc(name QName) {
+	delete(r.elements, name)
+}
+
+func (r *Reader) Parse() error {
+	for {
+		var closed bool
+		node, err := r.Read()
+		if closed = errors.Is(err, ErrClosed); !closed && err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+		if err = r.emit(node, closed); err != nil {
+			if errors.Is(err, ErrBreak) {
+				break
+			}
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *Reader) emit(node Node, closed bool) error {
+	for _, fn := range r.nodes[node.Type()] {
+		if err := fn(r, node); err != nil {
+			return err
+		}
+	}
+	switch n := node.(type) {
+	case *Element:
+		for _, fn := range r.elements[n.QName] {
+			if err := fn(r, n, closed); err != nil {
+				return err
+			}
+		}
+	default:
+		// pass
+	}
+	return nil
 }
 
 func (r *Reader) Read() (Node, error) {

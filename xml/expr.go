@@ -1036,7 +1036,7 @@ func toTime(value any) (time.Time, error) {
 		return time.UnixMilli(int64(v)), nil
 	default:
 		var zero time.Time
-		return zero, errType 
+		return zero, errType
 	}
 }
 
