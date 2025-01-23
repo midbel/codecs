@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -20,13 +19,16 @@ func main() {
 	}
 	defer r.Close()
 
+	var store Store
+
 	rs := xml.NewReader(r)
-	rs.OnElement(xml.LocalName("book"), onBook)
-	rs.OnElement(xml.LocalName("author"), onAuthor)
+	rs.OnElementOpen(xml.LocalName("book"), store.onBook)
+	rs.OnElementOpen(xml.LocalName("author"), store.onAuthor)
 	if err := rs.Start(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
+	fmt.Println(store.books)
 }
 
 type Book struct {
@@ -34,17 +36,16 @@ type Book struct {
 	Price float64
 }
 
-func onBook(rs *xml.Reader, el *xml.Element, closed bool) error {
+type Store struct {
+	books []Book
+}
+
+func (s *Store) onBook(rs *xml.Reader, el *xml.Element, closed bool) error {
 	var b Book
-	if closed {
-		fmt.Printf("onBook(done): %+v\n", b)
-		return nil
-	}
-	fmt.Println("onBook", el.Identity(), closed)
 
 	sub := rs.Sub()
 	el1 := xml.LocalName("title")
-	sub.OnElement(el1, func(rs *xml.Reader, _ *xml.Element, closed bool) error {
+	sub.OnElementOpen(el1, func(rs *xml.Reader, _ *xml.Element, closed bool) error {
 		if closed {
 			return nil
 		}
@@ -56,26 +57,29 @@ func onBook(rs *xml.Reader, el *xml.Element, closed bool) error {
 		return err
 	})
 	el2 := xml.LocalName("price")
-	sub.OnElement(el2, func(rs *xml.Reader, _ *xml.Element, closed bool) error {
+	sub.OnElementOpen(el2, func(rs *xml.Reader, _ *xml.Element, closed bool) error {
 		if closed {
 			return nil
 		}
 		fmt.Println("element(book.price)")
 		str, err := getValue(rs)
 		if err == nil {
-			b.Title = str
+			b.Price, err = strconv.ParseFloat(str, 64)
 		}
-		b.Price, err = strconv.ParseFloat(str, 64)
 		return err
 	})
 
-	return sub.Until(func(n xml.Node, err error) bool {
-		return n.QualifiedName() == "book" && errors.Is(err, xml.ErrClosed)
+	bk := xml.LocalName("book")
+	sub.OnElementClosed(bk, func(_ *xml.Reader, _ *xml.Element, closed bool) error {
+		fmt.Printf("onBook(done): %+v\n", b)
+		s.books = append(s.books, b)
+		return nil
 	})
+
+	return sub.Start()
 }
 
-func onAuthor(rs *xml.Reader, el *xml.Element, closed bool) error {
-	// fmt.Println("onAuthor", el.Identity(), closed)
+func (s *Store) onAuthor(rs *xml.Reader, el *xml.Element, closed bool) error {
 	return nil
 }
 

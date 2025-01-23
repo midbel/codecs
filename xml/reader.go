@@ -2,7 +2,6 @@ package xml
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"slices"
 	"strings"
@@ -23,17 +22,19 @@ type Reader struct {
 	curr Token
 	peek Token
 
-	elements map[QName]OnElementFunc
-	nodes    map[NodeType]OnNodeFunc
+	openEls   map[QName]OnElementFunc
+	closedEls map[QName]OnElementFunc
+	nodes     map[NodeType]OnNodeFunc
 
 	parent *Reader
 }
 
 func NewReader(r io.Reader) *Reader {
 	rs := Reader{
-		scan:     Scan(r),
-		elements: make(map[QName]OnElementFunc),
-		nodes:    make(map[NodeType]OnNodeFunc),
+		scan:      Scan(r),
+		closedEls: make(map[QName]OnElementFunc),
+		openEls:   make(map[QName]OnElementFunc),
+		nodes:     make(map[NodeType]OnNodeFunc),
 	}
 	rs.next()
 	rs.next()
@@ -42,12 +43,13 @@ func NewReader(r io.Reader) *Reader {
 
 func (r *Reader) Sub() *Reader {
 	rs := Reader{
-		scan:     r.scan,
-		curr:     r.curr,
-		peek:     r.peek,
-		elements: make(map[QName]OnElementFunc),
-		nodes:    make(map[NodeType]OnNodeFunc),
-		parent:   r,
+		scan:      r.scan,
+		curr:      r.curr,
+		peek:      r.peek,
+		closedEls: make(map[QName]OnElementFunc),
+		openEls:   make(map[QName]OnElementFunc),
+		nodes:     make(map[NodeType]OnNodeFunc),
+		parent:    r,
 	}
 	return &rs
 }
@@ -60,12 +62,20 @@ func (r *Reader) ClearNodeFunc(kind NodeType) {
 	delete(r.nodes, kind)
 }
 
-func (r *Reader) OnElement(name QName, fn OnElementFunc) {
-	r.elements[name] = fn
+func (r *Reader) OnElementOpen(name QName, fn OnElementFunc) {
+	r.openEls[name] = fn
 }
 
-func (r *Reader) ClearElementFunc(name QName) {
-	delete(r.elements, name)
+func (r *Reader) OnElementClosed(name QName, fn OnElementFunc) {
+	r.closedEls[name] = fn
+}
+
+func (r *Reader) ClearElementOpenFunc(name QName) {
+	delete(r.openEls, name)
+}
+
+func (r *Reader) ClearElementClosedFunc(name QName) {
+	delete(r.closedEls, name)
 }
 
 func (r *Reader) Start() error {
@@ -110,10 +120,17 @@ func (r *Reader) emit(node Node, closed bool) error {
 	}
 	switch n := node.(type) {
 	case *Element:
-		if fn, ok := r.getElementFunc(n.QName); ok {
-			if err := fn(r, n, closed); err != nil {
-				return err
-			}
+		var (
+			fn OnElementFunc
+			ok bool
+		)
+		if closed {
+			fn, ok = r.getClosedElementFunc(n.QName)
+		} else {
+			fn, ok = r.getOpenElementFunc(n.QName)
+		}
+		if ok {
+			return fn(r, n, closed)
 		}
 	default:
 		// pass
@@ -121,13 +138,24 @@ func (r *Reader) emit(node Node, closed bool) error {
 	return nil
 }
 
-func (r *Reader) getElementFunc(name QName) (OnElementFunc, bool) {
-	fn, ok := r.elements[name]
+func (r *Reader) getOpenElementFunc(name QName) (OnElementFunc, bool) {
+	fn, ok := r.openEls[name]
 	if ok {
 		return fn, ok
 	}
 	if r.parent != nil {
-		return r.parent.getElementFunc(name)
+		return r.parent.getOpenElementFunc(name)
+	}
+	return nil, false
+}
+
+func (r *Reader) getClosedElementFunc(name QName) (OnElementFunc, bool) {
+	fn, ok := r.closedEls[name]
+	if ok {
+		return fn, ok
+	}
+	if r.parent != nil {
+		return r.parent.getClosedElementFunc(name)
 	}
 	return nil, false
 }

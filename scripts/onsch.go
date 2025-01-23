@@ -34,13 +34,16 @@ func main() {
 	e.Encode(sch)
 }
 
-type BuildContext int8
+type buildContext int32
 
 const (
-	ctxSchema BuildContext = 1 << iota
+	ctxSchema buildContext = 1 << iota
 	ctxPattern
 	ctxRule
 	ctxAssert
+	ctxPhase
+	ctxActive
+	ctxFunction
 )
 
 type Builder struct {
