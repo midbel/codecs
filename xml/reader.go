@@ -2,6 +2,7 @@ package xml
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"slices"
 	"strings"
@@ -22,15 +23,17 @@ type Reader struct {
 	curr Token
 	peek Token
 
-	elements map[QName][]OnElementFunc
-	nodes    map[NodeType][]OnNodeFunc
+	elements map[QName]OnElementFunc
+	nodes    map[NodeType]OnNodeFunc
+
+	parent *Reader
 }
 
 func NewReader(r io.Reader) *Reader {
 	rs := Reader{
 		scan:     Scan(r),
-		elements: make(map[QName][]OnElementFunc),
-		nodes:    make(map[NodeType][]OnNodeFunc),
+		elements: make(map[QName]OnElementFunc),
+		nodes:    make(map[NodeType]OnNodeFunc),
 	}
 	rs.next()
 	rs.next()
@@ -42,14 +45,15 @@ func (r *Reader) Sub() *Reader {
 		scan:     r.scan,
 		curr:     r.curr,
 		peek:     r.peek,
-		elements: make(map[QName][]OnElementFunc),
-		nodes:    make(map[NodeType][]OnNodeFunc),
+		elements: make(map[QName]OnElementFunc),
+		nodes:    make(map[NodeType]OnNodeFunc),
+		parent:   r,
 	}
 	return &rs
 }
 
 func (r *Reader) OnNode(kind NodeType, fn OnNodeFunc) {
-	r.nodes[kind] = append(r.nodes[kind], fn)
+	r.nodes[kind] = fn
 }
 
 func (r *Reader) ClearNodeFunc(kind NodeType) {
@@ -57,14 +61,25 @@ func (r *Reader) ClearNodeFunc(kind NodeType) {
 }
 
 func (r *Reader) OnElement(name QName, fn OnElementFunc) {
-	r.elements[name] = append(r.elements[name], fn)
+	r.elements[name] = fn
 }
 
 func (r *Reader) ClearElementFunc(name QName) {
 	delete(r.elements, name)
 }
 
-func (r *Reader) Parse() error {
+func (r *Reader) Start() error {
+	forever := func(_ Node, _ error) bool {
+		return true
+	}
+	return r.run(forever)
+}
+
+func (r *Reader) Until(fn func(Node, error) bool) error {
+	return r.run(fn)
+}
+
+func (r *Reader) run(fn func(Node, error) bool) error {
 	for {
 		var closed bool
 		node, err := r.Read()
@@ -73,6 +88,9 @@ func (r *Reader) Parse() error {
 				break
 			}
 			return err
+		}
+		if ok := fn(node, err); !ok {
+			break
 		}
 		if err = r.emit(node, closed); err != nil {
 			if errors.Is(err, ErrBreak) {
@@ -85,14 +103,14 @@ func (r *Reader) Parse() error {
 }
 
 func (r *Reader) emit(node Node, closed bool) error {
-	for _, fn := range r.nodes[node.Type()] {
+	if fn, ok := r.getNodeFunc(node.Type()); ok {
 		if err := fn(r, node); err != nil {
 			return err
 		}
 	}
 	switch n := node.(type) {
 	case *Element:
-		for _, fn := range r.elements[n.QName] {
+		if fn, ok := r.getElementFunc(n.QName); ok {
 			if err := fn(r, n, closed); err != nil {
 				return err
 			}
@@ -101,6 +119,28 @@ func (r *Reader) emit(node Node, closed bool) error {
 		// pass
 	}
 	return nil
+}
+
+func (r *Reader) getElementFunc(name QName) (OnElementFunc, bool) {
+	fn, ok := r.elements[name]
+	if ok {
+		return fn, ok
+	}
+	if r.parent != nil {
+		return r.parent.getElementFunc(name)
+	}
+	return nil, false
+}
+
+func (r *Reader) getNodeFunc(kind NodeType) (OnNodeFunc, bool) {
+	fn, ok := r.nodes[kind]
+	if ok {
+		return fn, ok
+	}
+	if r.parent != nil {
+		return r.parent.getNodeFunc(kind)
+	}
+	return nil, false
 }
 
 func (r *Reader) Read() (Node, error) {
@@ -280,6 +320,11 @@ func (r *Reader) is(kind rune) bool {
 func (r *Reader) next() {
 	r.curr = r.peek
 	r.peek = r.scan.Scan()
+
+	if r.parent != nil {
+		r.parent.curr = r.curr
+		r.parent.peek = r.peek
+	}
 }
 
 func (r *Reader) createError(elem, msg string) error {
