@@ -219,6 +219,14 @@ type QName struct {
 	Name  string
 }
 
+func ParseName(name string) (QName, error) {
+	var (
+		qn  QName
+		err error
+	)
+	return qn, err
+}
+
 func LocalName(name string) QName {
 	return QualifiedName(name, "")
 }
@@ -228,6 +236,10 @@ func QualifiedName(name, space string) QName {
 		Name:  name,
 		Space: space,
 	}
+}
+
+func (q QName) Equal(other QName) bool {
+	return q.Space == other.Space && q.Name == other.Name
 }
 
 func (q QName) LocalName() string {

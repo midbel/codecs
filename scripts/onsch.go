@@ -1,7 +1,7 @@
 package main
 
 import (
-	"encoding/json"
+	// "encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -9,6 +9,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/midbel/codecs/xml"
 )
@@ -29,9 +30,11 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
-	e := json.NewEncoder(os.Stdout)
-	e.SetIndent("", " ")
-	e.Encode(sch)
+	// e := json.NewEncoder(os.Stdout)
+	// e.SetIndent("", " ")
+	// e.Encode(sch)
+	fmt.Println("done")
+	_ = sch
 }
 
 type buildContext int32
@@ -48,7 +51,7 @@ const (
 
 type Builder struct {
 	schema  *Schema
-	context BuildContext
+	context buildContext
 }
 
 func New() *Builder {
@@ -62,11 +65,12 @@ func (b *Builder) Build(r io.Reader) (*Schema, error) {
 	rs := xml.NewReader(r)
 	rs.OnElement(xml.LocalName("schema"), b.onSchema)
 	rs.OnElement(xml.LocalName("title"), b.onTitle)
-	rs.OnElement(xml.LocalName("phase"), b.onPhase)
 	rs.OnElement(xml.LocalName("pattern"), b.onPattern)
 	rs.OnElement(xml.LocalName("rule"), b.onRule)
 	rs.OnElement(xml.LocalName("assert"), b.onAssert)
 	rs.OnElement(xml.LocalName("let"), b.onLet)
+	rs.OnElementOpen(xml.LocalName("phase"), b.onPhase)
+	rs.OnElementOpen(xml.LocalName("function"), b.onFunction)
 	return b.schema, rs.Start()
 }
 
@@ -133,6 +137,19 @@ func (b *Builder) setLetToRule(ident, value string) error {
 	return nil
 }
 
+func (b *Builder) onSchema(rs *xml.Reader, el *xml.Element, closed bool) error {
+	b.context = ctxSchema
+	if closed {
+		return nil
+	}
+	attr, err := getAttribute(el, "queryBinding")
+	if err != nil {
+		return err
+	}
+	b.schema.Mode = attr
+	return nil
+}
+
 func (b *Builder) onTitle(rs *xml.Reader, el *xml.Element, closed bool) error {
 	if closed {
 		return nil
@@ -148,20 +165,106 @@ func (b *Builder) onTitle(rs *xml.Reader, el *xml.Element, closed bool) error {
 }
 
 func (b *Builder) onPhase(rs *xml.Reader, el *xml.Element, closed bool) error {
-	return nil
-}
-
-func (b *Builder) onSchema(rs *xml.Reader, el *xml.Element, closed bool) error {
-	b.context = ctxSchema
-	if closed {
-		return nil
+	if b.context != ctxSchema {
+		return fmt.Errorf("phase element only allowed in schema")
 	}
-	attr, err := getAttribute(el, "queryBinding")
+	var (
+		ph  Phase
+		err error
+	)
+	ph.Ident, err = getAttribute(el, "id")
 	if err != nil {
 		return err
 	}
-	b.schema.Mode = attr
-	return nil
+
+	sub := rs.Sub()
+	sub.OnElement(xml.LocalName("active"), func(_ *xml.Reader, el *xml.Element, closed bool) error {
+		if !closed {
+			return fmt.Errorf("active element should be self closed")
+		}
+		pattern, err := getAttribute(el, "pattern")
+		if err == nil {
+			ph.Actives = append(ph.Actives, pattern)
+		}
+		return err
+	})
+	sub.OnElementClosed(xml.LocalName("phase"), func(_ *xml.Reader, el *xml.Element, _ bool) error {
+		b.schema.Phases = append(b.schema.Phases, ph)
+		return nil
+	})
+	if err := sub.Start(); err != nil {
+		return err
+	}
+	return xml.ErrBreak
+}
+
+func (b *Builder) onFunction(rs *xml.Reader, el *xml.Element, closed bool) error {
+	if closed {
+		return nil
+	}
+	var (
+		fn  Function
+		err error
+	)
+	fn.Name, err = getAttribute(el, "name")
+	if err != nil {
+		return err
+	}
+	sub := rs.Sub()
+	sub.OnElementClosed(xml.LocalName("function"), func(_ *xml.Reader, el *xml.Element, closed bool) error {
+		return xml.ErrBreak
+	})
+	sub.OnElement(xml.LocalName("param"), func(_ *xml.Reader, el *xml.Element, closed bool) error {
+		if !closed {
+			return fmt.Errorf("param should be self closed")
+		}
+		name, err := getAttribute(el, "name")
+		if err != nil {
+			return err
+		}
+		as, _ := getAttribute(el, "as")
+		fmt.Println("onParam", name, as)
+		return nil
+	})
+	sub.OnElement(xml.LocalName("variable"), func(rs *xml.Reader, el *xml.Element, closed bool) error {
+		if closed {
+			return nil
+		}
+		name, err := getAttribute(el, "name")
+		if err != nil {
+			return err
+		}
+		value, err := getAttribute(el, "select")
+		if err != nil && errors.Is(err, ErrMissing) {
+			value, err = getValue(rs)
+		}
+		if err == nil {
+			fmt.Println("onVariable", name, cleanString(value))
+		}
+		return err
+	})
+	sub.OnElement(xml.LocalName("value-of"), func(_ *xml.Reader, el *xml.Element, closed bool) error {
+		code, err := getAttribute(el, "select")
+		if err != nil {
+			return err
+		}
+		fmt.Println("onValueOf", cleanString(code))
+		return nil
+	})
+	sub.OnElement(xml.LocalName("sequence"), func(_ *xml.Reader, el *xml.Element, closed bool) error {
+		code, err := getAttribute(el, "select")
+		if err != nil {
+			return err
+		}
+		fmt.Println("onSequence", cleanString(code))
+		return nil
+	})
+	sub.OnElementOpen(xml.LocalName("choose"), func(_ *xml.Reader, el *xml.Element, closed bool) error {
+		return xml.ErrDiscard
+	})
+
+	fmt.Println("onFunction", fn.Name)
+	return sub.Start()
 }
 
 func (b *Builder) onPattern(rs *xml.Reader, el *xml.Element, closed bool) error {
@@ -175,6 +278,7 @@ func (b *Builder) onPattern(rs *xml.Reader, el *xml.Element, closed bool) error 
 	}
 	p := Pattern{
 		Variables: make(map[string]string),
+		Functions: make(map[string]Function),
 	}
 	p.Ident, _ = getAttribute(el, "id")
 	b.setPattern(p)
@@ -197,6 +301,7 @@ func (b *Builder) onRule(rs *xml.Reader, el *xml.Element, closed bool) error {
 	r := Rule{
 		Context:   ctx,
 		Variables: make(map[string]string),
+		Functions: make(map[string]Function),
 	}
 	return b.setRule(r)
 }
@@ -256,14 +361,14 @@ type Schema struct {
 	Phases    []Phase
 	Patterns  []Pattern
 	Variables map[string]string
-	Functions map[string]string
+	Functions map[string]Function
 }
 
 func Default() *Schema {
 	s := Schema{
 		Mode:      "xpath",
 		Variables: make(map[string]string),
-		Functions: make(map[string]string),
+		Functions: make(map[string]Function),
 	}
 	return &s
 }
@@ -277,12 +382,14 @@ type Pattern struct {
 	Ident     string
 	Rules     []Rule
 	Variables map[string]string
+	Functions map[string]Function
 }
 
 type Rule struct {
 	Context   string
 	Asserts   []Assert
 	Variables map[string]string
+	Functions map[string]Function
 }
 
 type Assert struct {
@@ -295,6 +402,11 @@ type Assert struct {
 type Let struct {
 	Ident string
 	Value string
+}
+
+type Function struct {
+	Name   string
+	Params []string
 }
 
 func getValue(rs *xml.Reader) (string, error) {
@@ -330,10 +442,10 @@ func cleanString(str string) string {
 	var prev rune
 	str = strings.TrimSpace(str)
 	return strings.Map(func(r rune) rune {
-		if r == '\n' {
+		if r == '\n' || r == '\r' {
 			r = ' '
 		}
-		if (r == ' ' || r == '\t') && r == prev {
+		if unicode.IsSpace(r) && unicode.IsSpace(prev) {
 			return -1
 		}
 		prev = r

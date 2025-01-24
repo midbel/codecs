@@ -959,7 +959,7 @@ func (s *QueryScanner) scanLiteral(tok *Token) {
 		s.read()
 	}
 	tok.Type = Literal
-	tok.Literal = s.str.String()
+	tok.Literal = strings.TrimSpace(s.str.String())
 	if s.char != quote {
 		tok.Type = Invalid
 	}
@@ -1835,7 +1835,6 @@ func (s *Scanner) scanLiteral(tok *Token) {
 	}
 	tok.Type = Literal
 	tok.Literal = s.str.String()
-
 	if s.char == langle {
 		s.state = 0
 	}

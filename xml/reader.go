@@ -8,8 +8,9 @@ import (
 )
 
 var (
-	ErrClosed = errors.New("closed")
-	ErrBreak  = errors.New("break")
+	ErrClosed  = errors.New("closed")
+	ErrBreak   = errors.New("break")
+	ErrDiscard = errors.New("discard")
 )
 
 type (
@@ -62,6 +63,16 @@ func (r *Reader) ClearNodeFunc(kind NodeType) {
 	delete(r.nodes, kind)
 }
 
+func (r *Reader) OnElement(name QName, fn OnElementFunc) {
+	r.OnElementOpen(name, fn)
+	r.OnElementClosed(name, fn)
+}
+
+func (r *Reader) ClearElementFunc(name QName) {
+	r.ClearElementOpenFunc(name)
+	r.ClearElementClosedFunc(name)
+}
+
 func (r *Reader) OnElementOpen(name QName, fn OnElementFunc) {
 	r.openEls[name] = fn
 }
@@ -79,17 +90,6 @@ func (r *Reader) ClearElementClosedFunc(name QName) {
 }
 
 func (r *Reader) Start() error {
-	forever := func(_ Node, _ error) bool {
-		return true
-	}
-	return r.run(forever)
-}
-
-func (r *Reader) Until(fn func(Node, error) bool) error {
-	return r.run(fn)
-}
-
-func (r *Reader) run(fn func(Node, error) bool) error {
 	for {
 		var closed bool
 		node, err := r.Read()
@@ -99,13 +99,29 @@ func (r *Reader) run(fn func(Node, error) bool) error {
 			}
 			return err
 		}
-		if ok := fn(node, err); !ok {
-			break
-		}
 		if err = r.emit(node, closed); err != nil {
 			if errors.Is(err, ErrBreak) {
 				break
 			}
+			if !closed && errors.Is(err, ErrDiscard) {
+				err = r.discard(node)
+			}
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *Reader) discard(node Node) error {
+	for {
+		n, err := r.Read()
+		if errors.Is(err, ErrClosed) {
+			if n.QualifiedName() == node.QualifiedName() {
+				break
+			}
+			continue
+		}
+		if err != nil {
 			return err
 		}
 	}
