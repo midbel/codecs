@@ -124,7 +124,7 @@ func (b *Builder) setFunction(fn Function) error {
 	case ctxSchema | ctxPattern | ctxRule:
 		err = b.setFuncToRule(fn)
 	default:
-		err = fmt.Errorf("invalid let element")
+		err = fmt.Errorf("invalid function element")
 	}
 	return err
 }
@@ -226,7 +226,7 @@ func (b *Builder) onPhase(rs *xml.Reader, el *xml.Element, closed bool) error {
 	})
 	sub.OnElementClosed(xml.LocalName("phase"), func(_ *xml.Reader, el *xml.Element, _ bool) error {
 		b.schema.Phases = append(b.schema.Phases, ph)
-		return nil
+		return xml.ErrBreak
 	})
 	if err := sub.Start(); err != nil {
 		return err
