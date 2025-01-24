@@ -14,8 +14,10 @@ var (
 )
 
 type (
-	OnElementFunc func(*Reader, *Element, bool) error
 	OnNodeFunc    func(*Reader, Node) error
+	OnElementFunc func(*Reader, *Element, bool) error
+	OnInstrFunc   func(*Reader, *Instruction) error
+	OnTextFunc    func(*Reader, string) error
 )
 
 type Reader struct {
@@ -25,6 +27,8 @@ type Reader struct {
 
 	openEls   map[QName]OnElementFunc
 	closedEls map[QName]OnElementFunc
+	instrEls  map[QName]OnInstrFunc
+	textEls   map[QName]OnTextFunc
 	nodes     map[NodeType]OnNodeFunc
 
 	parent *Reader
@@ -35,6 +39,8 @@ func NewReader(r io.Reader) *Reader {
 		scan:      Scan(r),
 		closedEls: make(map[QName]OnElementFunc),
 		openEls:   make(map[QName]OnElementFunc),
+		instrEls:  make(map[QName]OnInstrFunc),
+		textEls:   make(map[QName]OnTextFunc),
 		nodes:     make(map[NodeType]OnNodeFunc),
 	}
 	rs.next()
@@ -49,6 +55,8 @@ func (r *Reader) Sub() *Reader {
 		peek:      r.peek,
 		closedEls: make(map[QName]OnElementFunc),
 		openEls:   make(map[QName]OnElementFunc),
+		instrEls:  make(map[QName]OnInstrFunc),
+		textEls:   make(map[QName]OnTextFunc),
 		nodes:     make(map[NodeType]OnNodeFunc),
 		parent:    r,
 	}

@@ -1,7 +1,7 @@
 package main
 
 import (
-	// "encoding/json"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -30,11 +30,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
-	// e := json.NewEncoder(os.Stdout)
-	// e.SetIndent("", " ")
-	// e.Encode(sch)
-	fmt.Println("done")
-	_ = sch
+	e := json.NewEncoder(os.Stdout)
+	e.SetIndent("", " ")
+	e.Encode(sch)
+	// fmt.Println("done")
 }
 
 type buildContext int32
@@ -115,12 +114,36 @@ func (b *Builder) setLet(ident, value string) error {
 	return err
 }
 
+func (b *Builder) setFunction(fn Function) error {
+	var err error
+	switch b.context {
+	case ctxSchema:
+		b.schema.Functions[fn.QualifiedName()] = fn
+	case ctxSchema | ctxPattern:
+		err = b.setFuncToPattern(fn)
+	case ctxSchema | ctxPattern | ctxRule:
+		err = b.setFuncToRule(fn)
+	default:
+		err = fmt.Errorf("invalid let element")
+	}
+	return err
+}
+
 func (b *Builder) setLetToPattern(ident, value string) error {
 	x := len(b.schema.Patterns) - 1
 	if x < 0 {
 		return fmt.Errorf("no pattern element found")
 	}
 	b.schema.Patterns[x].Variables[ident] = value
+	return nil
+}
+
+func (b *Builder) setFuncToPattern(fn Function) error {
+	x := len(b.schema.Patterns) - 1
+	if x < 0 {
+		return fmt.Errorf("no pattern element found")
+	}
+	b.schema.Patterns[x].Functions[fn.QualifiedName()] = fn
 	return nil
 }
 
@@ -134,6 +157,19 @@ func (b *Builder) setLetToRule(ident, value string) error {
 		return fmt.Errorf("no rule element in pattern found")
 	}
 	b.schema.Patterns[x].Rules[y].Variables[ident] = value
+	return nil
+}
+
+func (b *Builder) setFuncToRule(fn Function) error {
+	x := len(b.schema.Patterns) - 1
+	if x < 0 {
+		return fmt.Errorf("no pattern element found")
+	}
+	y := len(b.schema.Patterns[x].Rules) - 1
+	if y < 0 {
+		return fmt.Errorf("no rule element in pattern found")
+	}
+	b.schema.Patterns[x].Rules[y].Functions[fn.QualifiedName()] = fn
 	return nil
 }
 
@@ -199,19 +235,18 @@ func (b *Builder) onPhase(rs *xml.Reader, el *xml.Element, closed bool) error {
 }
 
 func (b *Builder) onFunction(rs *xml.Reader, el *xml.Element, closed bool) error {
-	if closed {
-		return nil
+	var fn Function
+	name, err := getAttribute(el, "name")
+	if err != nil {
+		return err
 	}
-	var (
-		fn  Function
-		err error
-	)
-	fn.Name, err = getAttribute(el, "name")
+	fn.QName, err = xml.ParseName(name)
 	if err != nil {
 		return err
 	}
 	sub := rs.Sub()
 	sub.OnElementClosed(xml.LocalName("function"), func(_ *xml.Reader, el *xml.Element, closed bool) error {
+		b.setFunction(fn)
 		return xml.ErrBreak
 	})
 	sub.OnElement(xml.LocalName("param"), func(_ *xml.Reader, el *xml.Element, closed bool) error {
@@ -223,7 +258,9 @@ func (b *Builder) onFunction(rs *xml.Reader, el *xml.Element, closed bool) error
 			return err
 		}
 		as, _ := getAttribute(el, "as")
-		fmt.Println("onParam", name, as)
+		_ = as
+		fn.Params = append(fn.Params, name)
+
 		return nil
 	})
 	sub.OnElement(xml.LocalName("variable"), func(rs *xml.Reader, el *xml.Element, closed bool) error {
@@ -239,7 +276,8 @@ func (b *Builder) onFunction(rs *xml.Reader, el *xml.Element, closed bool) error
 			value, err = getValue(rs)
 		}
 		if err == nil {
-			fmt.Println("onVariable", name, cleanString(value))
+			_ = name
+			fn.Body = append(fn.Body, cleanString(value))
 		}
 		return err
 	})
@@ -248,7 +286,7 @@ func (b *Builder) onFunction(rs *xml.Reader, el *xml.Element, closed bool) error
 		if err != nil {
 			return err
 		}
-		fmt.Println("onValueOf", cleanString(code))
+		fn.Body = append(fn.Body, cleanString(code))
 		return nil
 	})
 	sub.OnElement(xml.LocalName("sequence"), func(_ *xml.Reader, el *xml.Element, closed bool) error {
@@ -256,14 +294,12 @@ func (b *Builder) onFunction(rs *xml.Reader, el *xml.Element, closed bool) error
 		if err != nil {
 			return err
 		}
-		fmt.Println("onSequence", cleanString(code))
+		fn.Body = append(fn.Body, cleanString(code))
 		return nil
 	})
 	sub.OnElementOpen(xml.LocalName("choose"), func(_ *xml.Reader, el *xml.Element, closed bool) error {
 		return xml.ErrDiscard
 	})
-
-	fmt.Println("onFunction", fn.Name)
 	return sub.Start()
 }
 
@@ -405,8 +441,9 @@ type Let struct {
 }
 
 type Function struct {
-	Name   string
+	xml.QName
 	Params []string
+	Body   []string
 }
 
 func getValue(rs *xml.Reader) (string, error) {
@@ -427,15 +464,6 @@ func getAttribute(el *xml.Element, name string) (string, error) {
 		return "", fmt.Errorf("%s: %w %s", name, ErrMissing, "attribute")
 	}
 	return el.Attrs[ix].Value(), nil
-}
-
-func discardClosed(fn xml.OnElementFunc) xml.OnElementFunc {
-	return func(rs *xml.Reader, el *xml.Element, closed bool) error {
-		if closed {
-			return nil
-		}
-		return fn(rs, el, closed)
-	}
 }
 
 func cleanString(str string) string {

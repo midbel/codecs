@@ -221,10 +221,17 @@ type QName struct {
 
 func ParseName(name string) (QName, error) {
 	var (
-		qn  QName
-		err error
+		qn QName
+		ok bool
 	)
-	return qn, err
+	qn.Space, qn.Name, ok = strings.Cut(name, ":")
+	if !ok {
+		qn.Name, qn.Space = qn.Space, ""
+	}
+	if ok && qn.Space == "" {
+		return qn, fmt.Errorf("invalid namespace")
+	}
+	return qn, nil
 }
 
 func LocalName(name string) QName {
