@@ -99,7 +99,7 @@ type Schema struct {
 func Default() *Schema {
 	s := Schema{
 		Environ: xml.Empty[xml.Expr](),
-		Funcs: xml.Empty[xml.Callable](),
+		Funcs:   xml.Empty[xml.Callable](),
 	}
 	return &s
 }

@@ -1006,7 +1006,7 @@ func (s *QueryScanner) scanNumber(tok *Token) {
 
 func (s *QueryScanner) scanVariable(tok *Token) {
 	s.read()
-	for !s.done() && (unicode.IsLetter(s.char) || unicode.IsDigit(s.char)) {
+	for !s.done() && (unicode.IsLetter(s.char) || unicode.IsDigit(s.char) || s.char == underscore) {
 		s.write()
 		s.read()
 	}
