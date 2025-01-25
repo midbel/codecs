@@ -132,12 +132,12 @@ type Context struct {
 	Index         int
 	Size          int
 	PrincipalType NodeType
-	Environ
+	Environ[Expr]
 }
 
 func defaultContext(n Node) Context {
 	ctx := createContext(n, 1, 1)
-	ctx.Environ = Empty()
+	ctx.Environ = Empty[Expr]()
 	return ctx
 }
 
@@ -205,7 +205,7 @@ type query struct {
 	expr Expr
 }
 
-func (q query) FindWithEnv(node Node, env Environ) ([]Item, error) {
+func (q query) FindWithEnv(node Node, env Environ[Expr]) ([]Item, error) {
 	ctx := createContext(node, 1, 1)
 	ctx.Environ = env
 	return q.find(ctx)

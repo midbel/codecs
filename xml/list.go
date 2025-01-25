@@ -6,33 +6,33 @@ import (
 	"time"
 )
 
-type Environ interface {
-	Resolve(string) (Expr, error)
-	Define(string, Expr)
+type Environ[T any] interface {
+	Resolve(string) (T, error)
+	Define(string, T)
 }
 
-type Env struct {
-	values map[string]Expr
-	parent Environ
+type Env[T any] struct {
+	values map[string]T
+	parent Environ[T]
 }
 
-func Empty() Environ {
-	return Enclosed(nil)
+func Empty[T any]() Environ[T] {
+	return Enclosed[T](nil)
 }
 
-func Enclosed(parent Environ) Environ {
-	e := Env{
-		values: make(map[string]Expr),
+func Enclosed[T any](parent Environ[T]) Environ[T] {
+	e := Env[T]{
+		values: make(map[string]T),
 		parent: parent,
 	}
 	return &e
 }
 
-func (e *Env) Define(ident string, expr Expr) {
+func (e *Env[T]) Define(ident string, expr T) {
 	e.values[ident] = expr
 }
 
-func (e *Env) Resolve(ident string) (Expr, error) {
+func (e *Env[T]) Resolve(ident string) (T, error) {
 	expr, ok := e.values[ident]
 	if ok {
 		return expr, nil
@@ -40,7 +40,8 @@ func (e *Env) Resolve(ident string) (Expr, error) {
 	if e.parent != nil {
 		return e.parent.Resolve(ident)
 	}
-	return nil, fmt.Errorf("%s: identifier not defined", ident)
+	var t T
+	return t, fmt.Errorf("%s: identifier not defined", ident)
 }
 
 type Item interface {
@@ -48,7 +49,7 @@ type Item interface {
 	Value() any
 	True() bool
 	Atomic() bool
-	Assert(Expr, Environ) ([]Item, error)
+	Assert(Expr, Environ[Expr]) ([]Item, error)
 }
 
 func createSingle(item Item) []Item {
@@ -88,7 +89,7 @@ func createLiteral(value any) Item {
 	}
 }
 
-func (i literalItem) Assert(_ Expr, _ Environ) ([]Item, error) {
+func (i literalItem) Assert(_ Expr, _ Environ[Expr]) ([]Item, error) {
 	return nil, fmt.Errorf("can not assert on literal item")
 }
 
@@ -137,7 +138,7 @@ func createNode(node Node) Item {
 	}
 }
 
-func (i nodeItem) Assert(expr Expr, env Environ) ([]Item, error) {
+func (i nodeItem) Assert(expr Expr, env Environ[Expr]) ([]Item, error) {
 	ctx := createContext(i.node, 1, 1)
 	ctx.Environ = env
 	return expr.find(ctx)
