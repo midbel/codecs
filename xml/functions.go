@@ -125,6 +125,8 @@ var builtins = []registeredBuiltin{
 	registerFunc("floor", "fn", callFloor),
 	registerFunc("ceiling", "", callCeil),
 	registerFunc("ceiling", "fn", callCeil),
+	registerFunc("number", "", callNumber),
+	registerFunc("number", "fn", callNumber),
 	registerFunc("abs", "", callAbs),
 	registerFunc("abs", "fn", callAbs),
 	registerFunc("date", "", callDate),
@@ -187,6 +189,10 @@ func callAbs(ctx Context, args []Expr) ([]Item, error) {
 		return nil, err
 	}
 	return singleValue(math.Abs(val)), nil
+}
+
+func callNumber(ctx Context, args []Expr) ([]Item, error) {
+	return nil, nil
 }
 
 func callExists(ctx Context, args []Expr) ([]Item, error) {

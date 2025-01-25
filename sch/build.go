@@ -56,13 +56,30 @@ func (b *Builder) createEnv() xml.Environ[xml.Expr] {
 	case ctxSchema | ctxPattern:
 		return xml.Enclosed[xml.Expr](b.schema)
 	case ctxSchema | ctxPattern | ctxRule:
-		x := len(b.schema.Patterns) - 1 
+		x := len(b.schema.Patterns) - 1
 		if x < 0 {
 			return xml.Empty[xml.Expr]()
 		}
 		return xml.Enclosed[xml.Expr](b.schema.Patterns[x])
 	default:
 		return xml.Empty[xml.Expr]()
+	}
+}
+
+func (b *Builder) createFuncEnv() xml.Environ[xml.Callable] {
+	switch b.context {
+	case ctxSchema:
+		return xml.Empty[xml.Callable]()
+	case ctxSchema | ctxPattern:
+		return xml.Enclosed[xml.Callable](b.schema.Funcs)
+	case ctxSchema | ctxPattern | ctxRule:
+		x := len(b.schema.Patterns) - 1
+		if x < 0 {
+			return xml.Empty[xml.Callable]()
+		}
+		return xml.Enclosed[xml.Callable](b.schema.Patterns[x].Funcs)
+	default:
+		return xml.Empty[xml.Callable]()
 	}
 }
 
@@ -210,6 +227,8 @@ func (b *Builder) onNs(rs *xml.Reader, el *xml.Element, closed bool) error {
 	if !closed {
 		return fmt.Errorf("ns element should be self closed")
 	}
+	// prefix, err := getAttribute(el, "prefix")
+	// uri, err := getAttribute(el, "uri")
 	return nil
 }
 
@@ -241,10 +260,7 @@ func (b *Builder) onPhase(rs *xml.Reader, el *xml.Element, closed bool) error {
 		b.schema.Phases = append(b.schema.Phases, &ph)
 		return xml.ErrBreak
 	})
-	if err := sub.Start(); err != nil {
-		return err
-	}
-	return xml.ErrBreak
+	return sub.Start()
 }
 
 func (b *Builder) onFunction(rs *xml.Reader, el *xml.Element, closed bool) error {
@@ -293,7 +309,7 @@ func (b *Builder) onFunction(rs *xml.Reader, el *xml.Element, closed bool) error
 			if err != nil {
 				return err
 			}
-			_, _ = name, expr
+			fn.body = append(fn.body, xml.Assign(name, expr))
 		}
 		return err
 	})
@@ -304,7 +320,6 @@ func (b *Builder) onFunction(rs *xml.Reader, el *xml.Element, closed bool) error
 		}
 		expr, err := compileExpr(normalizeSpace(code))
 		if err != nil {
-			fmt.Println("valuf-of error", normalizeSpace(code))
 			return err
 		}
 		fn.body = append(fn.body, expr)
@@ -317,7 +332,6 @@ func (b *Builder) onFunction(rs *xml.Reader, el *xml.Element, closed bool) error
 		}
 		expr, err := compileExpr(normalizeSpace(code))
 		if err != nil {
-			fmt.Println("sequence error", normalizeSpace(code))
 			return err
 		}
 		fn.body = append(fn.body, expr)
@@ -340,7 +354,7 @@ func (b *Builder) onPattern(rs *xml.Reader, el *xml.Element, closed bool) error 
 	}
 	p := Pattern{
 		Environ: b.createEnv(),
-		Funcs:   xml.Empty[xml.Callable](),
+		Funcs:   b.createFuncEnv(),
 	}
 	p.Ident, _ = getAttribute(el, "id")
 	b.setPattern(&p)
@@ -363,7 +377,7 @@ func (b *Builder) onRule(rs *xml.Reader, el *xml.Element, closed bool) error {
 	r := Rule{
 		Context: ctx,
 		Environ: b.createEnv(),
-		Funcs:   xml.Empty[xml.Callable](),
+		Funcs:   b.createFuncEnv(),
 	}
 	return b.setRule(&r)
 }

@@ -44,24 +44,7 @@ type Function struct {
 }
 
 func (f Function) Call(ctx xml.Context, args []xml.Expr) ([]xml.Item, error) {
-	return nil, nil
-}
-
-type Assignment struct {
-	ident string
-	expr  xml.Expr
-}
-
-func (a Assignment) Find(node xml.Node) ([]xml.Item, error) {
-	ctx := xml.Context{
-		Node:    node,
-		Environ: xml.Empty[xml.Expr](),
-	}
-	return a.find(ctx)
-}
-
-func (a Assignment) find(ctx xml.Context) ([]xml.Item, error) {
-	ctx.Define(a.ident, a.expr)
+	fmt.Println("calling", f.QualifiedName(), args)
 	return nil, nil
 }
 
@@ -118,6 +101,10 @@ func Parse(r io.Reader) (*Schema, error) {
 	return b.Build(r)
 }
 
+func (s *Schema) ResolveFunc(name string) (xml.Callable, error) {
+	return s.Funcs.Resolve(name)
+}
+
 func (s *Schema) Exec(doc *xml.Document, keep FilterFunc) iter.Seq[Result] {
 	return s.ExecContext(context.Background(), doc, keep)
 }
@@ -159,6 +146,10 @@ type Pattern struct {
 	Rules []*Rule
 }
 
+func (p *Pattern) ResolveFunc(name string) (xml.Callable, error) {
+	return p.Funcs.Resolve(name)
+}
+
 func (p *Pattern) Exec(doc *xml.Document, keep FilterFunc) iter.Seq[Result] {
 	return p.ExecContext(context.Background(), doc, keep)
 }
@@ -198,6 +189,10 @@ type Rule struct {
 	Title   string
 	Context string
 	Asserts []*Assert
+}
+
+func (r *Rule) ResolveFunc(name string) (xml.Callable, error) {
+	return r.Funcs.Resolve(name)
 }
 
 func (r *Rule) Count(doc *xml.Document) (int, error) {

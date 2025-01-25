@@ -37,7 +37,7 @@ func main() {
 		os.Exit(2)
 	}
 	if list {
-		print(schema, opts.Keep())
+		printList(schema)
 		return
 	}
 	var re Reporter
@@ -52,6 +52,12 @@ func main() {
 		fmt.Fprintln(os.Stderr, "%s: unsupported report type")
 	}
 	execDefault(re, schema, flag.Args())
+}
+
+func printList(schema *sch.Schema) {
+	for a := range schema.Asserts() {
+		fmt.Println(a.Ident)
+	}
 }
 
 func execDefault(re Reporter, schema *sch.Schema, files []string) error {

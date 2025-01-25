@@ -623,7 +623,7 @@ func (c call) Find(node Node) ([]Item, error) {
 func (c call) find(ctx Context) ([]Item, error) {
 	fn, err := findBuiltin(c.QName)
 	if err != nil {
-		return nil, err
+		return c.findUserDefinedFunction(ctx)
 	}
 	if fn == nil {
 		return nil, fmt.Errorf("%s: %s", errImplemented, c.QualifiedName())
@@ -633,6 +633,20 @@ func (c call) find(ctx Context) ([]Item, error) {
 		err = fmt.Errorf("%s: %s", c.QualifiedName(), err)
 	}
 	return items, err
+}
+
+func (c call) findUserDefinedFunction(ctx Context) ([]Item, error) {
+	res, ok := ctx.Environ.(interface {
+		ResolveFunc(string) (Callable, error)
+	})
+	if !ok {
+		return nil, fmt.Errorf("%s can not be resolved", c.QualifiedName())
+	}
+	fn, err := res.ResolveFunc(c.QualifiedName())
+	if err != nil {
+		return nil, err
+	}
+	return fn.Call(ctx, c.args)
 }
 
 type attr struct {
@@ -782,11 +796,19 @@ type Let struct {
 	expr  Expr
 }
 
+func Assign(ident string, expr Expr) Expr {
+	return Let{
+		ident: ident,
+		expr:  expr,
+	}
+}
+
 func (e Let) Find(node Node) ([]Item, error) {
 	return e.find(defaultContext(node))
 }
 
 func (e Let) find(ctx Context) ([]Item, error) {
+	ctx.Define(e.ident, e.expr)
 	return nil, nil
 }
 
