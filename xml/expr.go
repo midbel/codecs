@@ -122,15 +122,13 @@ type Callable interface {
 	Call(ctx Context, args []Expr) ([]Item, error)
 }
 
-func Call(ctx Context, body []Expr, env Environ[Expr]) ([]Item, error) {
+func Call(ctx Context, body []Expr) ([]Item, error) {
 	var (
 		is  []Item
 		err error
 	)
-	sub := defaultContext(ctx.Node)
-	sub.Environ = Enclosed(env)
 	for i := range body {
-		is, err = body[i].find(sub)
+		is, err = body[i].find(ctx)
 		if err != nil {
 			return nil, err
 		}

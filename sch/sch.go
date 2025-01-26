@@ -53,11 +53,15 @@ func (f Function) Call(ctx xml.Context, args []xml.Expr) ([]xml.Item, error) {
 	if len(args) != len(f.args) {
 		return nil, fmt.Errorf("invalid number of arguments given")
 	}
-	env := xml.Empty[xml.Expr]()
+	env := ctx.Environ
+	defer func() {
+		ctx.Environ = env
+	}()
+	ctx.Environ = xml.Enclosed[xml.Expr](ctx.Environ)
 	for i := range f.args {
-		env.Define(f.args[i].name, args[i])
+		ctx.Environ.Define(f.args[i].name, args[i])
 	}
-	is, err := xml.Call(ctx, f.body, env)
+	is, err := xml.Call(ctx, f.body)
 	if err != nil {
 		return nil, err
 	}
