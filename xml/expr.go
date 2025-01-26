@@ -932,14 +932,18 @@ func (t Type) IsCastable(value any) Item {
 	return createLiteral(false)
 }
 
-func (t Type) Cast(str string) (Item, error) {
+func (t Type) Cast(in any) (Item, error) {
 	var (
 		val any
 		err error
 	)
 	switch t.QualifiedName() {
 	case "xs:date", "date":
-		val, err = castToDate(str)
+		val, err = castToDate(in)
+	case "xs:decimal", "decimal":
+		val, err = castToFloat(in)
+	case "xs:boolean", "boolean":
+		val, err = castToBool(in)
 	default:
 		return nil, ErrCast
 	}
@@ -952,6 +956,19 @@ func (t Type) Cast(str string) (Item, error) {
 type cast struct {
 	expr Expr
 	kind Type
+}
+
+func As(expr Expr, name QName) Expr {
+	if name.Zero() {
+		return expr
+	}
+	t := Type{
+		QName: name,
+	}
+	return cast{
+		expr: expr,
+		kind: t,
+	}
 }
 
 func (c cast) Find(node Node) ([]Item, error) {
@@ -967,7 +984,7 @@ func (c cast) find(ctx Context) ([]Item, error) {
 		if !is[i].Atomic() {
 			return nil, errType
 		}
-		is[i], err = c.kind.Cast(is[i].Value().(string))
+		is[i], err = c.kind.Cast(is[i].Value())
 		if err != nil {
 			return nil, err
 		}

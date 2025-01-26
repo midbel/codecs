@@ -59,7 +59,8 @@ func (f Function) Call(ctx xml.Context, args []xml.Expr) ([]xml.Item, error) {
 	}()
 	ctx.Environ = xml.Enclosed[xml.Expr](ctx.Environ)
 	for i := range f.args {
-		ctx.Environ.Define(f.args[i].name, args[i])
+		e := xml.As(args[i], f.args[i].as)
+		ctx.Environ.Define(f.args[i].name, e)
 	}
 	is, err := xml.Call(ctx, f.body)
 	if err != nil {
