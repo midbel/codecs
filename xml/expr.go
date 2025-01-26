@@ -122,6 +122,22 @@ type Callable interface {
 	Call(ctx Context, args []Expr) ([]Item, error)
 }
 
+func Call(ctx Context, body []Expr, env Environ[Expr]) ([]Item, error) {
+	var (
+		is  []Item
+		err error
+	)
+	sub := defaultContext(ctx.Node)
+	sub.Environ = Enclosed(env)
+	for i := range body {
+		is, err = body[i].find(sub)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return is, err
+}
+
 type Expr interface {
 	Find(Node) ([]Item, error)
 	find(Context) ([]Item, error)
@@ -623,7 +639,7 @@ func (c call) Find(node Node) ([]Item, error) {
 func (c call) find(ctx Context) ([]Item, error) {
 	fn, err := findBuiltin(c.QName)
 	if err != nil {
-		return c.findUserDefinedFunction(ctx)
+		return c.callUserDefinedFunction(ctx)
 	}
 	if fn == nil {
 		return nil, fmt.Errorf("%s: %s", errImplemented, c.QualifiedName())
@@ -635,7 +651,7 @@ func (c call) find(ctx Context) ([]Item, error) {
 	return items, err
 }
 
-func (c call) findUserDefinedFunction(ctx Context) ([]Item, error) {
+func (c call) callUserDefinedFunction(ctx Context) ([]Item, error) {
 	res, ok := ctx.Environ.(interface {
 		ResolveFunc(string) (Callable, error)
 	})

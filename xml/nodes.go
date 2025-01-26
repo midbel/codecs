@@ -245,6 +245,10 @@ func QualifiedName(name, space string) QName {
 	}
 }
 
+func (q QName) Zero() bool {
+	return q.isDocumentNode()
+}
+
 func (q QName) Equal(other QName) bool {
 	return q.Space == other.Space && q.Name == other.Name
 }

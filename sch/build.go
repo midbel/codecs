@@ -273,6 +273,15 @@ func (b *Builder) onFunction(rs *xml.Reader, el *xml.Element, closed bool) error
 	if err != nil {
 		return err
 	}
+
+	if as, err := getAttribute(el, "as"); err == nil {
+		q, err := xml.ParseName(as)
+		if err != nil {
+			return err
+		}
+		fn.as = q
+	}
+
 	sub := rs.Sub()
 	sub.OnElementClosed(xml.LocalName("function"), func(_ *xml.Reader, el *xml.Element, closed bool) error {
 		b.setFunction(fn)
@@ -282,14 +291,22 @@ func (b *Builder) onFunction(rs *xml.Reader, el *xml.Element, closed bool) error
 		if !closed {
 			return fmt.Errorf("param should be self closed")
 		}
-		name, err := getAttribute(el, "name")
+		var (
+			param Parameter
+			err   error
+		)
+		param.name, err = getAttribute(el, "name")
 		if err != nil {
 			return err
 		}
-		as, _ := getAttribute(el, "as")
-		_ = as
-		fn.args = append(fn.args, name)
-
+		if as, err := getAttribute(el, "as"); err == nil {
+			q, err := xml.ParseName(as)
+			if err != nil {
+				return err
+			}
+			param.as = q
+		}
+		fn.args = append(fn.args, param)
 		return nil
 	})
 	sub.OnElement(xml.LocalName("variable"), func(rs *xml.Reader, el *xml.Element, closed bool) error {

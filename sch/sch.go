@@ -37,15 +37,34 @@ type Let struct {
 	Value string
 }
 
+type Parameter struct {
+	name string
+	as   xml.QName
+}
+
 type Function struct {
 	xml.QName
-	args []string
+	as   xml.QName
+	args []Parameter
 	body []xml.Expr
 }
 
 func (f Function) Call(ctx xml.Context, args []xml.Expr) ([]xml.Item, error) {
-	fmt.Println("calling", f.QualifiedName(), args)
-	return nil, nil
+	if len(args) != len(f.args) {
+		return nil, fmt.Errorf("invalid number of arguments given")
+	}
+	env := xml.Empty[xml.Expr]()
+	for i := range f.args {
+		env.Define(f.args[i].name, args[i])
+	}
+	is, err := xml.Call(ctx, f.body, env)
+	if err != nil {
+		return nil, err
+	}
+	if !f.as.Zero() {
+
+	}
+	return is, nil
 }
 
 type Result struct {
