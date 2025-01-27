@@ -959,7 +959,7 @@ func (s *QueryScanner) scanLiteral(tok *Token) {
 		s.read()
 	}
 	tok.Type = Literal
-	tok.Literal = strings.TrimSpace(s.str.String())
+	tok.Literal = s.str.String()
 	if s.char != quote {
 		tok.Type = Invalid
 	}

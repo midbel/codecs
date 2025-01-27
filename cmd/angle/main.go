@@ -155,8 +155,6 @@ func open(file string) (io.ReadCloser, error) {
 		return nil, err
 	}
 	switch u.Scheme {
-	case "", "file":
-		return os.Open(file)
 	case "http", "https":
 		req, err := http.NewRequest(http.MethodGet, u.String(), nil)
 		if err != nil {
@@ -172,7 +170,7 @@ func open(file string) (io.ReadCloser, error) {
 		}
 		return res.Body, nil
 	default:
-		return nil, fmt.Errorf("file can not be retrieve with %s protocol", u.Scheme)
+		return os.Open(file)
 	}
 }
 
