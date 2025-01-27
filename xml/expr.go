@@ -1099,6 +1099,8 @@ func toFloat(value any) (float64, error) {
 		return v, nil
 	case string:
 		return strconv.ParseFloat(v, 64)
+	case time.Time:
+		return float64(v.Unix()), nil
 	default:
 		return math.NaN(), nil
 	}
@@ -1112,6 +1114,8 @@ func toString(value any) (string, error) {
 		return strconv.FormatFloat(v, 'f', -1, 64), nil
 	case bool:
 		return strconv.FormatBool(v), nil
+	case time.Time:
+		return v.Format("2006-01-02"), nil
 	default:
 		return "", errType
 	}
@@ -1125,6 +1129,8 @@ func toBool(v any) bool {
 		return v != 0
 	case string:
 		return len(v) > 0
+	case time.Time:
+		return !v.IsZero()
 	default:
 		return false
 	}
