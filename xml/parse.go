@@ -559,20 +559,27 @@ func (c *compiler) compileAxis() (Expr, error) {
 }
 
 func (c *compiler) compileKind() (Expr, error) {
-	var k kind
+	var (
+		kindTest kind
+		withArg  bool
+	)
 	switch c.curr.Literal {
 	case "node":
-		k.kind = typeAll
+		kindTest.kind = typeAll
 	case "element":
-		k.kind = TypeElement
+		kindTest.kind = TypeElement
+		withArg = true
 	case "text":
-		k.kind = TypeText
+		kindTest.kind = TypeText
 	case "comment":
-		k.kind = TypeComment
+		kindTest.kind = TypeComment
+	case "attribute":
+		kindTest.kind = TypeAttribute
+		withArg = true
 	case "processing-instruction":
-		k.kind = TypeInstruction
+		kindTest.kind = TypeInstruction
 	case "document-node":
-		k.kind = TypeDocument
+		kindTest.kind = TypeDocument
 	default:
 		return nil, fmt.Errorf("kind test not supported")
 	}
@@ -581,11 +588,25 @@ func (c *compiler) compileKind() (Expr, error) {
 		return nil, errSyntax
 	}
 	c.next()
+	if withArg {
+		if !c.is(Name) {
+			return nil, fmt.Errorf("expected name")
+		}
+		kindTest.localName = c.curr.Literal
+		c.next()
+		if c.is(opSeq) {
+			c.next()
+			if !c.is(Name) {
+				return nil, fmt.Errorf("expected type annotation")
+			}
+			c.next()
+		}
+	}
 	if !c.is(endGrp) {
 		return nil, errSyntax
 	}
 	c.next()
-	return k, nil
+	return kindTest, nil
 }
 
 func (c *compiler) compileName() (Expr, error) {
