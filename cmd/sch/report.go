@@ -330,7 +330,7 @@ func (r fileReport) print(res sch.Result) {
 	var msg string
 	if res.Failed() {
 		msg = res.Error.Error()
-		msg = shorten(msg, 48)
+		msg = shorten(msg, 128)
 	} else {
 		msg = "ok"
 	}

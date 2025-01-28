@@ -3,6 +3,7 @@ package xml
 import (
 	"errors"
 	"fmt"
+	"iter"
 	"math"
 	"slices"
 	"strconv"
@@ -882,15 +883,17 @@ func (q quantified) find(ctx Context) ([]Item, error) {
 	defer func() {
 		ctx.Environ = env
 	}()
-	items, err := q.binds[0].expr.find(ctx)
-	if err != nil {
-		return nil, err
-	}
-	for _, i := range items {
-		val := value{
-			item: i,
+	for items, err := range combine(q.binds, ctx) {
+		if err != nil {
+			return nil, err
 		}
-		ctx.Environ.Define(q.binds[0].ident, val)
+		for i := range items {
+			var val value
+			if len(items[i]) > 0 {
+				val.item = items[i][0]
+			}
+			ctx.Environ.Define(q.binds[i].ident, val)
+		}
 		res, err := q.test.find(ctx)
 		if err != nil {
 			return nil, err
@@ -902,6 +905,37 @@ func (q quantified) find(ctx Context) ([]Item, error) {
 		}
 	}
 	return singleValue(true), nil
+}
+
+func combine(list []binding, ctx Context) iter.Seq2[[][]Item, error] {
+	if len(list) == 0 {
+		return empty
+	}
+	fn := func(yield func([][]Item, error) bool) {
+		is, err := list[0].expr.find(ctx)
+		if err != nil {
+			yield(nil, err)
+			return
+		}
+		for arr, err := range combine(list[1:], ctx) {
+			if err != nil {
+				yield(nil, err)
+				return
+			}
+			vs := [][]Item{
+				slices.Clone(is),
+			}
+			ok := yield(slices.Concat(vs, arr), nil)
+			if !ok {
+				break
+			}
+		}
+	}
+	return fn
+}
+
+func empty(yield func([][]Item, error) bool) {
+	yield(nil, nil)
 }
 
 type value struct {
