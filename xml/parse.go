@@ -209,7 +209,34 @@ func (c *compiler) compileIf() (Expr, error) {
 
 func (c *compiler) compileFor() (Expr, error) {
 	c.next()
-	return nil, errImplemented
+	var q loop
+	for !c.done() && !c.is(reserved) {
+		bind, err := c.compileInClause()
+		if err != nil {
+			return nil, err
+		}
+		q.binds = append(q.binds, bind)
+		switch c.curr.Type {
+		case opSeq:
+			c.next()
+			if c.is(reserved) {
+				return nil, errSyntax
+			}
+		case reserved:
+		default:
+			return nil, fmt.Errorf("unexpected operator")
+		}
+	}
+	if !c.is(reserved) && c.curr.Literal != kwReturn {
+		return nil, fmt.Errorf("expected return keyword")
+	}
+	c.next()
+	expr, err := c.compile()
+	if err != nil {
+		return nil, err
+	}
+	q.body = expr
+	return q, nil
 }
 
 func (c *compiler) compileInClause() (binding, error) {
@@ -256,7 +283,7 @@ func (c *compiler) compileQuantified(every bool) (Expr, error) {
 		return nil, fmt.Errorf("expected satisfies operator")
 	}
 	c.next()
-	test, err := c.compileExpr(powLowest)
+	test, err := c.compile()
 	if err != nil {
 		return nil, err
 	}
