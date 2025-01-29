@@ -888,9 +888,8 @@ func (q quantified) find(ctx Context) ([]Item, error) {
 			return nil, err
 		}
 		for i := range items {
-			var val value
-			if len(items[i]) > 0 {
-				val.item = items[i][0]
+			val := value{
+				item: i,
 			}
 			ctx.Environ.Define(q.binds[i].ident, val)
 		}
@@ -907,7 +906,7 @@ func (q quantified) find(ctx Context) ([]Item, error) {
 	return singleValue(true), nil
 }
 
-func combine(list []binding, ctx Context) iter.Seq2[[][]Item, error] {
+func combine(list []binding, ctx Context) iter.Seq2[[]Item, error] {
 	if len(list) == 0 {
 		return empty
 	}
@@ -917,24 +916,24 @@ func combine(list []binding, ctx Context) iter.Seq2[[][]Item, error] {
 			yield(nil, err)
 			return
 		}
-		for arr, err := range combine(list[1:], ctx) {
-			if err != nil {
-				yield(nil, err)
-				return
-			}
-			vs := [][]Item{
-				slices.Clone(is),
-			}
-			ok := yield(slices.Concat(vs, arr), nil)
-			if !ok {
-				break
+		for _, i := range is {			
+			for arr, err := range combine(list[1:], ctx) {
+				if err != nil {
+					yield(nil, err)
+					return
+				}
+				vs := []Item{i}
+				ok := yield(append(vs, arr...), nil)
+				if !ok {
+					break
+				}
 			}
 		}
 	}
 	return fn
 }
 
-func empty(yield func([][]Item, error) bool) {
+func empty(yield func([]Item, error) bool) {
 	yield(nil, nil)
 }
 
