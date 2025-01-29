@@ -937,10 +937,6 @@ func combine(list []binding, ctx Context) iter.Seq2[[]Item, error] {
 	return fn
 }
 
-func empty(yield func([]Item, error) bool) {
-	yield(nil, nil)
-}
-
 type value struct {
 	item Item
 }
