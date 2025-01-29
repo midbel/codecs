@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<projects lang="en">
+	<?project-include filename="deprecated.xml" strategy="merge" ?>
+	<project id="codecs">
+		<repository>
+			<url>https://github.com/midbel/codecs</url>
+			<owner>midbel</owner>
+			<date>2024-12-01</date>
+		</repository>
+		<active>true</active>
+		<description>library to handle various data format</description>
+	</project>
+	<project id="mule">
+		<repository>
+			<url>https://github.com/midbel/mule</url>
+			<owner>midbel</owner>
+			<date>2024-12-01</date>
+		</repository>
+		<active>true</active>
+		<description>scriptable REST requests</description>
+	</project>
+</projects>
