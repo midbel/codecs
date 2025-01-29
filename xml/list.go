@@ -49,7 +49,6 @@ type Item interface {
 	Value() any
 	True() bool
 	Atomic() bool
-	Assert(Expr, Environ[Expr]) ([]Item, error)
 }
 
 func createSingle(item Item) []Item {

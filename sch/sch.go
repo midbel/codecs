@@ -13,6 +13,10 @@ import (
 	"github.com/midbel/codecs/xml"
 )
 
+type Asserter interface {
+	Assert(xml.Expr, xml.Environ[xml.Expr]) ([]xml.Item, error)
+}
+
 var ErrAssert = errors.New("assertion error")
 
 const (
@@ -324,15 +328,20 @@ func (a *Assert) Eval(ctx context.Context, items []xml.Item, env xml.Environ[xml
 		if err := ctx.Err(); err != nil {
 			return pass, err
 		}
-		res, err := items[i].Assert(test, env)
+		ast, ok := items[i].(Asserter)
+		if !ok {
+			continue
+		}
+		res, err := ast.Assert(test, env)
 		if err != nil {
 			return 0, fmt.Errorf("%s (%s)", a.Message, err)
 		}
-		ok := isTrue(res)
-		if !ok {
-			return pass, fmt.Errorf("%w: %s", ErrAssert, a.Message)
+		if ok := isTrue(res); ok {
+			pass++
 		}
-		pass++
+	}
+	if pass < len(items) {
+		return pass, fmt.Errorf("%w: %s", ErrAssert, a.Message)	
 	}
 	return pass, nil
 }
