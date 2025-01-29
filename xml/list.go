@@ -78,6 +78,17 @@ func isTrue(list []Item) bool {
 	return len(list) > 0 && list[0].True()
 }
 
+func atomicItem(item Item) (Item, error) {
+	if item.Atomic() {
+		return item, nil
+	}
+	n, ok := item.(nodeItem)
+	if !ok || !n.Node().Leaf() {
+		return nil, fmt.Errorf("item can not be converted to literal")
+	}
+	return createLiteral(n.Value()), nil
+}
+
 type literalItem struct {
 	value any
 }

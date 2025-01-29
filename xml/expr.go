@@ -131,7 +131,7 @@ func Call(ctx Context, body []Expr) ([]Item, error) {
 	for i := range body {
 		is, err = body[i].find(ctx)
 		if err != nil {
-			return nil, err
+			break
 		}
 	}
 	return is, err
@@ -1014,10 +1014,11 @@ func (c cast) find(ctx Context) ([]Item, error) {
 		return nil, err
 	}
 	for i := range is {
-		if !is[i].Atomic() {
+		item, err := atomicItem(is[i])
+		if err != nil {
 			return nil, errType
 		}
-		is[i], err = c.kind.Cast(is[i].Value())
+		is[i], err = c.kind.Cast(item.Value())
 		if err != nil {
 			return nil, err
 		}
