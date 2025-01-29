@@ -908,7 +908,7 @@ func (q quantified) find(ctx Context) ([]Item, error) {
 
 func combine(list []binding, ctx Context) iter.Seq2[[]Item, error] {
 	if len(list) == 0 {
-		return empty
+		return nil
 	}
 	fn := func(yield func([]Item, error) bool) {
 		is, err := list[0].expr.find(ctx)
@@ -916,8 +916,12 @@ func combine(list []binding, ctx Context) iter.Seq2[[]Item, error] {
 			yield(nil, err)
 			return
 		}
-		for _, i := range is {			
-			for arr, err := range combine(list[1:], ctx) {
+		for _, i := range is {
+			it := combine(list[1:], ctx)
+			if it == nil {
+				break
+			}
+			for arr, err := range it {
 				if err != nil {
 					yield(nil, err)
 					return

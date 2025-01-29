@@ -319,6 +319,9 @@ type Assert struct {
 }
 
 func (a *Assert) Eval(ctx context.Context, items []xml.Item, env xml.Environ[xml.Expr]) (int, error) {
+	if len(items) == 0 {
+		return 0, nil
+	}
 	test, err := compileExpr(a.Test)
 	if err != nil {
 		return 0, err
@@ -341,7 +344,7 @@ func (a *Assert) Eval(ctx context.Context, items []xml.Item, env xml.Environ[xml
 		}
 	}
 	if pass < len(items) {
-		return pass, fmt.Errorf("%w: %s", ErrAssert, a.Message)	
+		return pass, fmt.Errorf("%w: %s", ErrAssert, a.Message)
 	}
 	return pass, nil
 }
