@@ -887,11 +887,11 @@ func (q quantified) find(ctx Context) ([]Item, error) {
 		if err != nil {
 			return nil, err
 		}
-		for i := range items {
+		for j, item := range items {
 			val := value{
-				item: i,
+				item: item,
 			}
-			ctx.Environ.Define(q.binds[i].ident, val)
+			ctx.Environ.Define(q.binds[j].ident, val)
 		}
 		res, err := q.test.find(ctx)
 		if err != nil {
@@ -910,7 +910,7 @@ func combine(list []binding, ctx Context) iter.Seq2[[]Item, error] {
 	if len(list) == 0 {
 		return empty
 	}
-	fn := func(yield func([][]Item, error) bool) {
+	fn := func(yield func([]Item, error) bool) {
 		is, err := list[0].expr.find(ctx)
 		if err != nil {
 			yield(nil, err)
