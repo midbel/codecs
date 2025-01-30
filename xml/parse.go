@@ -95,6 +95,7 @@ func CompileMode(r io.Reader, mode StepMode) (Expr, error) {
 		currLevel: cp.compileStep,
 		anyLevel:  cp.compileStep,
 		begPred:   cp.compileFilter,
+		opConcat:  cp.compileBinary,
 		opAdd:     cp.compileBinary,
 		opSub:     cp.compileBinary,
 		opMul:     cp.compileBinary,
@@ -153,15 +154,15 @@ func (c *compiler) compile() (Expr, error) {
 }
 
 func (c *compiler) compileReservedPrefix() (Expr, error) {
-	switch c.curr.Literal {
+	switch c.getCurrentLiteral() {
 	case kwIf:
 		return c.compileIf()
 	case kwFor:
 		return c.compileFor()
 	case kwSome, kwEvery:
-		return c.compileQuantified(c.curr.Literal == kwEvery)
+		return c.compileQuantified(c.getCurrentLiteral() == kwEvery)
 	default:
-		return nil, fmt.Errorf("%s: reserved word can not be used as prefix operator", c.curr.Literal)
+		return nil, fmt.Errorf("%s: reserved word can not be used as prefix operator", c.getCurrentLiteral())
 	}
 }
 
@@ -190,14 +191,14 @@ func (c *compiler) compileIf() (Expr, error) {
 	if cdt.test, err = c.compileCdt(); err != nil {
 		return nil, err
 	}
-	if !c.is(reserved) && c.curr.Literal != kwThen {
+	if !c.is(reserved) && c.getCurrentLiteral() != kwThen {
 		return nil, fmt.Errorf("then keyword expected")
 	}
 	c.next()
 	if cdt.csq, err = c.compile(); err != nil {
 		return nil, err
 	}
-	if !c.is(reserved) && c.curr.Literal != kwElse {
+	if !c.is(reserved) && c.getCurrentLiteral() != kwElse {
 		return nil, fmt.Errorf("else keyword expected")
 	}
 	c.next()
@@ -227,7 +228,7 @@ func (c *compiler) compileFor() (Expr, error) {
 			return nil, fmt.Errorf("unexpected operator")
 		}
 	}
-	if !c.is(reserved) && c.curr.Literal != kwReturn {
+	if !c.is(reserved) && c.getCurrentLiteral() != kwReturn {
 		return nil, fmt.Errorf("expected return keyword")
 	}
 	c.next()
@@ -244,9 +245,9 @@ func (c *compiler) compileInClause() (binding, error) {
 	if !c.is(variable) {
 		return b, fmt.Errorf("identifier expected")
 	}
-	b.ident = c.curr.Literal
+	b.ident = c.getCurrentLiteral()
 	c.next()
-	if !c.is(reserved) && c.curr.Literal != kwIn {
+	if !c.is(reserved) && c.getCurrentLiteral() != kwIn {
 		return b, fmt.Errorf("expected in operator")
 	}
 	c.next()
@@ -279,7 +280,7 @@ func (c *compiler) compileQuantified(every bool) (Expr, error) {
 			return nil, fmt.Errorf("unexpected operator")
 		}
 	}
-	if !c.is(reserved) && c.curr.Literal != kwSatisfies {
+	if !c.is(reserved) && c.getCurrentLiteral() != kwSatisfies {
 		return nil, fmt.Errorf("expected satisfies operator")
 	}
 	c.next()
@@ -292,7 +293,7 @@ func (c *compiler) compileQuantified(every bool) (Expr, error) {
 }
 
 func (c *compiler) compileReservedInfix(left Expr) (Expr, error) {
-	keyword := c.curr.Literal
+	keyword := c.getCurrentLiteral()
 	c.next()
 
 	var (
@@ -362,17 +363,17 @@ func (c *compiler) compileCastable(left Expr) (Expr, error) {
 
 func (c *compiler) compileType() (Type, error) {
 	var t Type
-	if !c.is(reserved) && c.curr.Literal != kwAs {
+	if !c.is(reserved) && c.getCurrentLiteral() != kwAs {
 		return t, fmt.Errorf("as expected")
 	}
 	c.next()
 
-	t.Name = c.curr.Literal
+	t.Name = c.getCurrentLiteral()
 	c.next()
 	if c.is(Namespace) {
 		c.next()
 		t.Space = t.Name
-		t.Name = c.curr.Literal
+		t.Name = c.getCurrentLiteral()
 		c.next()
 	}
 	return t, nil
@@ -455,14 +456,14 @@ func (c *compiler) compileBinary(left Expr) (Expr, error) {
 func (c *compiler) compileLiteral() (Expr, error) {
 	defer c.next()
 	i := literal{
-		expr: c.curr.Literal,
+		expr: c.getCurrentLiteral(),
 	}
 	return i, nil
 }
 
 func (c *compiler) compileNumber() (Expr, error) {
 	defer c.next()
-	f, err := strconv.ParseFloat(c.curr.Literal, 64)
+	f, err := strconv.ParseFloat(c.getCurrentLiteral(), 64)
 	if err != nil {
 		return nil, err
 	}
@@ -487,7 +488,7 @@ func (c *compiler) compileReverse() (Expr, error) {
 func (c *compiler) compileAttr() (Expr, error) {
 	defer c.next()
 	a := attr{
-		ident: c.curr.Literal,
+		ident: c.getCurrentLiteral(),
 	}
 	return a, nil
 }
@@ -559,21 +560,17 @@ func (c *compiler) compileExpr(pow int) (Expr, error) {
 	return left, nil
 }
 
-func (c *compiler) power() int {
-	return bindings[c.curr.Type]
-}
-
 func (c *compiler) compileVariable() (Expr, error) {
 	defer c.next()
 	v := identifier{
-		ident: c.curr.Literal,
+		ident: c.getCurrentLiteral(),
 	}
 	return v, nil
 }
 
 func (c *compiler) compileAxis() (Expr, error) {
 	a := axis{
-		kind: c.curr.Literal,
+		kind: c.getCurrentLiteral(),
 	}
 	c.next()
 	c.next()
@@ -590,7 +587,7 @@ func (c *compiler) compileKind() (Expr, error) {
 		kindTest kind
 		withArg  bool
 	)
-	switch c.curr.Literal {
+	switch c.getCurrentLiteral() {
 	case "node":
 		kindTest.kind = typeAll
 	case "element":
@@ -619,7 +616,7 @@ func (c *compiler) compileKind() (Expr, error) {
 		if !c.is(Name) {
 			return nil, fmt.Errorf("expected name")
 		}
-		kindTest.localName = c.curr.Literal
+		kindTest.localName = c.getCurrentLiteral()
 		c.next()
 		if c.is(opSeq) {
 			c.next()
@@ -644,7 +641,7 @@ func (c *compiler) compileName() (Expr, error) {
 		expr Expr
 		err  error
 	)
-	if isKind(c.curr.Literal) && c.peek.Type == begGrp {
+	if isKind(c.getCurrentLiteral()) && c.peek.Type == begGrp {
 		expr, err = c.compileKind()
 	} else {
 		expr, err = c.compileNameBase()
@@ -666,7 +663,7 @@ func (c *compiler) compileNameBase() (Expr, error) {
 		return a, nil
 	}
 	n := name{
-		ident: c.curr.Literal,
+		ident: c.getCurrentLiteral(),
 	}
 	if c.is(opMul) {
 		n.ident = "*"
@@ -678,7 +675,7 @@ func (c *compiler) compileNameBase() (Expr, error) {
 		if !c.is(Name) {
 			return nil, fmt.Errorf("name expected")
 		}
-		n.ident = c.curr.Literal
+		n.ident = c.getCurrentLiteral()
 		c.next()
 	}
 	return n, nil
@@ -756,6 +753,14 @@ func (c *compiler) compileRoot() (Expr, error) {
 	return expr, nil
 }
 
+func (c *compiler) power() int {
+	return bindings[c.curr.Type]
+}
+
+func (c *compiler) getCurrentLiteral() string {
+	return c.curr.Literal
+}
+
 func (c *compiler) is(kind rune) bool {
 	return c.curr.Type == kind
 }
@@ -764,7 +769,7 @@ func (c *compiler) endExpr() bool {
 	if !c.is(reserved) {
 		return false
 	}
-	switch c.curr.Literal {
+	switch c.getCurrentLiteral() {
 	case kwSatisfies:
 	case kwReturn:
 	case kwIn:
