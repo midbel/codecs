@@ -341,7 +341,6 @@ func (c *compiler) compileReservedInfix(left Expr) (Expr, error) {
 }
 
 func (c *compiler) compileRange(left Expr) (Expr, error) {
-	c.next()
 	right, err := c.compile()
 	if err != nil {
 		return nil, err
@@ -350,7 +349,7 @@ func (c *compiler) compileRange(left Expr) (Expr, error) {
 		left:  left,
 		right: right,
 	}
-	return expr, errImplemented
+	return expr, nil
 }
 
 func (c *compiler) compileCast(left Expr) (Expr, error) {
@@ -561,6 +560,7 @@ func (c *compiler) compileCall(left Expr) (Expr, error) {
 func (c *compiler) compileExpr(pow int) (Expr, error) {
 	fn, ok := c.prefix[c.curr.Type]
 	if !ok {
+		fmt.Println(c.curr, c.peek)
 		return nil, fmt.Errorf("unexpected prefix expression")
 	}
 	left, err := fn()

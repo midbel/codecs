@@ -78,6 +78,7 @@ func TestCompileValidExpression(t *testing.T) {
 		`//url[substring(., 1, 4) = 'https']`,
 		`some $x in (1, 2, 3) satisfies $x mod 10 < 10`,
 		`some $x in (1, 2, 3), $y in ("foo", "bar") satisfies $x || $y = 'test'`,
+		`every $x in (1 to 10) satisfies $x <= 10`,
 		`if ($x != 'foobar' and $y = -3.4e-101) then ./@id else ./owner`,
 		`for $x in (1, 2, 3), $y in ('foo', 'bar') return $x || $y`,
 		`if ($x castable as xs:string) then $x cast as xs:string else $x cast as xs:decimal`,
