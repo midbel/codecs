@@ -302,6 +302,8 @@ func (c *compiler) compileReservedInfix(left Expr) (Expr, error) {
 		err  error
 	)
 	switch keyword {
+	case kwTo:
+		return c.compileRange(left)
 	case kwCast:
 		return c.compileCast(left)
 	case kwCastable:
@@ -336,6 +338,19 @@ func (c *compiler) compileReservedInfix(left Expr) (Expr, error) {
 		return nil, fmt.Errorf("%s: reserved word can not be used as infix operator", keyword)
 	}
 	return expr, err
+}
+
+func (c *compiler) compileRange(left Expr) (Expr, error) {
+	c.next()
+	right, err := c.compile()
+	if err != nil {
+		return nil, err
+	}
+	expr := rng{
+		left:  left,
+		right: right,
+	}
+	return expr, errImplemented
 }
 
 func (c *compiler) compileCast(left Expr) (Expr, error) {
@@ -801,6 +816,7 @@ const (
 	kwThen      = "then"
 	kwFor       = "for"
 	kwIn        = "in"
+	kwTo        = "to"
 	kwUnion     = "union"
 	kwIntersect = "intersect"
 	kwExcept    = "except"
@@ -824,6 +840,7 @@ func isReserved(str string) bool {
 	case kwThen:
 	case kwFor:
 	case kwIn:
+	case kwTo:
 	case kwUnion:
 	case kwIntersect:
 	case kwExcept:
