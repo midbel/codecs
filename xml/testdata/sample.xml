@@ -1,8 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <projects lang="en">
+	<!-- include older project which are not currently maintained -->
 	<?project-include filename="deprecated.xml" strategy="merge" ?>
 	<project id="codecs">
+		<tag value="encoder"/>
+		<tag value="decoder"/>
+		<tag value="xml"/>
+		<tag value="json"/>
+		<tag value="xpath"/>
+		<tag value="schematron"/>
 		<repository>
 			<url>https://github.com/midbel/codecs</url>
 			<owner>midbel</owner>
@@ -10,6 +17,9 @@
 		</repository>
 		<active>true</active>
 		<description>library to handle various data format</description>
+		<languages>
+			<language>golang</language>
+		</languages>
 	</project>
 	<project id="mule">
 		<repository>
@@ -19,5 +29,8 @@
 		</repository>
 		<active>true</active>
 		<description>scriptable REST requests</description>
+		<languages>
+			<language>golang</language>
+		</languages>
 	</project>
 </projects>

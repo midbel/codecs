@@ -1272,7 +1272,7 @@ func (p *Parser) parseProlog() (Node, error) {
 		}
 		return nil, nil
 	}
-	node, err := p.parseProcessingInstr()
+	node, err := p.parsePI()
 	if err != nil {
 		return nil, err
 	}
@@ -1311,7 +1311,7 @@ func (p *Parser) parseNode() (Node, error) {
 	case CommentTag:
 		node, err = p.parseComment()
 	case ProcInstTag:
-		node, err = p.parseProcessingInstr()
+		node, err = p.parsePI()
 	case Cdata:
 		node, _ = p.parseCharData()
 	case Literal:
@@ -1332,13 +1332,13 @@ func (p *Parser) parseElement() (Node, error) {
 		err  error
 	)
 	if p.is(Namespace) {
-		elem.Space = p.curr.Literal
+		elem.Space = p.getCurrentLiteral()
 		p.next()
 	}
 	if !p.is(Name) {
 		return nil, p.createError("element", "name is missing")
 	}
-	elem.Name = p.curr.Literal
+	elem.Name = p.getCurrentLiteral()
 	p.next()
 
 	elem.Attrs, err = p.parseAttributes(&elem, func() bool {
@@ -1378,7 +1378,7 @@ func (p *Parser) parseElement() (Node, error) {
 
 func (p *Parser) parseCloseElement(elem Element) error {
 	if p.is(Namespace) {
-		if elem.Space != p.curr.Literal {
+		if elem.Space != p.getCurrentLiteral() {
 			return p.createError("element", "namespace mismatched with opening element")
 		}
 		p.next()
@@ -1386,7 +1386,7 @@ func (p *Parser) parseCloseElement(elem Element) error {
 	if !p.is(Name) {
 		return p.createError("element", "name is missing")
 	}
-	if p.curr.Literal != elem.Name {
+	if p.getCurrentLiteral() != elem.Name {
 		return p.createError("element", "name mismatched with opening element")
 	}
 	p.next()
@@ -1397,13 +1397,13 @@ func (p *Parser) parseCloseElement(elem Element) error {
 	return nil
 }
 
-func (p *Parser) parseProcessingInstr() (Node, error) {
+func (p *Parser) parsePI() (Node, error) {
 	p.next()
 	if !p.is(Name) {
 		return nil, p.createError("processing instruction", "name is missing")
 	}
 	var elem Instruction
-	elem.Name = p.curr.Literal
+	elem.Name = p.getCurrentLiteral()
 	p.next()
 	var err error
 	elem.Attrs, err = p.parseAttributes(&elem, func() bool {
@@ -1446,18 +1446,18 @@ func (p *Parser) parseAttributes(parent Node, done func() bool) ([]Attribute, er
 func (p *Parser) parseAttr() (Attribute, error) {
 	var attr Attribute
 	if p.is(Namespace) {
-		attr.Space = p.curr.Literal
+		attr.Space = p.getCurrentLiteral()
 		p.next()
 	}
 	if !p.is(Attr) {
 		return attr, p.createError("attribute", "name is expected")
 	}
-	attr.Name = p.curr.Literal
+	attr.Name = p.getCurrentLiteral()
 	p.next()
 	if !p.is(Literal) {
 		return attr, p.createError("attribute", "value is missing")
 	}
-	attr.Datum = p.curr.Literal
+	attr.Datum = p.getCurrentLiteral()
 	p.next()
 	return attr, nil
 }
@@ -1465,7 +1465,7 @@ func (p *Parser) parseAttr() (Attribute, error) {
 func (p *Parser) parseComment() (Node, error) {
 	defer p.next()
 	node := Comment{
-		Content: p.curr.Literal,
+		Content: p.getCurrentLiteral(),
 	}
 	return &node, nil
 }
@@ -1473,14 +1473,14 @@ func (p *Parser) parseComment() (Node, error) {
 func (p *Parser) parseCharData() (Node, error) {
 	defer p.next()
 	char := CharData{
-		Content: p.curr.Literal,
+		Content: p.getCurrentLiteral(),
 	}
 	return &char, nil
 }
 
 func (p *Parser) parseLiteral() (Node, error) {
 	text := Text{
-		Content: p.curr.Literal,
+		Content: p.getCurrentLiteral(),
 	}
 	if p.TrimSpace {
 		text.Content = strings.TrimSpace(text.Content)
@@ -1490,6 +1490,10 @@ func (p *Parser) parseLiteral() (Node, error) {
 		return nil, nil
 	}
 	return &text, nil
+}
+
+func (p *Parser) getCurrentLiteral() string {
+	return p.curr.Literal
 }
 
 func (p *Parser) createError(elem, msg string) error {
