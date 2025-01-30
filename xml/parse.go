@@ -95,6 +95,7 @@ func CompileMode(r io.Reader, mode StepMode) (Expr, error) {
 		currLevel: cp.compileStep,
 		anyLevel:  cp.compileStep,
 		begPred:   cp.compileFilter,
+		opArrow:   cp.compileArrow,
 		opConcat:  cp.compileBinary,
 		opAdd:     cp.compileBinary,
 		opSub:     cp.compileBinary,
@@ -433,6 +434,10 @@ func (c *compiler) compileAlt(left Expr) (Expr, error) {
 	var res union
 	res.all = []Expr{left, expr}
 	return res, nil
+}
+
+func (c *compiler) compileArrow(left Expr) (Expr, error) {
+	return nil, errImplemented
 }
 
 func (c *compiler) compileBinary(left Expr) (Expr, error) {
@@ -847,6 +852,7 @@ const (
 	endPred
 	begGrp
 	endGrp
+	opArrow
 	opConcat
 	opAdd
 	opSub
@@ -930,6 +936,10 @@ func (s *QueryScanner) scanOperator(tok *Token) {
 		tok.Type = opMod
 	case equal:
 		tok.Type = opEq
+		if k := s.peek(); k == rangle {
+			s.read()
+			tok.Type = opArrow
+		}
 	case bang:
 		tok.Type = Invalid
 		if k == equal {
@@ -1586,6 +1596,8 @@ func (t Token) String() string {
 		return "<divide>"
 	case opMod:
 		return "<modulo>"
+	case opArrow:
+		return "<arrow>"
 	case opEq:
 		return "<equal>"
 	case opNe:
