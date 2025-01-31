@@ -26,6 +26,7 @@ var (
 const (
 	powLowest = iota
 	powAlt
+	powAssign
 	powOr
 	powAnd
 	powReserv
@@ -47,6 +48,7 @@ var bindings = map[rune]int{
 	anyLevel:  powLevel,
 	opAlt:     powAlt,
 	opConcat:  powConcat,
+	opAssign: powAssign,
 	opEq:      powEq,
 	opNe:      powNe,
 	opGt:      powCmp,
@@ -156,6 +158,8 @@ func (c *compiler) compile() (Expr, error) {
 
 func (c *compiler) compileReservedPrefix() (Expr, error) {
 	switch c.getCurrentLiteral() {
+	case kwLet:
+		return c.compileLet()
 	case kwIf:
 		return c.compileIf()
 	case kwFor:
@@ -258,6 +262,10 @@ func (c *compiler) compileInClause() (binding, error) {
 	}
 	b.expr = expr
 	return b, nil
+}
+
+func (c *compiler) compileLet() (Expr, error) {
+	return nil, errImplemented
 }
 
 func (c *compiler) compileQuantified(every bool) (Expr, error) {
@@ -811,6 +819,7 @@ func (c *compiler) next() {
 }
 
 const (
+	kwLet       = "let"
 	kwIf        = "if"
 	kwElse      = "else"
 	kwThen      = "then"
@@ -835,6 +844,7 @@ const (
 
 func isReserved(str string) bool {
 	switch str {
+	case kwLet:
 	case kwIf:
 	case kwElse:
 	case kwThen:
@@ -869,6 +879,7 @@ const (
 	endPred
 	begGrp
 	endGrp
+	opAssign
 	opArrow
 	opConcat
 	opAdd
@@ -995,6 +1006,9 @@ func (s *QueryScanner) scanDelimiter(tok *Token) {
 		if k == colon {
 			s.read()
 			tok.Type = opAxis
+		} else if k == equal {
+			s.read()
+			tok.Type = opAssign
 		}
 	case dot:
 		tok.Type = currNode
@@ -1613,6 +1627,8 @@ func (t Token) String() string {
 		return "<divide>"
 	case opMod:
 		return "<modulo>"
+	case opAssign:
+		return "<assignment>"
 	case opArrow:
 		return "<arrow>"
 	case opEq:

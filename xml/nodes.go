@@ -331,6 +331,7 @@ type Element struct {
 	QName
 	Attrs []Attribute
 	Nodes []Node
+	NS    map[string]string
 
 	parent   Node
 	position int
@@ -339,6 +340,7 @@ type Element struct {
 func NewElement(name QName) *Element {
 	return &Element{
 		QName: name,
+		NS:    make(map[string]string),
 	}
 }
 
