@@ -827,6 +827,19 @@ func (e Let) find(ctx Context) ([]Item, error) {
 	return nil, nil
 }
 
+type let struct {
+	binds []binding
+	expr  Expr
+}
+
+func (e let) Find(node Node) ([]Item, error) {
+	return e.find(defaultContext(node))
+}
+
+func (e let) find(ctx Context) ([]Item, error) {
+	return nil, nil
+}
+
 type rng struct {
 	left  Expr
 	right Expr

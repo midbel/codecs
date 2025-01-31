@@ -48,7 +48,7 @@ var bindings = map[rune]int{
 	anyLevel:  powLevel,
 	opAlt:     powAlt,
 	opConcat:  powConcat,
-	opAssign: powAssign,
+	opAssign:  powAssign,
 	opEq:      powEq,
 	opNe:      powNe,
 	opGt:      powCmp,
@@ -265,7 +265,45 @@ func (c *compiler) compileInClause() (binding, error) {
 }
 
 func (c *compiler) compileLet() (Expr, error) {
-	return nil, errImplemented
+	var q let
+	for !c.done() {
+		var b binding
+		if !c.is(variable) {
+			return nil, fmt.Errorf("identifier expected")
+		}
+		b.ident = c.getCurrentLiteral()
+		c.next()
+		if !c.is(opAssign) {
+			return nil, fmt.Errorf("expected assignment operator")
+		}
+		c.next()
+		expr, err := c.compileExpr(powLowest)
+		if err != nil {
+			return nil, err
+		}
+		b.expr = expr
+		q.binds = append(q.binds, b)
+		switch c.curr.Type {
+		case opSeq:
+			c.next()
+			if c.is(reserved) {
+				return nil, errSyntax
+			}
+		case reserved:
+		default:
+			return nil, fmt.Errorf("unexpected operator")
+		}
+	}
+	if !c.is(reserved) && c.getCurrentLiteral() != kwReturn {
+		return nil, fmt.Errorf("expected return keyword")
+	}
+	c.next()
+	expr, err := c.compile()
+	if err != nil {
+		return nil, err
+	}
+	q.expr = expr
+	return q, nil
 }
 
 func (c *compiler) compileQuantified(every bool) (Expr, error) {
