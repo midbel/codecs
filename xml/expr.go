@@ -412,8 +412,7 @@ func (i identifier) find(ctx Context) ([]Item, error) {
 }
 
 type name struct {
-	space string
-	ident string
+	QName
 }
 
 func (n name) Find(node Node) ([]Item, error) {
@@ -421,20 +420,13 @@ func (n name) Find(node Node) ([]Item, error) {
 }
 
 func (n name) find(ctx Context) ([]Item, error) {
-	if n.space == "*" && n.ident == ctx.LocalName() {
+	if n.Space == "*" && n.Name == ctx.LocalName() {
 		return singleNode(ctx.Node), nil
 	}
 	if ctx.QualifiedName() != n.QualifiedName() {
 		return nil, nil
 	}
 	return singleNode(ctx.Node), nil
-}
-
-func (n name) QualifiedName() string {
-	if n.space == "" {
-		return n.ident
-	}
-	return fmt.Sprintf("%s:%s", n.space, n.ident)
 }
 
 type sequence struct {

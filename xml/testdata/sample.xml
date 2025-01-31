@@ -22,6 +22,9 @@
 		</languages>
 	</project>
 	<project id="mule">
+		<tag value="api"/>
+		<tag value="rest"/>
+		<tag value="cli"/>
 		<repository>
 			<url>https://github.com/midbel/mule</url>
 			<owner>midbel</owner>

@@ -565,7 +565,7 @@ func (c *compiler) compileCall(left Expr) (Expr, error) {
 			return call{}, fmt.Errorf("invalid function identifier")
 		}
 		fn := call{
-			QName: QualifiedName(n.ident, n.space),
+			QName: n.QName,
 		}
 		c.next()
 		for !c.done() && !c.is(endGrp) {
@@ -728,21 +728,24 @@ func (c *compiler) compileNameBase() (Expr, error) {
 		var a wildcard
 		return a, nil
 	}
-	n := name{
-		ident: c.getCurrentLiteral(),
+	qn := QName{
+		Name: c.getCurrentLiteral(),
 	}
 	if c.is(opMul) {
-		n.ident = "*"
+		qn.Name = "*"
 	}
 	c.next()
 	if c.is(Namespace) {
 		c.next()
-		n.space = n.ident
+		qn.Space = qn.Name
 		if !c.is(Name) {
 			return nil, fmt.Errorf("name expected")
 		}
-		n.ident = c.getCurrentLiteral()
+		qn.Name = c.getCurrentLiteral()
 		c.next()
+	}
+	n := name{
+		QName: qn,
 	}
 	return n, nil
 }
