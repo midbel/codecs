@@ -33,6 +33,12 @@ func TestExprFind(t *testing.T) {
 		{
 			Query: `//tag[lower-case(@value) = "api"]/parent::project/@id`,
 		},
+		{
+			Query: `//tag | //owner`,
+		},
+		{
+			Query: `//tag intersect //owner`,
+		},
 	}
 
 	doc, err := sample()

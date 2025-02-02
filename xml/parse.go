@@ -606,7 +606,6 @@ func (c *compiler) compileCall(left Expr) (Expr, error) {
 func (c *compiler) compileExpr(pow int) (Expr, error) {
 	fn, ok := c.prefix[c.curr.Type]
 	if !ok {
-		fmt.Println(c.curr, c.peek)
 		return nil, fmt.Errorf("unexpected prefix expression")
 	}
 	left, err := fn()
