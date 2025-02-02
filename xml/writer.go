@@ -202,7 +202,11 @@ func (w *Writer) writeAttributes(attrs []Attribute, depth int) error {
 			w.writeNL()
 			w.writer.WriteString(prefix)
 		}
-		w.writer.WriteString(a.QualifiedName())
+		if w.NoNamespace {
+			w.writer.WriteString(a.LocalName())
+		} else {
+			w.writer.WriteString(a.QualifiedName())
+		}
 		w.writer.WriteRune(equal)
 		w.writer.WriteRune(quote)
 		w.writer.WriteString(escapeText(a.Value()))
