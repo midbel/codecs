@@ -88,8 +88,8 @@ func (d *Document) WriteString() (string, error) {
 	return buf.String(), err
 }
 
-func (d *Document) SetRootNamespace(ns string) {
-	if ns == "" {
+func (d *Document) SetRootName(name string) {
+	if name == "" {
 		return
 	}
 	root := d.Root()
@@ -97,7 +97,20 @@ func (d *Document) SetRootNamespace(ns string) {
 		return
 	}
 	if el, ok := root.(*Element); ok {
-		el.Space = ns
+		el.Name = name
+	}
+}
+
+func (d *Document) SetRootNamespace(name string) {
+	if name == "" {
+		return
+	}
+	root := d.Root()
+	if root == nil {
+		return
+	}
+	if el, ok := root.(*Element); ok {
+		el.Space = name
 	}
 }
 
