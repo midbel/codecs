@@ -129,10 +129,11 @@ func (d *Document) Query(expr string) (*Document, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(items) == 1 {
-
+	root := NewElement(LocalName(d.Root().LocalName()))
+	for i := range items {
+		root.Append(items[i].Node())
 	}
-	return d, nil
+	return NewDocument(root), nil
 }
 
 func (d *Document) Find(name string) (Node, error) {
