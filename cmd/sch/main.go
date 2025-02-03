@@ -29,6 +29,7 @@ func main() {
 	flag.StringVar(&opts.RootSpace, "root-namespace", "", "modify namespace of root element")
 	flag.BoolVar(&opts.ErrorOnly, "only-error", false, "print only errorneous assertions")
 	flag.DurationVar(&opts.Timeout, "timeout", time.Second*30, "timeout before stopping")
+	flag.StringVar(&opts.ReportDir, "html-report-dir", "", "html report directory")
 	flag.Parse()
 
 	schema, err := parseSchema(flag.Arg(0))

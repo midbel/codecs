@@ -34,6 +34,7 @@ type ReportOptions struct {
 	FailFast   bool
 	IgnoreZero bool
 	ErrorOnly  bool
+	ReportDir  string
 }
 
 func (r ReportOptions) Keep() sch.FilterFunc {
