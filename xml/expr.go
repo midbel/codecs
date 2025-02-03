@@ -842,7 +842,33 @@ func (r rng) Find(node Node) ([]Item, error) {
 }
 
 func (r rng) find(ctx Context) ([]Item, error) {
-	return nil, nil
+	left, err := r.left.find(ctx)
+	if err != nil {
+		return nil, err
+	}
+	right, err := r.right.find(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if isEmpty(left) || isEmpty(right) {
+		return nil, nil
+	}
+	beg, err := toFloat(left[0].Value())
+	if err != nil {
+		return nil, err
+	}
+	end, err := toFloat(right[0].Value())
+	if err != nil {
+		return nil, err
+	}
+	if beg > end {
+		return nil, nil
+	}
+	var list []Item
+	for i := int(beg); i <= int(end); i++ {
+		list = append(list, createLiteral(float64(i)))
+	}
+	return list, nil
 }
 
 type binding struct {
