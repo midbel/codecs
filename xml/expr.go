@@ -861,12 +861,11 @@ func (r rng) find(ctx Context) ([]Item, error) {
 	if err != nil {
 		return nil, err
 	}
-	if beg > end {
-		return nil, nil
-	}
 	var list []Item
-	for i := int(beg); i <= int(end); i++ {
-		list = append(list, createLiteral(float64(i)))
+	if beg < end {
+		for i := int(beg); i <= int(end); i++ {
+			list = append(list, createLiteral(float64(i)))
+		}
 	}
 	return list, nil
 }
