@@ -4,7 +4,7 @@ import (
 	"flag"
 )
 
-type QueryCmd struct{
+type QueryCmd struct {
 	Root string
 }
 
