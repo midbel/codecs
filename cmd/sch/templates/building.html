@@ -17,15 +17,26 @@
     h1, h2 {
       text-align: center;
     }
+    aside {
+      text-align: center;
+      font-size: 50px;
+    }
+    aside p {
+      font-size: 12px;
+    }
   </style>
 </head>
 
 <body>
   <main>
     <header>
-      <h1>Reports are under Construction</h1>
-      <h2>When all reports will be ready the page will be automatically refreshed and the results will be displayed</h2>
+      <h1>Reports are being created</h1>
+      <h2>When all reports will be ready, the page will be automatically refreshed and their results will be available for viewing</h2>
     </header>
+    <aside>
+      <meter id="progress" min="0" max="{{ .Total }}" value="{{ .Count }}">{{ percent2 .Count .Total }}&percent;</meter>
+      <p>file being processed: {{.File}}</p>
+    </aside>
   </main>
 </body>
 

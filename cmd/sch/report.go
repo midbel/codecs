@@ -114,12 +114,20 @@ var fnmap = template.FuncMap{
 		ratio := float64(stats.Pass) / float64(stats.Count)
 		return ratio * 100.0
 	},
+	"percent2": func(curr, total int) float64 {
+		ratio := float64(curr) / float64(total)
+		return ratio * 100.0
+	},
 }
 
 type reportHandler struct {
 	reportDir string
 	tpl       *template.Template
 	site      http.Handler
+
+	total int
+	count int
+	file  string
 }
 
 func handleReport(reportDir string, tpl *template.Template) http.Handler {
@@ -128,13 +136,31 @@ func handleReport(reportDir string, tpl *template.Template) http.Handler {
 		reportDir: reportDir,
 		site:      http.FileServer(http.Dir(reportDir)),
 	}
-	return h
+	return &h
 }
 
-func (h reportHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *reportHandler) SetTotal(total int) {
+	h.total = total
+}
+
+func (h *reportHandler) SetFile(file string) {
+	h.file = file
+	h.count++
+}
+
+func (h *reportHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if _, err := os.Stat(filepath.Join(h.reportDir, "index.html")); err != nil {
-		w.Header().Set("refresh", "10")
-		h.tpl.ExecuteTemplate(w, "building.html", nil)
+		w.Header().Set("refresh", "2")
+		ctx := struct {
+			Total int
+			Count int
+			File  string
+		}{
+			Total: h.total,
+			Count: h.count,
+			File:  filepath.Base(h.file),
+		}
+		h.tpl.ExecuteTemplate(w, "building.html", ctx)
 		return
 	}
 	h.site.ServeHTTP(w, r)
@@ -151,7 +177,12 @@ func HtmlReport(opts ReportOptions) (Reporter, error) {
 	}
 	if opts.ReportDir == "" {
 		opts.ReportDir = filepath.Join(os.TempDir(), "angle", "reports")
-		os.MkdirAll(opts.ReportDir, 0755)
+		if err := os.RemoveAll(opts.ReportDir); err != nil {
+			return nil, err
+		}
+		if err := os.MkdirAll(opts.ReportDir, 0755); err != nil {
+			return nil, err
+		}
 	}
 	if opts.ListenAddr != "" {
 		report.serv = &http.Server{
@@ -170,17 +201,24 @@ func (r *htmlReport) Exec(schema *sch.Schema, files []string) error {
 		res []*fileResult
 		ctx = context.Background()
 	)
+	if r, ok := r.serv.Handler.(interface{ SetTotal(int) }); ok {
+		r.SetTotal(len(files))
+	}
 	sig := make(chan os.Signal, 1)
 	if r.serv != nil {
 		signal.Notify(sig, os.Interrupt, os.Kill)
 	}
 	for i := range files {
 		r.status.Reset()
+		if r, ok := r.serv.Handler.(interface{ SetFile(string) }); ok {
+			r.SetFile(files[i])
+		}
 		fr, err := r.exec(ctx, schema, files[i])
 		if err != nil {
 			continue
 		}
 		res = append(res, fr)
+		time.Sleep(time.Second * 5)
 	}
 	if schema.Title == "" {
 		schema.Title = reportTitle
