@@ -30,6 +30,7 @@ func main() {
 	flag.BoolVar(&opts.ErrorOnly, "only-error", false, "print only errorneous assertions")
 	flag.DurationVar(&opts.Timeout, "timeout", time.Second*30, "timeout before stopping")
 	flag.StringVar(&opts.ReportDir, "html-report-dir", "", "html report directory")
+	flag.StringVar(&opts.ListenAddr, "html-serve-addr", "", "html file serve")
 	flag.Parse()
 
 	schema, err := parseSchema(flag.Arg(0))
@@ -44,13 +45,17 @@ func main() {
 	var re Reporter
 	switch report {
 	case "html":
-		re = HtmlReport(opts)
+		re, err = HtmlReport(opts)
 	case "stdout", "":
 		re = StdoutReport(opts)
 	case "csv":
 	case "xml":
 	default:
 		fmt.Fprintln(os.Stderr, "%s: unsupported report type")
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 	execDefault(re, schema, flag.Args())
 }

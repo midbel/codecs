@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
-	_ "embed"
+	"embed"
 	"fmt"
 	"html/template"
 	"io"
+	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"time"
@@ -15,19 +17,15 @@ import (
 	"github.com/midbel/codecs/xml"
 )
 
-//go:embed templates/overview.html
-var allTemplate string
-
-//go:embed templates/detail.html
-var oneTemplate string
-
-//go:embed templates/index.html
-var siteTemplate string
+//go:embed templates/*
+var reportsTemplate embed.FS
 
 type ReportOptions struct {
 	Timeout time.Duration
 	Group   string
 	Level   string
+
+	Format string
 
 	RootSpace  string
 	Quiet      bool
@@ -35,6 +33,7 @@ type ReportOptions struct {
 	IgnoreZero bool
 	ErrorOnly  bool
 	ReportDir  string
+	ListenAddr string
 }
 
 func (r ReportOptions) Keep() sch.FilterFunc {
@@ -86,9 +85,9 @@ type fileResult struct {
 type htmlReport struct {
 	ReportOptions
 	status ReportStatus
-	all    *template.Template
-	one    *template.Template
 	site   *template.Template
+
+	serv *http.Server
 }
 
 const reportTitle = "Execution Results"
@@ -117,18 +116,53 @@ var fnmap = template.FuncMap{
 	},
 }
 
-func HtmlReport(opts ReportOptions) Reporter {
-	var (
-		all, _  = template.New("template").Funcs(fnmap).Parse(allTemplate)
-		one, _  = template.New("template").Funcs(fnmap).Parse(oneTemplate)
-		site, _ = template.New("template").Funcs(fnmap).Parse(siteTemplate)
-	)
-	return &htmlReport{
+type reportHandler struct {
+	reportDir string
+	tpl       *template.Template
+	site      http.Handler
+}
+
+func handleReport(reportDir string, tpl *template.Template) http.Handler {
+	h := reportHandler{
+		tpl:       tpl,
+		reportDir: reportDir,
+		site:      http.FileServer(http.Dir(reportDir)),
+	}
+	return h
+}
+
+func (h reportHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if _, err := os.Stat(filepath.Join(h.reportDir, "index.html")); err != nil {
+		w.Header().Set("refresh", "10")
+		h.tpl.ExecuteTemplate(w, "building.html", nil)
+		return
+	}
+	h.site.ServeHTTP(w, r)
+}
+
+func HtmlReport(opts ReportOptions) (Reporter, error) {
+	site, err := template.New("angle").Funcs(fnmap).ParseFS(reportsTemplate, "templates/*.html")
+	if err != nil {
+		return nil, err
+	}
+	report := htmlReport{
 		ReportOptions: opts,
-		all:           all,
-		one:           one,
 		site:          site,
 	}
+	if opts.ReportDir == "" {
+		opts.ReportDir = filepath.Join(os.TempDir(), "angle", "reports")
+		os.MkdirAll(opts.ReportDir, 0755)
+	}
+	if opts.ListenAddr != "" {
+		report.serv = &http.Server{
+			Addr:         opts.ListenAddr,
+			Handler:      handleReport(opts.ReportDir, report.site),
+			ReadTimeout:  10 * time.Second,
+			WriteTimeout: 10 * time.Second,
+		}
+		go report.serv.ListenAndServe()
+	}
+	return &report, nil
 }
 
 func (r *htmlReport) Exec(schema *sch.Schema, files []string) error {
@@ -136,6 +170,10 @@ func (r *htmlReport) Exec(schema *sch.Schema, files []string) error {
 		res []*fileResult
 		ctx = context.Background()
 	)
+	sig := make(chan os.Signal, 1)
+	if r.serv != nil {
+		signal.Notify(sig, os.Interrupt, os.Kill)
+	}
 	for i := range files {
 		r.status.Reset()
 		fr, err := r.exec(ctx, schema, files[i])
@@ -147,7 +185,13 @@ func (r *htmlReport) Exec(schema *sch.Schema, files []string) error {
 	if schema.Title == "" {
 		schema.Title = reportTitle
 	}
-	return r.generateSite(filepath.Dir(files[0]), schema.Title, res)
+	r.generateSite(filepath.Dir(files[0]), schema.Title, res)
+
+	if r.serv != nil {
+		signal.Reset(<-sig)
+		return r.serv.Shutdown(ctx)
+	}
+	return nil
 }
 
 func (r *htmlReport) Run(schema *sch.Schema, file string) error {
@@ -209,7 +253,7 @@ func (r htmlReport) generateSite(dir, title string, files []*fileResult) error {
 		Files: files,
 	}
 
-	if err := r.site.Execute(w, ctx); err != nil {
+	if err := r.site.ExecuteTemplate(w, "index.html", ctx); err != nil {
 		return err
 	}
 	for i := range files {
@@ -251,7 +295,7 @@ func (r htmlReport) createDetailReport(dir string, res sch.Result, back string) 
 		Back:   back,
 		Result: res,
 	}
-	return r.one.Execute(w, ctx)
+	return r.site.ExecuteTemplate(w, "detail.html", ctx)
 }
 
 func (r htmlReport) createOverviewReport(dir string, file *fileResult) error {
@@ -269,7 +313,7 @@ func (r htmlReport) createOverviewReport(dir string, file *fileResult) error {
 		File: filepath.Clean(file.File),
 		List: file.Results,
 	}
-	return r.all.Execute(w, ctx)
+	return r.site.ExecuteTemplate(w, "overview.html", ctx)
 }
 
 type fileReport struct {
