@@ -150,7 +150,7 @@ func (h *reportHandler) SetFile(file string) {
 
 func (h *reportHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if _, err := os.Stat(filepath.Join(h.reportDir, "index.html")); err != nil {
-		w.Header().Set("refresh", "2")
+		w.Header().Set("refresh", "5")
 		ctx := struct {
 			Total int
 			Count int
@@ -218,7 +218,6 @@ func (r *htmlReport) Exec(schema *sch.Schema, files []string) error {
 			continue
 		}
 		res = append(res, fr)
-		time.Sleep(time.Second * 5)
 	}
 	if schema.Title == "" {
 		schema.Title = reportTitle
