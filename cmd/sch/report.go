@@ -198,8 +198,8 @@ func HtmlReport(opts ReportOptions) (Reporter, error) {
 
 func (r *htmlReport) Exec(schema *sch.Schema, files []string) error {
 	var (
-		res []*fileResult
-		ctx = context.Background()
+		res         []*fileResult
+		ctx, cancel = context.WithCancel(context.Background())
 	)
 	if r, ok := r.serv.Handler.(interface{ SetTotal(int) }); ok {
 		r.SetTotal(len(files))
@@ -209,6 +209,16 @@ func (r *htmlReport) Exec(schema *sch.Schema, files []string) error {
 		signal.Notify(sig, os.Interrupt, os.Kill)
 	}
 	for i := range files {
+		select {
+		case s := <-sig:
+			signal.Reset(s)
+			cancel()
+		default:
+			// pass
+		}
+		if err := ctx.Err(); err != nil {
+			break
+		}
 		r.status.Reset()
 		if r, ok := r.serv.Handler.(interface{ SetFile(string) }); ok {
 			r.SetFile(files[i])
@@ -225,7 +235,9 @@ func (r *htmlReport) Exec(schema *sch.Schema, files []string) error {
 	r.generateSite(filepath.Dir(files[0]), schema.Title, res)
 
 	if r.serv != nil {
-		signal.Reset(<-sig)
+		if err := ctx.Err(); err == nil {
+			signal.Reset(<-sig)
+		}
 		return r.serv.Shutdown(ctx)
 	}
 	return nil
