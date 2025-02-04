@@ -368,17 +368,27 @@ func (r htmlReport) createOverviewReport(dir string, file *fileResult) error {
 type fileReport struct {
 	writer io.Writer
 	status ReportStatus
+	tpl    *template.Template
 	ReportOptions
 }
 
-func StdoutReport(opts ReportOptions) Reporter {
+func StdoutReport(opts ReportOptions) (Reporter, error) {
 	if opts.Timeout == 0 {
 		opts.Timeout = time.Second * 60
 	}
-	return fileReport{
+	report := fileReport{
 		writer:        os.Stdout,
 		ReportOptions: opts,
 	}
+
+	if opts.Format != "" {
+		tpl, err := template.New("line").Parse(strings.TrimSpace(opts.Format) + "\n")
+		if err != nil {
+			return nil, err
+		}
+		report.tpl = tpl
+	}
+	return report, nil
 }
 
 func (r fileReport) Run(schema *sch.Schema, file string) error {
@@ -406,12 +416,14 @@ func (r fileReport) Run(schema *sch.Schema, file string) error {
 			break
 		}
 	}
-	fmt.Fprintf(r.writer, "%d assertions", r.status.Count)
-	fmt.Fprintln(r.writer)
-	fmt.Fprintf(r.writer, "%d pass", r.status.Pass)
-	fmt.Fprintln(r.writer)
-	fmt.Fprintf(r.writer, "%d failed", r.status.ErrorCount())
-	fmt.Fprintln(r.writer)
+	if r.tpl == nil {
+		fmt.Fprintf(r.writer, "%d assertions", r.status.Count)
+		fmt.Fprintln(r.writer)
+		fmt.Fprintf(r.writer, "%d pass", r.status.Pass)
+		fmt.Fprintln(r.writer)
+		fmt.Fprintf(r.writer, "%d failed", r.status.ErrorCount())
+		fmt.Fprintln(r.writer)
+	}
 	if !r.status.Succeed() {
 		return fmt.Errorf("document is not valid")
 	}
@@ -421,6 +433,10 @@ func (r fileReport) Run(schema *sch.Schema, file string) error {
 const pattern = "%s | %-4d | %8s | %-32s | %3d/%-3d | %s"
 
 func (r fileReport) print(res sch.Result) {
+	if r.tpl != nil {
+		r.printFormat(res)
+		return
+	}
 	var msg string
 	if res.Failed() {
 		msg = res.Error.Error()
@@ -431,6 +447,23 @@ func (r fileReport) print(res sch.Result) {
 	fmt.Fprint(r.writer, getColor(res))
 	fmt.Fprintf(r.writer, pattern, r.status.File, r.status.Count, res.Level, res.Ident, res.Pass, res.Total, msg)
 	fmt.Fprintln(r.writer, "\033[0m")
+}
+
+func (r fileReport) printFormat(res sch.Result) {
+	ctx := struct {
+		ID    string
+		File  string
+		Level string
+		Total int
+		Pass  int
+	}{
+		ID:    res.Ident,
+		File:  r.status.File,
+		Level: res.Level,
+		Total: res.Total,
+		Pass:  res.Pass,
+	}
+	r.tpl.Execute(r.writer, ctx)
 }
 
 func getColor(res sch.Result) string {

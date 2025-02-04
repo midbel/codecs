@@ -31,6 +31,7 @@ func main() {
 	flag.DurationVar(&opts.Timeout, "timeout", time.Second*30, "timeout before stopping")
 	flag.StringVar(&opts.ReportDir, "html-report-dir", "", "html report directory")
 	flag.StringVar(&opts.ListenAddr, "html-serve-addr", "", "html file serve")
+	flag.StringVar(&opts.Format, "format", "", "line format")
 	flag.Parse()
 
 	schema, err := parseSchema(flag.Arg(0))
@@ -47,7 +48,7 @@ func main() {
 	case "html":
 		re, err = HtmlReport(opts)
 	case "stdout", "":
-		re = StdoutReport(opts)
+		re, err = StdoutReport(opts)
 	case "csv":
 	case "xml":
 	default:
