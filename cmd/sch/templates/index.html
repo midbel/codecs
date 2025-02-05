@@ -44,6 +44,7 @@
       outline: none;
       cursor: pointer;
       padding: 0 16px;
+      margin-left: 2px;
       background-color: #fff;
       border-radius: 0.25rem;
       border: 1px solid #dddbda;
@@ -88,7 +89,8 @@
             {{ end }}
           </td>
           <td class="text-center">
-            <a href="{{ $el.Status.File }}/">see</a>
+            <a title="view details" href="{{ $el.Status.File }}/">see</a>
+            <a title="run new check on the document against the schema" href="/process/{{ $el.Status.File }}/">check</a>
           </td>
         </tr>
         {{ end }}

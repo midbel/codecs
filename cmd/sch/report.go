@@ -201,8 +201,10 @@ func (r *htmlReport) Exec(schema *sch.Schema, files []string) error {
 		res         []*fileResult
 		ctx, cancel = context.WithCancel(context.Background())
 	)
-	if r, ok := r.serv.Handler.(interface{ SetTotal(int) }); ok {
-		r.SetTotal(len(files))
+	if r.serv != nil {
+		if r, ok := r.serv.Handler.(interface{ SetTotal(int) }); ok {
+			r.SetTotal(len(files))
+		}
 	}
 	sig := make(chan os.Signal, 1)
 	if r.serv != nil {
@@ -220,8 +222,10 @@ func (r *htmlReport) Exec(schema *sch.Schema, files []string) error {
 			break
 		}
 		r.status.Reset()
-		if r, ok := r.serv.Handler.(interface{ SetFile(string) }); ok {
-			r.SetFile(files[i])
+		if r.serv != nil {
+			if r, ok := r.serv.Handler.(interface{ SetFile(string) }); ok {
+				r.SetFile(files[i])
+			}
 		}
 		fr, err := r.exec(ctx, schema, files[i])
 		if err != nil {

@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>schema</title>
+  <title>{{.File}}</title>
   <style type="text/css">
     body {
       font-family: system-ui;
@@ -85,6 +85,27 @@
       padding: 8px;
       border: 1px solid #BDBDBD;
     }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    header a {
+      display: inline-block;
+      outline: none;
+      cursor: pointer;
+      padding: 0 16px;
+      margin-left: 2px;
+      background-color: #fff;
+      border-radius: 0.25rem;
+      border: 1px solid #dddbda;
+      color: #0070d2;
+      font-size: 13px;
+      line-height: 30px;
+      font-weight: 400;
+      text-align: center;
+      text-decoration: none;
+    }
   </style>
 </head>
 
@@ -92,6 +113,7 @@
   <main>
     <header>
       <h1>{{.File}}</h1>
+      <a title="run new check on the document against the schema" href="/process/{{ .File }}/">check</a>
     </header>
     <form>
       <div>
