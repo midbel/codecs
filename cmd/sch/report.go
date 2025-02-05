@@ -301,9 +301,11 @@ func (r htmlReport) generateSite(dir, title string, files []*fileResult) error {
 	ctx := struct {
 		Title string
 		Files []*fileResult
+		Checkable bool
 	}{
 		Title: title,
 		Files: files,
+		Checkable: r.serv != nil,
 	}
 
 	if err := r.site.ExecuteTemplate(w, "index.html", ctx); err != nil {
@@ -362,9 +364,11 @@ func (r htmlReport) createOverviewReport(dir string, file *fileResult) error {
 	ctx := struct {
 		File string
 		List []sch.Result
+		Checkable bool
 	}{
 		File: filepath.Clean(file.File),
 		List: file.Results,
+		Checkable: r.serv != nil,
 	}
 	return r.site.ExecuteTemplate(w, "overview.html", ctx)
 }

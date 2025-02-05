@@ -113,7 +113,9 @@
   <main>
     <header>
       <h1>{{.File}}</h1>
+      {{ if .Checkable }}
       <a title="run new check on the document against the schema" href="/process/{{ .File }}/">check</a>
+      {{ end }}
     </header>
     <form>
       <div>

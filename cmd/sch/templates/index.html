@@ -90,7 +90,9 @@
           </td>
           <td class="text-center">
             <a title="view details" href="{{ $el.Status.File }}/">see</a>
+            {{ if $.Checkable }}
             <a title="run new check on the document against the schema" href="/process/{{ $el.Status.File }}/">check</a>
+            {{ end }}
           </td>
         </tr>
         {{ end }}
