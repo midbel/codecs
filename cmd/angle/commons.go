@@ -16,11 +16,17 @@ import (
 
 var ErrDocument = errors.New("bad xml document")
 
+const (
+	snakeCaseType = "snake"
+	kebabCaseType = "kebab"
+)
+
 type WriterOptions struct {
 	NoNamespace bool
 	NoProlog    bool
 	NoComment   bool
 	Compact     bool
+	CaseType    string
 }
 
 type Document struct {
@@ -118,10 +124,22 @@ func writeDocument(doc *xml.Document, file string, options WriterOptions) error 
 	}
 
 	ws := xml.NewWriter(w)
-	ws.NoNamespace = options.NoNamespace
-	ws.NoComment = options.NoComment
-	ws.Compact = options.Compact
-
+	if options.NoNamespace {
+		ws.WriterOptions |= xml.OptionNoNamespace
+	}
+	if options.NoComment {
+		ws.WriterOptions |= xml.OptionNoComment
+	}
+	if options.Compact {
+		ws.WriterOptions |= xml.OptionCompact
+	}
+	switch options.CaseType {
+	case snakeCaseType:
+		ws.WriterOptions |= xml.OptionNamespaceSnakeCase | xml.OptionNameSnakeCase
+	case kebabCaseType:
+		ws.WriterOptions |= xml.OptionNamespaceKebabCase | xml.OptionNameKebabCase
+	default:
+	}
 	return ws.Write(doc)
 }
 

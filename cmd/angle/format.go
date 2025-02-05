@@ -17,6 +17,7 @@ func (f FormatCmd) Run(args []string) error {
 	set.BoolVar(&f.NoProlog, "no-prolog", false, "don't write the xml prolog into the output document")
 	set.BoolVar(&f.NoComment, "no-comment", false, "dont't write the comment present in the input document")
 	set.BoolVar(&f.Compact, "compact", false, "write compact output")
+	set.StringVar(&f.CaseType, "case-type", "", "rewrite element/attribute name to given case family")
 	set.StringVar(&f.OutFile, "f", "", "specify the path to the file where the document will be written")
 	set.StringVar(&f.Query, "q", "", "")
 

@@ -7,16 +7,79 @@ import (
 	"io"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/midbel/codecs/casing"
 )
+
+type WriterOptions uint64
+
+const (
+	OptionCompact WriterOptions = 1 << iota
+	OptionNoNamespace
+	OptionNoComment
+	OptionNoProlog
+	OptionCharDataToText
+	OptionNameSnakeCase
+	OptionNameKebabCase
+	OptionNamespaceSnakeCase
+	OptionNamespaceKebabCase
+)
+
+func (w WriterOptions) Compact() bool {
+	return w&OptionCompact > 0
+}
+
+func (w WriterOptions) NoNamespace() bool {
+	return w&OptionNoNamespace > 0
+}
+
+func (w WriterOptions) NoComment() bool {
+	return w&OptionNoComment > 0
+}
+
+func (w WriterOptions) NoProlog() bool {
+	return w&OptionNoProlog > 0
+}
+
+func (w WriterOptions) CharDataToText() bool {
+	return w&OptionCharDataToText > 0
+}
+
+func (w WriterOptions) NamespaceToSnakeCase() bool {
+	return w&OptionNamespaceSnakeCase > 0
+}
+
+func (w WriterOptions) NameToSnakeCase() bool {
+	return w&OptionNameSnakeCase > 0
+}
+
+func (w WriterOptions) NamespaceToKebabCase() bool {
+	return w&OptionNamespaceKebabCase > 0
+}
+
+func (w WriterOptions) NameToKebabCase() bool {
+	return w&OptionNameKebabCase > 0
+}
+
+func (w WriterOptions) rewriteQName(name QName) QName {
+	if w.NameToKebabCase() {
+		name.Name = casing.To(casing.KebabCase, name.Name)
+	} else if w.NameToSnakeCase() {
+		name.Name = casing.To(casing.SnakeCase, name.Name)
+	}
+	if w.NamespaceToSnakeCase() {
+		name.Space = casing.To(casing.SnakeCase, name.Space)
+	} else if w.NamespaceToKebabCase() {
+		name.Space = casing.To(casing.KebabCase, name.Space)
+	}
+	return name
+}
 
 type Writer struct {
 	writer *bufio.Writer
 
-	Compact     bool
-	Indent      string
-	NoProlog    bool
-	NoNamespace bool
-	NoComment   bool
+	Indent string
+	WriterOptions
 }
 
 func WriteNode(node Node) string {
@@ -76,10 +139,11 @@ func (w *Writer) writeElement(node *Element, depth int) error {
 		w.writer.WriteString(prefix)
 	}
 	w.writer.WriteRune(langle)
-	if w.NoNamespace {
-		w.writer.WriteString(node.LocalName())
+	name := w.rewriteQName(node.QName)
+	if w.NoNamespace() {
+		w.writer.WriteString(name.LocalName())
 	} else {
-		w.writer.WriteString(node.QualifiedName())
+		w.writer.WriteString(name.QualifiedName())
 	}
 	level := depth + 1
 	if len(node.Attrs) == 1 {
@@ -108,10 +172,11 @@ func (w *Writer) writeElement(node *Element, depth int) error {
 	}
 	w.writer.WriteRune(langle)
 	w.writer.WriteRune(slash)
-	if w.NoNamespace {
-		w.writer.WriteString(node.LocalName())
+
+	if w.NoNamespace() {
+		w.writer.WriteString(name.LocalName())
 	} else {
-		w.writer.WriteString(node.QualifiedName())
+		w.writer.WriteString(name.QualifiedName())
 	}
 	w.writer.WriteRune(rangle)
 	return w.writer.Flush()
@@ -136,7 +201,7 @@ func (w *Writer) writeCharData(node *CharData, _ int) error {
 }
 
 func (w *Writer) writeComment(node *Comment, depth int) error {
-	if w.NoComment {
+	if w.NoComment() {
 		return nil
 	}
 	w.writeNL()
@@ -163,7 +228,9 @@ func (w *Writer) writeInstruction(node *Instruction, depth int) error {
 	}
 	w.writer.WriteRune(langle)
 	w.writer.WriteRune(question)
-	w.writer.WriteString(node.Name)
+
+	name := w.rewriteQName(node.QName)
+	w.writer.WriteString(name.Name)
 	if err := w.writeAttributes(node.Attrs, 0); err != nil {
 		return err
 	}
@@ -173,7 +240,7 @@ func (w *Writer) writeInstruction(node *Instruction, depth int) error {
 }
 
 func (w *Writer) writeProlog() error {
-	if w.NoProlog {
+	if w.NoProlog() {
 		return nil
 	}
 	prolog := NewInstruction(LocalName("xml"))
@@ -193,19 +260,20 @@ func (w *Writer) writeAttributeAsNode(attr *Attribute, depth int) error {
 func (w *Writer) writeAttributes(attrs []Attribute, depth int) error {
 	prefix := w.getIndent(depth)
 	for _, a := range attrs {
-		if w.NoNamespace && (a.Space == "xmlns" || a.Name == "xmlns") && a.Value() != "" {
+		if w.NoNamespace() && (a.Space == "xmlns" || a.Name == "xmlns") && a.Value() != "" {
 			continue
 		}
-		if depth == 0 || w.Compact {
+		if depth == 0 || w.Compact() {
 			w.writer.WriteRune(' ')
 		} else {
 			w.writeNL()
 			w.writer.WriteString(prefix)
 		}
-		if w.NoNamespace {
-			w.writer.WriteString(a.LocalName())
+		name := w.rewriteQName(a.QName)
+		if w.NoNamespace() {
+			w.writer.WriteString(name.LocalName())
 		} else {
-			w.writer.WriteString(a.QualifiedName())
+			w.writer.WriteString(name.QualifiedName())
 		}
 		w.writer.WriteRune(equal)
 		w.writer.WriteRune(quote)
@@ -216,14 +284,14 @@ func (w *Writer) writeAttributes(attrs []Attribute, depth int) error {
 }
 
 func (w *Writer) writeNL() {
-	if w.Compact {
+	if w.Compact() {
 		return
 	}
 	w.writer.WriteRune('\n')
 }
 
 func (w *Writer) getIndent(depth int) string {
-	if w.Compact {
+	if w.Compact() {
 		return ""
 	}
 	return strings.Repeat(w.Indent, depth)
