@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
-	"net/http"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"strings"
 	"time"
@@ -86,8 +84,6 @@ type htmlReport struct {
 	ReportOptions
 	status ReportStatus
 	site   *template.Template
-
-	serv *http.Server
 }
 
 const reportTitle = "Execution Results"
@@ -120,52 +116,6 @@ var fnmap = template.FuncMap{
 	},
 }
 
-type reportHandler struct {
-	reportDir string
-	tpl       *template.Template
-	site      http.Handler
-
-	total int
-	count int
-	file  string
-}
-
-func handleReport(reportDir string, tpl *template.Template) http.Handler {
-	h := reportHandler{
-		tpl:       tpl,
-		reportDir: reportDir,
-		site:      http.FileServer(http.Dir(reportDir)),
-	}
-	return &h
-}
-
-func (h *reportHandler) SetTotal(total int) {
-	h.total = total
-}
-
-func (h *reportHandler) SetFile(file string) {
-	h.file = file
-	h.count++
-}
-
-func (h *reportHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if _, err := os.Stat(filepath.Join(h.reportDir, "index.html")); err != nil {
-		w.Header().Set("refresh", "5")
-		ctx := struct {
-			Total int
-			Count int
-			File  string
-		}{
-			Total: h.total,
-			Count: h.count,
-			File:  filepath.Base(h.file),
-		}
-		h.tpl.ExecuteTemplate(w, "building.html", ctx)
-		return
-	}
-	h.site.ServeHTTP(w, r)
-}
-
 func HtmlReport(opts ReportOptions) (Reporter, error) {
 	site, err := template.New("angle").Funcs(fnmap).ParseFS(reportsTemplate, "templates/*.html")
 	if err != nil {
@@ -184,49 +134,16 @@ func HtmlReport(opts ReportOptions) (Reporter, error) {
 			return nil, err
 		}
 	}
-	if opts.ListenAddr != "" {
-		report.serv = &http.Server{
-			Addr:         opts.ListenAddr,
-			Handler:      handleReport(opts.ReportDir, report.site),
-			ReadTimeout:  10 * time.Second,
-			WriteTimeout: 10 * time.Second,
-		}
-		go report.serv.ListenAndServe()
-	}
 	return &report, nil
 }
 
 func (r *htmlReport) Exec(schema *sch.Schema, files []string) error {
 	var (
-		res         []*fileResult
-		ctx, cancel = context.WithCancel(context.Background())
+		res []*fileResult
+		ctx = context.Background()
 	)
-	if r.serv != nil {
-		if r, ok := r.serv.Handler.(interface{ SetTotal(int) }); ok {
-			r.SetTotal(len(files))
-		}
-	}
-	sig := make(chan os.Signal, 1)
-	if r.serv != nil {
-		signal.Notify(sig, os.Interrupt, os.Kill)
-	}
 	for i := range files {
-		select {
-		case s := <-sig:
-			signal.Reset(s)
-			cancel()
-		default:
-			// pass
-		}
-		if err := ctx.Err(); err != nil {
-			break
-		}
 		r.status.Reset()
-		if r.serv != nil {
-			if r, ok := r.serv.Handler.(interface{ SetFile(string) }); ok {
-				r.SetFile(files[i])
-			}
-		}
 		fr, err := r.exec(ctx, schema, files[i])
 		if err != nil {
 			continue
@@ -236,15 +153,7 @@ func (r *htmlReport) Exec(schema *sch.Schema, files []string) error {
 	if schema.Title == "" {
 		schema.Title = reportTitle
 	}
-	r.generateSite(filepath.Dir(files[0]), schema.Title, res)
-
-	if r.serv != nil {
-		if err := ctx.Err(); err == nil {
-			signal.Reset(<-sig)
-		}
-		return r.serv.Shutdown(ctx)
-	}
-	return nil
+	return r.generateSite(filepath.Dir(files[0]), schema.Title, res)
 }
 
 func (r *htmlReport) Run(schema *sch.Schema, file string) error {
@@ -299,13 +208,12 @@ func (r htmlReport) generateSite(dir, title string, files []*fileResult) error {
 	defer w.Close()
 
 	ctx := struct {
-		Title string
-		Files []*fileResult
+		Title     string
+		Files     []*fileResult
 		Checkable bool
 	}{
 		Title: title,
 		Files: files,
-		Checkable: r.serv != nil,
 	}
 
 	if err := r.site.ExecuteTemplate(w, "index.html", ctx); err != nil {
@@ -362,13 +270,12 @@ func (r htmlReport) createOverviewReport(dir string, file *fileResult) error {
 	defer w.Close()
 
 	ctx := struct {
-		File string
-		List []sch.Result
+		File      string
+		List      []sch.Result
 		Checkable bool
 	}{
 		File: filepath.Clean(file.File),
 		List: file.Results,
-		Checkable: r.serv != nil,
 	}
 	return r.site.ExecuteTemplate(w, "overview.html", ctx)
 }

@@ -7,60 +7,60 @@ import (
 )
 
 func TestCasing(t *testing.T) {
-	data := []struct{
+	data := []struct {
 		Input string
-		Want string
-		Case casing.CaseType
+		Want  string
+		Case  casing.CaseType
 	}{
 		{
 			Input: "foobar",
-			Want: "foobar",
-			Case: casing.SnakeCase,
+			Want:  "foobar",
+			Case:  casing.SnakeCase,
 		},
 		{
 			Input: "foobar",
-			Want: "FOOBAR",
-			Case: casing.UpperSnakeCase,
+			Want:  "FOOBAR",
+			Case:  casing.UpperSnakeCase,
 		},
 		{
 			Input: "fooBar",
-			Want: "foo-bar",
-			Case: casing.KebabCase,
+			Want:  "foo-bar",
+			Case:  casing.KebabCase,
 		},
 		{
 			Input: "fooBar",
-			Want: "FOO-BAR",
-			Case: casing.UpperKebabCase,
+			Want:  "FOO-BAR",
+			Case:  casing.UpperKebabCase,
 		},
 		{
 			Input: "fooBar",
-			Want: "foo_bar",
-			Case: casing.SnakeCase,
+			Want:  "foo_bar",
+			Case:  casing.SnakeCase,
 		},
 		{
 			Input: "fooBar",
-			Want: "FOO_BAR",
-			Case: casing.UpperSnakeCase,
+			Want:  "FOO_BAR",
+			Case:  casing.UpperSnakeCase,
 		},
 		{
 			Input: "fooBAR",
-			Want: "foo_bar",
-			Case: casing.SnakeCase,
+			Want:  "foo_bar",
+			Case:  casing.SnakeCase,
 		},
 		{
 			Input: "fooBAR",
-			Want: "foo-bar",
-			Case: casing.KebabCase,
+			Want:  "foo-bar",
+			Case:  casing.KebabCase,
 		},
 		{
 			Input: "foo___-___BAR",
-			Want: "foo-bar",
-			Case: casing.KebabCase,
+			Want:  "foo-bar",
+			Case:  casing.KebabCase,
 		},
 		{
 			Input: "  ---foo_bar---  ",
-			Want: "foo-bar",
-			Case: casing.KebabCase,
+			Want:  "foo-bar",
+			Case:  casing.KebabCase,
 		},
 	}
 	for _, d := range data {
