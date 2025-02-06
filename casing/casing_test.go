@@ -18,14 +18,29 @@ func TestCasing(t *testing.T) {
 			Case: casing.SnakeCase,
 		},
 		{
+			Input: "foobar",
+			Want: "FOOBAR",
+			Case: casing.UpperSnakeCase,
+		},
+		{
 			Input: "fooBar",
 			Want: "foo-bar",
 			Case: casing.KebabCase,
 		},
 		{
 			Input: "fooBar",
+			Want: "FOO-BAR",
+			Case: casing.UpperKebabCase,
+		},
+		{
+			Input: "fooBar",
 			Want: "foo_bar",
 			Case: casing.SnakeCase,
+		},
+		{
+			Input: "fooBar",
+			Want: "FOO_BAR",
+			Case: casing.UpperSnakeCase,
 		},
 		{
 			Input: "fooBAR",

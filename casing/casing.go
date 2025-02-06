@@ -11,7 +11,9 @@ type CaseType int8
 const (
 	DefaultCase CaseType = -(1 << iota)
 	SnakeCase
+	UpperSnakeCase
 	KebabCase
+	UpperKebabCase
 	CamelCase
 	PascalCase
 )
@@ -19,9 +21,13 @@ const (
 func To(to CaseType, str string) string {
 	switch to {
 	case SnakeCase:
-		str = ToSnake(str)
+		str = toSnake(str, unicode.ToLower)
+	case UpperSnakeCase:
+		str = toSnake(str, unicode.ToUpper)
 	case KebabCase:
-		str = ToKebab(str)
+		str = toKebab(str, unicode.ToLower)
+	case UpperKebabCase:
+		str = toKebab(str, unicode.ToUpper)
 	case CamelCase:
 		str = ToCamel(str)
 	case PascalCase:
@@ -31,7 +37,17 @@ func To(to CaseType, str string) string {
 	return str
 }
 
+type transformFunc func(rune) rune
+
 func ToSnake(str string) string {
+	return toSnake(str, unicode.ToLower)
+}
+
+func ToKebab(str string) string {
+	return toSnake(str, unicode.ToLower)
+}
+
+func toSnake(str string, transform transformFunc) string {
 	var (
 		chars []rune
 		last  rune
@@ -43,9 +59,9 @@ func ToSnake(str string) string {
 			if !isSep(last) && !unicode.IsUpper(last) {
 				chars = append(chars, underscore)
 			}
-			chars = append(chars, unicode.To(unicode.LowerCase, r))
+			chars = append(chars, transform(r))
 		} else {
-			chars = append(chars, unicode.To(unicode.LowerCase, r))
+			chars = append(chars, transform(r))
 		}
 		last = r
 	}
@@ -55,7 +71,7 @@ func ToSnake(str string) string {
 	return string(chars)
 }
 
-func ToKebab(str string) string {
+func toKebab(str string, transform transformFunc) string {
 	var (
 		chars []rune
 		last  rune
@@ -67,9 +83,9 @@ func ToKebab(str string) string {
 			if !isSep(last) && !unicode.IsUpper(last) {
 				chars = append(chars, hyphen)
 			}
-			chars = append(chars, unicode.To(unicode.LowerCase, r))
+			chars = append(chars, transform(r))
 		} else {
-			chars = append(chars, unicode.To(unicode.LowerCase, r))
+			chars = append(chars, transform(r))
 		}
 		last = r
 	}
