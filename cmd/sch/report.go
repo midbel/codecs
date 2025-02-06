@@ -153,7 +153,7 @@ func (r *htmlReport) Exec(schema *sch.Schema, files []string) error {
 	if schema.Title == "" {
 		schema.Title = reportTitle
 	}
-	return r.generateSite(filepath.Dir(files[0]), schema.Title, res)
+	return r.generateSite(schema.Title, res)
 }
 
 func (r *htmlReport) Run(schema *sch.Schema, file string) error {
@@ -162,7 +162,7 @@ func (r *htmlReport) Run(schema *sch.Schema, file string) error {
 	if err != nil {
 		return err
 	}
-	return r.generateReport(filepath.Dir(file), res)
+	return r.generateReport(res)
 }
 
 func (r *htmlReport) exec(ctx context.Context, schema *sch.Schema, file string) (*fileResult, error) {
@@ -195,8 +195,8 @@ func (r *htmlReport) run(ctx context.Context, schema *sch.Schema, doc *xml.Docum
 	return list
 }
 
-func (r htmlReport) generateSite(dir, title string, files []*fileResult) error {
-	tmp := filepath.Join(dir, "reports")
+func (r htmlReport) generateSite(title string, files []*fileResult) error {
+	tmp := filepath.Join(r.ReportDir, "reports")
 	if err := os.MkdirAll(tmp, 0755); err != nil {
 		return err
 	}
@@ -220,15 +220,15 @@ func (r htmlReport) generateSite(dir, title string, files []*fileResult) error {
 		return err
 	}
 	for i := range files {
-		if err := r.generateReport(dir, files[i]); err != nil {
+		if err := r.generateReport(files[i]); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (r htmlReport) generateReport(dir string, file *fileResult) error {
-	tmp := filepath.Join(dir, "reports", file.Status.File)
+func (r htmlReport) generateReport(file *fileResult) error {
+	tmp := filepath.Join(r.ReportDir, "reports", file.Status.File)
 	if err := os.MkdirAll(tmp, 0755); err != nil {
 		return err
 	}
