@@ -30,7 +30,7 @@ func main() {
 	flag.BoolVar(&opts.ErrorOnly, "only-error", false, "print only errorneous assertions")
 	flag.DurationVar(&opts.Timeout, "timeout", time.Second*30, "timeout before stopping")
 	flag.StringVar(&opts.ReportDir, "html-report-dir", "", "html report directory")
-	flag.StringVar(&opts.ListenAddr, "html-serve-addr", "", "html file serve")
+	flag.StringVar(&opts.ListenAddr, "listen-addr", "", "html file serve")
 	flag.StringVar(&opts.Format, "format", "", "line format")
 	flag.Parse()
 
@@ -43,6 +43,19 @@ func main() {
 		printList(schema)
 		return
 	}
+
+	if opts.ListenAddr != "" {
+		files := flag.Args()
+
+		serv, _ := Serve(schema, files[1:], opts)
+		defer serv.Close()
+		if err := serv.ListenAndServe(); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
+		return
+	}
+
 	var re Reporter
 	switch report {
 	case "html":

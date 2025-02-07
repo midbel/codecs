@@ -76,6 +76,7 @@ type Reporter interface {
 
 type fileResult struct {
 	File    string
+	LastMod time.Time
 	Status  ReportStatus
 	Results []sch.Result
 }
