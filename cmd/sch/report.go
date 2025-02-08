@@ -79,6 +79,8 @@ type fileResult struct {
 	LastMod time.Time
 	Status  ReportStatus
 	Results []sch.Result
+
+	Building  bool
 }
 
 type htmlReport struct {
@@ -108,12 +110,21 @@ var fnmap = template.FuncMap{
 		}
 	},
 	"percent": func(stats ReportStatus) float64 {
+		if stats.Pass == 0 || stats.Count == 0 {
+			return 0
+		}
 		ratio := float64(stats.Pass) / float64(stats.Count)
 		return ratio * 100.0
 	},
 	"percent2": func(curr, total int) float64 {
+		if curr == 0 || total == 0 {
+			return 0
+		}
 		ratio := float64(curr) / float64(total)
 		return ratio * 100.0
+	},
+	"datetimefmt": func(w time.Time) string {
+		return w.Format("2006-01-02 15:05:04")
 	},
 }
 
@@ -177,6 +188,7 @@ func (r *htmlReport) exec(ctx context.Context, schema *sch.Schema, file string) 
 		File:    file,
 		Results: all,
 		Status:  r.status,
+		LastMod: time.Now(),
 	}
 	return &res, nil
 }
@@ -197,27 +209,7 @@ func (r *htmlReport) run(ctx context.Context, schema *sch.Schema, doc *xml.Docum
 }
 
 func (r htmlReport) generateSite(title string, files []*fileResult) error {
-	tmp := filepath.Join(r.ReportDir, "reports")
-	if err := os.MkdirAll(tmp, 0755); err != nil {
-		return err
-	}
-	out := filepath.Join(tmp, "index.html")
-	w, err := os.Create(out)
-	if err != nil {
-		return err
-	}
-	defer w.Close()
-
-	ctx := struct {
-		Title     string
-		Files     []*fileResult
-		Checkable bool
-	}{
-		Title: title,
-		Files: files,
-	}
-
-	if err := r.site.ExecuteTemplate(w, "index.html", ctx); err != nil {
+	if err := r.generateIndex(title, files); err != nil {
 		return err
 	}
 	for i := range files {
@@ -228,8 +220,37 @@ func (r htmlReport) generateSite(title string, files []*fileResult) error {
 	return nil
 }
 
+func (r htmlReport) generateIndex(title string, files []*fileResult) error {
+	if err := os.MkdirAll(r.ReportDir, 0755); err != nil {
+		return err
+	}
+	out := filepath.Join(r.ReportDir, "index.html")
+	w, err := os.Create(out)
+	if err != nil {
+		return err
+	}
+	defer w.Close()
+
+	ctx := struct {
+		Title     string
+		Count int
+		Total int
+		Files     []*fileResult
+	}{
+		Title: title,
+		Total: len(files),
+		Files: files,
+	}
+	for i := range files {
+		if !files[i].Building {
+			ctx.Count++
+		}
+	}
+	return r.site.ExecuteTemplate(w, "index.html", ctx)
+}
+
 func (r htmlReport) generateReport(file *fileResult) error {
-	tmp := filepath.Join(r.ReportDir, "reports", file.Status.File)
+	tmp := filepath.Join(r.ReportDir, file.Status.File)
 	if err := os.MkdirAll(tmp, 0755); err != nil {
 		return err
 	}
@@ -273,7 +294,6 @@ func (r htmlReport) createOverviewReport(dir string, file *fileResult) error {
 	ctx := struct {
 		File      string
 		List      []sch.Result
-		Checkable bool
 	}{
 		File: filepath.Clean(file.File),
 		List: file.Results,
