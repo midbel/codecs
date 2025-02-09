@@ -103,6 +103,7 @@ func (s *serverReporter) execute(ctx context.Context, file string) error {
 	if ix >= 0 {
 		res := s.results[ix]
 		res.Building = true
+		res.Results = res.Results[:0]
 		s.report.generateReport(res)
 		// s.events <- res
 	}
