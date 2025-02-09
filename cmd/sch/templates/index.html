@@ -146,11 +146,25 @@
       e.preventDefault()
       await fetch(e.target.href, {method: 'POST'})
     }
+    async function reloadPage() {
+      const res = await fetch(window.location.href)
+      const parser = new DOMParser()
+      const doc = parser.parseFromString(await res.text(), "text/html")
+
+      document.querySelector('main').replaceWith(doc.querySelector('main'))
+
+      const list = Array.from(document.querySelectorAll("a.process"))
+      list.forEach(i => {
+        i.addEventListener("click", submitFile)
+      })
+    }
     document.addEventListener("DOMContentLoaded", () => {
       const list = Array.from(document.querySelectorAll("a.process"))
       list.forEach(i => {
         i.addEventListener("click", submitFile)
       })
+
+      setInterval(reloadPage, 2000)
     })
   </script>
 </body>

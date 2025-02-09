@@ -80,7 +80,7 @@ type fileResult struct {
 	Status  ReportStatus
 	Results []sch.Result
 
-	Building  bool
+	Building bool
 }
 
 type htmlReport struct {
@@ -232,10 +232,10 @@ func (r htmlReport) generateIndex(title string, files []*fileResult) error {
 	defer w.Close()
 
 	ctx := struct {
-		Title     string
+		Title string
 		Count int
 		Total int
-		Files     []*fileResult
+		Files []*fileResult
 	}{
 		Title: title,
 		Total: len(files),
@@ -292,11 +292,13 @@ func (r htmlReport) createOverviewReport(dir string, file *fileResult) error {
 	defer w.Close()
 
 	ctx := struct {
-		File      string
-		List      []sch.Result
+		File   string
+		Result *fileResult
+		List   []sch.Result
 	}{
-		File: filepath.Clean(file.File),
-		List: file.Results,
+		File:   filepath.Clean(file.File),
+		Result: file,
+		List:   file.Results,
 	}
 	return r.site.ExecuteTemplate(w, "overview.html", ctx)
 }

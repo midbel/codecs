@@ -9,8 +9,14 @@ import (
 	"slices"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/midbel/codecs/sch"
 )
+
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+}
 
 type Server interface {
 	io.Closer
@@ -24,6 +30,9 @@ type serverReporter struct {
 	results []*fileResult
 	report  *htmlReport
 	schema  *sch.Schema
+
+	events  chan *fileResult
+	running chan struct{}
 
 	ReportOptions
 }
@@ -40,12 +49,15 @@ func Serve(schema *sch.Schema, files []string, opts ReportOptions) (Server, erro
 		schema:        schema,
 		files:         files,
 		ReportOptions: opts,
+		events:        make(chan *fileResult),
+		running:       make(chan struct{}, 10),
 	}
 
 	mux := http.NewServeMux()
 	mux.Handle("GET /", http.FileServer(http.Dir(opts.ReportDir)))
 	mux.HandleFunc("POST /process/{file}", sh.processFile)
 	mux.HandleFunc("POST /upload", sh.uploadFile)
+	mux.HandleFunc("/ws", sh.ws)
 
 	sh.Server = &http.Server{
 		Addr:         opts.ListenAddr,
@@ -63,8 +75,8 @@ func (s *serverReporter) run() error {
 	now := time.Now()
 	for i := range s.files {
 		res := fileResult{
-			File: s.files[i],
-			LastMod: now,
+			File:     s.files[i],
+			LastMod:  now,
 			Building: true,
 		}
 		res.Status.SetFile(s.files[i])
@@ -90,7 +102,8 @@ func (s *serverReporter) execute(ctx context.Context, file string) error {
 		res := s.results[ix]
 		res.Building = true
 		s.report.generateReport(res)
-	}	
+		s.events <- res
+	}
 	res, err := s.report.exec(ctx, s.schema, file)
 	if err != nil {
 		return err
@@ -103,17 +116,26 @@ func (s *serverReporter) execute(ctx context.Context, file string) error {
 		s.results[ix] = res
 	}
 	s.report.generateReport(res)
+	s.events <- res
 	return nil
 }
 
 func (s *serverReporter) executeFile(file string) error {
 	ix := slices.IndexFunc(s.files, func(other string) bool {
-		return filepath.Base(other) == file
+		return filepath.Base(other) == file+".xml"
 	})
 	if ix < 0 {
 		return fmt.Errorf("file does not exist")
 	}
-	go s.execute(context.TODO(), s.files[ix])
+	select {
+	case s.running <- struct{}{}:
+		go func() {
+			s.execute(context.TODO(), s.files[ix])
+			<-s.running
+		}()
+	default:
+		return fmt.Errorf("too many jobs already running")
+	}
 	return nil
 }
 
@@ -127,4 +149,20 @@ func (s *serverReporter) processFile(w http.ResponseWriter, r *http.Request) {
 
 func (s *serverReporter) uploadFile(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
+}
+
+func (s *serverReporter) ws(w http.ResponseWriter, r *http.Request) {
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	go s.handleConn(ws)
+}
+
+func (s *serverReporter) handleConn(ws *websocket.Conn) {
+	defer ws.Close()
+	for e := range s.events {
+		_ = e
+	}
 }
