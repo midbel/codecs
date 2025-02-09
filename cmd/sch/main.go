@@ -47,7 +47,11 @@ func main() {
 	if opts.ListenAddr != "" {
 		files := flag.Args()
 
-		serv, _ := Serve(schema, files[1:], opts)
+		serv, err := Serve(schema, files[1:], opts)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(3)
+		}
 		defer serv.Close()
 		if err := serv.ListenAndServe(); err != nil {
 			fmt.Fprintln(os.Stderr, err)

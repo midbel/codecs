@@ -24,7 +24,7 @@
     table tbody td:first-child {
       width: 5%;
     }
-    table td, table th{
+    table td, table th {
       padding: 4px 8px;
       border: 1px solid #E0E0E0
     }
@@ -72,7 +72,7 @@
     aside meter {
       font-size: 50px;
     }
-    .loader {
+    div.loader {
       display: inline-block;
       border: 4px solid #f3f3f3;
       border-radius: 50%;
@@ -95,7 +95,7 @@
       <h1>{{ .Title }}</h1>
     </header>
     {{ if ne .Count .Total }}
-    <aside>
+    <aside id="info-status">
       <header>
         <h1>Reports are being created</h1>
         <h2>When all reports will be ready, the page will be automatically refreshed and their results will be available for viewing</h2>
@@ -107,7 +107,7 @@
     {{ end }}
     <table>
       <thead>
-        <th></th>
+        <th>#</th>
         <th>file</th>
         <th>result</th>
         <th>last modified</th>
@@ -127,44 +127,24 @@
             {{ datetimefmt .LastMod }}
           </td>
           <td class="text-center">
-            {{ if not .Building }}
-            <a title="view details" href="{{ $el.Status.File }}/">see</a>
-            <a class="process" title="run new check on the document against the schema" href="/process/{{ $el.Status.File }}">process</a>
-            {{ else }}
-            <div class="text-center">
-              <span class="loader"></span>
+            <div class="btn-group">
+              <a title="view details" href="/{{ $el.Status.File }}/">see</a>
+              <a class="process" title="run new check on the document against the schema" href="/process/{{ $el.Status.File }}">process</a>
             </div>
-            {{end}}
           </td>
         </tr>
         {{ end }}
       </tbody>
     </table>
   </main>
+
   <script>
-    async function submitFile(e) {
-      e.preventDefault()
-      await fetch(e.target.href, {method: 'POST'})
-    }
-    async function reloadPage() {
-      const res = await fetch(window.location.href)
-      const parser = new DOMParser()
-      const doc = parser.parseFromString(await res.text(), "text/html")
-
-      document.querySelector('main').replaceWith(doc.querySelector('main'))
-
-      const list = Array.from(document.querySelectorAll("a.process"))
-      list.forEach(i => {
-        i.addEventListener("click", submitFile)
-      })
+    function message({ data }) {
+      const item = JSON.parse(data)
     }
     document.addEventListener("DOMContentLoaded", () => {
-      const list = Array.from(document.querySelectorAll("a.process"))
-      list.forEach(i => {
-        i.addEventListener("click", submitFile)
-      })
-
-      setInterval(reloadPage, 2000)
+      const ws = new WebSocket("/ws")
+      ws.onmessage = message 
     })
   </script>
 </body>

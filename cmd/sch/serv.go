@@ -154,13 +154,7 @@ func (s *serverReporter) uploadFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *serverReporter) statusFiles(w http.ResponseWriter, r *http.Request) {
-	data := struct {
-		Files   []string
-		Results []*fileResult
-	}{
-		Files:   s.files,
-		Results: s.results,
-	}
+	data := s.getStatus(time.Now())
 	json.NewEncoder(w).Encode(data)
 }
 
@@ -175,7 +169,22 @@ func (s *serverReporter) ws(w http.ResponseWriter, r *http.Request) {
 
 func (s *serverReporter) handleConn(ws *websocket.Conn) {
 	defer ws.Close()
-	for e := range s.events {
-		_ = e
+	t := time.NewTicker(time.Second)
+	for w := range t.C {
+		data := s.getStatus(w)
+		ws.WriteJSON(data)
 	}
+}
+
+func (s *serverReporter) getStatus(w time.Time) any {
+	data := struct {
+		When    time.Time     `json:"when"`
+		Files   []string      `json:"files"`
+		Results []*fileResult `json:"results"`
+	}{
+		When:    w,
+		Files:   s.files,
+		Results: s.results,
+	}
+	return data
 }
