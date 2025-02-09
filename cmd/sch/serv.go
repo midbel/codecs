@@ -154,6 +154,10 @@ func (s *serverReporter) uploadFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *serverReporter) statusFiles(w http.ResponseWriter, r *http.Request) {
+	if len(s.results) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	data := s.getStatus(time.Now())
 	json.NewEncoder(w).Encode(data)
 }
