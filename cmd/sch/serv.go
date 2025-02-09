@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -57,7 +58,8 @@ func Serve(schema *sch.Schema, files []string, opts ReportOptions) (Server, erro
 	mux.Handle("GET /", http.FileServer(http.Dir(opts.ReportDir)))
 	mux.HandleFunc("POST /process/{file}", sh.processFile)
 	mux.HandleFunc("POST /upload", sh.uploadFile)
-	mux.HandleFunc("/ws", sh.ws)
+	mux.HandleFunc("GET /ws", sh.ws)
+	mux.HandleFunc("GET /status", sh.statusFiles)
 
 	sh.Server = &http.Server{
 		Addr:         opts.ListenAddr,
@@ -102,7 +104,7 @@ func (s *serverReporter) execute(ctx context.Context, file string) error {
 		res := s.results[ix]
 		res.Building = true
 		s.report.generateReport(res)
-		s.events <- res
+		// s.events <- res
 	}
 	res, err := s.report.exec(ctx, s.schema, file)
 	if err != nil {
@@ -116,7 +118,7 @@ func (s *serverReporter) execute(ctx context.Context, file string) error {
 		s.results[ix] = res
 	}
 	s.report.generateReport(res)
-	s.events <- res
+	// s.events <- res
 	return nil
 }
 
@@ -149,6 +151,17 @@ func (s *serverReporter) processFile(w http.ResponseWriter, r *http.Request) {
 
 func (s *serverReporter) uploadFile(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
+}
+
+func (s *serverReporter) statusFiles(w http.ResponseWriter, r *http.Request) {
+	data := struct {
+		Files   []string
+		Results []*fileResult
+	}{
+		Files:   s.files,
+		Results: s.results,
+	}
+	json.NewEncoder(w).Encode(data)
 }
 
 func (s *serverReporter) ws(w http.ResponseWriter, r *http.Request) {
