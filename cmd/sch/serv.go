@@ -105,7 +105,7 @@ func (s *serverReporter) execute(ctx context.Context, file string) error {
 		res.Building = true
 		res.Results = res.Results[:0]
 		s.report.generateReport(res)
-		// s.events <- res
+		s.sendResult(res)
 	}
 	res, err := s.report.exec(ctx, s.schema, file)
 	if err != nil {
@@ -119,8 +119,15 @@ func (s *serverReporter) execute(ctx context.Context, file string) error {
 		s.results[ix] = res
 	}
 	s.report.generateReport(res)
-	// s.events <- res
+	s.sendResult(res)
 	return nil
+}
+
+func (s *serverReporter) sendResult(res *fileResult) {
+	select {
+	case s.events <- res:
+	default:
+	}
 }
 
 func (s *serverReporter) executeFile(file string) error {

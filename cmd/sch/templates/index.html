@@ -137,16 +137,6 @@
       </tbody>
     </table>
   </main>
-
-  <script>
-    function message({ data }) {
-      const item = JSON.parse(data)
-    }
-    document.addEventListener("DOMContentLoaded", () => {
-      const ws = new WebSocket("/ws")
-      ws.onmessage = message 
-    })
-  </script>
 </body>
 
 </html>
