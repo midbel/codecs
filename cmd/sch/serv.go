@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"path/filepath"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -24,6 +26,59 @@ type Server interface {
 	ListenAndServe() error
 }
 
+type clientChan struct {
+	queue chan *fileResult
+	conn  *websocket.Conn
+	closed bool
+}
+
+func newClientChan(conn *websocket.Conn) *clientChan {
+	return &clientChan{
+		queue: make(chan *fileResult, 10),
+		conn:  conn,
+	}
+}
+
+func (c *clientChan) RemoteAddr() net.Addr {
+	return c.conn.RemoteAddr()
+}
+
+func (c *clientChan) Send(res *fileResult) {
+	if c.closed {
+		return 
+	}
+	select {
+	case c.queue <- res:
+	default:
+	}
+}
+
+func (c *clientChan) Close() error {
+	if c.closed {
+		return nil
+	}
+	c.closed = true
+	close(c.queue)
+	return c.conn.Close()
+}
+
+func (c *clientChan) Run() {
+	defer c.Close()
+	for res := range c.queue {
+		data := struct {
+			When    time.Time     `json:"when"`
+			Results []*fileResult `json:"results"`
+		}{
+			When:    time.Now(),
+			Results: []*fileResult{res},
+		}
+		fmt.Println("result", c.RemoteAddr(), res.File)
+		if err := c.conn.WriteJSON(data); err != nil {
+			break
+		}
+	}
+}
+
 type serverReporter struct {
 	*http.Server
 
@@ -32,26 +87,28 @@ type serverReporter struct {
 	report  *htmlReport
 	schema  *sch.Schema
 
-	events  chan *fileResult
+	mu sync.Mutex
+	clients map[net.Addr]*clientChan
+
 	running chan struct{}
 
 	ReportOptions
 }
 
 func Serve(schema *sch.Schema, files []string, opts ReportOptions) (Server, error) {
-	rp, err := HtmlReport(opts)
+	rp, err := staticHtmlReport(opts)
 	if err != nil {
 		return nil, err
 	}
-	report, _ := rp.(*htmlReport)
+	rp.static = !rp.static
 
 	sh := serverReporter{
-		report:        report,
+		report:        rp,
 		schema:        schema,
 		files:         files,
 		ReportOptions: opts,
-		events:        make(chan *fileResult),
 		running:       make(chan struct{}, 10),
+		clients:       make(map[net.Addr]*clientChan),
 	}
 
 	mux := http.NewServeMux()
@@ -118,15 +175,17 @@ func (s *serverReporter) execute(ctx context.Context, file string) error {
 	} else {
 		s.results[ix] = res
 	}
-	s.report.generateReport(res)
 	s.sendResult(res)
+	s.report.generateReport(res)
 	return nil
 }
 
 func (s *serverReporter) sendResult(res *fileResult) {
-	select {
-	case s.events <- res:
-	default:
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for name, c := range s.clients {
+		fmt.Println(name)
+		c.Send(res)
 	}
 }
 
@@ -176,16 +235,25 @@ func (s *serverReporter) ws(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	go s.handleConn(ws)
+	c := newClientChan(ws)
+	s.registerClient(c)
+	go func() {
+		addr := c.RemoteAddr()
+		c.Run()
+		s.unregisterClient(addr)
+	}()
 }
 
-func (s *serverReporter) handleConn(ws *websocket.Conn) {
-	defer ws.Close()
-	t := time.NewTicker(time.Second)
-	for w := range t.C {
-		data := s.getStatus(w)
-		ws.WriteJSON(data)
-	}
+func (s *serverReporter) registerClient(client *clientChan) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.clients[client.RemoteAddr()] = client
+}
+
+func (s *serverReporter) unregisterClient(addr net.Addr) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.clients, addr)
 }
 
 func (s *serverReporter) getStatus(w time.Time) any {

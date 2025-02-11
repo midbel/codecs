@@ -11,15 +11,16 @@
       font-size: 0.9em;
     }
     main {
-      width: 70%;
+      width: 90%;
       margin: 0 auto;
     }
     table{
       width: 100%;
       border-collapse:collapse
     }
-    table tbody th{
-      width: 40%
+    table tbody th, table thead tr th:nth-child(2){
+      width: 40%;
+      text-align: left;
     }
     table tbody td:first-child {
       width: 5%;
@@ -39,7 +40,7 @@
     .text-center{
       text-align:center;
     }
-    table td a {
+    table td a, header a {
       display: inline-block;
       outline: none;
       cursor: pointer;
@@ -86,6 +87,13 @@
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
+    {{ if not .Static }}
+    main > header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    {{ end  }}
   </style>
 </head>
 
@@ -93,18 +101,10 @@
   <main>
     <header>
       <h1>{{ .Title }}</h1>
+      {{ if not .Static }}
+        <a href="#">execute all</a>
+      {{ end }}
     </header>
-    {{ if ne .Count .Total }}
-    <aside id="info-status">
-      <header>
-        <h1>Reports are being created</h1>
-        <h2>When all reports will be ready, the page will be automatically refreshed and their results will be available for viewing</h2>
-      </header>
-      <p>
-        <meter id="progress" min="0" max="{{ .Total }}" value="{{ .Count }}">{{ percent2 .Count .Total }}&percent;</meter>
-      </p>
-    </aside>
-    {{ end }}
     <table>
       <thead>
         <th>#</th>
@@ -128,8 +128,10 @@
           </td>
           <td class="text-center">
             <div class="btn-group">
-              <a title="view details" href="/{{ $el.Status.File }}/">see</a>
-              <a class="process" title="run new check on the document against the schema" href="/process/{{ $el.Status.File }}">process</a>
+              <a class="action-see" title="view details" href="/{{ $el.Status.File }}/">see</a>
+              {{ if not $.Static }}
+              <a class="action-process" title="run new check on the document against the schema" href="/process/{{ $el.Status.File }}">process</a>
+              {{ end }}
             </div>
           </td>
         </tr>
@@ -137,6 +139,132 @@
       </tbody>
     </table>
   </main>
+  {{ if not .Static }}
+  <template id="loader">
+    <div class="loader"></div>
+  </template>
+  <template id="actions">
+    <div class="btn-group">
+      <a class="action-see" title="view details" href="#">see</a>
+      <a class="action-process" class="process" title="run new check on the document against the schema" href="#">process</a>
+    </div>
+  </template>
+  <template id="progress">
+    <aside id="status">
+      <header>
+        <h1>Reports are being created</h1>
+        <h2>When all reports will be ready, the page will be automatically refreshed and their results will be available for viewing</h2>
+      </header>
+      <p>
+        <meter min="0" max="0" value="0"></meter>
+      </p>
+    </aside>
+  </template>
+  <script>
+  function updateProgress(item) {
+    const running = item.results.some(res => res.Building)
+    let el = document.querySelector('#status')
+    if (!running) {
+      el?.remove()
+      return
+    }
+    if (!el) {
+      const tpl = document.querySelector('template#progress')
+      el = tpl.content.cloneNode(true)
+      document.querySelector('main>header').after(el)
+    }
+    const meter = el.querySelector('meter')
+    if (!meter) {
+      return
+    }
+    meter.max = item.results.length
+    meter.value = item.results.filter(res => !res.Building).length
+  }
+
+  function updateLoader(el) {
+    let loader = el.querySelector('td:last-child div.loader')
+    if (loader) {
+      return
+    }
+    el = el.querySelector('td:last-child')
+    el.replaceChildren()
+    loader = document.querySelector('template#loader')
+    el.append(loader.content.cloneNode(true))
+  }
+
+  function updateActions(el, res) {
+    el = el.querySelector('td:last-child')
+    el.replaceChildren()
+    actions = document.querySelector('template#actions')
+    actions = actions.content.cloneNode(true)
+
+    actions.querySelector('a.action-see').href = `/${res.Status.File}/`
+    actions.querySelector('a.action-process').href = `/process/${res.Status.File}`
+
+    actions.querySelector('a.action-process').addEventListener("click", triggerExec)
+
+    el.append(actions)
+  }
+
+  function updateResult(el, res) {
+    el = el.querySelector('th~td')
+    if (!el) {
+      return
+    }
+    const percent = (res.Status.Pass / res.Status.Count) * 100
+    el.innerHTML = `${percent.toFixed(2)}&percnt;`
+  }
+
+  function recv({ data }) {
+    const item = JSON.parse(data)
+    updateProgress(item)
+
+    item.results.forEach((res) => {
+      const row = document.querySelector(`tr#${res.Status.File}`)
+      if (res.Building) {
+        updateLoader(row)
+      } else {
+        updateActions(row, res)
+        updateResult(row, res)
+      }
+    })
+    const running = item.results.some(res => res.Building)
+    if (!running) {
+      document.querySelector('header a').style.display = 'inherit'
+    }
+  }
+
+  function executeAll() {
+    const list = document.querySelectorAll("table tbody a[href^='/process']")
+    Array.from(list).forEach(async (el) => {
+      el.click()
+    })
+    document.querySelector('header a').style.display = 'none'
+  }
+
+  async function triggerExec(e) {
+    e.preventDefault()
+    await fetch(e.target.href, {method: 'POST'})
+    updateLoader(e.target.closest('tr'))
+  }
+
+  function setup() {  
+    document.addEventListener("DOMContentLoaded", () => {
+      const ws = new WebSocket("/ws")
+      ws.onmessage = recv
+
+      document.querySelector('header a').addEventListener('click', (e) => {
+        e.preventDefault()
+        executeAll()
+      })
+      document.querySelectorAll('table a[href^="/process"]').forEach(el => {
+        el.addEventListener("click", triggerExec)
+      })
+    })
+  }
+  setup()
+  </script>
+  {{ end }}
 </body>
 
 </html>

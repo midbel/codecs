@@ -44,6 +44,11 @@ type ReportStatus struct {
 	Pass  int
 }
 
+func (r *ReportStatus) Clone() ReportStatus {
+	c := *r
+	return c
+}
+
 func (r *ReportStatus) Reset() {
 	r.File = ""
 	r.Count = 0
@@ -87,6 +92,7 @@ type htmlReport struct {
 	ReportOptions
 	status ReportStatus
 	site   *template.Template
+	static bool
 }
 
 const reportTitle = "Execution Results"
@@ -129,6 +135,10 @@ var fnmap = template.FuncMap{
 }
 
 func HtmlReport(opts ReportOptions) (Reporter, error) {
+	return staticHtmlReport(opts)
+}
+
+func staticHtmlReport(opts ReportOptions) (*htmlReport, error) {
 	site, err := template.New("angle").Funcs(fnmap).ParseFS(reportsTemplate, "templates/*.html")
 	if err != nil {
 		return nil, err
@@ -136,6 +146,7 @@ func HtmlReport(opts ReportOptions) (Reporter, error) {
 	report := htmlReport{
 		ReportOptions: opts,
 		site:          site,
+		static:        true,
 	}
 	if opts.ReportDir == "" {
 		opts.ReportDir = filepath.Join(os.TempDir(), "angle", "reports")
@@ -182,14 +193,14 @@ func (r *htmlReport) exec(ctx context.Context, schema *sch.Schema, file string) 
 	if err != nil {
 		return nil, err
 	}
-	r.status.SetFile(file)
 	all := r.run(ctx, schema, doc)
 	res := fileResult{
 		File:    file,
 		Results: all,
-		Status:  r.status,
+		Status:  r.status.Clone(),
 		LastMod: time.Now(),
 	}
+	res.Status.SetFile(file)
 	return &res, nil
 }
 
@@ -232,14 +243,16 @@ func (r htmlReport) generateIndex(title string, files []*fileResult) error {
 	defer w.Close()
 
 	ctx := struct {
-		Title string
-		Count int
-		Total int
-		Files []*fileResult
+		Static bool
+		Title  string
+		Count  int
+		Total  int
+		Files  []*fileResult
 	}{
-		Title: title,
-		Total: len(files),
-		Files: files,
+		Static: r.static,
+		Title:  title,
+		Total:  len(files),
+		Files:  files,
 	}
 	for i := range files {
 		if !files[i].Building {
@@ -295,10 +308,12 @@ func (r htmlReport) createOverviewReport(dir string, file *fileResult) error {
 		File   string
 		Result *fileResult
 		List   []sch.Result
+		Static bool
 	}{
 		File:   filepath.Clean(file.File),
 		Result: file,
 		List:   file.Results,
+		Static: r.static,
 	}
 	return r.site.ExecuteTemplate(w, "overview.html", ctx)
 }
