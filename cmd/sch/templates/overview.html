@@ -129,10 +129,8 @@
       <h1>{{.File}}</h1>
       {{ if not .Static }}
       <aside>
-        {{ if not .Result.Building }}
+        {{ if not .Static }}
         <a title="run new check on the document against the schema" href="/process/{{ .File }}">process</a>
-        {{else}}
-        <div class="loader"></div>
         {{ end }}
       </aside>
       {{ end }}
