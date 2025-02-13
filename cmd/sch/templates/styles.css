@@ -1,0 +1,149 @@
+body {
+font-family: system-ui;
+font-size: 0.9em;
+}
+main {
+width: 90%;
+margin: 0 auto;
+}
+
+table{
+  width: 100%;
+  border-collapse:collapse
+}
+table tbody th{
+  width: 30%
+}
+table tbody td:first-child {
+  width: 5%;
+}
+table tbody td:last-child {
+  width: 10%;
+}
+table td, table th{
+  padding: 4px 8px;
+  border: 1px solid #E0E0E0
+}
+table tbody tr.warning{
+  background-color: #FB8C00; 
+  color: white
+}
+table tbody tr.fatal{
+  background-color: #E53935; 
+  color: white
+}
+.text-center{
+  text-align:center;
+}
+table td a {
+  display: inline-block;
+  outline: none;
+  cursor: pointer;
+  padding: 0 16px;
+  background-color: #fff;
+  border-radius: 0.25rem;
+  border: 1px solid #dddbda;
+  color: #0070d2;
+  font-size: 13px;
+  line-height: 30px;
+  font-weight: 400;
+  text-align: center;
+  text-decoration: none;
+}
+
+p.xpath {
+color: #039BE5;
+}
+p.xpath, pre {
+border: 1px solid #E0E0E0;
+background-color: #F5F5F5;
+padding: 8px;
+}
+pre {
+font-size: 1.15em;
+}
+pre.failure, pre.fatal {
+border-color: #B71C1C;
+background-color: #FFCDD2;
+}
+
+a.back {
+display: inline-block;
+outline: none;
+cursor: pointer;
+padding: 0 8px;
+background-color: #fff;
+border-radius: 0.25rem;
+border: 1px solid #dddbda;
+color: #0070d2;
+font-size: 13px;
+line-height: 30px;
+font-weight: 400;
+text-align: center;
+text-decoration: none;
+}
+
+form {
+display: flex;
+margin-bottom: 32px;
+gap: 16px;
+flex-flow: row wrap;
+align-items: center;
+}
+form div {
+display: flex;
+gap: 8px;
+align-items: center;
+}
+form label {
+display: inline-block;
+font-weight: 400;
+font-size: 1.2em;
+}
+form label:first-letter{
+text-transform: uppercase;
+}
+form input, form select, form label {
+flex-grow: 2;
+}
+form input, form select {
+font-size: 1.15em;
+padding: 8px;
+border: 1px solid #BDBDBD;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+header a {
+  display: inline-block;
+  outline: none;
+  cursor: pointer;
+  padding: 0 16px;
+  margin-left: 2px;
+  background-color: #fff;
+  border-radius: 0.25rem;
+  border: 1px solid #dddbda;
+  color: #0070d2;
+  font-size: 13px;
+  line-height: 30px;
+  font-weight: 400;
+  text-align: center;
+  text-decoration: none;
+}
+.loader {
+  display: inline-block;
+  border: 4px solid #f3f3f3;
+  border-radius: 50%;
+  border-top: 4px solid #3498db;
+  width: 16px;
+  height: 16px;
+  -webkit-animation: spin 2s linear infinite; /* Safari */
+  animation: spin 2s linear infinite;
+}
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

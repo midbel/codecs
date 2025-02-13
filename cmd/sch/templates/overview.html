@@ -6,120 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{.File}}</title>
   <style type="text/css">
-    body {
-      font-family: system-ui;
-      font-size: 0.9em;
-    }
-    main {
-      width: 90%;
-      margin: 0 auto;
-    }
-    table{
-      width: 100%;
-      border-collapse:collapse
-    }
-    table tbody th{
-      width: 30%
-    }
-    table tbody td:first-child {
-      width: 5%;
-    }
-    table tbody td:last-child {
-      width: 10%;
-    }
-    table td, table th{
-      padding: 4px 8px;
-      border: 1px solid #E0E0E0
-    }
-    table tbody tr.warning{
-      background-color: #FB8C00; 
-      color: white
-    }
-    table tbody tr.fatal{
-      background-color: #E53935; 
-      color: white
-    }
-    .text-center{
-      text-align:center;
-    }
-    table td a {
-      display: inline-block;
-      outline: none;
-      cursor: pointer;
-      padding: 0 16px;
-      background-color: #fff;
-      border-radius: 0.25rem;
-      border: 1px solid #dddbda;
-      color: #0070d2;
-      font-size: 13px;
-      line-height: 30px;
-      font-weight: 400;
-      text-align: center;
-      text-decoration: none;
-    }
-    form {
-      display: flex;
-      margin-bottom: 32px;
-      gap: 16px;
-      flex-flow: row wrap;
-      align-items: center;
-    }
-    form div {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-    }
-    form label {
-      display: inline-block;
-      font-weight: 400;
-      font-size: 1.2em;
-    }
-    form label:first-letter{
-      text-transform: uppercase;
-    }
-    form input, form select, form label {
-      flex-grow: 2;
-    }
-    form input, form select {
-      font-size: 1.15em;
-      padding: 8px;
-      border: 1px solid #BDBDBD;
-    }
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    header a {
-      display: inline-block;
-      outline: none;
-      cursor: pointer;
-      padding: 0 16px;
-      margin-left: 2px;
-      background-color: #fff;
-      border-radius: 0.25rem;
-      border: 1px solid #dddbda;
-      color: #0070d2;
-      font-size: 13px;
-      line-height: 30px;
-      font-weight: 400;
-      text-align: center;
-      text-decoration: none;
-    }
-    .loader {
-      display: inline-block;
-      border: 4px solid #f3f3f3;
-      border-radius: 50%;
-      border-top: 4px solid #3498db;
-      width: 16px;
-      height: 16px;
-      -webkit-animation: spin 2s linear infinite; /* Safari */
-      animation: spin 2s linear infinite;
-    }
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
+    {{ template "styles.css" }}
   </style>
 </head>
 
@@ -200,27 +87,7 @@
     </table>
   </main>
   <script>
-    const rule = document.querySelector('#rule')
-    const level = document.querySelector('#level')
-    const status = document.querySelector('#status')
-
-    function filterTableRows() {
-      const rows = document.querySelectorAll('table tbody tr')
-      Array.from(rows).forEach(r => {
-        const levelNode = r.querySelector('td:nth-child(3)')
-        const errorNode = r.querySelector('td:nth-child(6)')
-        const ok1 = rule.value == "" || r.id.indexOf(rule.value) >= 0
-        const ok2 = level.value == "" || levelNode.textContent == level.value
-        const ok3 = status.value == "" 
-          || (status.value == "succeed" && errorNode.textContent == "") 
-          || (status.value == "error" && errorNode.textContent != "")
-        r.style.display = ok1 && ok2 && ok3 ? "table-row" : "none"
-      })
-    }
-
-    rule.addEventListener("blur", filterTableRows)
-    level.addEventListener("change", filterTableRows)
-    status.addEventListener("change", filterTableRows)
+    {{ template "overview.js" }}
   </script>
 </body>
 

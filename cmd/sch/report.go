@@ -139,7 +139,7 @@ func HtmlReport(opts ReportOptions) (Reporter, error) {
 }
 
 func staticHtmlReport(opts ReportOptions) (*htmlReport, error) {
-	site, err := template.New("angle").Funcs(fnmap).ParseFS(reportsTemplate, "templates/*.html")
+	site, err := template.New("angle").Funcs(fnmap).ParseFS(reportsTemplate, "templates/*")
 	if err != nil {
 		return nil, err
 	}
@@ -268,6 +268,7 @@ func (r htmlReport) generateReport(file *fileResult) error {
 		return err
 	}
 	if err := r.createOverviewReport(tmp, file); err != nil {
+		fmt.Println("oups overview", err)
 		return err
 	}
 	for _, res := range file.Results {
