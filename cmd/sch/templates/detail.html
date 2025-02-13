@@ -19,6 +19,10 @@
       background-color: #F5F5F5;
       padding: 8px;
     }
+    pre.failure {
+      border-color: #B71C1C;
+      background-color: #FFCDD2;
+    }
     pre {
       font-size: 1.15em;
     }
@@ -76,13 +80,13 @@
       <header>
         <h2>Nodes</h2>
       </header>
-      {{ range .Items }}
+      {{ range $item := .Items }}
       {{ with $n := .Node }}
         <section>
           <header>
             <h3>{{$n.QualifiedName}} - {{$n.Identity}}</h3>
           </header>
-          <pre> {{ stringify $n }}</pre>
+          <pre {{ if not $item.Pass }}class="failure"{{end}}> {{ stringify $n }}</pre>
         </section>
       {{else}}
         <p>empty nodes set</p>

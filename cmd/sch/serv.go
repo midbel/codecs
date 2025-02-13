@@ -27,8 +27,8 @@ type Server interface {
 }
 
 type clientChan struct {
-	queue chan *fileResult
-	conn  *websocket.Conn
+	queue  chan *fileResult
+	conn   *websocket.Conn
 	closed bool
 }
 
@@ -45,7 +45,7 @@ func (c *clientChan) RemoteAddr() net.Addr {
 
 func (c *clientChan) Send(res *fileResult) {
 	if c.closed {
-		return 
+		return
 	}
 	select {
 	case c.queue <- res:
@@ -87,7 +87,7 @@ type serverReporter struct {
 	report  *htmlReport
 	schema  *sch.Schema
 
-	mu sync.Mutex
+	mu      sync.Mutex
 	clients map[net.Addr]*clientChan
 
 	running chan struct{}

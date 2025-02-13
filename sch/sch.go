@@ -76,6 +76,12 @@ func (f Function) Call(ctx xml.Context, args []xml.Expr) ([]xml.Item, error) {
 	return is, nil
 }
 
+type ResultItem struct {
+	xml.Item
+	Returns []xml.Item
+	Pass    bool
+}
+
 type Result struct {
 	Ident   string
 	Level   string
@@ -84,7 +90,7 @@ type Result struct {
 	Pass    int
 	Error   error
 
-	Items []xml.Item
+	Items []*ResultItem
 	Rule  string
 	Test  string
 
@@ -271,7 +277,7 @@ func (r *Rule) ExecContext(ctx context.Context, doc *xml.Document, keep FilterFu
 				continue
 			}
 			now := time.Now()
-			pass, err := a.Eval(ctx, items, r)
+			pass, all, err := a.Eval(ctx, items, r)
 
 			res := Result{
 				Ident:   a.Ident,
@@ -280,7 +286,7 @@ func (r *Rule) ExecContext(ctx context.Context, doc *xml.Document, keep FilterFu
 				Total:   len(items),
 				Pass:    pass,
 				Error:   err,
-				Items:   items,
+				Items:   all,
 				Rule:    r.Context,
 				Test:    a.Test,
 				Elapsed: time.Since(now),
@@ -318,18 +324,21 @@ type Assert struct {
 	Message string
 }
 
-func (a *Assert) Eval(ctx context.Context, items []xml.Item, env xml.Environ[xml.Expr]) (int, error) {
+func (a *Assert) Eval(ctx context.Context, items []xml.Item, env xml.Environ[xml.Expr]) (int, []*ResultItem, error) {
 	if len(items) == 0 {
-		return 0, nil
+		return 0, nil, nil
 	}
 	test, err := compileExpr(a.Test)
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
-	var pass int
+	var (
+		pass int
+		all  []*ResultItem
+	)
 	for i := range items {
 		if err := ctx.Err(); err != nil {
-			return pass, err
+			return pass, all, err
 		}
 		ast, ok := items[i].(Asserter)
 		if !ok {
@@ -337,16 +346,21 @@ func (a *Assert) Eval(ctx context.Context, items []xml.Item, env xml.Environ[xml
 		}
 		res, err := ast.Assert(test, env)
 		if err != nil {
-			return 0, fmt.Errorf("%s (%s)", a.Message, err)
+			return 0, nil, fmt.Errorf("%s (%s)", a.Message, err)
 		}
-		if ok := isTrue(res); ok {
+		r := ResultItem{
+			Item:    items[i],
+			Returns: res,
+		}
+		if r.Pass = isTrue(res); r.Pass {
 			pass++
 		}
+		all = append(all, &r)
 	}
 	if pass < len(items) {
-		return pass, fmt.Errorf("%w: %s", ErrAssert, a.Message)
+		return pass, all, fmt.Errorf("%w: %s", ErrAssert, a.Message)
 	}
-	return pass, nil
+	return pass, all, nil
 }
 
 func isTrue(res []xml.Item) bool {
