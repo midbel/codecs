@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"iter"
 	"os"
 	"path/filepath"
 	"strings"
@@ -163,11 +164,17 @@ func staticHtmlReport(opts ReportOptions) (*htmlReport, error) {
 func (r *htmlReport) Exec(schema *sch.Schema, files []string) error {
 	var (
 		res []*fileResult
+		counter int
 		ctx = context.Background()
 	)
-	for i := range files {
+
+	for i := range r.getFilesList(files) {
+		counter++
 		r.status.Reset()
-		fr, err := r.exec(ctx, schema, files[i])
+		now := time.Now()
+		fr, err := r.exec(ctx, schema, i)
+		fmt.Printf("%d: done processing file: %s (elsapsed: %s)", counter, i, time.Since(now))
+		fmt.Println()
 		if err != nil {
 			continue
 		}
@@ -177,6 +184,26 @@ func (r *htmlReport) Exec(schema *sch.Schema, files []string) error {
 		schema.Title = reportTitle
 	}
 	return r.generateSite(schema.Title, res)
+}
+
+func (r *htmlReport) getFilesList(files []string) iter.Seq[string] {
+	return func(yield func(string) bool) {
+		for _, f := range files {
+			if i, err := os.Stat(f); err == nil && i.IsDir() {
+				es, _ := os.ReadDir(f)
+				for _, e := range es {
+					n := filepath.Join(f, e.Name())
+					if !yield(n) {
+						break
+					}
+				}
+				continue
+			}
+			if !yield(f) {
+				break
+			}
+		}
+	}
 }
 
 func (r *htmlReport) Run(schema *sch.Schema, file string) error {
