@@ -1142,7 +1142,7 @@ func isEqual(left, right []Item) (bool, error) {
 	switch x := left[0].Value().(type) {
 	case float64:
 		y, err := toFloat(right[0].Value())
-		return x == y, err
+		return nearlyEqual(x, y), err
 	case string:
 		y, err := toString(right[0].Value())
 		return x == y, err
@@ -1154,6 +1154,13 @@ func isEqual(left, right []Item) (bool, error) {
 	default:
 		return false, errType
 	}
+}
+
+func nearlyEqual(left, right float64) bool {
+	if (left == right) {
+		return true
+	}
+	return math.Abs(left - right) < 0.000001
 }
 
 func toTime(value any) (time.Time, error) {
