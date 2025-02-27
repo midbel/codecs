@@ -55,6 +55,8 @@ var bindings = map[rune]int{
 	opGe:      powCmp,
 	opLt:      powCmp,
 	opLe:      powCmp,
+	opBefore:  powCmp,
+	opAfter:   powCmp,
 	opAnd:     powAnd,
 	opOr:      powOr,
 	opAdd:     powAdd,
@@ -112,6 +114,8 @@ func CompileMode(r io.Reader, mode StepMode) (Expr, error) {
 		opLe:      cp.compileBinary,
 		opAnd:     cp.compileBinary,
 		opOr:      cp.compileBinary,
+		opBefore:  cp.compileBinary,
+		opAfter:   cp.compileBinary,
 		opAlt:     cp.compileAlt,
 		begGrp:    cp.compileCall,
 		reserved:  cp.compileReservedInfix,
@@ -348,6 +352,8 @@ func (c *compiler) compileReservedInfix(left Expr) (Expr, error) {
 		err  error
 	)
 	switch keyword {
+	case kwIs:
+		return c.compileIdentity(left)
 	case kwTo:
 		return c.compileRange(left)
 	case kwCast:
@@ -384,6 +390,18 @@ func (c *compiler) compileReservedInfix(left Expr) (Expr, error) {
 		return nil, fmt.Errorf("%s: reserved word can not be used as infix operator", keyword)
 	}
 	return expr, err
+}
+
+func (c *compiler) compileIdentity(left Expr) (Expr, error) {
+	right, err := c.compile()
+	if err != nil {
+		return nil, err
+	}
+	expr := identity{
+		left:  left,
+		right: right,
+	}
+	return expr, nil
 }
 
 func (c *compiler) compileRange(left Expr) (Expr, error) {
@@ -878,6 +896,7 @@ const (
 	kwDiv       = "div"
 	kwMod       = "mod"
 	kwAs        = "as"
+	kwIs        = "is"
 	kwCast      = "cast"
 	kwCastable  = "castable"
 )
@@ -901,6 +920,7 @@ func isReserved(str string) bool {
 	case kwCast:
 	case kwCastable:
 	case kwAs:
+	case kwIs:
 	default:
 		return false
 	}
@@ -922,6 +942,8 @@ const (
 	opAssign
 	opArrow
 	opConcat
+	opBefore
+	opAfter
 	opAdd
 	opSub
 	opMul
@@ -1019,12 +1041,18 @@ func (s *QueryScanner) scanOperator(tok *Token) {
 		if k == equal {
 			s.read()
 			tok.Type = opLe
+		} else if k == langle {
+			s.read()
+			tok.Type = opBefore
 		}
 	case rangle:
 		tok.Type = opGt
 		if k == equal {
 			s.read()
 			tok.Type = opGe
+		} else if k == rangle {
+			s.read()
+			tok.Type = opAfter
 		}
 	case lparen:
 		tok.Type = begGrp

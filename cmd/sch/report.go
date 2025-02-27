@@ -163,9 +163,9 @@ func staticHtmlReport(opts ReportOptions) (*htmlReport, error) {
 
 func (r *htmlReport) Exec(schema *sch.Schema, files []string) error {
 	var (
-		res []*fileResult
+		res     []*fileResult
 		counter int
-		ctx = context.Background()
+		ctx     = context.Background()
 	)
 
 	for i := range r.getFilesList(files) {

@@ -536,10 +536,40 @@ func (b binary) find(ctx Context) ([]Item, error) {
 			ok = !ok
 		}
 		res, err = ok, err1
+	case opBefore:
+	case opAfter:
 	default:
 		return nil, errImplemented
 	}
 	return singleValue(res), err
+}
+
+type identity struct {
+	left  Expr
+	right Expr
+}
+
+func (i identity) Find(node Node) ([]Item, error) {
+	return i.find(defaultContext(node))
+}
+
+func (i identity) find(ctx Context) ([]Item, error) {
+	left, err := i.left.find(ctx)
+	if err != nil {
+		return nil, err
+	}
+	right, err := i.right.find(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if isEmpty(left) || isEmpty(right) {
+		return singleValue(false), nil
+	}
+	var (
+		n1 = left[0].Node()
+		n2 = right[0].Node()
+	)
+	return singleValue(n1.Identity() == n2.Identity()), nil
 }
 
 type reverse struct {
@@ -1121,7 +1151,7 @@ func compareItems(left, right []Item, cmp func(left, right Item) (bool, error)) 
 		for j := range right {
 			ok, err := cmp(left[i], right[j])
 			if ok || err != nil {
-				return ok, err 
+				return ok, err
 			}
 		}
 	}
@@ -1168,10 +1198,10 @@ func isEqual(left, right []Item) (bool, error) {
 }
 
 func nearlyEqual(left, right float64) bool {
-	if (left == right) {
+	if left == right {
 		return true
 	}
-	return math.Abs(left - right) < 0.000001
+	return math.Abs(left-right) < 0.000001
 }
 
 func toTime(value any) (time.Time, error) {
