@@ -1110,50 +1110,61 @@ func apply(left, right []Item, do func(left, right float64) (float64, error)) (a
 	return do(x, y)
 }
 
-func isLess(left, right []Item) (bool, error) {
+func compareItems(left, right []Item, cmp func(left, right Item) (bool, error)) (bool, error) {
 	if isEmpty(left) {
 		return false, nil
 	}
 	if isEmpty(right) {
 		return false, nil
 	}
-	switch x := left[0].Value().(type) {
-	case float64:
-		y, err := toFloat(right[0].Value())
-		return x < y, err
-	case string:
-		y, err := toString(right[0].Value())
-		return x < y, err
-	case time.Time:
-		y, err := toTime(right[0].Value())
-		return x.Before(y), err
-	default:
-		return false, errType
+	for i := range left {
+		for j := range right {
+			ok, err := cmp(left[i], right[j])
+			if ok || err != nil {
+				return ok, err 
+			}
+		}
 	}
+	return false, nil
+}
+
+func isLess(left, right []Item) (bool, error) {
+	return compareItems(left, right, func(left, right Item) (bool, error) {
+		switch x := left.Value().(type) {
+		case float64:
+			y, err := toFloat(right.Value())
+			return x < y, err
+		case string:
+			y, err := toString(right.Value())
+			return x < y, err
+		case time.Time:
+			y, err := toTime(right.Value())
+			return x.Before(y), err
+		default:
+			return false, errType
+		}
+	})
+
 }
 
 func isEqual(left, right []Item) (bool, error) {
-	if isEmpty(left) {
-		return false, nil
-	}
-	if isEmpty(right) {
-		return false, nil
-	}
-	switch x := left[0].Value().(type) {
-	case float64:
-		y, err := toFloat(right[0].Value())
-		return nearlyEqual(x, y), err
-	case string:
-		y, err := toString(right[0].Value())
-		return x == y, err
-	case bool:
-		return x == toBool(right[0].Value()), nil
-	case time.Time:
-		y, err := toTime(right[0].Value())
-		return x.Equal(y), err
-	default:
-		return false, errType
-	}
+	return compareItems(left, right, func(left, right Item) (bool, error) {
+		switch x := left.Value().(type) {
+		case float64:
+			y, err := toFloat(right.Value())
+			return nearlyEqual(x, y), err
+		case string:
+			y, err := toString(right.Value())
+			return x == y, err
+		case bool:
+			return x == toBool(right.Value()), nil
+		case time.Time:
+			y, err := toTime(right.Value())
+			return x.Equal(y), err
+		default:
+			return false, errType
+		}
+	})
 }
 
 func nearlyEqual(left, right float64) bool {
