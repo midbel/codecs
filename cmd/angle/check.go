@@ -15,7 +15,7 @@ type CheckCmd struct {
 }
 
 func (c CheckCmd) Run(args []string) error {
-	set := flag.NewFlagSet("format", flag.ContinueOnError)
+	set := flag.NewFlagSet("format", flag.ExitOnError)
 	set.BoolVar(&c.FailFast, "fail-fast", false, "stop checking files as soon as first error is encountered")
 	if err := set.Parse(args); err != nil {
 		return err
