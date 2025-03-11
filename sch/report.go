@@ -164,6 +164,9 @@ func (r *htmlReport) Run(schema *Schema, files []string) error {
 	if len(files) == 0 {
 		return fmt.Errorf("no files given")
 	}
+	if err := r.prepareAssets(); err != nil {
+		return err
+	}
 	if schema.Title == "" {
 		schema.Title = reportTitle
 	}
@@ -206,6 +209,36 @@ func (r *htmlReport) exec(schema *Schema, file *fileResult) error {
 	return r.generateReport(file)
 }
 
+func (r htmlReport) prepareAssets() error {
+	if err := os.MkdirAll(r.ReportDir, 0755); err != nil {
+		return err
+	}
+	writeFile := func(file string) error {
+		w, err := os.Create(filepath.Join(r.ReportDir, file))
+		if err != nil {
+			return err
+		}
+		defer w.Close()
+
+		name := fmt.Sprintf("templates/%s", file)
+		r, err := reportsTemplate.Open(name)
+		if err != nil {
+			return err
+		}
+		defer r.Close()
+		_, err = io.Copy(w, r)
+		return err
+	}
+
+	files := []string{"styles.css", "overview.js"}
+	for _, f := range files {
+		if err := writeFile(f); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (r htmlReport) generateIndex(title string, files []*fileResult) error {
 	if err := os.MkdirAll(r.ReportDir, 0755); err != nil {
 		return err
@@ -224,7 +257,6 @@ func (r htmlReport) generateIndex(title string, files []*fileResult) error {
 		Total  int
 		Files  []*fileResult
 	}{
-		Static: r.static,
 		Title:  title,
 		Total:  len(files),
 		Files:  files,
