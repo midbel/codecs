@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>schema</title>
+  <style type="text/css">
+    body {
+      font-family: system-ui;
+      font-size: 0.9em;
+    }
+    main {
+      width: 90%;
+      margin: 0 auto;
+    }
+    table{
+      width: 100%;
+      border-collapse:collapse
+    }
+    table tbody th, table thead tr th:nth-child(2){
+      width: 40%;
+      text-align: left;
+    }
+    table tbody td:first-child {
+      width: 5%;
+    }
+    table td, table th {
+      padding: 4px 8px;
+      border: 1px solid #E0E0E0
+    }
+    table tbody tr.warning{
+      background-color: #FB8C00; 
+      color: white
+    }
+    table tbody tr.fatal{
+      background-color: #E53935; 
+      color: white
+    }
+    .text-center{
+      text-align:center;
+    }
+    table td a, header a {
+      display: inline-block;
+      outline: none;
+      cursor: pointer;
+      padding: 0 16px;
+      margin-left: 2px;
+      background-color: #fff;
+      border-radius: 0.25rem;
+      border: 1px solid #dddbda;
+      color: #0070d2;
+      font-size: 13px;
+      line-height: 30px;
+      font-weight: 400;
+      text-align: center;
+      text-decoration: none;
+    }
+    tr.fail {
+      background-color: #B71C1C;
+      color: #FFFFFF;
+    }
+    tr.warn {
+      background-color: #FF8F00;
+      color: #FFFFFF;
+    }
+    aside, h1, h2, h3 {
+      text-align: center;
+    }
+    aside p {
+      font-size: 12px;
+    }
+    aside meter {
+      font-size: 50px;
+    }
+    div.loader {
+      display: inline-block;
+      border: 4px solid #f3f3f3;
+      border-radius: 50%;
+      border-top: 4px solid #3498db;
+      width: 16px;
+      height: 16px;
+      -webkit-animation: spin 2s linear infinite; /* Safari */
+      animation: spin 2s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    main > header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <header>
+      <h1>{{ .Title }}</h1>
+    </header>
+    <table>
+      <thead>
+        <th>#</th>
+        <th>file</th>
+        <th>result</th>
+        <th>last modified</th>
+        <th>done</th>
+        <th></th>
+      </thead>
+      <tbody>
+        {{ range $ix, $el := .Files }}
+        <tr id="{{ $el.Status.File }}" class="{{ statusClass $el.Status }}">
+          <td class="text-center">{{ increment $ix}}</td>
+          <th>{{ $el.Status.File }}</th>
+          <td width="10%" class="text-center">
+            {{ with $res := percent $el.Status}}
+              <span>{{ printf "%.2f" $res }}&percnt;</span>
+            {{ end }}
+          </td>
+          <td class="text-center">
+            {{ datetimefmt .LastMod }}
+          </td>
+          <td class="text-center">
+            {{ not .Building }}
+          </td>
+          <td class="text-center">
+            <div class="btn-group">
+              <a class="action-see" title="view details" href="/{{ $el.Status.File }}/">see</a>
+            </div>
+          </td>
+        </tr>
+        {{ end }}
+      </tbody>
+    </table>
+  </main>
+</body>
+
+</html>

@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -18,8 +19,6 @@ var reportsTemplate embed.FS
 
 type ReportOptions struct {
 	Timeout time.Duration
-	Group   string
-	Level   string
 
 	Format string
 
@@ -29,11 +28,6 @@ type ReportOptions struct {
 	IgnoreZero bool
 	ErrorOnly  bool
 	ReportDir  string
-	ListenAddr string
-}
-
-func (r ReportOptions) Keep() FilterFunc {
-	return keepAssert(r.Group, r.Level)
 }
 
 type ReportStatus struct {
@@ -74,16 +68,25 @@ func (r ReportStatus) Succeed() bool {
 }
 
 type Reporter interface {
-	Run(*Schema, string) error
+	Run(*Schema, []string) error
 }
 
 type fileResult struct {
 	File    string
 	LastMod time.Time
-	Status  ReportStatus
 	Results []Result
 
 	Building bool
+	Error    error
+}
+
+func (r fileResult) Status() ReportStatus {
+	var rs ReportStatus
+	rs.SetFile(r.File)
+	for i := range r.Results {
+		rs.Update(r.Results[i])
+	}
+	return rs
 }
 
 const reportTitle = "Execution Results"
@@ -127,7 +130,6 @@ var fnmap = template.FuncMap{
 
 type htmlReport struct {
 	ReportOptions
-	status ReportStatus
 	site   *template.Template
 	static bool
 }
@@ -158,20 +160,50 @@ func staticHtmlReport(opts ReportOptions) (*htmlReport, error) {
 	return &report, nil
 }
 
-func (r *htmlReport) Run(schema *Schema, file string) error {
-	return nil
-}
-
-func (r htmlReport) generateSite(title string, files []*fileResult) error {
-	if err := r.generateIndex(title, files); err != nil {
+func (r *htmlReport) Run(schema *Schema, files []string) error {
+	if len(files) == 0 {
+		return fmt.Errorf("no files given")
+	}
+	if schema.Title == "" {
+		schema.Title = reportTitle
+	}
+	list := make([]*fileResult, len(files))
+	for i := range files {
+		list[i] = &fileResult{
+			File:     files[i],
+			LastMod:  time.Now(),
+			Building: true,
+		}
+	}
+	if err := r.generateIndex(schema.Title, list); err != nil {
 		return err
 	}
-	for i := range files {
-		if err := r.generateReport(files[i]); err != nil {
+	for i := range list {
+		now := time.Now()
+		list[i].Error = r.exec(schema, list[i])
+		list[i].Building = false
+
+		if err := r.generateIndex(schema.Title, list); err != nil {
 			return err
+		}
+		if !r.Quiet {
+			fmt.Fprintf(os.Stdout, "done processing %s (%s)", list[i].File, time.Since(now))
+			fmt.Fprintln(os.Stdout)
 		}
 	}
 	return nil
+}
+
+func (r *htmlReport) exec(schema *Schema, file *fileResult) error {
+	doc, err := parseDocument(file.File, r.RootSpace)
+	if err != nil {
+		return err
+	}
+	res := schema.Exec(doc)
+	file.LastMod = time.Now()
+	file.Results = slices.Collect(res)
+
+	return r.generateReport(file)
 }
 
 func (r htmlReport) generateIndex(title string, files []*fileResult) error {
@@ -197,16 +229,14 @@ func (r htmlReport) generateIndex(title string, files []*fileResult) error {
 		Total:  len(files),
 		Files:  files,
 	}
-	for i := range files {
-		if !files[i].Building {
-			ctx.Count++
-		}
-	}
 	return r.site.ExecuteTemplate(w, "index.html", ctx)
 }
 
 func (r htmlReport) generateReport(file *fileResult) error {
-	tmp := filepath.Join(r.ReportDir, file.Status.File)
+	var (
+		status = file.Status()
+		tmp    = filepath.Join(r.ReportDir, status.File)
+	)
 	if err := os.MkdirAll(tmp, 0755); err != nil {
 		return err
 	}
@@ -214,7 +244,7 @@ func (r htmlReport) generateReport(file *fileResult) error {
 		return err
 	}
 	for _, res := range file.Results {
-		if err := r.createDetailReport(tmp, res, file.Status.File); err != nil {
+		if err := r.createDetailReport(tmp, res, status.File); err != nil {
 			return err
 		}
 	}
@@ -289,7 +319,7 @@ func StdoutReport(opts ReportOptions) (Reporter, error) {
 	return report, nil
 }
 
-func (r fileReport) Run(schema *Schema, file string) error {
+func (r fileReport) Run(schema *Schema, files []string) error {
 	return nil
 }
 
@@ -351,33 +381,6 @@ func shorten(str string, maxLength int) string {
 		return str
 	}
 	return str[:maxLength+x] + "..."
-}
-
-func keepAssert(group, level string) FilterFunc {
-	var groups []string
-	if len(group) > 0 {
-		groups = strings.Split(group, "-")
-	}
-
-	keep := func(a *Assert) bool {
-		if len(groups) == 0 {
-			return true
-		}
-		parts := strings.Split(a.Ident, "-")
-		if len(parts) < len(groups) {
-			return false
-		}
-		for i := range groups {
-			if parts[i] != groups[i] {
-				return false
-			}
-		}
-		if level != "" && level != a.Flag {
-			return false
-		}
-		return true
-	}
-	return keep
 }
 
 func parseDocument(file, rootns string) (*xml.Document, error) {

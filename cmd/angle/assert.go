@@ -19,12 +19,19 @@ type AssertCmd struct {
 
 func (a AssertCmd) Run(args []string) error {
 	set := flag.NewFlagSet("assert", flag.ExitOnError)
+	set.StringVar(&a.reportType, "r", "", "report type")
+	set.StringVar(&a.options.RootSpace, "root-namespace", "", "modify namespace of root element")
+	set.StringVar(&a.options.ReportDir, "html-report-dir", "", "directory where site will be build when using html report")
+	set.BoolVar(&a.options.Quiet, "quiet", false, "don't trace processing progress")
 	if err := set.Parse(args); err != nil {
 		return err
 	}
-	schema, err := parseSchemaFile(flag.Arg(0))
+	schema, err := parseSchemaFile(set.Arg(0))
 	if err != nil {
 		return err
+	}
+	if set.NArg() <= 1 {
+		return fmt.Errorf("no enough files given")
 	}
 
 	var re sch.Reporter
@@ -41,8 +48,8 @@ func (a AssertCmd) Run(args []string) error {
 	if err != nil {
 		return err
 	}
-	_, _ = re, schema
-	return nil
+	args = set.Args()
+	return re.Run(schema, args[1:])
 }
 
 func parseSchemaFile(file string) (*sch.Schema, error) {

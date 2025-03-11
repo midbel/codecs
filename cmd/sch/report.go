@@ -87,6 +87,7 @@ type fileResult struct {
 	Results []sch.Result
 
 	Building bool
+	Error    bool
 }
 
 type htmlReport struct {
