@@ -83,6 +83,7 @@ func parseDocument(file string, include bool) (*xml.Document, error) {
 	defer r.Close()
 
 	p := xml.NewParser(r)
+	p.OmitProlog = true
 	if include {
 		p.RegisterPI("angle-include", piInclude)
 	}
