@@ -130,22 +130,48 @@ var fnmap = template.FuncMap{
 
 type htmlReport struct {
 	ReportOptions
-	site   *template.Template
 	static bool
+
+	index  *template.Template
+	file   *template.Template
+	assert *template.Template
 }
 
 func HtmlReport(opts ReportOptions) (Reporter, error) {
 	return staticHtmlReport(opts)
 }
 
-func staticHtmlReport(opts ReportOptions) (*htmlReport, error) {
-	site, err := template.New("angle").Funcs(fnmap).ParseFS(reportsTemplate, "templates/*")
+func parseTemplate(base *template.Template, files ...string) (*template.Template, error) {
+	clone, err := base.Clone()
 	if err != nil {
 		return nil, err
 	}
+	list := []string{"templates/layout.html"}
+	list = append(list, files...)
+	return clone.ParseFS(reportsTemplate, list...)
+}
+
+func staticHtmlReport(opts ReportOptions) (*htmlReport, error) {
+	base := template.New("all").Funcs(fnmap)
+
+	index, err := parseTemplate(base, "templates/index.html")
+	if err != nil {
+		return nil, err
+	}
+	file, err := parseTemplate(base, "templates/filter.html", "templates/overview.html")
+	if err != nil {
+		return nil, err
+	}
+	assert, err := parseTemplate(base, "templates/detail.html")
+	if err != nil {
+		return nil, err
+	}
+
 	report := htmlReport{
 		ReportOptions: opts,
-		site:          site,
+		index:         index,
+		file:          file,
+		assert:        assert,
 		static:        true,
 	}
 	if opts.ReportDir == "" {
@@ -257,11 +283,11 @@ func (r htmlReport) generateIndex(title string, files []*fileResult) error {
 		Total  int
 		Files  []*fileResult
 	}{
-		Title:  title,
-		Total:  len(files),
-		Files:  files,
+		Title: title,
+		Total: len(files),
+		Files: files,
 	}
-	return r.site.ExecuteTemplate(w, "index.html", ctx)
+	return r.index.ExecuteTemplate(w, "index.html", ctx)
 }
 
 func (r htmlReport) generateReport(file *fileResult) error {
@@ -298,7 +324,7 @@ func (r htmlReport) createDetailReport(dir string, res Result, back string) erro
 		Back:   back,
 		Result: res,
 	}
-	return r.site.ExecuteTemplate(w, "detail.html", ctx)
+	return r.assert.ExecuteTemplate(w, "detail.html", ctx)
 }
 
 func (r htmlReport) createOverviewReport(dir string, file *fileResult) error {
@@ -320,7 +346,7 @@ func (r htmlReport) createOverviewReport(dir string, file *fileResult) error {
 		List:   file.Results,
 		Static: r.static,
 	}
-	return r.site.ExecuteTemplate(w, "overview.html", ctx)
+	return r.file.ExecuteTemplate(w, "overview.html", ctx)
 }
 
 const pattern = "%s | %-4d | %8s | %-32s | %3d/%-3d | %s"

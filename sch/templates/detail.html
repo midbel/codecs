@@ -1,65 +1,48 @@
-<!DOCTYPE html>
-<html lang="en">
+{{template "layout" .}}
 
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>schema</title>
-  <style type="text/css">
-    {{ template "styles.css" }}
-  </style>
-</head>
+{{define "header"}}
+  <header>
+    <h1>{{ .Ident }}</h1>
+  </header>
+{{end}}
 
-<body>
-  <main>
+{{define "main"}}
+  <section>
     <header>
-      <h1>{{ .Ident }}</h1>
+      <h2>Context</h2>
     </header>
-    <aside>
-      <a class="back" href="/{{ .Back }}/">back</a>
-    </aside>
+    <p>{{ .Message }}</p>
+    <p class="xpath">{{.Rule}}</p>
+  </section>
+  <section>
+    <header>
+      <h2>Test</h2>
+    </header>
+    <p class="xpath">{{.Test}}</p>
+  </section>
+  {{ if .Failed }}
     <section>
       <header>
-        <h2>Context</h2>
+        <h2>Error</h2>
       </header>
-      <p>{{ .Message }}</p>
-      <p class="xpath">{{.Rule}}</p>
+      <p>{{.Error}}</p>
     </section>
-    <section>
-      <header>
-        <h2>Test</h2>
-      </header>
-      <p class="xpath">{{.Test}}</p>
-    </section>
-    {{ if .Failed }}
+  {{ end }}
+  <section>
+    <header>
+      <h2>Nodes</h2>
+    </header>
+    {{ range $item := .Items }}
+    {{ with $n := .Node }}
       <section>
         <header>
-          <h2>Error</h2>
+          <h3>{{$n.QualifiedName}} - {{$n.Identity}}</h3>
         </header>
-        <p>{{.Error}}</p>
+        <pre {{ if not $item.Pass }}class="failure"{{end}}> {{ stringify $n }}</pre>
       </section>
+    {{else}}
+      <p>empty nodes set</p>
     {{ end }}
-    <section>
-      <header>
-        <h2>Nodes</h2>
-      </header>
-      {{ range $item := .Items }}
-      {{ with $n := .Node }}
-        <section>
-          <header>
-            <h3>{{$n.QualifiedName}} - {{$n.Identity}}</h3>
-          </header>
-          <pre {{ if not $item.Pass }}class="failure"{{end}}> {{ stringify $n }}</pre>
-        </section>
-      {{else}}
-        <p>empty nodes set</p>
-      {{ end }}
-      {{ end }}
-    </section>
-    <footer>
-      <a class="back" href="/{{ .Back }}/">back</a>
-    </footer>
-  </main>
-</body>
-
-</html>
+    {{ end }}
+  </section>
+{{end}}
