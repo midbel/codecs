@@ -38,11 +38,12 @@
         <header>
           <h3>{{$n.QualifiedName}} - {{$n.Identity}}</h3>
         </header>
-        <pre {{ if not $item.Pass }}class="failure"{{end}}> {{ stringify $n }}</pre>
+        <pre id="{{$n.Identity}}" {{ if not $item.Pass }}class="failure"{{end}}> {{ stringify $n }}</pre>
       </section>
     {{else}}
       <p>empty nodes set</p>
     {{ end }}
     {{ end }}
   </section>
+  <script src="/sidebar.js"></script>
 {{end}}

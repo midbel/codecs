@@ -80,7 +80,7 @@ pre {
   font-size: 1.15em;
 }
 
-pre.failure, pre.fatal {
+pre.failure, a.failure, pre.fatal, a.failure {
   border-color: #B71C1C;
   background-color: #FFCDD2;
 }

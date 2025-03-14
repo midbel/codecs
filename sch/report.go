@@ -256,7 +256,7 @@ func (r htmlReport) prepareAssets() error {
 		return err
 	}
 
-	files := []string{"styles.css", "overview.js"}
+	files := []string{"styles.css", "overview.js", "sidebar.js"}
 	for _, f := range files {
 		if err := writeFile(f); err != nil {
 			return err
