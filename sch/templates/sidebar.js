@@ -41,9 +41,10 @@
 
     const sideHeight = sidebar.offsetHeight
     const itemHeight = sideHeight / total
+    const maxItemHeight = 5
 
     Array.from(all).forEach((item) => {
-      const el = createLinkFromItem(item, itemHeight)
+      const el = createLinkFromItem(item, itemHeight > maxItemHeight ? itemHeight)
       sidebar.append(el)
     })
   })

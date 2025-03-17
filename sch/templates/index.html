@@ -33,7 +33,9 @@
         {{ not .Building }}
       </td>
       <td class="text-center">
+        {{ if not .Building }}
         <a class="btn btn-default" title="view details" href="/{{ $el.Status.File }}/">see</a>
+        {{ end }}
       </td>
     </tr>
     {{ end }}
