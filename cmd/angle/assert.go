@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"iter"
+	"path/filepath"
+	"slices"
 	"net/url"
 	"os"
 	"strings"
@@ -49,7 +52,35 @@ func (a AssertCmd) Run(args []string) error {
 		return err
 	}
 	args = set.Args()
-	return re.Run(schema, args[1:])
+	it := getFiles(args[1:])
+	return re.Run(schema, slices.Collect(it))
+}
+
+func getFiles(files []string) iter.Seq[string] {
+	fn := func(yield func(string) bool) {
+		for _, f := range files {
+			i, err := os.Stat(f)
+			if err != nil {
+				continue
+			}
+			if i.Mode().IsRegular() {
+				if !yield(f) {
+					return
+				}
+				continue
+			}
+			es, err := os.ReadDir(f)
+			if err != nil {
+				continue
+			}
+			for _, e := range es {
+				if !yield(filepath.Join(f, e.Name())) {
+					return
+				}
+			}
+		}
+	}
+	return fn
 }
 
 func parseSchemaFile(file string) (*sch.Schema, error) {
