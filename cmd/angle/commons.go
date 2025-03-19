@@ -1,6 +1,7 @@
 package main
 
 import (
+	"compress/gzip"
 	"errors"
 	"fmt"
 	"io"
@@ -122,6 +123,13 @@ func writeDocument(doc *xml.Document, file string, options WriterOptions) error 
 		}
 		defer f.Close()
 		w = f
+
+		if filepath.Ext(file) == ".gz" {
+			z, _ := gzip.NewWriterLevel(w, gzip.BestCompression)
+			defer z.Close()
+
+			w = z
+		}
 	}
 
 	ws := xml.NewWriter(w)
