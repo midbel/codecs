@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -26,6 +27,10 @@ const typeNode = TypeDocument | TypeElement | TypeComment | TypeAttribute | Type
 
 func isNode(n Node) bool {
 	return n.Type()&typeNode > 0
+}
+
+type Cloner interface {
+	Clone() Node
 }
 
 type Node interface {
@@ -374,6 +379,26 @@ func NewElement(name QName) *Element {
 		QName: name,
 		NS:    make(map[string]string),
 	}
+}
+
+func (e *Element) Clone() Node {
+	c := &Element{
+		QName:    e.QName,
+		Attrs:    slices.Clone(e.Attrs),
+		NS:       maps.Clone(e.NS),
+		parent:   e.parent,
+		position: e.position,
+	}
+	for i := range e.Nodes {
+		if x, ok := e.Nodes[i].(Cloner); ok {
+			if y := x.Clone(); y != nil {
+				c.Append(y)
+			} else {
+				c.Append(e.Nodes[i])
+			}
+		}
+	}
+	return c
 }
 
 func (_ *Element) Type() NodeType {

@@ -79,6 +79,7 @@ type Writer struct {
 	writer *bufio.Writer
 
 	Indent string
+	Doctype string
 	WriterOptions
 }
 
