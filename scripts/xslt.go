@@ -10,6 +10,21 @@ import (
 	"github.com/midbel/codecs/xml"
 )
 
+type executeFunc func(xml.Node, xml.Node, *Stylesheet) error
+
+var executers map[xml.QName]executeFunc
+
+func init() {
+	executers = map[xml.QName]executeFunc{
+		xml.QualifiedName("for-each", "xsl"):        executeForeach,
+		xml.QualifiedName("value-of", "xsl"):        executeValueOf,
+		xml.QualifiedName("call-template", "xsl"):   executeCallTemplate,
+		xml.QualifiedName("apply-templates", "xsl"): executeApplyTemplates,
+		xml.QualifiedName("if", "xsl"):              executeIf,
+		xml.QualifiedName("choose", "xsl"):          executeChoose,
+	}
+}
+
 func main() {
 	quiet := flag.Bool("q", false, "quiet")
 	flag.Parse()
@@ -19,87 +34,220 @@ func main() {
 		fmt.Fprintln(os.Stderr, "fail to load document:", err)
 		os.Exit(2)
 	}
-	result, err := transform(flag.Arg(0), doc)
+
+	sheet, err := Load(flag.Arg(0))
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "fail to load stylesheet:", err)
+		fmt.Fprintln(os.Stderr, "fail to load stylesheet", err)
 		os.Exit(2)
+	}
+
+	result, err := sheet.Execute(doc)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 	var w io.Writer = os.Stdout
 	if *quiet {
 		w = io.Discard
 	}
 	writer := xml.NewWriter(w)
-	writer.Write(result)
+	writer.Write(result.(*xml.Document))
 }
 
-func transform(file string, source *xml.Document) (*xml.Document, error) {
+type Stylesheet struct {
+	Method  string
+	Version string
+	Indent  bool
+
+	Templates  []*Template
+	Parameters map[string]string
+}
+
+func Load(file string) (*Stylesheet, error) {
 	doc, err := loadDocument(file)
 	if err != nil {
 		return nil, err
 	}
-	tpl, err := getMainTemplate(doc)
-	if err != nil {
-		return nil, err
-	}
-	expr, err := xml.CompileString("/")
-	if err != nil {
-		return nil, err
-	}
+	var sheet Stylesheet
 
-	items, err := expr.Find(source)
+	query, err := xml.CompileString("/xsl:stylesheet/xsl:template")
 	if err != nil {
 		return nil, err
 	}
-	if len(items) == 0 {
-		return nil, fmt.Errorf("no root template found")
-	}
-	root, err := processTemplate(tpl, items[0].Node())
+	items, err := query.Find(doc)
 	if err != nil {
 		return nil, err
 	}
-	return xml.NewDocument(root), nil
+	for _, el := range items {
+		el, ok := el.Node().(*xml.Element)
+		if !ok {
+			continue
+		}
+		t := Template{
+			Fragment: el,
+		}
+		ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
+			return a.Name == "name"
+		})
+		if ix >= 0 {
+			t.Name = el.Attrs[ix].Value()
+		}
+		ix = slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
+			return a.Name == "match"
+		})
+		if ix >= 0 {
+			t.Match = el.Attrs[ix].Value()
+		} else {
+			t.Match = "."
+		}
+		sheet.Templates = append(sheet.Templates, &t)
+	}
+	return &sheet, nil
 }
 
-func processTemplate(node xml.Node, datum xml.Node) (xml.Node, error) {
-	el, ok := node.(*xml.Element)
+func (s *Stylesheet) Find(name string) (*Template, error) {
+	ix := slices.IndexFunc(s.Templates, func(t *Template) bool {
+		return t.Name == name
+	})
+	if ix < 0 {
+		return nil, fmt.Errorf("template %s not found", name)
+	}
+	return s.Templates[ix], nil
+}
+
+func (s *Stylesheet) Execute(doc xml.Node) (xml.Node, error) {
+	ix := slices.IndexFunc(s.Templates, func(t *Template) bool {
+		return t.isRoot()
+	})
+	if ix < 0 {
+		return nil, fmt.Errorf("main template not found")
+	}
+
+	root, err := s.Templates[ix].Execute(doc, s)
+	if err == nil {
+		if len(root) != 1 {
+			return nil, fmt.Errorf("more than one root element returned")
+		}
+		return xml.NewDocument(root[0]), nil
+	}
+	return nil, err
+}
+
+type Template struct {
+	Name     string
+	Match    string
+	Mode     string
+	Fragment xml.Node
+}
+
+func (t *Template) Execute(datum xml.Node, style *Stylesheet) ([]xml.Node, error) {
+	value, err := t.getData(datum)
+	if err != nil {
+		return nil, err
+	}
+	el, ok := t.Fragment.(*xml.Element)
 	if !ok {
-		return nil, fmt.Errorf("template: invalid element")
+		return nil, fmt.Errorf("template: xml element expected")
 	}
-	if len(el.Nodes) != 1 {
-		return nil, fmt.Errorf("template should have no more than one element")
+	var nodes []xml.Node
+	for _, n := range el.Nodes {
+		c := cloneNode(n)
+		if c == nil {
+			continue
+		}
+		if err := t.execute(c, value, style); err != nil {
+			return nil, err
+		}
+		nodes = append(nodes, c)
 	}
-	root := el.Nodes[0]
-	if err := transformNode(root, datum); err != nil {
-		return nil, err
-	}
-	return root, nil
+	return nodes, nil
 }
 
-func transformNode(node, datum xml.Node) error {
+func (t *Template) execute(current, datum xml.Node, style *Stylesheet) error {
+	return transformNode(current, datum, style)
+}
+
+func (t *Template) getData(datum xml.Node) (xml.Node, error) {
+	query, err := xml.CompileString(t.Match)
+	if err != nil {
+		return nil, err
+	}
+	items, err := query.Find(datum)
+	if err != nil {
+		return nil, err
+	}
+	if len(items) != 1 {
+		return nil, fmt.Errorf("template: too many result returned by query")
+	}
+	return items[0].Node(), nil
+}
+
+func (t *Template) isRoot() bool {
+	return t.Match == "/"
+}
+
+func transformNode(node, datum xml.Node, style *Stylesheet) error {
 	el, ok := node.(*xml.Element)
 	if !ok {
 		return fmt.Errorf("node: xml element expected (got %T)", el)
 	}
-	fmt.Printf("transformNode: %s\n", el.QualifiedName())
-	if el.Space == "xsl" && el.Name == "for-each" {
-		return processForeach(el, datum)
-	} else if el.Space == "xsl" && el.Name == "value-of" {
-		return processValueOf(el, datum)
-	} else {
-		for i := range el.Nodes {
-			if el.Nodes[i].Type() != xml.TypeElement {
-				continue
-			}
-			err := transformNode(el.Nodes[i], datum)
-			if err != nil {
-				return err
-			}
+	fn, ok := executers[el.QName]
+	if ok {
+		if fn == nil {
+			return fmt.Errorf("%s not yet implemented", el.QName)
+		}
+		return fn(node, datum, style)
+	}
+	nodes := slices.Clone(el.Nodes)
+	for i := range nodes {
+		if nodes[i].Type() != xml.TypeElement {
+			continue
+		}
+		err := transformNode(nodes[i], datum, style)
+		if err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
-func processForeach(node, datum xml.Node) error {
+func executeApplyTemplates(node, datum xml.Node, style *Stylesheet) error {
+	return nil
+}
+
+func executeCallTemplate(node, datum xml.Node, style *Stylesheet) error {
+	el := node.(*xml.Element)
+	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
+		return a.Name == "name"
+	})
+	if ix < 0 {
+		return fmt.Errorf("call-template: missing name attribute")
+	}
+	tpl, err := style.Find(el.Attrs[ix].Value())
+	if err != nil {
+		return err
+	}
+	nodes, err := tpl.Execute(datum, style)
+	if err != nil {
+		return err
+	}
+	if i, ok := el.Parent().(interface{ InsertNodes(int, []xml.Node) error }); ok {
+		if err := i.InsertNodes(el.Position(), nodes); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func executeIf(node, datum xml.Node, style *Stylesheet) error {
+	return nil
+}
+
+func executeChoose(node, datum xml.Node, style *Stylesheet) error {
+	return nil
+}
+
+func executeForeach(node, datum xml.Node, style *Stylesheet) error {
 	el := node.(*xml.Element)
 	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
 		return a.Name == "select"
@@ -130,7 +278,7 @@ func processForeach(node, datum xml.Node) error {
 				continue
 			}
 			parent.Append(c)
-			if err := transformNode(c, value); err != nil {
+			if err := transformNode(c, value, style); err != nil {
 				return err
 			}
 		}
@@ -138,7 +286,7 @@ func processForeach(node, datum xml.Node) error {
 	return nil
 }
 
-func processValueOf(node, datum xml.Node) error {
+func executeValueOf(node, datum xml.Node, style *Stylesheet) error {
 	el := node.(*xml.Element)
 	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
 		return a.Name == "select"
@@ -171,18 +319,6 @@ func cloneNode(n xml.Node) xml.Node {
 		return nil
 	}
 	return cloner.Clone()
-}
-
-func getMainTemplate(doc *xml.Document) (xml.Node, error) {
-	tpl, err := doc.Query("//xsl:template[@match=\"/\"]")
-	if err != nil {
-		return nil, err
-	}
-	root, ok := tpl.Root().(*xml.Element)
-	if !ok || len(root.Nodes) == 0 {
-		return nil, fmt.Errorf("invalid root element")
-	}
-	return root.Nodes[0], nil
 }
 
 func loadDocument(file string) (*xml.Document, error) {

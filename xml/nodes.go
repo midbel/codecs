@@ -393,12 +393,44 @@ func (e *Element) Clone() Node {
 		if x, ok := e.Nodes[i].(Cloner); ok {
 			if y := x.Clone(); y != nil {
 				c.Append(y)
-			} else {
-				c.Append(e.Nodes[i])
 			}
+		} else {
+			c.Append(e.Nodes[i])
 		}
 	}
 	return c
+}
+
+func (e *Element) ReplaceNode(at int, node Node) error{
+	if at < 0 || at >= len(e.Nodes) {
+		return fmt.Errorf("bad index")
+	}
+	node.setParent(e)
+	node.setPosition(at)
+	e.Nodes[at] = node
+	return nil	
+}
+
+func (e *Element) InsertNode(at int, node Node) error {
+	return e.InsertNodes(at, []Node{node})
+}
+
+func (e *Element) InsertNodes(at int, nodes []Node) error {
+	if at < 0 || at >= len(e.Nodes) {
+		return fmt.Errorf("bad index")
+	}
+	var (
+		before = e.Nodes[:at]
+		after = e.Nodes[at+1:]
+	)
+	e.Nodes = slices.Concat(before, nodes, after)
+	for i := at+len(nodes); i < len(e.Nodes); i++ {
+		e.Nodes[i].setPosition(i)
+	}
+	for i := range nodes {
+		nodes[i].setParent(e)
+	}
+	return nil
 }
 
 func (_ *Element) Type() NodeType {
