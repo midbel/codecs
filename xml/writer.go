@@ -21,8 +21,10 @@ const (
 	OptionCharDataToText
 	OptionNameSnakeCase
 	OptionNameKebabCase
+	OptionNameLowerCase
 	OptionNamespaceSnakeCase
 	OptionNamespaceKebabCase
+	OptionNamespaceLowerCase
 )
 
 func (w WriterOptions) Compact() bool {
@@ -61,16 +63,28 @@ func (w WriterOptions) NameToKebabCase() bool {
 	return w&OptionNameKebabCase > 0
 }
 
+func (w WriterOptions) NamespaceToLowerCase() bool {
+	return w&OptionNamespaceLowerCase > 0
+}
+
+func (w WriterOptions) NameToLowerCase() bool {
+	return w&OptionNameLowerCase > 0
+}
+
 func (w WriterOptions) rewriteQName(name QName) QName {
 	if w.NameToKebabCase() {
 		name.Name = casing.To(casing.KebabCase, name.Name)
 	} else if w.NameToSnakeCase() {
 		name.Name = casing.To(casing.SnakeCase, name.Name)
+	} else if w.NameToLowerCase() {
+		name.Name = strings.ToLower(name.Name)
 	}
 	if w.NamespaceToSnakeCase() {
 		name.Space = casing.To(casing.SnakeCase, name.Space)
 	} else if w.NamespaceToKebabCase() {
 		name.Space = casing.To(casing.KebabCase, name.Space)
+	} else if w.NamespaceToKebabCase() {
+		name.Space = strings.ToLower(name.Space)
 	}
 	return name
 }
@@ -78,7 +92,7 @@ func (w WriterOptions) rewriteQName(name QName) QName {
 type Writer struct {
 	writer *bufio.Writer
 
-	Indent string
+	Indent  string
 	Doctype string
 	WriterOptions
 }

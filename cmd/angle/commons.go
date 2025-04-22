@@ -20,6 +20,7 @@ var ErrDocument = errors.New("bad xml document")
 const (
 	snakeCaseType = "snake"
 	kebabCaseType = "kebab"
+	lowerCaseType = "lower"
 )
 
 type WriterOptions struct {
@@ -147,6 +148,8 @@ func writeDocument(doc *xml.Document, file string, options WriterOptions) error 
 		ws.WriterOptions |= xml.OptionNamespaceSnakeCase | xml.OptionNameSnakeCase
 	case kebabCaseType:
 		ws.WriterOptions |= xml.OptionNamespaceKebabCase | xml.OptionNameKebabCase
+	case lowerCaseType:
+		ws.WriterOptions |= xml.OptionNamespaceLowerCase | xml.OptionNameLowerCase
 	default:
 	}
 	return ws.Write(doc)

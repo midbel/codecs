@@ -119,6 +119,18 @@ func (d *Document) SetRootNamespace(name string) {
 	}
 }
 
+func (d *Document) GetNodesCount() int {
+	root := d.Root()
+	if root == nil {
+		return 0
+	}
+	el, ok := root.(*Element)
+	if ok {
+		return len(el.Nodes)
+	}
+	return 0
+}
+
 func (d *Document) GetElementById(id string) (Node, error) {
 	root := d.Root()
 	if el, ok := root.(*Element); ok {
@@ -401,14 +413,14 @@ func (e *Element) Clone() Node {
 	return c
 }
 
-func (e *Element) ReplaceNode(at int, node Node) error{
+func (e *Element) ReplaceNode(at int, node Node) error {
 	if at < 0 || at >= len(e.Nodes) {
 		return fmt.Errorf("bad index")
 	}
 	node.setParent(e)
 	node.setPosition(at)
 	e.Nodes[at] = node
-	return nil	
+	return nil
 }
 
 func (e *Element) InsertNode(at int, node Node) error {
@@ -421,10 +433,10 @@ func (e *Element) InsertNodes(at int, nodes []Node) error {
 	}
 	var (
 		before = e.Nodes[:at]
-		after = e.Nodes[at+1:]
+		after  = e.Nodes[at+1:]
 	)
 	e.Nodes = slices.Concat(before, nodes, after)
-	for i := at+len(nodes); i < len(e.Nodes); i++ {
+	for i := at + len(nodes); i < len(e.Nodes); i++ {
 		e.Nodes[i].setPosition(i)
 	}
 	for i := range nodes {
