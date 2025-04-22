@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"slices"
+	"strings"
 
 	"github.com/midbel/codecs/xml"
 )
@@ -26,7 +27,10 @@ func init() {
 }
 
 func main() {
-	quiet := flag.Bool("q", false, "quiet")
+	var (
+		quiet = flag.Bool("q", false, "quiet")
+		mode  = flag.String("m", "", "mode")
+	)
 	flag.Parse()
 
 	doc, err := loadDocument(flag.Arg(1))
@@ -40,6 +44,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "fail to load stylesheet", err)
 		os.Exit(2)
 	}
+	sheet.Mode = *mode
 
 	result, err := sheet.Execute(doc)
 	if err != nil {
@@ -58,6 +63,8 @@ type Stylesheet struct {
 	Method  string
 	Version string
 	Indent  bool
+
+	Mode string
 
 	Templates  []*Template
 	Parameters map[string]string
@@ -115,6 +122,47 @@ func (s *Stylesheet) Find(name string) (*Template, error) {
 	return s.Templates[ix], nil
 }
 
+func (s *Stylesheet) Match(node xml.Node) (*Template, error) {
+	// match work in reverse
+	// given a node, we should check that the node would be selected
+	// from the xpath expression given in the match attribute of the
+	// template
+	isMatch := func(pattern string) (bool, int) {
+		if pattern == "" {
+			return false, -1
+		}
+		var (
+			parts = strings.Split(pattern, "/")
+			curr  = node
+			point int
+		)
+		slices.Reverse(parts)
+		for {
+			if len(parts) == 0 {
+				break
+			}
+			if curr.QualifiedName() != parts[0] {
+				break
+			}
+			point++
+			curr = node.Parent()
+			if curr == nil {
+				break
+			}
+			parts = parts[1:]
+
+		}
+		return true && len(parts) == 0, point
+
+	}
+	for _, t := range s.Templates {
+		if ok, _ := isMatch(t.Match); ok {
+			return t.Clone(), nil
+		}
+	}
+	return nil, fmt.Errorf("no template found matching given node (%s)", node.QualifiedName())
+}
+
 func (s *Stylesheet) Execute(doc xml.Node) (xml.Node, error) {
 	ix := slices.IndexFunc(s.Templates, func(t *Template) bool {
 		return t.isRoot()
@@ -138,6 +186,14 @@ type Template struct {
 	Match    string
 	Mode     string
 	Fragment xml.Node
+}
+
+func (t *Template) Clone() *Template {
+	tpl := Template{
+		Match: ".",
+	}
+	tpl.Fragment = cloneNode(t.Fragment)
+	return &tpl
 }
 
 func (t *Template) Execute(datum xml.Node, style *Stylesheet) ([]xml.Node, error) {
@@ -212,6 +268,34 @@ func transformNode(node, datum xml.Node, style *Stylesheet) error {
 }
 
 func executeApplyTemplates(node, datum xml.Node, style *Stylesheet) error {
+	el := node.(*xml.Element)
+	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
+		return a.Name == "select"
+	})
+	if ix >= 0 {
+		query, err := xml.CompileString(el.Attrs[ix].Value())
+		if err != nil {
+			return err
+		}
+		items, err := query.Find(datum)
+		if err != nil {
+			return err
+		}
+		datum = items[0].Node()
+	}
+	tpl, err := style.Match(datum)
+	if err != nil {
+		return err
+	}
+	nodes, err := tpl.Execute(datum, style)
+	if err != nil {
+		return err
+	}
+	if i, ok := el.Parent().(interface{ InsertNodes(int, []xml.Node) error }); ok {
+		if err := i.InsertNodes(el.Position(), nodes); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -307,7 +391,6 @@ func executeValueOf(node, datum xml.Node, style *Stylesheet) error {
 	if !ok {
 		return fmt.Errorf("value-of: xml element expected as parent")
 	}
-	_, _ = text, parent
 	parent.Nodes = parent.Nodes[:0]
 	parent.Append(text)
 	return nil
