@@ -447,11 +447,11 @@ func executeValueOf(node, datum xml.Node, style *Stylesheet) error {
 	return nil
 }
 func testNode(expr string, datum xml.Node) (bool, error) {
-	expr, err := xml.CompileString(expr)
+	query, err := xml.CompileString(expr)
 	if err != nil {
 		return false, err
 	}
-	items, err := expr.Find(datum)
+	items, err := query.Find(datum)
 	if err != nil {
 		return false, err
 	}
