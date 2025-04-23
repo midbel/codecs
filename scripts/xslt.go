@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/midbel/codecs/xml"
 )
+
+var errImplemented = errors.New("not implemented")
 
 type executeFunc func(xml.Node, xml.Node, *Stylesheet) error
 
@@ -23,6 +26,8 @@ func init() {
 		xml.QualifiedName("apply-templates", "xsl"): executeApplyTemplates,
 		xml.QualifiedName("if", "xsl"):              executeIf,
 		xml.QualifiedName("choose", "xsl"):          executeChoose,
+		xml.QualifiedName("variable", "xsl"):        executeVariable,
+		xml.QualifiedName("param", "xsl"):           executeParameter,
 	}
 }
 
@@ -134,7 +139,7 @@ func (s *Stylesheet) Match(node xml.Node) (*Template, error) {
 		var (
 			parts = strings.Split(pattern, "/")
 			curr  = node
-			point int
+			rank int
 		)
 		slices.Reverse(parts)
 		for {
@@ -144,7 +149,7 @@ func (s *Stylesheet) Match(node xml.Node) (*Template, error) {
 			if curr.QualifiedName() != parts[0] {
 				break
 			}
-			point++
+			rank++
 			curr = node.Parent()
 			if curr == nil {
 				break
@@ -152,10 +157,13 @@ func (s *Stylesheet) Match(node xml.Node) (*Template, error) {
 			parts = parts[1:]
 
 		}
-		return true && len(parts) == 0, point
+		return true, rank
 
 	}
 	for _, t := range s.Templates {
+		if t.isRoot() {
+			continue
+		}
 		if ok, _ := isMatch(t.Match); ok {
 			return t.Clone(), nil
 		}
@@ -169,6 +177,10 @@ func (s *Stylesheet) Execute(doc xml.Node) (xml.Node, error) {
 	})
 	if ix < 0 {
 		return nil, fmt.Errorf("main template not found")
+	}
+
+	if d, ok := doc.(*xml.Document); ok {
+		doc = d.Root()
 	}
 
 	root, err := s.Templates[ix].Execute(doc, s)
@@ -189,9 +201,7 @@ type Template struct {
 }
 
 func (t *Template) Clone() *Template {
-	tpl := Template{
-		Match: ".",
-	}
+	var tpl Template
 	tpl.Fragment = cloneNode(t.Fragment)
 	return &tpl
 }
@@ -206,7 +216,7 @@ func (t *Template) Execute(datum xml.Node, style *Stylesheet) ([]xml.Node, error
 		return nil, fmt.Errorf("template: xml element expected")
 	}
 	var nodes []xml.Node
-	for _, n := range el.Nodes {
+	for _, n := range slices.Clone(el.Nodes) {
 		c := cloneNode(n)
 		if c == nil {
 			continue
@@ -224,6 +234,9 @@ func (t *Template) execute(current, datum xml.Node, style *Stylesheet) error {
 }
 
 func (t *Template) getData(datum xml.Node) (xml.Node, error) {
+	if t.Match == "" {
+		return datum, nil
+	}
 	query, err := xml.CompileString(t.Match)
 	if err != nil {
 		return nil, err
@@ -254,7 +267,14 @@ func transformNode(node, datum xml.Node, style *Stylesheet) error {
 		}
 		return fn(node, datum, style)
 	}
-	nodes := slices.Clone(el.Nodes)
+	return processNode(node, datum, style)
+}
+
+func processNode(node, datum xml.Node, style *Stylesheet) error {
+	var (
+		el    = node.(*xml.Element)
+		nodes = slices.Clone(el.Nodes)
+	)
 	for i := range nodes {
 		if nodes[i].Type() != xml.TypeElement {
 			continue
@@ -265,6 +285,14 @@ func transformNode(node, datum xml.Node, style *Stylesheet) error {
 		}
 	}
 	return nil
+}
+
+func executeParameter(node, datum xml.Node, style *Stylesheet) error {
+	return errImplemented
+}
+
+func executeVariable(node, datum xml.Node, style *Stylesheet) error {
+	return errImplemented
 }
 
 func executeApplyTemplates(node, datum xml.Node, style *Stylesheet) error {
@@ -281,12 +309,18 @@ func executeApplyTemplates(node, datum xml.Node, style *Stylesheet) error {
 		if err != nil {
 			return err
 		}
+		if len(items) == 0 {
+			if r, ok := node.Parent().(interface{ RemoveNode(int) error }); ok {
+				return r.RemoveNode(node.Position())
+			}
+		}
 		datum = items[0].Node()
 	}
 	tpl, err := style.Match(datum)
 	if err != nil {
 		return err
 	}
+
 	nodes, err := tpl.Execute(datum, style)
 	if err != nil {
 		return err
@@ -324,7 +358,24 @@ func executeCallTemplate(node, datum xml.Node, style *Stylesheet) error {
 }
 
 func executeIf(node, datum xml.Node, style *Stylesheet) error {
-	return nil
+	el := node.(*xml.Element)
+	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
+		return a.Name == "test"
+	})
+	if ix < 0 {
+		return fmt.Errorf("if: missing test attribute")
+	}
+	ok, err := testNode(el.Attrs[ix].Value(), datum)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		if r, ok := el.Parent().(interface{ RemoveNode(int) error }); ok {
+			return r.RemoveNode(el.Position())
+		}
+		return nil
+	}
+	return processNode(node, datum, style)
 }
 
 func executeChoose(node, datum xml.Node, style *Stylesheet) error {
@@ -394,6 +445,37 @@ func executeValueOf(node, datum xml.Node, style *Stylesheet) error {
 	parent.Nodes = parent.Nodes[:0]
 	parent.Append(text)
 	return nil
+}
+func testNode(expr string, datum xml.Node) (bool, error) {
+	expr, err := xml.CompileString(expr)
+	if err != nil {
+		return false, err
+	}
+	items, err := expr.Find(datum)
+	if err != nil {
+		return false, err
+	}
+	return isTrue(items), nil
+}
+
+func isTrue(items []xml.Item) bool {
+	if len(items) == 0 {
+		return false
+	}
+	var ok bool
+	if !items[0].Atomic() {
+		return true
+	}
+	switch res := items[0].Value().(type) {
+	case bool:
+		ok = res
+	case float64:
+		ok = res != 0
+	case string:
+		ok = res != ""
+	default:
+	}
+	return ok
 }
 
 func cloneNode(n xml.Node) xml.Node {

@@ -413,6 +413,17 @@ func (e *Element) Clone() Node {
 	return c
 }
 
+func (e *Element) RemoveNode(at int) error {
+	if at < 0 || at >= len(e.Nodes) {
+		return fmt.Errorf("bad index")
+	}
+	e.Nodes = slices.Delete(e.Nodes, at, at+1)
+	for i := range e.Nodes[at:] {
+		e.Nodes[i].setPosition(at+i)
+	}
+	return nil	
+}
+
 func (e *Element) ReplaceNode(at int, node Node) error {
 	if at < 0 || at >= len(e.Nodes) {
 		return fmt.Errorf("bad index")
