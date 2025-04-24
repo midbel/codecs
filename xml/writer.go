@@ -89,12 +89,23 @@ func (w WriterOptions) rewriteQName(name QName) QName {
 	return name
 }
 
+type PrologWriterFunc func(w io.Writer) error
+
+func (fn PrologWriterFunc) WriteProlog(w io.Writer) error {
+	return fn(w)
+}
+
+type PrologWriter interface {
+	WriteProlog(w io.Writer) error
+}
+
 type Writer struct {
 	writer *bufio.Writer
 
 	Indent  string
 	Doctype string
 	WriterOptions
+	PrologWriter
 }
 
 func WriteNode(node Node) string {
@@ -258,12 +269,16 @@ func (w *Writer) writeProlog() error {
 	if w.NoProlog() {
 		return nil
 	}
-	prolog := NewInstruction(LocalName("xml"))
-	prolog.Attrs = []Attribute{
-		NewAttribute(LocalName("version"), SupportedVersion),
-		NewAttribute(LocalName("encoding"), SupportedEncoding),
+	if w.PrologWriter == nil {
+		prolog := NewInstruction(LocalName("xml"))
+		prolog.Attrs = []Attribute{
+			NewAttribute(LocalName("version"), SupportedVersion),
+			NewAttribute(LocalName("encoding"), SupportedEncoding),
+		}
+		return w.writeInstruction(prolog, 0)
+	} else {
+		return w.WriteProlog(w.writer)
 	}
-	return w.writeInstruction(prolog, 0)
 }
 
 func (w *Writer) writeAttributeAsNode(attr *Attribute, depth int) error {

@@ -61,16 +61,32 @@ func main() {
 		w = io.Discard
 	}
 	writer := xml.NewWriter(w)
+	if sheet.OutputSettings != nil {
+		if !sheet.OutputSettings.Indent {
+			writer.WriterOptions |= xml.OptionCompact
+		}
+		if sheet.OutputSettings.OmitProlog {
+			writer.WriterOptions |= xml.OptionNoProlog
+		}
+		if sheet.OutputSettings.Method == "html" {
+			writer.PrologWriter = xml.PrologWriterFunc(writeDoctypeHTML)
+		}
+	}
 	writer.Write(result.(*xml.Document))
 }
 
-type Stylesheet struct {
-	Method  string
-	Version string
-	Indent  bool
+type OutputSettings struct {
+	Method     string
+	Encoding   string
+	Version    string
+	Indent     bool
+	OmitProlog bool
+}
 
+type Stylesheet struct {
 	Mode string
 
+	*OutputSettings
 	Templates  []*Template
 	Parameters map[string]string
 }
@@ -81,7 +97,89 @@ func Load(file string) (*Stylesheet, error) {
 		return nil, err
 	}
 	var sheet Stylesheet
+	sheet.Templates, err = loadTemplates(doc)
+	if err != nil {
+		return nil, err
+	}
+	sheet.OutputSettings = &OutputSettings{
+		Method:  "xml",
+		Version: "1.0",
+		Indent:  true,
+	}
+	out, err := loadOutput(doc)
+	if err != nil {
+		return nil, err
+	}
+	if out != nil {
+		sheet.OutputSettings = out
+	}
 
+	return &sheet, nil
+}
+
+func loadOutput(doc xml.Node) (*OutputSettings, error) {
+	query, err := xml.CompileString("/xsl:stylesheet/xsl:output")
+	if err != nil {
+		return nil, err
+	}
+	items, err := query.Find(doc)
+	if err != nil {
+		return nil, err
+	}
+	if len(items) == 0 {
+		return nil, nil
+	}
+	var (
+		node = items[0].Node().(*xml.Element)
+		out  OutputSettings
+		ix   int
+	)
+	ix = slices.IndexFunc(node.Attrs, func(a xml.Attribute) bool {
+		return a.Name == "method"
+	})
+	if ix >= 0 {
+		out.Method = node.Attrs[ix].Value()
+	}
+	ix = slices.IndexFunc(node.Attrs, func(a xml.Attribute) bool {
+		return a.Name == "version"
+	})
+	if ix >= 0 {
+		out.Version = node.Attrs[ix].Value()
+	}
+	ix = slices.IndexFunc(node.Attrs, func(a xml.Attribute) bool {
+		return a.Name == "encoding"
+	})
+	if ix >= 0 {
+		out.Encoding = node.Attrs[ix].Value()
+	}
+	ix = slices.IndexFunc(node.Attrs, func(a xml.Attribute) bool {
+		return a.Name == "indent"
+	})
+	if ix >= 0 {
+		if attr := node.Attrs[ix].Value(); attr == "yes" {
+			out.Indent = true
+		} else if attr == "no" {
+			out.Indent = false
+		} else {
+			return nil, fmt.Errorf("output: invalid value %q for attribute indent", attr)
+		}
+	}
+	ix = slices.IndexFunc(node.Attrs, func(a xml.Attribute) bool {
+		return a.Name == "omit-xml-declaration"
+	})
+	if ix >= 0 {
+		if attr := node.Attrs[ix].Value(); attr == "yes" {
+			out.OmitProlog = true
+		} else if attr == "no" {
+			out.OmitProlog = false
+		} else {
+			return nil, fmt.Errorf("output: invalid value %q for attribute omit-xml-declaration", attr)
+		}
+	}
+	return &out, nil
+}
+
+func loadTemplates(doc xml.Node) ([]*Template, error) {
 	query, err := xml.CompileString("/xsl:stylesheet/xsl:template")
 	if err != nil {
 		return nil, err
@@ -90,6 +188,7 @@ func Load(file string) (*Stylesheet, error) {
 	if err != nil {
 		return nil, err
 	}
+	var list []*Template
 	for _, el := range items {
 		el, ok := el.Node().(*xml.Element)
 		if !ok {
@@ -112,9 +211,9 @@ func Load(file string) (*Stylesheet, error) {
 		} else {
 			t.Match = "."
 		}
-		sheet.Templates = append(sheet.Templates, &t)
+		list = append(list, &t)
 	}
-	return &sheet, nil
+	return list, nil
 }
 
 func (s *Stylesheet) Find(name string) (*Template, error) {
@@ -505,4 +604,9 @@ func loadDocument(file string) (*xml.Document, error) {
 
 	p := xml.NewParser(r)
 	return p.Parse()
+}
+
+func writeDoctypeHTML(w io.Writer) error {
+	_, err := io.WriteString(w, "<!DOCTYPE html>")
+	return err
 }
