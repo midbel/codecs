@@ -139,7 +139,7 @@ func (s *Stylesheet) Match(node xml.Node) (*Template, error) {
 		var (
 			parts = strings.Split(pattern, "/")
 			curr  = node
-			rank int
+			rank  int
 		)
 		slices.Reverse(parts)
 		for {
@@ -320,13 +320,17 @@ func executeApplyTemplates(node, datum xml.Node, style *Stylesheet) error {
 	if err != nil {
 		return err
 	}
-
-	nodes, err := tpl.Execute(datum, style)
-	if err != nil {
-		return err
-	}
-	if i, ok := el.Parent().(interface{ InsertNodes(int, []xml.Node) error }); ok {
-		if err := i.InsertNodes(el.Position(), nodes); err != nil {
+	var (
+		parent = el.Parent().(*xml.Element)
+		frag   = tpl.Fragment.(*xml.Element)
+	)
+	for _, n := range slices.Clone(frag.Nodes) {
+		c := cloneNode(n)
+		if c == nil {
+			continue
+		}
+		parent.ReplaceNode(el.Position(), c)
+		if err := transformNode(c, datum, style); err != nil {
 			return err
 		}
 	}
@@ -375,7 +379,13 @@ func executeIf(node, datum xml.Node, style *Stylesheet) error {
 		}
 		return nil
 	}
-	return processNode(node, datum, style)
+	if err = processNode(node, datum, style); err != nil {
+		return err
+	}
+	if i, ok := el.Parent().(interface{ InsertNodes(int, []xml.Node) error }); ok {
+		return i.InsertNodes(el.Position(), el.Nodes)
+	}
+	return nil
 }
 
 func executeChoose(node, datum xml.Node, style *Stylesheet) error {
