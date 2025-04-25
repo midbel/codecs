@@ -12,7 +12,10 @@ import (
 	"github.com/midbel/codecs/xml"
 )
 
-var errImplemented = errors.New("not implemented")
+var (
+	errImplemented = errors.New("not implemented")
+	errUndefined   = errors.New("undefined")
+)
 
 type executeFunc func(xml.Node, xml.Node, *Stylesheet) error
 
@@ -27,7 +30,6 @@ func init() {
 		xml.QualifiedName("if", "xsl"):              executeIf,
 		xml.QualifiedName("choose", "xsl"):          executeChoose,
 		xml.QualifiedName("variable", "xsl"):        executeVariable,
-		xml.QualifiedName("param", "xsl"):           executeParameter,
 	}
 }
 
@@ -76,6 +78,7 @@ func main() {
 }
 
 type OutputSettings struct {
+	Name       string
 	Method     string
 	Encoding   string
 	Version    string
@@ -85,6 +88,9 @@ type OutputSettings struct {
 
 type Stylesheet struct {
 	Mode string
+
+	vars   xml.Environ[string]
+	params xml.Environ[string]
 
 	*OutputSettings
 	Templates  []*Template
@@ -96,15 +102,18 @@ func Load(file string) (*Stylesheet, error) {
 	if err != nil {
 		return nil, err
 	}
-	var sheet Stylesheet
+	sheet := Stylesheet{
+		vars: xml.Empty[string](),
+	}
 	sheet.Templates, err = loadTemplates(doc)
 	if err != nil {
 		return nil, err
 	}
 	sheet.OutputSettings = &OutputSettings{
-		Method:  "xml",
-		Version: "1.0",
-		Indent:  true,
+		Method:   "xml",
+		Version:  "1.0",
+		Encoding: "UTF-8",
+		Indent:   true,
 	}
 	out, err := loadOutput(doc)
 	if err != nil {
@@ -113,8 +122,48 @@ func Load(file string) (*Stylesheet, error) {
 	if out != nil {
 		sheet.OutputSettings = out
 	}
+	if sheet.params, err = loadParams(doc); err != nil {
+		return nil, err
+	}
 
 	return &sheet, nil
+}
+
+func loadVariables(doc xml.Node) error {
+	return nil
+}
+
+func loadParams(doc xml.Node) (xml.Environ[string], error) {
+	query, err := xml.CompileString("/xsl:stylesheet/xsl:param")
+	if err != nil {
+		return nil, err
+	}
+	items, err := query.Find(doc)
+	if err != nil {
+		return nil, err
+	}
+	env := xml.Empty[string]()
+	for i := range items {
+		n := items[i].Node().(*xml.Element)
+		if n == nil {
+			continue
+		}
+		ix := slices.IndexFunc(n.Attrs, func(a xml.Attribute) bool {
+			return a.Name == "name"
+		})
+		if ix < 0 {
+			return nil, fmt.Errorf("param: missing name attribute")
+		}
+		ident := n.Attrs[ix].Value()
+		ix = slices.IndexFunc(n.Attrs, func(a xml.Attribute) bool {
+			return a.Name == "select"
+		})
+		if ix >= 0 {
+
+		}
+		env.Define(ident, "")
+	}
+	return env, nil
 }
 
 func loadOutput(doc xml.Node) (*OutputSettings, error) {
@@ -132,48 +181,22 @@ func loadOutput(doc xml.Node) (*OutputSettings, error) {
 	var (
 		node = items[0].Node().(*xml.Element)
 		out  OutputSettings
-		ix   int
 	)
-	ix = slices.IndexFunc(node.Attrs, func(a xml.Attribute) bool {
-		return a.Name == "method"
-	})
-	if ix >= 0 {
-		out.Method = node.Attrs[ix].Value()
-	}
-	ix = slices.IndexFunc(node.Attrs, func(a xml.Attribute) bool {
-		return a.Name == "version"
-	})
-	if ix >= 0 {
-		out.Version = node.Attrs[ix].Value()
-	}
-	ix = slices.IndexFunc(node.Attrs, func(a xml.Attribute) bool {
-		return a.Name == "encoding"
-	})
-	if ix >= 0 {
-		out.Encoding = node.Attrs[ix].Value()
-	}
-	ix = slices.IndexFunc(node.Attrs, func(a xml.Attribute) bool {
-		return a.Name == "indent"
-	})
-	if ix >= 0 {
-		if attr := node.Attrs[ix].Value(); attr == "yes" {
-			out.Indent = true
-		} else if attr == "no" {
-			out.Indent = false
-		} else {
-			return nil, fmt.Errorf("output: invalid value %q for attribute indent", attr)
-		}
-	}
-	ix = slices.IndexFunc(node.Attrs, func(a xml.Attribute) bool {
-		return a.Name == "omit-xml-declaration"
-	})
-	if ix >= 0 {
-		if attr := node.Attrs[ix].Value(); attr == "yes" {
-			out.OmitProlog = true
-		} else if attr == "no" {
-			out.OmitProlog = false
-		} else {
-			return nil, fmt.Errorf("output: invalid value %q for attribute omit-xml-declaration", attr)
+	for _, a := range node.Attrs {
+		switch value := a.Value(); a.Name {
+		case "name":
+			out.Name = value
+		case "method":
+			out.Method = value
+		case "version":
+			out.Version = value
+		case "encoding":
+			out.Encoding = value
+		case "indent":
+			out.Indent = value == "yes"
+		case "omit-xml-declaration":
+			out.OmitProlog = value == "yes"
+		default:
 		}
 	}
 	return &out, nil
@@ -197,19 +220,19 @@ func loadTemplates(doc xml.Node) ([]*Template, error) {
 		t := Template{
 			Fragment: el,
 		}
-		ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
-			return a.Name == "name"
-		})
-		if ix >= 0 {
-			t.Name = el.Attrs[ix].Value()
-		}
-		ix = slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
-			return a.Name == "match"
-		})
-		if ix >= 0 {
-			t.Match = el.Attrs[ix].Value()
-		} else {
-			t.Match = "."
+		for _, a := range el.Attrs {
+			switch attr := a.Value(); a.Name {
+			case "name":
+				t.Name = attr
+			case "match":
+				t.Match = attr
+				if t.Match == "" {
+					t.Match = "."
+				}
+			case "mode":
+				t.Mode = attr
+			default:
+			}
 		}
 		list = append(list, &t)
 	}
@@ -226,7 +249,7 @@ func (s *Stylesheet) Find(name string) (*Template, error) {
 	return s.Templates[ix], nil
 }
 
-func (s *Stylesheet) Match(node xml.Node) (*Template, error) {
+func (s *Stylesheet) Match(node xml.Node, withMode string) (*Template, error) {
 	// match work in reverse
 	// given a node, we should check that the node would be selected
 	// from the xpath expression given in the match attribute of the
@@ -259,8 +282,11 @@ func (s *Stylesheet) Match(node xml.Node) (*Template, error) {
 		return true, rank
 
 	}
+	if withMode == "" {
+		withMode = s.Mode
+	}
 	for _, t := range s.Templates {
-		if t.isRoot() {
+		if t.isRoot() || t.Mode != withMode {
 			continue
 		}
 		if ok, _ := isMatch(t.Match); ok {
@@ -272,7 +298,7 @@ func (s *Stylesheet) Match(node xml.Node) (*Template, error) {
 
 func (s *Stylesheet) Execute(doc xml.Node) (xml.Node, error) {
 	ix := slices.IndexFunc(s.Templates, func(t *Template) bool {
-		return t.isRoot()
+		return t.isRoot() && t.Mode == s.Mode
 	})
 	if ix < 0 {
 		return nil, fmt.Errorf("main template not found")
@@ -297,6 +323,8 @@ type Template struct {
 	Match    string
 	Mode     string
 	Fragment xml.Node
+
+	params xml.Environ[string]
 }
 
 func (t *Template) Clone() *Template {
@@ -391,6 +419,13 @@ func executeParameter(node, datum xml.Node, style *Stylesheet) error {
 }
 
 func executeVariable(node, datum xml.Node, style *Stylesheet) error {
+	el := node.(*xml.Element)
+	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
+		return a.Name == "name"
+	})
+	if ix < 0 {
+		return fmt.Errorf("variable: missing required name attribute")
+	}
 	return errImplemented
 }
 
@@ -415,7 +450,14 @@ func executeApplyTemplates(node, datum xml.Node, style *Stylesheet) error {
 		}
 		datum = items[0].Node()
 	}
-	tpl, err := style.Match(datum)
+	ix = slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
+		return a.Name == "mode"
+	})
+	mode := style.Mode
+	if ix >= 0 {
+		mode = el.Attrs[ix].Value()
+	}
+	tpl, err := style.Match(datum, mode)
 	if err != nil {
 		return err
 	}
