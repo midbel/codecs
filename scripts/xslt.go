@@ -15,6 +15,7 @@ import (
 var (
 	errImplemented = errors.New("not implemented")
 	errUndefined   = errors.New("undefined")
+	errSkip        = errors.New("skip")
 )
 
 type executeFunc func(xml.Node, xml.Node, *Stylesheet) error
@@ -386,6 +387,9 @@ func (t *Template) Execute(datum xml.Node, style *Stylesheet) ([]xml.Node, error
 			continue
 		}
 		if err := t.execute(c, value, style); err != nil {
+			if errors.Is(err, errSkip) {
+				continue
+			}
 			return nil, err
 		}
 		nodes = append(nodes, c)
@@ -469,7 +473,7 @@ func executeResultDocument(node, datum xml.Node, style *Stylesheet) error {
 	})
 	var (
 		file string
-		outn  string
+		outn string
 	)
 	if ix < 0 {
 		return fmt.Errorf("result-document: missing href attribute")
@@ -494,7 +498,7 @@ func executeResultDocument(node, datum xml.Node, style *Stylesheet) error {
 		doc.Nodes = append(doc.Nodes, c)
 	}
 
-	if r, ok := el.Parent().(interface {RemoveNode(int) error} ); ok {
+	if r, ok := el.Parent().(interface{ RemoveNode(int) error }); ok {
 		if err := r.RemoveNode(el.Position()); err != nil {
 			return err
 		}
@@ -514,12 +518,12 @@ func executeResultDocument(node, datum xml.Node, style *Stylesheet) error {
 		if out.OmitProlog {
 			writer.WriterOptions |= xml.OptionNoProlog
 		}
-		if out.Method == "html" {
+		if out.Method == "html" && (out.Version == "5" || out.Version == "5.0") {
 			writer.PrologWriter = xml.PrologWriterFunc(writeDoctypeHTML)
 		}
 	}
 	writer.Write(&doc)
-	return nil
+	return errSkip
 }
 
 func executeApplyTemplates(node, datum xml.Node, style *Stylesheet) error {
