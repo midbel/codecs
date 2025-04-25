@@ -30,14 +30,24 @@ func init() {
 		xml.QualifiedName("if", "xsl"):              executeIf,
 		xml.QualifiedName("choose", "xsl"):          executeChoose,
 		xml.QualifiedName("variable", "xsl"):        executeVariable,
+		xml.QualifiedName("result-document", "xsl"): executeResultDocument,
 	}
 }
 
 func main() {
 	var (
-		quiet = flag.Bool("q", false, "quiet")
-		mode  = flag.String("m", "", "mode")
+		quiet  = flag.Bool("q", false, "quiet")
+		mode   = flag.String("m", "", "mode")
+		params []string
 	)
+	flag.Func("p", "template parameter", func(str string) error {
+		_, _, ok := strings.Cut(str, "=")
+		if !ok {
+			return fmt.Errorf("invalid parameter")
+		}
+		params = append(params, str)
+		return nil
+	})
 	flag.Parse()
 
 	doc, err := loadDocument(flag.Arg(1))
@@ -53,6 +63,11 @@ func main() {
 	}
 	sheet.Mode = *mode
 
+	for _, p := range params {
+		k, v, _ := strings.Cut(p, "=")
+		sheet.DefineParam(k, v)
+	}
+
 	result, err := sheet.Execute(doc)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -63,14 +78,15 @@ func main() {
 		w = io.Discard
 	}
 	writer := xml.NewWriter(w)
-	if sheet.OutputSettings != nil {
-		if !sheet.OutputSettings.Indent {
+	if len(sheet.output) > 0 {
+		out := sheet.output[0]
+		if !out.Indent {
 			writer.WriterOptions |= xml.OptionCompact
 		}
-		if sheet.OutputSettings.OmitProlog {
+		if out.OmitProlog {
 			writer.WriterOptions |= xml.OptionNoProlog
 		}
-		if sheet.OutputSettings.Method == "html" {
+		if out.Method == "html" {
 			writer.PrologWriter = xml.PrologWriterFunc(writeDoctypeHTML)
 		}
 	}
@@ -92,7 +108,7 @@ type Stylesheet struct {
 	vars   xml.Environ[string]
 	params xml.Environ[string]
 
-	*OutputSettings
+	output     []*OutputSettings
 	Templates  []*Template
 	Parameters map[string]string
 }
@@ -109,18 +125,21 @@ func Load(file string) (*Stylesheet, error) {
 	if err != nil {
 		return nil, err
 	}
-	sheet.OutputSettings = &OutputSettings{
-		Method:   "xml",
-		Version:  "1.0",
-		Encoding: "UTF-8",
-		Indent:   true,
-	}
+
 	out, err := loadOutput(doc)
 	if err != nil {
 		return nil, err
 	}
 	if out != nil {
-		sheet.OutputSettings = out
+		sheet.output = out
+	} else {
+		out := &OutputSettings{
+			Method:   "xml",
+			Version:  "1.0",
+			Encoding: "UTF-8",
+			Indent:   true,
+		}
+		sheet.output = append(sheet.output, out)
 	}
 	if sheet.params, err = loadParams(doc); err != nil {
 		return nil, err
@@ -166,7 +185,7 @@ func loadParams(doc xml.Node) (xml.Environ[string], error) {
 	return env, nil
 }
 
-func loadOutput(doc xml.Node) (*OutputSettings, error) {
+func loadOutput(doc xml.Node) ([]*OutputSettings, error) {
 	query, err := xml.CompileString("/xsl:stylesheet/xsl:output")
 	if err != nil {
 		return nil, err
@@ -175,31 +194,32 @@ func loadOutput(doc xml.Node) (*OutputSettings, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(items) == 0 {
-		return nil, nil
-	}
-	var (
-		node = items[0].Node().(*xml.Element)
-		out  OutputSettings
-	)
-	for _, a := range node.Attrs {
-		switch value := a.Value(); a.Name {
-		case "name":
-			out.Name = value
-		case "method":
-			out.Method = value
-		case "version":
-			out.Version = value
-		case "encoding":
-			out.Encoding = value
-		case "indent":
-			out.Indent = value == "yes"
-		case "omit-xml-declaration":
-			out.OmitProlog = value == "yes"
-		default:
+	var list []*OutputSettings
+	for i := range items {
+		var (
+			node = items[i].Node().(*xml.Element)
+			out  OutputSettings
+		)
+		for _, a := range node.Attrs {
+			switch value := a.Value(); a.Name {
+			case "name":
+				out.Name = value
+			case "method":
+				out.Method = value
+			case "version":
+				out.Version = value
+			case "encoding":
+				out.Encoding = value
+			case "indent":
+				out.Indent = value == "yes"
+			case "omit-xml-declaration":
+				out.OmitProlog = value == "yes"
+			default:
+			}
 		}
+		list = append(list, &out)
 	}
-	return &out, nil
+	return list, nil
 }
 
 func loadTemplates(doc xml.Node) ([]*Template, error) {
@@ -237,6 +257,20 @@ func loadTemplates(doc xml.Node) ([]*Template, error) {
 		list = append(list, &t)
 	}
 	return list, nil
+}
+
+func (s *Stylesheet) DefineParam(param, value string) {
+	s.params.Define(param, value)
+}
+
+func (s *Stylesheet) GetOutput(name string) *OutputSettings {
+	ix := slices.IndexFunc(s.output, func(o *OutputSettings) bool {
+		return o.Name == name
+	})
+	if ix < 0 && name != "" {
+		return s.GetOutput("")
+	}
+	return s.output[ix]
 }
 
 func (s *Stylesheet) Find(name string) (*Template, error) {
@@ -310,10 +344,13 @@ func (s *Stylesheet) Execute(doc xml.Node) (xml.Node, error) {
 
 	root, err := s.Templates[ix].Execute(doc, s)
 	if err == nil {
-		if len(root) != 1 {
-			return nil, fmt.Errorf("more than one root element returned")
-		}
-		return xml.NewDocument(root[0]), nil
+		// if len(root) != 1 {
+		// 	return nil, fmt.Errorf("more than one root element returned")
+		// }
+		// return xml.NewDocument(root[0]), nil
+		var doc xml.Document
+		doc.Nodes = append(doc.Nodes, root...)
+		return &doc, nil
 	}
 	return nil, err
 }
@@ -414,10 +451,6 @@ func processNode(node, datum xml.Node, style *Stylesheet) error {
 	return nil
 }
 
-func executeParameter(node, datum xml.Node, style *Stylesheet) error {
-	return errImplemented
-}
-
 func executeVariable(node, datum xml.Node, style *Stylesheet) error {
 	el := node.(*xml.Element)
 	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
@@ -427,6 +460,66 @@ func executeVariable(node, datum xml.Node, style *Stylesheet) error {
 		return fmt.Errorf("variable: missing required name attribute")
 	}
 	return errImplemented
+}
+
+func executeResultDocument(node, datum xml.Node, style *Stylesheet) error {
+	el := node.(*xml.Element)
+	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
+		return a.Name == "href"
+	})
+	var (
+		file string
+		outn  string
+	)
+	if ix < 0 {
+		return fmt.Errorf("result-document: missing href attribute")
+	}
+	file = el.Attrs[ix].Value()
+
+	ix = slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
+		return a.Name == "format"
+	})
+	if ix >= 0 {
+		outn = el.Attrs[ix].Value()
+	}
+	var doc xml.Document
+	for _, n := range slices.Clone(el.Nodes) {
+		c := cloneNode(n)
+		if c == nil {
+			continue
+		}
+		if err := transformNode(c, datum, style); err != nil {
+			return err
+		}
+		doc.Nodes = append(doc.Nodes, c)
+	}
+
+	if r, ok := el.Parent().(interface {RemoveNode(int) error} ); ok {
+		if err := r.RemoveNode(el.Position()); err != nil {
+			return err
+		}
+	}
+
+	w, err := os.Create(file)
+	if err != nil {
+		return err
+	}
+	defer w.Close()
+
+	writer := xml.NewWriter(w)
+	if out := style.GetOutput(outn); out != nil {
+		if !out.Indent {
+			writer.WriterOptions |= xml.OptionCompact
+		}
+		if out.OmitProlog {
+			writer.WriterOptions |= xml.OptionNoProlog
+		}
+		if out.Method == "html" {
+			writer.PrologWriter = xml.PrologWriterFunc(writeDoctypeHTML)
+		}
+	}
+	writer.Write(&doc)
+	return nil
 }
 
 func executeApplyTemplates(node, datum xml.Node, style *Stylesheet) error {
