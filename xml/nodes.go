@@ -641,6 +641,19 @@ func (e *Element) setParent(parent Node) {
 	e.parent = parent
 }
 
+func (e *Element) RemoveAttr(at int) error {
+	if at < 0 || at >= len(e.Attrs) {
+		return fmt.Errorf("bad index")
+	}
+	a := e.Attrs[at]
+	a.setParent(nil)
+	e.Attrs = slices.Delete(e.Attrs, at, at+1)
+	for i := range e.Attrs {
+		e.Attrs[i].setPosition(i)
+	}
+	return nil		
+}
+
 func (e *Element) SetAttribute(attr Attribute) error {
 	ix := slices.IndexFunc(e.Attrs, func(a Attribute) bool {
 		return a.QualifiedName() == attr.QualifiedName()

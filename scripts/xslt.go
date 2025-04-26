@@ -566,15 +566,16 @@ func processNode(node, datum xml.Node, style *Stylesheet) error {
 		return a.QName == xml.QualifiedName("use-attribute-sets", "xsl")
 	})
 	if ix >= 0 {
-		ix = slices.IndexFunc(style.AttrSet, func(set *AttributeSet) bool {
+		ax := slices.IndexFunc(style.AttrSet, func(set *AttributeSet) bool {
 			return set.Name == el.Attrs[ix].Value()
 		})
-		if ix < 0 {
+		if ax < 0 {
 			return fmt.Errorf("attribute-set not defined")
 		}
-		for _, a := range style.AttrSet[ix].Attrs {
-			el.Attrs = append(el.Attrs, a)
+		for _, a := range style.AttrSet[ax].Attrs {
+			el.SetAttribute(a)
 		}
+		el.RemoveAttr(el.Attrs[ix].Position())
 	}
 	for i := range nodes {
 		if nodes[i].Type() != xml.TypeElement {
