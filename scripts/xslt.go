@@ -40,6 +40,13 @@ func init() {
 		xml.QualifiedName("import", "xsl"):          executeImport,
 		xml.QualifiedName("include", "xsl"):         executeInclude,
 		xml.QualifiedName("with-param", "xsl"):      executeWithParam,
+		xml.QualifiedName("copy", "xsl"):            executeCopy,
+		xml.QualifiedName("copy-of", "xsl"):         executeCopyOf,
+		xml.QualifiedName("sequence", "xsl"):        executeSequence,
+		xml.QualifiedName("element", "xsl"):         executeElement,
+		xml.QualifiedName("attribute", "xsl"):       executeAttribute,
+		xml.QualifiedName("text", "xsl"):            executeText,
+		xml.QualifiedName("comment", "xsl"):         executeComment,
 	}
 }
 
@@ -942,6 +949,35 @@ func executeValueOf(node, datum xml.Node, style *Stylesheet) error {
 	parent.Append(text)
 	return nil
 }
+
+func executeCopy(node, datum xml.Node, style *Stylesheet) error {
+	return nil
+}
+
+func executeCopyOf(node, datum xml.Node, style *Stylesheet) error {
+	return nil
+}
+
+func executeSequence(node, datum xml.Node, style *Stylesheet) error {
+	return nil
+}
+
+func executeElement(node, datum xml.Node, style *Stylesheet) error {
+	return nil
+}
+
+func executeAttribute(node, datum xml.Node, style *Stylesheet) error {
+	return nil
+}
+
+func executeText(node, datum xml.Node, style *Stylesheet) error {
+	return nil
+}
+
+func executeComment(node, datum xml.Node, style *Stylesheet) error {
+	return nil
+}
+
 func testNode(expr string, datum xml.Node) (bool, error) {
 	query, err := xml.CompileString(expr)
 	if err != nil {
