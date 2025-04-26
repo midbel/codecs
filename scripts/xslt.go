@@ -32,6 +32,9 @@ func init() {
 		xml.QualifiedName("choose", "xsl"):          executeChoose,
 		xml.QualifiedName("variable", "xsl"):        executeVariable,
 		xml.QualifiedName("result-document", "xsl"): executeResultDocument,
+		xml.QualifiedName("source-document", "xsl"): executeSourceDocument,
+		xml.QualifiedName("import", "xsl"):          executeImport,
+		xml.QualifiedName("include", "xsl"):         executeInclude,
 	}
 }
 
@@ -466,6 +469,18 @@ func executeVariable(node, datum xml.Node, style *Stylesheet) error {
 	return errImplemented
 }
 
+func executeImport(node, datum xml.Node, style *Stylesheet) error {
+	return nil
+}
+
+func executeInclude(node, datum xml.Node, style *Stylesheet) error {
+	return nil
+}
+
+func executeSourceDocument(node, datum xml.Node, style *Stylesheet) error {
+	return nil
+}
+
 func executeResultDocument(node, datum xml.Node, style *Stylesheet) error {
 	el := node.(*xml.Element)
 	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
@@ -627,6 +642,25 @@ func executeIf(node, datum xml.Node, style *Stylesheet) error {
 }
 
 func executeChoose(node, datum xml.Node, style *Stylesheet) error {
+	query, err := xml.CompileString("./xsl:when")
+	if err != nil {
+		return err
+	}
+	items, err := query.Find(node)
+	if err != nil {
+		return err
+	}
+	for i := range items {
+		n := items[i].Node()
+		_ = n
+	}
+
+	if query, err = xml.CompileString("./xsl:otherwise"); err != nil {
+		return err
+	}
+	if items, err = query.Find(node); err != nil {
+		return err
+	}
 	return nil
 }
 
