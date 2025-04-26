@@ -30,11 +30,16 @@ func init() {
 		xml.QualifiedName("apply-templates", "xsl"): executeApplyTemplates,
 		xml.QualifiedName("if", "xsl"):              executeIf,
 		xml.QualifiedName("choose", "xsl"):          executeChoose,
+		xml.QualifiedName("where-populated", "xsl"): executeWithParam,
+		xml.QualifiedName("on-empty", "xsl"):        executeOnEmpty,
+		xml.QualifiedName("on-not-empty", "xsl"):    executeOnNotEmpty,
+		xml.QualifiedName("try", "xsl"):             executeTry,
 		xml.QualifiedName("variable", "xsl"):        executeVariable,
 		xml.QualifiedName("result-document", "xsl"): executeResultDocument,
 		xml.QualifiedName("source-document", "xsl"): executeSourceDocument,
 		xml.QualifiedName("import", "xsl"):          executeImport,
 		xml.QualifiedName("include", "xsl"):         executeInclude,
+		xml.QualifiedName("with-param", "xsl"):      executeWithParam,
 	}
 }
 
@@ -106,8 +111,36 @@ type OutputSettings struct {
 	OmitProlog bool
 }
 
+type MatchMode int8
+
+const (
+	MatchDeepCopy MatchMode = 1 << iota
+	MatchShallowCopy
+	MatchDeepSkip
+	MatchShallowSkip
+	MatchTextOnlyCopy
+	MatchFail
+)
+
+type AttributeSet struct {
+	Name  string
+	Attrs []xml.Attribute
+}
+
+type Mode struct {
+	Name       string
+	NoMatch    MatchMode
+	MultiMatch MatchMode
+}
+
+func (m Mode) Unnamed() bool {
+	return m.Name == ""
+}
+
 type Stylesheet struct {
-	Mode string
+	Mode    string
+	Modes   []*Mode
+	AttrSet []*AttributeSet
 
 	vars   xml.Environ[string]
 	params xml.Environ[string]
@@ -148,8 +181,95 @@ func Load(file string) (*Stylesheet, error) {
 	if sheet.params, err = loadParams(doc); err != nil {
 		return nil, err
 	}
+	if sheet.AttrSet, err = loadAttributeSet(doc); err != nil {
+		return nil, err
+	}
 
 	return &sheet, nil
+}
+
+func loadAttributeSet(doc xml.Node) ([]*AttributeSet, error) {
+	query, err := xml.CompileString("/xsl:stylesheet/xsl:attribute-set")
+	if err != nil {
+		return nil, err
+	}
+	items, err := query.Find(doc)
+	if err != nil {
+		return nil, err
+	}
+	var set []*AttributeSet
+	for i := range items {
+		n := items[i].Node().(*xml.Element)
+		if n == nil {
+			continue
+		}
+		ix := slices.IndexFunc(n.Attrs, func(a xml.Attribute) bool {
+			return a.Name == "name"
+		})
+		if ix < 0 {
+			return nil, fmt.Errorf("attribute-set: missing name attribute")
+		}
+		as := AttributeSet{
+			Name: n.Attrs[ix].Value(),
+		}
+		for _, n := range n.Nodes {
+			n := n.(*xml.Element)
+			if n == nil {
+				continue
+			}
+			ix := slices.IndexFunc(n.Attrs, func(a xml.Attribute) bool {
+				return a.Name == "name"
+			})
+			if ix < 0 {
+				return nil, fmt.Errorf("attribute: missing name attribute")
+			}
+			attr := xml.NewAttribute(xml.LocalName(n.Attrs[ix].Value()), n.Value())
+			as.Attrs = append(as.Attrs, attr)
+		}
+		set = append(set, &as)
+	}
+	return set, nil
+}
+
+func loadModes(doc xml.Node) ([]*Mode, error) {
+	query, err := xml.CompileString("/xsl:stylesheet/xsl:mode")
+	if err != nil {
+		return nil, err
+	}
+	items, err := query.Find(doc)
+	if err != nil {
+		return nil, err
+	}
+	var modes []*Mode
+	if len(items) == 0 {
+		m := Mode{
+			NoMatch: MatchFail,
+		}
+		modes := append(modes, &m)
+		return modes, nil
+	}
+	for i := range items {
+		n := items[i].Node().(*xml.Element)
+		if n == nil {
+			continue
+		}
+		var m Mode
+		for _, a := range n.Attrs {
+			switch attr := a.Value(); a.Name {
+			case "name":
+				m.Name = attr
+			case "on-no-match":
+				m.NoMatch = MatchFail
+			case "on-multiple-match":
+				m.MultiMatch = MatchFail
+			case "warning-on-no-match":
+			case "warning-on-multiple-match":
+			default:
+			}
+		}
+		modes = append(modes, &m)
+	}
+	return modes, nil
 }
 
 func loadParams(doc xml.Node) (xml.Environ[string], error) {
@@ -442,6 +562,20 @@ func processNode(node, datum xml.Node, style *Stylesheet) error {
 		el    = node.(*xml.Element)
 		nodes = slices.Clone(el.Nodes)
 	)
+	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
+		return a.QName == xml.QualifiedName("use-attribute-sets", "xsl")
+	})
+	if ix >= 0 {
+		ix = slices.IndexFunc(style.AttrSet, func(set *AttributeSet) bool {
+			return set.Name == el.Attrs[ix].Value()
+		})
+		if ix < 0 {
+			return fmt.Errorf("attribute-set not defined")
+		}
+		for _, a := range style.AttrSet[ix].Attrs {
+			el.Attrs = append(el.Attrs, a)
+		}
+	}
 	for i := range nodes {
 		if nodes[i].Type() != xml.TypeElement {
 			continue
@@ -634,6 +768,26 @@ func executeCallTemplate(node, datum xml.Node, style *Stylesheet) error {
 			return err
 		}
 	}
+	return nil
+}
+
+func executeWithParam(node, datum xml.Node, style *Stylesheet) error {
+	return nil
+}
+
+func executeTry(node, datum xml.Node, style *Stylesheet) error {
+	return nil
+}
+
+func executeWherePopulated(node, datum xml.Node, style *Stylesheet) error {
+	return nil
+}
+
+func executeOnEmpty(node, datum xml.Node, style *Stylesheet) error {
+	return nil
+}
+
+func executeOnNotEmpty(node, datum xml.Node, style *Stylesheet) error {
 	return nil
 }
 
