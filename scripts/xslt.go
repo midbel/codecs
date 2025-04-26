@@ -486,7 +486,7 @@ func executeVariable(node, datum xml.Node, style *Stylesheet) error {
 			return fmt.Errorf("no child nodes for variables")
 		}
 	}
-	if r, ok := el.Parent().(interface { RemoveNode(int) error } ); ok {
+	if r, ok := el.Parent().(interface{ RemoveNode(int) error }); ok {
 		return r.RemoveNode(el.Position())
 	}
 	return nil
@@ -674,8 +674,30 @@ func executeChoose(node, datum xml.Node, style *Stylesheet) error {
 		return err
 	}
 	for i := range items {
-		n := items[i].Node()
-		_ = n
+		n := items[i].Node().(*xml.Element)
+		x := slices.IndexFunc(n.Attrs, func(a xml.Attribute) bool {
+			return a.Name == "test"
+		})
+		if x < 0 {
+			return fmt.Errorf("choose: missing test attribute")
+		}
+		ok, err := testNode(n.Attrs[x].Value(), datum)
+		if err != nil {
+			return err
+		}
+		if ok {
+			if err := processNode(n, datum, style); err != nil {
+				return err
+			}
+			var (
+				pt = n.Parent()
+				gp = pt.Parent()
+			)
+			if i, ok := gp.(interface{ InsertNodes(int, []xml.Node) error }); ok {
+				return i.InsertNodes(pt.Position(), n.Nodes)
+			}
+			return nil
+		}
 	}
 
 	if query, err = xml.CompileString("./xsl:otherwise"); err != nil {
@@ -683,6 +705,20 @@ func executeChoose(node, datum xml.Node, style *Stylesheet) error {
 	}
 	if items, err = query.Find(node); err != nil {
 		return err
+	}
+	if len(items) == 0 {
+		return nil
+	}
+	n := items[0].Node().(*xml.Element)
+	if err := processNode(n, datum, style); err != nil {
+		return err
+	}
+	var (
+		pt = n.Parent()
+		gp = pt.Parent()
+	)
+	if i, ok := gp.(interface{ InsertNodes(int, []xml.Node) error }); ok {
+		return i.InsertNodes(pt.Position(), n.Nodes)
 	}
 	return nil
 }
