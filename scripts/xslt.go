@@ -152,10 +152,6 @@ func Load(file string) (*Stylesheet, error) {
 	return &sheet, nil
 }
 
-func loadVariables(doc xml.Node) error {
-	return nil
-}
-
 func loadParams(doc xml.Node) (xml.Environ[string], error) {
 	query, err := xml.CompileString("/xsl:stylesheet/xsl:param")
 	if err != nil {
@@ -466,7 +462,34 @@ func executeVariable(node, datum xml.Node, style *Stylesheet) error {
 	if ix < 0 {
 		return fmt.Errorf("variable: missing required name attribute")
 	}
-	return errImplemented
+	ident := el.Attrs[ix].Value()
+	ix = slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
+		return a.Name == "select"
+	})
+	if ix >= 0 {
+		query, err := xml.CompileString(el.Attrs[ix].Value())
+		if err != nil {
+			return err
+		}
+		items, err := query.Find(datum)
+		if err != nil {
+			return err
+		}
+		if len(items) > 0 {
+			style.vars.Define(ident, items[0].Value().(string))
+		} else {
+			style.vars.Define(ident, "")
+		}
+	} else {
+		// node variable - to be implemented
+		if len(el.Nodes) == 0 {
+			return fmt.Errorf("no child nodes for variables")
+		}
+	}
+	if r, ok := el.Parent().(interface { RemoveNode(int) error } ); ok {
+		return r.RemoveNode(el.Position())
+	}
+	return nil
 }
 
 func executeImport(node, datum xml.Node, style *Stylesheet) error {
