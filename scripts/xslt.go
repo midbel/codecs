@@ -54,6 +54,7 @@ func main() {
 	var (
 		quiet  = flag.Bool("q", false, "quiet")
 		mode   = flag.String("m", "", "mode")
+		file   = flag.String("f", "", "file")
 		params []string
 	)
 	flag.Func("p", "template parameter", func(str string) error {
@@ -92,6 +93,14 @@ func main() {
 	var w io.Writer = os.Stdout
 	if *quiet {
 		w = io.Discard
+	} else if *file != "" {
+		f, err := os.Create(*file)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(3)
+		}
+		defer f.Close()
+		w = f
 	}
 	writer := xml.NewWriter(w)
 	if len(sheet.output) > 0 {
@@ -430,10 +439,10 @@ func (s *Stylesheet) Match(node xml.Node, withMode string) (*Template, error) {
 				break
 			}
 			if curr.QualifiedName() != parts[0] {
-				break
+				return false, rank
 			}
 			rank++
-			curr = node.Parent()
+			curr = curr.Parent()
 			if curr == nil {
 				break
 			}
@@ -897,7 +906,7 @@ func executeForeach(node, datum xml.Node, style *Stylesheet) error {
 	if !ok {
 		return fmt.Errorf("for-each: xml element expected as parent")
 	}
-	parent.Nodes = parent.Nodes[:0]
+	parent.RemoveNode(el.Position())
 
 	expr, err := xml.CompileString(el.Attrs[ix].Value())
 	if err != nil {
