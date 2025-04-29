@@ -357,6 +357,10 @@ func (a axis) find(ctx Context) ([]Item, error) {
 		if err == nil {
 			list = slices.Concat(list, others)
 		}
+	case prevAxis:
+	case prevSiblingAxis:
+	case nextAxis:
+	case nextSiblingAxis:
 	default:
 		return nil, errImplemented
 	}
