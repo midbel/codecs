@@ -23,17 +23,27 @@ type executeFunc func(xml.Node, xml.Node, *Stylesheet) error
 var executers map[xml.QName]executeFunc
 
 func init() {
+	wrap := func(exec executeFunc) executeFunc {
+		fn := func(node, datum xml.Node, sheet *Stylesheet) error {
+			sheet.Enter()
+			defer sheet.Leave()
+
+			return exec(node, datum, sheet)
+		}
+		return fn
+	}
 	executers = map[xml.QName]executeFunc{
-		xml.QualifiedName("for-each", "xsl"):        executeForeach,
+		xml.QualifiedName("for-each", "xsl"):        wrap(executeForeach),
 		xml.QualifiedName("value-of", "xsl"):        executeValueOf,
-		xml.QualifiedName("call-template", "xsl"):   executeCallTemplate,
-		xml.QualifiedName("apply-templates", "xsl"): executeApplyTemplates,
-		xml.QualifiedName("if", "xsl"):              executeIf,
-		xml.QualifiedName("choose", "xsl"):          executeChoose,
+		xml.QualifiedName("call-template", "xsl"):   wrap(executeCallTemplate),
+		xml.QualifiedName("apply-templates", "xsl"): wrap(executeApplyTemplates),
+		xml.QualifiedName("if", "xsl"):              wrap(executeIf),
+		xml.QualifiedName("choose", "xsl"):          wrap(executeChoose),
 		xml.QualifiedName("where-populated", "xsl"): executeWithParam,
 		xml.QualifiedName("on-empty", "xsl"):        executeOnEmpty,
 		xml.QualifiedName("on-not-empty", "xsl"):    executeOnNotEmpty,
-		xml.QualifiedName("try", "xsl"):             executeTry,
+		xml.QualifiedName("try", "xsl"):             wrap(executeTry),
+		xml.QualifiedName("catch", "xsl"):           wrap(executeCatch),
 		xml.QualifiedName("variable", "xsl"):        executeVariable,
 		xml.QualifiedName("result-document", "xsl"): executeResultDocument,
 		xml.QualifiedName("source-document", "xsl"): executeSourceDocument,
@@ -158,12 +168,11 @@ type Stylesheet struct {
 	Modes   []*Mode
 	AttrSet []*AttributeSet
 
-	vars   xml.Environ[string]
-	params xml.Environ[string]
+	vars   xml.Environ[xml.Expr]
+	params xml.Environ[xml.Expr]
 
-	output     []*OutputSettings
-	Templates  []*Template
-	Parameters map[string]string
+	output    []*OutputSettings
+	Templates []*Template
 }
 
 func Load(file string) (*Stylesheet, error) {
@@ -172,7 +181,7 @@ func Load(file string) (*Stylesheet, error) {
 		return nil, err
 	}
 	sheet := Stylesheet{
-		vars: xml.Empty[string](),
+		vars: xml.Empty[xml.Expr](),
 	}
 	sheet.Templates, err = loadTemplates(doc)
 	if err != nil {
@@ -288,7 +297,7 @@ func loadModes(doc xml.Node) ([]*Mode, error) {
 	return modes, nil
 }
 
-func loadParams(doc xml.Node) (xml.Environ[string], error) {
+func loadParams(doc xml.Node) (xml.Environ[xml.Expr], error) {
 	query, err := xml.CompileString("/xsl:stylesheet/xsl:param")
 	if err != nil {
 		return nil, err
@@ -297,7 +306,7 @@ func loadParams(doc xml.Node) (xml.Environ[string], error) {
 	if err != nil {
 		return nil, err
 	}
-	env := xml.Empty[string]()
+	env := xml.Empty[xml.Expr]()
 	for i := range items {
 		n := items[i].Node().(*xml.Element)
 		if n == nil {
@@ -313,10 +322,10 @@ func loadParams(doc xml.Node) (xml.Environ[string], error) {
 		ix = slices.IndexFunc(n.Attrs, func(a xml.Attribute) bool {
 			return a.Name == "select"
 		})
+		_ = ident
 		if ix >= 0 {
 
 		}
-		env.Define(ident, "")
 	}
 	return env, nil
 }
@@ -395,8 +404,48 @@ func loadTemplates(doc xml.Node) ([]*Template, error) {
 	return list, nil
 }
 
-func (s *Stylesheet) DefineParam(param, value string) {
-	s.params.Define(param, value)
+func (s *Stylesheet) Enter() {
+	s.vars = xml.Enclosed[xml.Expr](s.vars)
+	s.params = xml.Enclosed[xml.Expr](s.params)
+}
+
+func (s *Stylesheet) Leave() {
+	if u, ok := s.vars.(interface{ Unwrap() xml.Environ[xml.Expr] }); ok {
+		s.vars = u.Unwrap()
+	}
+	if u, ok := s.params.(interface{ Unwrap() xml.Environ[xml.Expr] }); ok {
+		s.params = u.Unwrap()
+	}
+}
+
+func (s *Stylesheet) Resolve(ident string) (xml.Expr, error) {
+	expr, err := s.vars.Resolve(ident)
+	if err == nil {
+		return expr, nil
+	}
+	expr, err = s.params.Resolve(ident)
+	if err == nil {
+		return expr, nil
+	}
+	return nil, nil
+}
+
+func (s *Stylesheet) Define(param string, expr xml.Expr) {
+	s.vars.Define(param, expr)
+}
+
+func (s *Stylesheet) DefineParam(param, value string) error {
+	var (
+		expr xml.Expr
+		err  error
+	)
+	if value != "" {
+		expr, err = xml.CompileString(value)
+	}
+	if err == nil {
+		s.params.Define(param, expr)
+	}
+	return err
 }
 
 func (s *Stylesheet) GetOutput(name string) *OutputSettings {
@@ -416,10 +465,12 @@ func (s *Stylesheet) Find(name string) (*Template, error) {
 	if ix < 0 {
 		return nil, fmt.Errorf("template %s not found", name)
 	}
-	return s.Templates[ix], nil
+	tpl := s.Templates[ix].Clone()
+	s.prepare(tpl)
+	return tpl, nil
 }
 
-func (s *Stylesheet) Match(node xml.Node, withMode string) (*Template, error) {
+func (s *Stylesheet) Match(node xml.Node, mode string) (*Template, error) {
 	// match work in reverse
 	// given a node, we should check that the node would be selected
 	// from the xpath expression given in the match attribute of the
@@ -452,15 +503,17 @@ func (s *Stylesheet) Match(node xml.Node, withMode string) (*Template, error) {
 		return true, rank
 
 	}
-	if withMode == "" {
-		withMode = s.Mode
+	if mode == "" {
+		mode = s.Mode
 	}
 	for _, t := range s.Templates {
-		if t.isRoot() || t.Mode != withMode || t.Name != "" {
+		if t.isRoot() || t.Mode != mode || t.Name != "" {
 			continue
 		}
 		if ok, _ := isMatch(t.Match); ok {
-			return t.Clone(), nil
+			tpl := t.Clone()
+			s.prepare(tpl)
+			return tpl, nil
 		}
 	}
 	return nil, fmt.Errorf("no template found matching given node (%s)", node.QualifiedName())
@@ -480,15 +533,49 @@ func (s *Stylesheet) Execute(doc xml.Node) (xml.Node, error) {
 
 	root, err := s.Templates[ix].Execute(doc, s)
 	if err == nil {
-		// if len(root) != 1 {
-		// 	return nil, fmt.Errorf("more than one root element returned")
-		// }
-		// return xml.NewDocument(root[0]), nil
 		var doc xml.Document
 		doc.Nodes = append(doc.Nodes, root...)
 		return &doc, nil
 	}
 	return nil, err
+}
+
+func (s *Stylesheet) prepare(tpl *Template) error {
+	el := tpl.Fragment.(*xml.Element)
+	if el == nil {
+		return fmt.Errorf("template: fragment expected xml element")
+	}
+	for _, n := range slices.Clone(el.Nodes) {
+		if n.QualifiedName() != "xsl:param" {
+			break
+		}
+		e := n.(*xml.Element)
+		if e == nil {
+			continue
+		}
+		ix := slices.IndexFunc(e.Attrs, func(a xml.Attribute) bool {
+			return a.Name == "name"
+		})
+		if ix < 0 {
+			return fmt.Errorf("param: missing name attribute")
+		}
+		var (
+			ident = e.Attrs[ix].Value()
+			value string
+		)
+
+		ix = slices.IndexFunc(e.Attrs, func(a xml.Attribute) bool {
+			return a.Name == "select"
+		})
+		if ix >= 0 {
+			value = e.Attrs[ix].Value()
+		}
+		if err := s.DefineParam(ident, value); err != nil {
+			return err
+		}
+		el.RemoveNode(n.Position())
+	}
+	return nil
 }
 
 type Template struct {
@@ -617,6 +704,7 @@ func executeVariable(node, datum xml.Node, style *Stylesheet) error {
 	ix = slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
 		return a.Name == "select"
 	})
+	_ = ident
 	if ix >= 0 {
 		query, err := xml.CompileString(el.Attrs[ix].Value())
 		if err != nil {
@@ -626,11 +714,7 @@ func executeVariable(node, datum xml.Node, style *Stylesheet) error {
 		if err != nil {
 			return err
 		}
-		if len(items) > 0 {
-			style.vars.Define(ident, items[0].Value().(string))
-		} else {
-			style.vars.Define(ident, "")
-		}
+		_ = items
 	} else {
 		// node variable - to be implemented
 		if len(el.Nodes) == 0 {
@@ -747,6 +831,14 @@ func executeApplyTemplates(node, datum xml.Node, style *Stylesheet) error {
 	if err != nil {
 		return err
 	}
+	for _, n := range el.Nodes {
+		if n.QualifiedName() != "xsl:with-param" {
+			return fmt.Errorf("apply-templates: invalid child node %s", n.QualifiedName())
+		}
+		if err := transformNode(n, datum, style); err != nil {
+			return err
+		}
+	}
 	var (
 		parent = el.Parent().(*xml.Element)
 		frag   = tpl.Fragment.(*xml.Element)
@@ -778,6 +870,16 @@ func executeCallTemplate(node, datum xml.Node, style *Stylesheet) error {
 	if err != nil {
 		return err
 	}
+
+	for _, n := range el.Nodes {
+		if n.QualifiedName() != "xsl:with-param" {
+			return fmt.Errorf("call-templates: invalid child node %s", n.QualifiedName())
+		}
+		if err := transformNode(n, datum, style); err != nil {
+			return err
+		}
+	}
+
 	nodes, err := tpl.Execute(datum, style)
 	if err != nil {
 		return err
@@ -791,23 +893,43 @@ func executeCallTemplate(node, datum xml.Node, style *Stylesheet) error {
 }
 
 func executeWithParam(node, datum xml.Node, style *Stylesheet) error {
-	return nil
+	el := node.(*xml.Element)
+
+	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
+		return a.Name == "name"
+	})
+	if ix < 0 {
+		return fmt.Errorf("with-param: missing name attribute")
+	}
+	ident := el.Attrs[ix].Value()
+
+	ix = slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
+		return a.Name == "select"
+	})
+	if ix < 0 {
+		return fmt.Errorf("with-param: missing select attribute")
+	}
+	return style.DefineParam(ident, el.Attrs[ix].Value())
 }
 
 func executeTry(node, datum xml.Node, style *Stylesheet) error {
-	return nil
+	return errImplemented
+}
+
+func executeCatch(node, datum xml.Node, style *Stylesheet) error {
+	return errImplemented
 }
 
 func executeWherePopulated(node, datum xml.Node, style *Stylesheet) error {
-	return nil
+	return errImplemented
 }
 
 func executeOnEmpty(node, datum xml.Node, style *Stylesheet) error {
-	return nil
+	return errImplemented
 }
 
 func executeOnNotEmpty(node, datum xml.Node, style *Stylesheet) error {
-	return nil
+	return errImplemented
 }
 
 func executeIf(node, datum xml.Node, style *Stylesheet) error {
@@ -818,7 +940,7 @@ func executeIf(node, datum xml.Node, style *Stylesheet) error {
 	if ix < 0 {
 		return fmt.Errorf("if: missing test attribute")
 	}
-	ok, err := testNode(el.Attrs[ix].Value(), datum)
+	ok, err := testNode(el.Attrs[ix].Value(), datum, style)
 	if err != nil {
 		return err
 	}
@@ -854,7 +976,7 @@ func executeChoose(node, datum xml.Node, style *Stylesheet) error {
 		if x < 0 {
 			return fmt.Errorf("choose: missing test attribute")
 		}
-		ok, err := testNode(n.Attrs[x].Value(), datum)
+		ok, err := testNode(n.Attrs[x].Value(), datum, style)
 		if err != nil {
 			return err
 		}
@@ -914,8 +1036,15 @@ func executeForeach(node, datum xml.Node, style *Stylesheet) error {
 	if err != nil {
 		return err
 	}
-	items, err := expr.Find(datum)
-	if err != nil {
+	var items []xml.Item
+	if e, ok := expr.(interface {
+		FindWithEnv(xml.Node, xml.Environ[xml.Expr]) ([]xml.Item, error)
+	}); ok {
+		items, err = e.FindWithEnv(datum, style)
+	} else {
+		items, err = expr.Find(datum)
+	}
+	if err != nil || len(items) == 0 {
 		return err
 	}
 
@@ -947,12 +1076,19 @@ func executeValueOf(node, datum xml.Node, style *Stylesheet) error {
 	if err != nil {
 		return err
 	}
-	items, err := expr.Find(datum)
+	var items []xml.Item
+	if e, ok := expr.(interface {
+		FindWithEnv(xml.Node, xml.Environ[xml.Expr]) ([]xml.Item, error)
+	}); ok {
+		items, err = e.FindWithEnv(datum, style)
+	} else {
+		items, err = expr.Find(datum)
+	}
+	parent, ok := el.Parent().(*xml.Element)
 	if err != nil || len(items) == 0 {
-		return err
+		return parent.RemoveNode(el.Position())
 	}
 	text := xml.NewText(items[0].Node().Value())
-	parent, ok := el.Parent().(*xml.Element)
 	if !ok {
 		return fmt.Errorf("value-of: xml element expected as parent")
 	}
@@ -961,39 +1097,46 @@ func executeValueOf(node, datum xml.Node, style *Stylesheet) error {
 }
 
 func executeCopy(node, datum xml.Node, style *Stylesheet) error {
-	return nil
+	return errImplemented
 }
 
 func executeCopyOf(node, datum xml.Node, style *Stylesheet) error {
-	return nil
+	return errImplemented
 }
 
 func executeSequence(node, datum xml.Node, style *Stylesheet) error {
-	return nil
+	return errImplemented
 }
 
 func executeElement(node, datum xml.Node, style *Stylesheet) error {
-	return nil
+	return errImplemented
 }
 
 func executeAttribute(node, datum xml.Node, style *Stylesheet) error {
-	return nil
+	return errImplemented
 }
 
 func executeText(node, datum xml.Node, style *Stylesheet) error {
-	return nil
+	return errImplemented
 }
 
 func executeComment(node, datum xml.Node, style *Stylesheet) error {
-	return nil
+	return errImplemented
 }
 
-func testNode(expr string, datum xml.Node) (bool, error) {
+func testNode(expr string, datum xml.Node, env xml.Environ[xml.Expr]) (bool, error) {
 	query, err := xml.CompileString(expr)
 	if err != nil {
 		return false, err
 	}
-	items, err := query.Find(datum)
+	var items []xml.Item
+	if e, ok := query.(interface {
+		FindWithEnv(xml.Node, xml.Environ[xml.Expr]) ([]xml.Item, error)
+	}); ok {
+		items, err = e.FindWithEnv(datum, env)
+	} else {
+		items, err = query.Find(datum)
+	}
 	if err != nil {
 		return false, err
 	}

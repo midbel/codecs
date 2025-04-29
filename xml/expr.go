@@ -407,6 +407,9 @@ func (i identifier) find(ctx Context) ([]Item, error) {
 	if err != nil {
 		return nil, err
 	}
+	if expr == nil {
+		return nil, nil
+	}
 	res, err := expr.find(ctx)
 	return res, err
 }

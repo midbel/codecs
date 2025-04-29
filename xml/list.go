@@ -44,6 +44,13 @@ func (e *Env[T]) Resolve(ident string) (T, error) {
 	return t, fmt.Errorf("%s: identifier not defined", ident)
 }
 
+func (e *Env[T]) Unwrap() Environ[T] {
+	if e.parent == nil {
+		return e
+	}
+	return e.parent
+}
+
 type Item interface {
 	Node() Node
 	Value() any
