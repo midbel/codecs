@@ -456,7 +456,7 @@ func (s *Stylesheet) Match(node xml.Node, withMode string) (*Template, error) {
 		withMode = s.Mode
 	}
 	for _, t := range s.Templates {
-		if t.isRoot() || t.Mode != withMode {
+		if t.isRoot() || t.Mode != withMode || t.Name != "" {
 			continue
 		}
 		if ok, _ := isMatch(t.Match); ok {
@@ -750,17 +750,19 @@ func executeApplyTemplates(node, datum xml.Node, style *Stylesheet) error {
 	var (
 		parent = el.Parent().(*xml.Element)
 		frag   = tpl.Fragment.(*xml.Element)
+		nodes  []xml.Node
 	)
 	for _, n := range slices.Clone(frag.Nodes) {
 		c := cloneNode(n)
 		if c == nil {
 			continue
 		}
-		parent.ReplaceNode(el.Position(), c)
 		if err := transformNode(c, datum, style); err != nil {
 			return err
 		}
+		nodes = append(nodes, c)
 	}
+	parent.InsertNodes(el.Position(), nodes)
 	return nil
 }
 
@@ -954,8 +956,7 @@ func executeValueOf(node, datum xml.Node, style *Stylesheet) error {
 	if !ok {
 		return fmt.Errorf("value-of: xml element expected as parent")
 	}
-	parent.Nodes = parent.Nodes[:0]
-	parent.Append(text)
+	parent.ReplaceNode(el.Position(), text)
 	return nil
 }
 
