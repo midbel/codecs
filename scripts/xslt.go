@@ -58,7 +58,7 @@ func init() {
 		xml.QualifiedName("attribute", "xsl"):       executeAttribute,
 		xml.QualifiedName("text", "xsl"):            executeText,
 		xml.QualifiedName("comment", "xsl"):         executeComment,
-		xml.QualifiedName("message", "xsl"): executeMessage,
+		xml.QualifiedName("message", "xsl"):         executeMessage,
 	}
 }
 
