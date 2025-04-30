@@ -38,6 +38,7 @@ func init() {
 		xml.QualifiedName("value-of", "xsl"):        executeValueOf,
 		xml.QualifiedName("call-template", "xsl"):   wrap(executeCallTemplate),
 		xml.QualifiedName("apply-templates", "xsl"): wrap(executeApplyTemplates),
+		xml.QualifiedName("apply-import", "xsl"):    wrap(executeApplyImport),
 		xml.QualifiedName("if", "xsl"):              wrap(executeIf),
 		xml.QualifiedName("choose", "xsl"):          wrap(executeChoose),
 		xml.QualifiedName("where-populated", "xsl"): executeWithParam,
@@ -67,6 +68,7 @@ func main() {
 		quiet  = flag.Bool("q", false, "quiet")
 		mode   = flag.String("m", "", "mode")
 		file   = flag.String("f", "", "file")
+		dir    = flag.String("d", ".", "context directory")
 		params []string
 	)
 	flag.Func("p", "template parameter", func(str string) error {
@@ -90,6 +92,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "fail to load stylesheet", err)
 		os.Exit(2)
 	}
+	sheet.Context = *dir
 	sheet.Mode = *mode
 
 	for _, p := range params {
@@ -161,8 +164,9 @@ type Stylesheet struct {
 	output    []*OutputSettings
 	Templates []*Template
 
-	Context string
-	Others  []*Stylesheet
+	Context  string
+	Imported bool
+	Others   []*Stylesheet
 }
 
 func Load(file string) (*Stylesheet, error) {
@@ -420,14 +424,19 @@ func (s *Stylesheet) Generate(w io.Writer, doc *xml.Document) error {
 	return nil
 }
 
-func (s *Stylesheet) importSheet(file string) error {
-	return s.includeSheet(file)
+func (s *Stylesheet) ImportSheet(file string) error {
+	return s.includeSheet(file, true)
 }
 
-func (s *Stylesheet) includeSheet(file string) error {
+func (s *Stylesheet) IncludeSheet(file string) error {
+	return s.includeSheet(file, false)
+}
+
+func (s *Stylesheet) includeSheet(file string, imported bool) error {
 	file = filepath.Join(s.Context, file)
 	other, err := Load(file)
 	if err == nil {
+		other.Imported = imported
 		s.Others = append(s.Others, other)
 	}
 	return err
@@ -492,6 +501,11 @@ func (s *Stylesheet) Find(name string) (*Template, error) {
 		return t.Name == name
 	})
 	if ix < 0 {
+		for _, s := range s.Others {
+			if tpl, err := s.Find(name); err == nil {
+				return tpl, nil
+			}
+		}
 		return nil, fmt.Errorf("template %s not found", name)
 	}
 	tpl := s.Templates[ix].Clone()
@@ -543,6 +557,11 @@ func (s *Stylesheet) Match(node xml.Node, mode string) (*Template, error) {
 			tpl := t.Clone()
 			s.prepare(tpl)
 			return tpl, nil
+		}
+	}
+	for _, s := range s.Others {
+		if tpl, err := s.Match(node, mode); err == nil {
+			return tpl, err
 		}
 	}
 	return nil, fmt.Errorf("no template found matching given node (%s)", node.QualifiedName())
@@ -764,7 +783,7 @@ func executeImport(node, datum xml.Node, style *Stylesheet) error {
 	if ix < 0 {
 		return fmt.Errorf("import: missing href attribute")
 	}
-	return style.importSheet(el.Attrs[ix].Value())
+	return style.ImportSheet(el.Attrs[ix].Value())
 }
 
 func executeInclude(node, datum xml.Node, style *Stylesheet) error {
@@ -775,10 +794,37 @@ func executeInclude(node, datum xml.Node, style *Stylesheet) error {
 	if ix < 0 {
 		return fmt.Errorf("include: missing href attribute")
 	}
-	return style.includeSheet(el.Attrs[ix].Value())
+	return style.IncludeSheet(el.Attrs[ix].Value())
 }
 
 func executeSourceDocument(node, datum xml.Node, style *Stylesheet) error {
+	el := node.(*xml.Element)
+	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
+		return a.Name == "href"
+	})
+	if ix < 0 {
+		return fmt.Errorf("source-document: missing href attribute")
+	}
+	doc, err := loadDocument(filepath.Join(style.Context, el.Attrs[ix].Value()))
+	if err != nil {
+		return err
+	}
+	var nodes []xml.Node
+	for _, n := range slices.Clone(el.Nodes) {
+		c := cloneNode(n)
+		if c == nil {
+			continue
+		}
+		if err := transformNode(n, doc, style); err != nil {
+			return err
+		}
+		nodes = append(nodes, c)
+	}
+	if i, ok := el.Parent().(interface{ InsertNodes(int, []xml.Node) error }); ok {
+		if err := i.InsertNodes(el.Position(), nodes); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -840,6 +886,10 @@ func executeResultDocument(node, datum xml.Node, style *Stylesheet) error {
 	}
 	writer.Write(&doc)
 	return errSkip
+}
+
+func executeApplyImport(node, datum xml.Node, style *Stylesheet) error {
+	return nil
 }
 
 func executeApplyTemplates(node, datum xml.Node, style *Stylesheet) error {
