@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -57,6 +58,7 @@ func init() {
 		xml.QualifiedName("attribute", "xsl"):       executeAttribute,
 		xml.QualifiedName("text", "xsl"):            executeText,
 		xml.QualifiedName("comment", "xsl"):         executeComment,
+		xml.QualifiedName("message", "xsl"): executeMessage,
 	}
 }
 
@@ -95,11 +97,6 @@ func main() {
 		sheet.DefineParam(k, v)
 	}
 
-	result, err := sheet.Execute(doc)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
 	var w io.Writer = os.Stdout
 	if *quiet {
 		w = io.Discard
@@ -112,20 +109,10 @@ func main() {
 		defer f.Close()
 		w = f
 	}
-	writer := xml.NewWriter(w)
-	if len(sheet.output) > 0 {
-		out := sheet.output[0]
-		if !out.Indent {
-			writer.WriterOptions |= xml.OptionCompact
-		}
-		if out.OmitProlog {
-			writer.WriterOptions |= xml.OptionNoProlog
-		}
-		if out.Method == "html" {
-			writer.PrologWriter = xml.PrologWriterFunc(writeDoctypeHTML)
-		}
+	if err := sheet.Generate(w, doc); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
-	writer.Write(result.(*xml.Document))
 }
 
 type OutputSettings struct {
@@ -173,6 +160,9 @@ type Stylesheet struct {
 
 	output    []*OutputSettings
 	Templates []*Template
+
+	Context string
+	Others  []*Stylesheet
 }
 
 func Load(file string) (*Stylesheet, error) {
@@ -195,13 +185,7 @@ func Load(file string) (*Stylesheet, error) {
 	if out != nil {
 		sheet.output = out
 	} else {
-		out := &OutputSettings{
-			Method:   "xml",
-			Version:  "1.0",
-			Encoding: "UTF-8",
-			Indent:   true,
-		}
-		sheet.output = append(sheet.output, out)
+		sheet.output = append(sheet.output, defaultOutput())
 	}
 	if sheet.params, err = loadParams(doc); err != nil {
 		return nil, err
@@ -211,6 +195,16 @@ func Load(file string) (*Stylesheet, error) {
 	}
 
 	return &sheet, nil
+}
+
+func defaultOutput() *OutputSettings {
+	out := &OutputSettings{
+		Method:   "xml",
+		Version:  "1.0",
+		Encoding: "UTF-8",
+		Indent:   true,
+	}
+	return out
 }
 
 func loadAttributeSet(doc xml.Node) ([]*AttributeSet, error) {
@@ -402,6 +396,41 @@ func loadTemplates(doc xml.Node) ([]*Template, error) {
 		list = append(list, &t)
 	}
 	return list, nil
+}
+
+func (s *Stylesheet) Generate(w io.Writer, doc *xml.Document) error {
+	result, err := s.Execute(doc)
+	if err != nil {
+		return err
+	}
+	writer := xml.NewWriter(w)
+	if len(s.output) > 0 {
+		out := s.output[0]
+		if !out.Indent {
+			writer.WriterOptions |= xml.OptionCompact
+		}
+		if out.OmitProlog {
+			writer.WriterOptions |= xml.OptionNoProlog
+		}
+		if out.Method == "html" {
+			writer.PrologWriter = xml.PrologWriterFunc(writeDoctypeHTML)
+		}
+	}
+	writer.Write(result.(*xml.Document))
+	return nil
+}
+
+func (s *Stylesheet) importSheet(file string) error {
+	return s.includeSheet(file)
+}
+
+func (s *Stylesheet) includeSheet(file string) error {
+	file = filepath.Join(s.Context, file)
+	other, err := Load(file)
+	if err == nil {
+		s.Others = append(s.Others, other)
+	}
+	return err
 }
 
 func (s *Stylesheet) Enter() {
@@ -728,11 +757,25 @@ func executeVariable(node, datum xml.Node, style *Stylesheet) error {
 }
 
 func executeImport(node, datum xml.Node, style *Stylesheet) error {
-	return nil
+	el := node.(*xml.Element)
+	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
+		return a.Name == "href"
+	})
+	if ix < 0 {
+		return fmt.Errorf("import: missing href attribute")
+	}
+	return style.importSheet(el.Attrs[ix].Value())
 }
 
 func executeInclude(node, datum xml.Node, style *Stylesheet) error {
-	return nil
+	el := node.(*xml.Element)
+	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
+		return a.Name == "href"
+	})
+	if ix < 0 {
+		return fmt.Errorf("include: missing href attribute")
+	}
+	return style.includeSheet(el.Attrs[ix].Value())
 }
 
 func executeSourceDocument(node, datum xml.Node, style *Stylesheet) error {
@@ -1108,6 +1151,10 @@ func executeSequence(node, datum xml.Node, style *Stylesheet) error {
 	return errImplemented
 }
 
+func executeMessage(node, datum xml.Node, style *Stylesheet) error {
+	return errImplemented
+}
+
 func executeElement(node, datum xml.Node, style *Stylesheet) error {
 	return errImplemented
 }
@@ -1117,11 +1164,19 @@ func executeAttribute(node, datum xml.Node, style *Stylesheet) error {
 }
 
 func executeText(node, datum xml.Node, style *Stylesheet) error {
-	return errImplemented
+	text := xml.NewText(node.Value())
+	if r, ok := node.Parent().(interface{ ReplaceAt(int, xml.Node) error }); ok {
+		return r.ReplaceAt(node.Position(), text)
+	}
+	return nil
 }
 
 func executeComment(node, datum xml.Node, style *Stylesheet) error {
-	return errImplemented
+	comment := xml.NewComment(node.Value())
+	if r, ok := node.Parent().(interface{ ReplaceAt(int, xml.Node) error }); ok {
+		return r.ReplaceAt(node.Position(), comment)
+	}
+	return nil
 }
 
 func testNode(expr string, datum xml.Node, env xml.Environ[xml.Expr]) (bool, error) {

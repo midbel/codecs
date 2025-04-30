@@ -184,12 +184,16 @@ func (c Context) Root() Context {
 }
 
 func (c Context) Nodes() []Node {
+	return getNodes(c.Node)
+}
+
+func getNodes(c Node) []Node {
 	var nodes []Node
 	if c.Type() == TypeDocument {
-		doc := c.Node.(*Document)
+		doc := c.(*Document)
 		nodes = append(nodes, doc.Root())
 	} else if c.Type() == TypeElement {
-		el := c.Node.(*Element)
+		el := c.(*Element)
 		nodes = slices.Clone(el.Nodes)
 	}
 	return nodes
@@ -359,30 +363,24 @@ func (a axis) find(ctx Context) ([]Item, error) {
 		}
 	case prevAxis:
 	case prevSiblingAxis:
-		p := ctx.Node.Parent().(*xml.Element)
-		if p == nil {
-			break
-		}
-		for i, x := range p.Nodes {
+		nodes := getNodes(ctx.Node.Parent())
+		for i, x := range nodes {
 			if x.Position() >= ctx.Node.Position() {
 				break
 			}
-			other, err := a.next.find(ctx.Sub(x, i+1, len(p.Nodes)))
+			other, err := a.next.find(ctx.Sub(x, i+1, len(nodes)))
 			if err == nil {
 				list = slices.Concat(list, other)
 			}
 		}
 	case nextAxis:
 	case nextSiblingAxis:
-		p := ctx.Node.Parent().(*xml.Element)
-		if p == nil {
-			break
-		}
-		for i, x := range slices.Backward(p.Nodes) {
+		nodes := getNodes(ctx.Node.Parent())
+		for i, x := range slices.Backward(nodes) {
 			if x.Position() <= ctx.Node.Position() {
 				break
 			}
-			other, err := a.next.find(ctx.Sub(x, i+1, len(p.Nodes)))
+			other, err := a.next.find(ctx.Sub(x, i+1, len(nodes)))
 			if err == nil {
 				list = slices.Concat(list, other)
 			}
