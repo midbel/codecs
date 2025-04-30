@@ -1987,6 +1987,7 @@ func (s *Scanner) scanEntity() string {
 	if s.char != semicolon {
 		return ""
 	}
+	str.WriteRune(semicolon)
 	s.read()
 	return html.UnescapeString(str.String())
 }

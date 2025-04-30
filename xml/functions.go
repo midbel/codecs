@@ -113,6 +113,8 @@ var builtins = []registeredBuiltin{
 	registerFunc("exists", "fn", callExists),
 	registerFunc("empty", "", callEmpty),
 	registerFunc("empty", "fn", callEmpty),
+	registerFunc("distinct-values", "", callDistinctValues),
+	registerFunc("distinct-values", "fn", callDistinctValues),
 	registerFunc("tail", "", callTail),
 	registerFunc("tail", "fn", callTail),
 	registerFunc("head", "", callHead),
@@ -204,6 +206,10 @@ func callExists(ctx Context, args []Expr) ([]Item, error) {
 		return nil, err
 	}
 	return singleValue(!isEmpty(items)), nil
+}
+
+func callDistinctValues(ctx Context, args []Expr) ([]Item, error) {
+	return nil, nil
 }
 
 func callEmpty(ctx Context, args []Expr) ([]Item, error) {
