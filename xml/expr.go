@@ -359,8 +359,34 @@ func (a axis) find(ctx Context) ([]Item, error) {
 		}
 	case prevAxis:
 	case prevSiblingAxis:
+		p := ctx.Node.Parent().(*xml.Element)
+		if p == nil {
+			break
+		}
+		for i, x := range p.Nodes {
+			if x.Position() >= ctx.Node.Position() {
+				break
+			}
+			other, err := a.next.find(ctx.Sub(x, i+1, len(p.Nodes)))
+			if err == nil {
+				list = slices.Concat(list, other)
+			}
+		}
 	case nextAxis:
 	case nextSiblingAxis:
+		p := ctx.Node.Parent().(*xml.Element)
+		if p == nil {
+			break
+		}
+		for i, x := range slices.Backward(p.Nodes) {
+			if x.Position() <= ctx.Node.Position() {
+				break
+			}
+			other, err := a.next.find(ctx.Sub(x, i+1, len(p.Nodes)))
+			if err == nil {
+				list = slices.Concat(list, other)
+			}
+		}
 	default:
 		return nil, errImplemented
 	}
