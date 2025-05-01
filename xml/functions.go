@@ -135,6 +135,19 @@ var builtins = []registeredBuiltin{
 	registerFunc("date", "xs", callDate),
 	registerFunc("decimal", "", callDecimal),
 	registerFunc("decimal", "xs", callDecimal),
+	// extensions functions
+	registerFunc("read-file", "file", callXYZ),
+	registerFunc("write-file", "file", callXYZ),
+	registerFunc("exists", "file", callXYZ),
+	registerFunc("delete", "file", callXYZ),
+	registerFunc("list", "file", callXYZ),
+	registerFunc("encode", "binary", callXYZ),
+	registerFunc("decode", "binary", callXYZ),
+	registerFunc("concat", "binary", callXYZ),
+	registerFunc("substring", "binary", callXYZ),
+	registerFunc("send", "http", callXYZ),
+	registerFunc("get", "http", callXYZ),
+	registerFunc("post", "http", callXYZ),
 }
 
 func findBuiltin(qn QName) (builtinFunc, error) {
@@ -148,6 +161,10 @@ func findBuiltin(qn QName) (builtinFunc, error) {
 }
 
 type builtinFunc func(Context, []Expr) ([]Item, error)
+
+func callXYZ(ctx Context, args []Expr) ([]Item, error) {
+	return nil, nil
+}
 
 func callRound(ctx Context, args []Expr) ([]Item, error) {
 	if len(args) < 1 && len(args) > 2 {

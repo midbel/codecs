@@ -419,9 +419,9 @@ func (e *Element) RemoveNode(at int) error {
 	}
 	e.Nodes = slices.Delete(e.Nodes, at, at+1)
 	for i := range e.Nodes[at:] {
-		e.Nodes[i].setPosition(at+i)
+		e.Nodes[i].setPosition(at + i)
 	}
-	return nil	
+	return nil
 }
 
 func (e *Element) ReplaceNode(at int, node Node) error {
@@ -651,7 +651,7 @@ func (e *Element) RemoveAttr(at int) error {
 	for i := range e.Attrs {
 		e.Attrs[i].setPosition(i)
 	}
-	return nil		
+	return nil
 }
 
 func (e *Element) SetAttribute(attr Attribute) error {

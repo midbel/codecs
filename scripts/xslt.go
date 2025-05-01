@@ -38,7 +38,7 @@ func init() {
 		xml.QualifiedName("value-of", "xsl"):        executeValueOf,
 		xml.QualifiedName("call-template", "xsl"):   wrap(executeCallTemplate),
 		xml.QualifiedName("apply-templates", "xsl"): wrap(executeApplyTemplates),
-		xml.QualifiedName("apply-imports", "xsl"):    wrap(executeApplyImport),
+		xml.QualifiedName("apply-imports", "xsl"):   wrap(executeApplyImport),
 		xml.QualifiedName("if", "xsl"):              wrap(executeIf),
 		xml.QualifiedName("choose", "xsl"):          wrap(executeChoose),
 		xml.QualifiedName("where-populated", "xsl"): executeWithParam,

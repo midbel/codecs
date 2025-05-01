@@ -2,8 +2,8 @@ package xml
 
 import (
 	"fmt"
-	"strings"
 	"maps"
+	"strings"
 	"time"
 )
 
