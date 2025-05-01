@@ -148,6 +148,20 @@ var builtins = []registeredBuiltin{
 	registerFunc("send", "http", callXYZ),
 	registerFunc("get", "http", callXYZ),
 	registerFunc("post", "http", callXYZ),
+	registerFunc("hash", "crypto", callXYZ),
+	registerFunc("hmac", "crypto", callXYZ),
+	registerFunc("encrypt", "crypto", callXYZ),
+	registerFunc("decrypt", "crypto", callXYZ),
+	registerFunc("sign", "crypto", callXYZ),
+	registerFunc("verify", "crypto", callXYZ),
+	registerFunc("entries", "archive", callXYZ),
+	registerFunc("extract", "archive", callXYZ),
+	registerFunc("create", "archive", callXYZ),
+	registerFunc("execute", "process", callXYZ),
+	registerFunc("wait", "process", callXYZ),
+	registerFunc("stdout", "process", callXYZ),
+	registerFunc("stderr", "process", callXYZ),
+	registerFunc("exit-code", "process", callXYZ),
 }
 
 func findBuiltin(qn QName) (builtinFunc, error) {

@@ -425,23 +425,21 @@ func (s *Stylesheet) Generate(w io.Writer, doc *xml.Document) error {
 }
 
 func (s *Stylesheet) ImportSheet(file string) error {
-	return s.includeSheet(file, true)
-}
-
-func (s *Stylesheet) IncludeSheet(file string) error {
-	return s.includeSheet(file, false)
-}
-
-func (s *Stylesheet) includeSheet(file string, imported bool) error {
 	file = filepath.Join(s.Context, file)
 	other, err := Load(file)
 	if err != nil {
 		return err
 	}
-	if imported {
-		other.Imported = imported
-		s.Others = append(s.Others, other)
-		return nil
+	other.Imported = true
+	s.Others = append(s.Others, other)
+	return nil
+}
+
+func (s *Stylesheet) IncludeSheet(file string) error {
+	file = filepath.Join(s.Context, file)
+	other, err := Load(file)
+	if err != nil {
+		return err
 	}
 	s.Templates = append(s.Templates, other.Templates...)
 	if m, ok := s.vars.(interface{ Merge(xml.Environ[xml.Expr]) }); ok {
