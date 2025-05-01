@@ -435,11 +435,22 @@ func (s *Stylesheet) IncludeSheet(file string) error {
 func (s *Stylesheet) includeSheet(file string, imported bool) error {
 	file = filepath.Join(s.Context, file)
 	other, err := Load(file)
-	if err == nil {
+	if err != nil {
+		return err
+	}
+	if imported {
 		other.Imported = imported
 		s.Others = append(s.Others, other)
+		return nil
 	}
-	return err
+	s.Templates = append(s.Templates, other.Templates...)
+	if m, ok := s.vars.(interface{ Merge(xml.Environ[xml.Expr]) }); ok {
+		m.Merge(other.vars)
+	}
+	if m, ok := s.params.(interface{ Merge(xml.Environ[xml.Expr]) }); ok {
+		m.Merge(other.params)
+	}
+	return nil
 }
 
 func (s *Stylesheet) Enter() {
@@ -464,6 +475,12 @@ func (s *Stylesheet) Resolve(ident string) (xml.Expr, error) {
 	expr, err = s.params.Resolve(ident)
 	if err == nil {
 		return expr, nil
+	}
+	for _, x := range s.Others {
+		e, err := x.Resolve(ident)
+		if err == nil {
+			return e, nil
+		}
 	}
 	return nil, nil
 }

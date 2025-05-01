@@ -3,6 +3,7 @@ package xml
 import (
 	"fmt"
 	"strings"
+	"maps"
 	"time"
 )
 
@@ -49,6 +50,14 @@ func (e *Env[T]) Unwrap() Environ[T] {
 		return e
 	}
 	return e.parent
+}
+
+func (e *Env[T]) Merge(other Environ[T]) {
+	x, ok := other.(*Env[T])
+	if !ok {
+		return
+	}
+	maps.Copy(e.values, x.values)
 }
 
 type Item interface {
