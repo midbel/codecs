@@ -60,6 +60,9 @@ func init() {
 		xml.QualifiedName("text", "xsl"):            executeText,
 		xml.QualifiedName("comment", "xsl"):         executeComment,
 		xml.QualifiedName("message", "xsl"):         executeMessage,
+		xml.QualifiedName("fallback", "xsl"):        executeFallback,
+		xml.QualifiedName("merge", "xsl"):           executeMerge,
+		xml.QualifiedName("for-each-group", "xsl"):  executeForeachGroup,
 	}
 }
 
@@ -87,12 +90,11 @@ func main() {
 		os.Exit(2)
 	}
 
-	sheet, err := Load(flag.Arg(0))
+	sheet, err := Load(flag.Arg(0), *dir)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "fail to load stylesheet", err)
 		os.Exit(2)
 	}
-	sheet.Context = *dir
 	sheet.Mode = *mode
 
 	for _, p := range params {
@@ -169,13 +171,14 @@ type Stylesheet struct {
 	Others   []*Stylesheet
 }
 
-func Load(file string) (*Stylesheet, error) {
+func Load(file, contextDir string) (*Stylesheet, error) {
 	doc, err := loadDocument(file)
 	if err != nil {
 		return nil, err
 	}
 	sheet := Stylesheet{
-		vars: xml.Empty[xml.Expr](),
+		vars:    xml.Empty[xml.Expr](),
+		Context: contextDir,
 	}
 	sheet.Templates, err = loadTemplates(doc)
 	if err != nil {
@@ -197,6 +200,12 @@ func Load(file string) (*Stylesheet, error) {
 	if sheet.AttrSet, err = loadAttributeSet(doc); err != nil {
 		return nil, err
 	}
+	if err := includesSheet(&sheet, doc); err != nil {
+		return nil, err
+	}
+	if err := importsSheet(&sheet, doc); err != nil {
+		return nil, err
+	}
 
 	return &sheet, nil
 }
@@ -209,6 +218,42 @@ func defaultOutput() *OutputSettings {
 		Indent:   true,
 	}
 	return out
+}
+
+func includesSheet(sheet *Stylesheet, doc xml.Node) error {
+	query, err := xml.CompileString("/xsl:stylesheet/xsl:include")
+	if err != nil {
+		return err
+	}
+	items, err := query.Find(doc)
+	if err != nil {
+		return err
+	}
+	for _, i := range items {
+		err := executeInclude(i.Node(), doc, sheet)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func importsSheet(sheet *Stylesheet, doc xml.Node) error {
+	query, err := xml.CompileString("/xsl:stylesheet/xsl:import")
+	if err != nil {
+		return err
+	}
+	items, err := query.Find(doc)
+	if err != nil {
+		return err
+	}
+	for _, i := range items {
+		err := executeImport(i.Node(), doc, sheet)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func loadAttributeSet(doc xml.Node) ([]*AttributeSet, error) {
@@ -426,7 +471,7 @@ func (s *Stylesheet) Generate(w io.Writer, doc *xml.Document) error {
 
 func (s *Stylesheet) ImportSheet(file string) error {
 	file = filepath.Join(s.Context, file)
-	other, err := Load(file)
+	other, err := Load(file, s.Context)
 	if err != nil {
 		return err
 	}
@@ -437,7 +482,7 @@ func (s *Stylesheet) ImportSheet(file string) error {
 
 func (s *Stylesheet) IncludeSheet(file string) error {
 	file = filepath.Join(s.Context, file)
-	other, err := Load(file)
+	other, err := Load(file, s.Context)
 	if err != nil {
 		return err
 	}
@@ -1242,6 +1287,18 @@ func executeComment(node, datum xml.Node, style *Stylesheet) error {
 		return r.ReplaceAt(node.Position(), comment)
 	}
 	return nil
+}
+
+func executeFallback(node, datum xml.Node, style *Stylesheet) error {
+	return errImplemented
+}
+
+func executeForeachGroup(node, datum xml.Node, style *Stylesheet) error {
+	return errImplemented
+}
+
+func executeMerge(node, datum xml.Node, style *Stylesheet) error {
+	return errImplemented
 }
 
 func testNode(expr string, datum xml.Node, env xml.Environ[xml.Expr]) (bool, error) {

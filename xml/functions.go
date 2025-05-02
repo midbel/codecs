@@ -1,8 +1,20 @@
 package xml
 
 import (
+	"bytes"
+	"crypto/hmac"
+	"crypto/md5"
+	"crypto/sha1"
+	"crypto/sha256"
+	"crypto/sha512"
+	"encoding/base64"
+	"encoding/hex"
 	"fmt"
+	"hash"
+	"io"
 	"math"
+	"net/http"
+	"os"
 	"regexp"
 	"slices"
 	"strconv"
@@ -136,20 +148,20 @@ var builtins = []registeredBuiltin{
 	registerFunc("decimal", "", callDecimal),
 	registerFunc("decimal", "xs", callDecimal),
 	// extensions functions
-	registerFunc("read-file", "file", callXYZ),
-	registerFunc("write-file", "file", callXYZ),
-	registerFunc("exists", "file", callXYZ),
-	registerFunc("delete", "file", callXYZ),
-	registerFunc("list", "file", callXYZ),
+	registerFunc("read-file", "file", callReadFile),
+	registerFunc("write-file", "file", callWriteFile),
+	registerFunc("exists", "file", callFileExists),
+	registerFunc("delete", "file", callDeleteFile),
+	registerFunc("list", "file", callListDir),
 	registerFunc("encode", "binary", callXYZ),
 	registerFunc("decode", "binary", callXYZ),
 	registerFunc("concat", "binary", callXYZ),
 	registerFunc("substring", "binary", callXYZ),
 	registerFunc("send", "http", callXYZ),
-	registerFunc("get", "http", callXYZ),
-	registerFunc("post", "http", callXYZ),
-	registerFunc("hash", "crypto", callXYZ),
-	registerFunc("hmac", "crypto", callXYZ),
+	registerFunc("get", "http", callHttpGet),
+	registerFunc("post", "http", callHttpPost),
+	registerFunc("hash", "crypto", callHash),
+	registerFunc("hmac", "crypto", callHmac),
 	registerFunc("encrypt", "crypto", callXYZ),
 	registerFunc("decrypt", "crypto", callXYZ),
 	registerFunc("sign", "crypto", callXYZ),
@@ -177,7 +189,232 @@ func findBuiltin(qn QName) (builtinFunc, error) {
 type builtinFunc func(Context, []Expr) ([]Item, error)
 
 func callXYZ(ctx Context, args []Expr) ([]Item, error) {
-	return nil, nil
+	return nil, errImplemented
+}
+
+func callHash(ctx Context, args []Expr) ([]Item, error) {
+	if len(args) < 2 {
+		return nil, errArgument
+	}
+	input, err := getStringFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	alg, err := getStringFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	var res []byte
+	switch in := []byte(input); alg {
+	case "MD5":
+		tmp := md5.Sum(in)
+		res = tmp[:]
+	case "SHA-1":
+		tmp := sha1.Sum(in)
+		res = tmp[:]
+	case "SHA-256":
+		tmp := sha256.Sum256(in)
+		res = tmp[:]
+	case "SHA-512":
+		tmp := sha512.Sum512(in)
+		res = tmp[:]
+	default:
+		return nil, fmt.Errorf("%s unsupported algorithm")
+	}
+	var str string
+	if len(args) >= 3 {
+		encoding, err := getStringFromExpr(args[2], ctx)
+		if err != nil {
+			return nil, err
+		}
+		switch encoding {
+		case "base64":
+			str = base64.StdEncoding.EncodeToString(res)
+		case "hex":
+			str = hex.EncodeToString(res)
+		default:
+			return nil, fmt.Errorf("%s: unsupported output encoding", encoding)
+		}
+	}
+	return singleValue(str), nil
+}
+
+func callHmac(ctx Context, args []Expr) ([]Item, error) {
+	if len(args) < 3 {
+		return nil, errArgument
+	}
+	msg, err := getStringFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	key, err := getStringFromExpr(args[1], ctx)
+	if err != nil {
+		return nil, err
+	}
+	alg, err := getStringFromExpr(args[2], ctx)
+	if err != nil {
+		return nil, err
+	}
+	var mac hash.Hash
+	switch key := []byte(key); alg {
+	case "MD5":
+		mac = hmac.New(md5.New, key)
+	case "SHA-1":
+		mac = hmac.New(sha1.New, key)
+	case "SHA-256":
+		mac = hmac.New(sha256.New, key)
+	case "SHA-384":
+		mac = hmac.New(sha512.New384, key)
+	case "SHA-512":
+		mac = hmac.New(sha512.New, key)
+	default:
+		return nil, fmt.Errorf("%s: unsupported algorithm", alg)
+	}
+	mac.Write([]byte(msg))
+	var (
+		res = mac.Sum(nil)
+		str string
+	)
+	if len(args) >= 4 {
+		encoding, err := getStringFromExpr(args[3], ctx)
+		if err != nil {
+			return nil, err
+		}
+		switch encoding {
+		case "base64":
+			str = base64.StdEncoding.EncodeToString(res)
+		case "hex":
+			str = hex.EncodeToString(res)
+		default:
+			return nil, fmt.Errorf("%s: unsupported output encoding", encoding)
+		}
+	}
+	return singleValue(str), nil
+}
+
+func callHttpGet(ctx Context, args []Expr) ([]Item, error) {
+	if len(args) != 1 {
+		return nil, errArgument
+	}
+	url, err := getStringFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	res, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	var body bytes.Buffer
+	if _, err := io.Copy(&body, res.Body); err != nil {
+		return nil, err
+	}
+	return singleValue(body.String()), nil
+}
+
+func callHttpPost(ctx Context, args []Expr) ([]Item, error) {
+	if len(args) < 2 {
+		return nil, errArgument
+	}
+	url, err := getStringFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	content, err := getStringFromExpr(args[1], ctx)
+	if err != nil {
+		return nil, err
+	}
+	mime := "text/xml"
+	if len(args) >= 3 {
+		mime, _ = getStringFromExpr(args[2], ctx)
+	}
+
+	res, err := http.Post(url, mime, bytes.NewBufferString(content))
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	var body bytes.Buffer
+	if _, err := io.Copy(&body, res.Body); err != nil {
+		return nil, err
+	}
+	return singleValue(body.String()), nil
+}
+
+func callReadFile(ctx Context, args []Expr) ([]Item, error) {
+	if len(args) != 1 {
+		return nil, errArgument
+	}
+	file, err := getStringFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	buf, err := os.ReadFile(file)
+	if err == nil {
+		return singleValue(string(buf)), nil
+	}
+	return nil, err
+}
+
+func callWriteFile(ctx Context, args []Expr) ([]Item, error) {
+	if len(args) != 2 {
+		return nil, errArgument
+	}
+	file, err := getStringFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	content, err := getStringFromExpr(args[1], ctx)
+	if err != nil {
+		return nil, err
+	}
+	err = os.WriteFile(file, []byte(content), 0o644)
+	return nil, err
+}
+
+func callFileExists(ctx Context, args []Expr) ([]Item, error) {
+	if len(args) != 1 {
+		return nil, errArgument
+	}
+	file, err := getStringFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	_, err = os.Stat(file)
+	return singleValue(err == nil), err
+}
+
+func callDeleteFile(ctx Context, args []Expr) ([]Item, error) {
+	if len(args) != 1 {
+		return nil, errArgument
+	}
+	file, err := getStringFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	err = os.Remove(file)
+	return nil, err
+}
+
+func callListDir(ctx Context, args []Expr) ([]Item, error) {
+	if len(args) != 1 {
+		return nil, errArgument
+	}
+	file, err := getStringFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	es, err := os.ReadDir(file)
+	if err != nil {
+		return nil, err
+	}
+	var list []Item
+	for i := range es {
+		list = append(list, createLiteral(es[i].Name()))
+	}
+	return list, nil
 }
 
 func callRound(ctx Context, args []Expr) ([]Item, error) {
@@ -225,7 +462,23 @@ func callAbs(ctx Context, args []Expr) ([]Item, error) {
 }
 
 func callNumber(ctx Context, args []Expr) ([]Item, error) {
-	return nil, nil
+	var (
+		str string
+		err error
+	)
+	if len(args) >= 1 {
+		str, err = getStringFromExpr(args[0], ctx)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		str = ctx.Value()
+	}
+	val, err := strconv.ParseFloat(str, 64)
+	if err != nil {
+		return nil, err
+	}
+	return singleValue(val), nil
 }
 
 func callExists(ctx Context, args []Expr) ([]Item, error) {
@@ -358,11 +611,35 @@ func callCount(ctx Context, args []Expr) ([]Item, error) {
 }
 
 func callMin(ctx Context, args []Expr) ([]Item, error) {
-	return nil, errImplemented
+	items, err := expandArgs(ctx, args)
+	if err != nil {
+		return nil, err
+	}
+	var res any
+	if every(items, isFloat) {
+		list, _ := convert[float64](items, toFloat)
+		res = lowestValue(list)
+	} else {
+		list, _ := convert[string](items, toString)
+		res = lowestValue(list)
+	}
+	return singleValue(res), nil
 }
 
 func callMax(ctx Context, args []Expr) ([]Item, error) {
-	return nil, errImplemented
+	items, err := expandArgs(ctx, args)
+	if err != nil {
+		return nil, err
+	}
+	var res any
+	if every(items, isFloat) {
+		list, _ := convert[float64](items, toFloat)
+		res = greatestValue(list)
+	} else {
+		list, _ := convert[string](items, toString)
+		res = greatestValue(list)
+	}
+	return singleValue(res), nil
 }
 
 func callZeroOrOne(ctx Context, args []Expr) ([]Item, error) {
@@ -506,7 +783,26 @@ func callConcat(ctx Context, args []Expr) ([]Item, error) {
 }
 
 func callStringJoin(ctx Context, args []Expr) ([]Item, error) {
-	return nil, errImplemented
+	if len(args) < 1 {
+		return nil, errArgument
+	}
+	items, err := expandArgs(ctx, args[:1])
+	if err != nil {
+		return nil, err
+	}
+	list, err := convert(items, toString)
+	if err != nil {
+		return nil, err
+	}
+	var sep string
+	if len(args) >= 2 {
+		sep, err = getStringFromExpr(args[1], ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+	str := strings.Join(list, sep)
+	return singleValue(str), nil
 }
 
 func callSubstring(ctx Context, args []Expr) ([]Item, error) {
@@ -619,7 +915,33 @@ func callLowercase(ctx Context, args []Expr) ([]Item, error) {
 }
 
 func callTranslate(ctx Context, args []Expr) ([]Item, error) {
-	return nil, errImplemented
+	if len(args) != 3 {
+		return nil, errArgument
+	}
+	str, err := getStringFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	src, err := getStringFromExpr(args[1], ctx)
+	if err != nil {
+		return nil, err
+	}
+	dst, err := getStringFromExpr(args[2], ctx)
+	if err != nil {
+		return nil, err
+	}
+	set := []rune(dst)
+	str = strings.Map(func(r rune) rune {
+		ix := strings.IndexRune(src, r)
+		if ix < 0 {
+			return r
+		}
+		if len(set) < ix {
+			return set[ix]
+		}
+		return -1
+	}, str)
+	return singleValue(str), errImplemented
 }
 
 func callContains(ctx Context, args []Expr) ([]Item, error) {

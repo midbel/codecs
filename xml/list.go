@@ -125,6 +125,8 @@ func (i literalItem) Atomic() bool {
 
 func (i literalItem) True() bool {
 	switch v := i.value.(type) {
+	case []byte:
+		return len(v) != 0
 	case float64:
 		return v != 0
 	case string:
@@ -204,4 +206,54 @@ func (i nodeItem) Value() any {
 	}
 	str := traverse(i.node)
 	return strings.Join(str, "")
+}
+
+func isFloat(i Item) bool {
+	_, ok := i.Value().(float64)
+	return ok
+}
+
+func every(items []Item, test func(i Item) bool) bool {
+	for i := range items {
+		if !test(items[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func convert[T string | float64](items []Item, do func(any) (T, error)) ([]T, error) {
+	var list []T
+	for i := range items {
+		x, err := do(items[i].Value())
+		if err != nil {
+			return nil, err
+		}
+		list = append(list, x)
+	}
+	return list, nil
+}
+
+func lowestValue[T string | float64](items []T) T {
+	var res T
+	for i := range items {
+		if i == 0 {
+			res = items[i]
+			continue
+		}
+		res = min(items[i], res)
+	}
+	return res
+}
+
+func greatestValue[T string | float64](items []T) T {
+	var res T
+	for i := range items {
+		if i == 0 {
+			res = items[i]
+			continue
+		}
+		res = max(items[i], res)
+	}
+	return res
 }
