@@ -556,13 +556,20 @@ func (s *Stylesheet) GetOutput(name string) *OutputSettings {
 	return s.output[ix]
 }
 
-func (s *Stylesheet) Find(name string) (*Template, error) {
+func (s *Stylesheet) CurrentMode() string {
+	return s.Mode
+}
+
+func (s *Stylesheet) Find(name, mode string) (*Template, error) {
+	if mode == "" {
+		mode = s.CurrentMode()
+	}
 	ix := slices.IndexFunc(s.Templates, func(t *Template) bool {
-		return t.Name == name
+		return t.Name == name && t.Mode == mode
 	})
 	if ix < 0 {
 		for _, s := range s.Others {
-			if tpl, err := s.Find(name); err == nil {
+			if tpl, err := s.Find(name, mode); err == nil {
 				return tpl, nil
 			}
 		}
@@ -607,7 +614,7 @@ func (s *Stylesheet) Match(node xml.Node, mode string) (*Template, error) {
 
 	}
 	if mode == "" {
-		mode = s.Mode
+		mode = s.CurrentMode()
 	}
 	for _, t := range s.Templates {
 		if t.isRoot() || t.Mode != mode || t.Name != "" {
@@ -629,7 +636,7 @@ func (s *Stylesheet) Match(node xml.Node, mode string) (*Template, error) {
 
 func (s *Stylesheet) Execute(doc xml.Node) (xml.Node, error) {
 	ix := slices.IndexFunc(s.Templates, func(t *Template) bool {
-		return t.isRoot() && t.Mode == s.Mode
+		return t.isRoot() && t.Mode == s.CurrentMode()
 	})
 	if ix < 0 {
 		return nil, fmt.Errorf("main template not found")
@@ -812,17 +819,12 @@ func executeVariable(node, datum xml.Node, style *Stylesheet) error {
 	ix = slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
 		return a.Name == "select"
 	})
-	_ = ident
 	if ix >= 0 {
 		query, err := xml.CompileString(el.Attrs[ix].Value())
 		if err != nil {
 			return err
 		}
-		items, err := query.Find(datum)
-		if err != nil {
-			return err
-		}
-		_ = items
+		style.Define(ident, query)
 	} else {
 		// node variable - to be implemented
 		if len(el.Nodes) == 0 {
@@ -1019,7 +1021,17 @@ func executeCallTemplate(node, datum xml.Node, style *Stylesheet) error {
 	if ix < 0 {
 		return fmt.Errorf("call-template: missing name attribute")
 	}
-	tpl, err := style.Find(el.Attrs[ix].Value())
+	var (
+		name = el.Attrs[ix].Value()
+		mode = style.Mode
+	)
+	ix = slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
+		return a.Name == "mode"
+	})
+	if ix >= 0 {
+		mode = el.Attrs[ix].Value()
+	}
+	tpl, err := style.Find(name, mode)
 	if err != nil {
 		return err
 	}
@@ -1266,7 +1278,26 @@ func executeMessage(node, datum xml.Node, style *Stylesheet) error {
 }
 
 func executeElement(node, datum xml.Node, style *Stylesheet) error {
-	return errImplemented
+	el := node.(*xml.Element)
+	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
+		return a.Name == "name"
+	})
+	if ix < 0 {
+		return fmt.Errorf("element: missing name attribute")
+	}
+	qn, err := xml.ParseName(el.Attrs[ix].Value())
+	if err != nil {
+		return err
+	}
+	x := xml.NewElement(qn)
+	x.InsertNodes(0, el.Nodes)
+	if err := processNode(x, datum, style); err != nil {
+		return err
+	}
+	if r, ok := el.Parent().(interface{ ReplaceNode(int, xml.Node) error }); ok {
+		return r.ReplaceNode(el.Position(), x)
+	}
+	return nil
 }
 
 func executeAttribute(node, datum xml.Node, style *Stylesheet) error {
