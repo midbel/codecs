@@ -1289,13 +1289,22 @@ func executeElement(node, datum xml.Node, style *Stylesheet) error {
 	if err != nil {
 		return err
 	}
-	x := xml.NewElement(qn)
-	x.InsertNodes(0, el.Nodes)
-	if err := processNode(x, datum, style); err != nil {
-		return err
-	}
+	var (
+		curr = xml.NewElement(qn)
+		nodes = slices.Clone(el.Nodes)
+	)
 	if r, ok := el.Parent().(interface{ ReplaceNode(int, xml.Node) error }); ok {
-		return r.ReplaceNode(el.Position(), x)
+		r.ReplaceNode(el.Position(), curr)
+	}
+	for i := range nodes {
+		c := cloneNode(nodes[i])
+		if c == nil {
+			continue
+		}
+		curr.Append(c)
+		if err := transformNode(c, datum, style); err != nil {
+			return err
+		}
 	}
 	return nil
 }
