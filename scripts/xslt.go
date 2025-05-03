@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/midbel/codecs/xml"
@@ -151,14 +152,20 @@ type Mode struct {
 	MultiMatch MatchMode
 }
 
+var unnamedMode = Mode{
+	NoMatch:    MatchFail,
+	MultiMatch: MatchFail,
+}
+
 func (m Mode) Unnamed() bool {
 	return m.Name == ""
 }
 
 type Stylesheet struct {
-	Mode    string
-	Modes   []*Mode
-	AttrSet []*AttributeSet
+	Mode        string
+	currentMode *Mode
+	Modes       []*Mode
+	AttrSet     []*AttributeSet
 
 	vars   xml.Environ[xml.Expr]
 	params xml.Environ[xml.Expr]
@@ -177,9 +184,11 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 		return nil, err
 	}
 	sheet := Stylesheet{
-		vars:    xml.Empty[xml.Expr](),
-		Context: contextDir,
+		vars:        xml.Empty[xml.Expr](),
+		Context:     contextDir,
+		currentMode: &unnamedMode,
 	}
+	sheet.Modes = append(sheet.Modes, &unnamedMode)
 	sheet.Templates, err = loadTemplates(doc)
 	if err != nil {
 		return nil, err
@@ -430,6 +439,12 @@ func loadTemplates(doc xml.Node) ([]*Template, error) {
 		}
 		for _, a := range el.Attrs {
 			switch attr := a.Value(); a.Name {
+			case "priority":
+				p, err := strconv.Atoi(attr)
+				if err != nil {
+					return nil, err
+				}
+				t.Priority = p
 			case "name":
 				t.Name = attr
 			case "match":
@@ -581,50 +596,61 @@ func (s *Stylesheet) Find(name, mode string) (*Template, error) {
 }
 
 func (s *Stylesheet) Match(node xml.Node, mode string) (*Template, error) {
-	// match work in reverse
-	// given a node, we should check that the node would be selected
-	// from the xpath expression given in the match attribute of the
-	// template
-	isMatch := func(pattern string) (bool, int) {
-		if pattern == "" {
-			return false, -1
-		}
+	hasMatch := func(expr xml.Expr) (bool, int) {
 		var (
-			parts = strings.Split(pattern, "/")
+			depth int
 			curr  = node
-			rank  int
 		)
-		slices.Reverse(parts)
-		for {
-			if len(parts) == 0 {
+		for curr != nil {
+			items, err := expr.Find(curr)
+			if err != nil {
 				break
 			}
-			if curr.QualifiedName() != parts[0] {
-				return false, rank
+			if len(items) > 0 {
+				ok := slices.ContainsFunc(items, func(i xml.Item) bool {
+					n := i.Node()
+					return n.Identity() == node.Identity()
+				})
+				return ok, depth + expr.MatchPriority()
 			}
-			rank++
+			depth--
 			curr = curr.Parent()
-			if curr == nil {
-				break
-			}
-			parts = parts[1:]
-
 		}
-		return true, rank
-
+		return false, 0
 	}
 	if mode == "" {
 		mode = s.CurrentMode()
 	}
+	type TemplateMatch struct {
+		*Template
+		Priority int
+	}
+	var results []*TemplateMatch
 	for _, t := range s.Templates {
 		if t.isRoot() || t.Mode != mode || t.Name != "" {
 			continue
 		}
-		if ok, _ := isMatch(t.Match); ok {
-			tpl := t.Clone()
-			s.prepare(tpl)
-			return tpl, nil
+		expr, err := xml.CompileString(t.Match)
+		if err != nil {
+			continue
 		}
+		ok, prio := hasMatch(expr)
+		if !ok {
+			continue
+		}
+		m := TemplateMatch{
+			Template: t,
+			Priority: prio,
+		}
+		results = append(results, &m)
+	}
+	if len(results) > 0 {
+		slices.SortFunc(results, func(m1, m2 *TemplateMatch) int {
+			return m2.Priority - m1.Priority
+		})
+		tpl := results[0].Template.Clone()
+		s.prepare(tpl)
+		return tpl, nil
 	}
 	for _, s := range s.Others {
 		if tpl, err := s.Match(node, mode); err == nil {
@@ -697,6 +723,7 @@ type Template struct {
 	Name     string
 	Match    string
 	Mode     string
+	Priority int
 	Fragment xml.Node
 
 	params xml.Environ[string]
