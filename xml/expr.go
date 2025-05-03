@@ -140,6 +140,7 @@ func Call(ctx Context, body []Expr) ([]Item, error) {
 type Expr interface {
 	Find(Node) ([]Item, error)
 	find(Context) ([]Item, error)
+	MatchPriority() int
 }
 
 type Context struct {
@@ -234,6 +235,10 @@ func (q query) Find(node Node) ([]Item, error) {
 	return q.find(defaultContext(node))
 }
 
+func (q query) MatchPriority() int {
+	return q.expr.MatchPriority()
+}
+
 func (q query) find(ctx Context) ([]Item, error) {
 	return q.expr.find(ctx)
 }
@@ -242,6 +247,10 @@ type wildcard struct{}
 
 func (w wildcard) Find(node Node) ([]Item, error) {
 	return w.find(defaultContext(node))
+}
+
+func (w wildcard) MatchPriority() int {
+	return 0
 }
 
 func (w wildcard) find(ctx Context) ([]Item, error) {
@@ -257,6 +266,10 @@ func (r root) Find(node Node) ([]Item, error) {
 	return r.find(defaultContext(node).Root())
 }
 
+func (r root) MatchPriority() int {
+	return 0
+}
+
 func (_ root) find(ctx Context) ([]Item, error) {
 	root := ctx.Root()
 	return singleNode(root.Node), nil
@@ -266,6 +279,10 @@ type current struct{}
 
 func (c current) Find(node Node) ([]Item, error) {
 	return c.find(defaultContext(node))
+}
+
+func (c current) MatchPriority() int {
+	return 0
 }
 
 func (_ current) find(ctx Context) ([]Item, error) {
@@ -279,6 +296,10 @@ type step struct {
 
 func (s step) Find(node Node) ([]Item, error) {
 	return s.find(defaultContext(node))
+}
+
+func (s step) MatchPriority() int {
+	return 0
 }
 
 func (s step) find(ctx Context) ([]Item, error) {
@@ -305,6 +326,10 @@ type axis struct {
 
 func (a axis) Find(node Node) ([]Item, error) {
 	return a.find(defaultContext(node))
+}
+
+func (a axis) MatchPriority() int {
+	return 0
 }
 
 func (a axis) principalType() NodeType {
@@ -430,6 +455,10 @@ func (i identifier) Find(node Node) ([]Item, error) {
 	return i.find(defaultContext(node))
 }
 
+func (i identifier) MatchPriority() int {
+	return 0
+}
+
 func (i identifier) find(ctx Context) ([]Item, error) {
 	expr, err := ctx.Resolve(i.ident)
 	if err != nil {
@@ -450,6 +479,10 @@ func (n name) Find(node Node) ([]Item, error) {
 	return n.find(defaultContext(node))
 }
 
+func (n name) MatchPriority() int {
+	return 0
+}
+
 func (n name) find(ctx Context) ([]Item, error) {
 	if n.Space == "*" && n.Name == ctx.LocalName() {
 		return singleNode(ctx.Node), nil
@@ -466,6 +499,10 @@ type sequence struct {
 
 func (s sequence) Find(node Node) ([]Item, error) {
 	return s.find(defaultContext(node))
+}
+
+func (s sequence) MatchPriority() int {
+	return 0
 }
 
 func (s sequence) find(ctx Context) ([]Item, error) {
@@ -488,6 +525,10 @@ type binary struct {
 
 func (b binary) Find(node Node) ([]Item, error) {
 	return b.find(defaultContext(node))
+}
+
+func (b binary) MatchPriority() int {
+	return 0
 }
 
 func (b binary) find(ctx Context) ([]Item, error) {
@@ -584,6 +625,10 @@ func (i identity) Find(node Node) ([]Item, error) {
 	return i.find(defaultContext(node))
 }
 
+func (i identity) MatchPriority() int {
+	return 0
+}
+
 func (i identity) find(ctx Context) ([]Item, error) {
 	left, err := i.left.find(ctx)
 	if err != nil {
@@ -611,6 +656,10 @@ func (r reverse) Find(node Node) ([]Item, error) {
 	return r.find(defaultContext(node))
 }
 
+func (r reverse) MatchPriority() int {
+	return 0
+}
+
 func (r reverse) find(ctx Context) ([]Item, error) {
 	v, err := r.expr.find(ctx)
 	if err != nil {
@@ -631,6 +680,10 @@ func (i literal) Find(node Node) ([]Item, error) {
 	return i.find(defaultContext(node))
 }
 
+func (i literal) MatchPriority() int {
+	return 0
+}
+
 func (i literal) find(_ Context) ([]Item, error) {
 	return singleValue(i.expr), nil
 }
@@ -641,6 +694,10 @@ type number struct {
 
 func (n number) Find(node Node) ([]Item, error) {
 	return n.find(defaultContext(node))
+}
+
+func (n number) MatchPriority() int {
+	return 0
 }
 
 func (n number) find(_ Context) ([]Item, error) {
@@ -672,6 +729,10 @@ func (k kind) Find(node Node) ([]Item, error) {
 	return k.find(defaultContext(node))
 }
 
+func (k kind) MatchPriority() int {
+	return 0
+}
+
 func (k kind) find(ctx Context) ([]Item, error) {
 	if k.kind == typeAll || ctx.Type() == k.kind {
 		return singleNode(ctx.Node), nil
@@ -686,6 +747,10 @@ type call struct {
 
 func (c call) Find(node Node) ([]Item, error) {
 	return c.find(defaultContext(node))
+}
+
+func (c call) MatchPriority() int {
+	return 0
 }
 
 func (c call) find(ctx Context) ([]Item, error) {
@@ -725,6 +790,10 @@ func (a attr) Find(node Node) ([]Item, error) {
 	return a.find(defaultContext(node))
 }
 
+func (a attr) MatchPriority() int {
+	return 0
+}
+
 func (a attr) find(ctx Context) ([]Item, error) {
 	if ctx.Type() != TypeElement {
 		return nil, nil
@@ -745,6 +814,10 @@ type except struct {
 
 func (e except) Find(node Node) ([]Item, error) {
 	return e.find(defaultContext(node))
+}
+
+func (e except) MatchPriority() int {
+	return 0
 }
 
 func (e except) find(ctx Context) ([]Item, error) {
@@ -773,6 +846,10 @@ type intersect struct {
 
 func (i intersect) Find(node Node) ([]Item, error) {
 	return i.find(defaultContext(node))
+}
+
+func (i intersect) MatchPriority() int {
+	return 0
 }
 
 func (e intersect) find(ctx Context) ([]Item, error) {
@@ -804,6 +881,10 @@ func (u union) Find(node Node) ([]Item, error) {
 	return u.find(defaultContext(node))
 }
 
+func (u union) MatchPriority() int {
+	return 0
+}
+
 func (u union) find(ctx Context) ([]Item, error) {
 	var list []Item
 	for i := range u.all {
@@ -823,6 +904,10 @@ type filter struct {
 
 func (f filter) Find(node Node) ([]Item, error) {
 	return f.find(defaultContext(node))
+}
+
+func (f filter) MatchPriority() int {
+	return 0
 }
 
 func (f filter) find(ctx Context) ([]Item, error) {
@@ -875,6 +960,10 @@ func (e Let) Find(node Node) ([]Item, error) {
 	return e.find(defaultContext(node))
 }
 
+func (e Let) MatchPriority() int {
+	return 0
+}
+
 func (e Let) find(ctx Context) ([]Item, error) {
 	ctx.Define(e.ident, e.expr)
 	return nil, nil
@@ -900,6 +989,10 @@ type rng struct {
 
 func (r rng) Find(node Node) ([]Item, error) {
 	return r.find(defaultContext(node))
+}
+
+func (r rng) MatchPriority() int {
+	return 0
 }
 
 func (r rng) find(ctx Context) ([]Item, error) {
@@ -945,6 +1038,10 @@ func (o loop) Find(node Node) ([]Item, error) {
 	return o.find(defaultContext(node))
 }
 
+func (o loop) MatchPriority() int {
+	return 0
+}
+
 func (o loop) find(ctx Context) ([]Item, error) {
 	return nil, nil
 }
@@ -957,6 +1054,10 @@ type conditional struct {
 
 func (c conditional) Find(node Node) ([]Item, error) {
 	return c.find(defaultContext(node))
+}
+
+func (c conditional) MatchPriority() int {
+	return 0
 }
 
 func (c conditional) find(ctx Context) ([]Item, error) {
@@ -979,6 +1080,10 @@ type quantified struct {
 
 func (q quantified) Find(node Node) ([]Item, error) {
 	return q.find(defaultContext(node))
+}
+
+func (q qauntified) MatchPriority() int {
+	return 0
 }
 
 func (q quantified) find(ctx Context) ([]Item, error) {
@@ -1049,6 +1154,10 @@ func (v value) Find(node Node) ([]Item, error) {
 	return v.find(defaultContext(node))
 }
 
+func (v value) MatchPriority() int {
+	return 0
+}
+
 func (v value) find(ctx Context) ([]Item, error) {
 	return []Item{v.item}, nil
 }
@@ -1112,6 +1221,10 @@ func (c cast) Find(node Node) ([]Item, error) {
 	return c.find(defaultContext(node))
 }
 
+func (c cast) MatchPriority() int {
+	return 0
+}
+
 func (c cast) find(ctx Context) ([]Item, error) {
 	is, err := c.expr.find(ctx)
 	if err != nil {
@@ -1137,6 +1250,10 @@ type castable struct {
 
 func (c castable) Find(node Node) ([]Item, error) {
 	return c.find(defaultContext(node))
+}
+
+func (c castable) MatchPriority() int {
+	return 0
 }
 
 func (c castable) find(ctx Context) ([]Item, error) {

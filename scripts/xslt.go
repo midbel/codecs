@@ -1290,7 +1290,7 @@ func executeElement(node, datum xml.Node, style *Stylesheet) error {
 		return err
 	}
 	var (
-		curr = xml.NewElement(qn)
+		curr  = xml.NewElement(qn)
 		nodes = slices.Clone(el.Nodes)
 	)
 	if r, ok := el.Parent().(interface{ ReplaceNode(int, xml.Node) error }); ok {
