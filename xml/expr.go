@@ -17,6 +17,12 @@ var (
 	ErrEmpty     = errors.New("sequence is empty")
 )
 
+const (
+	prioLow  = -1
+	prioMed  = 0
+	prioHigh = 1
+)
+
 func FromRoot(expr Expr) Expr {
 	var base current
 	return fromBase(expr, base)
@@ -250,7 +256,7 @@ func (w wildcard) Find(node Node) ([]Item, error) {
 }
 
 func (w wildcard) MatchPriority() int {
-	return 0
+	return prioLow
 }
 
 func (w wildcard) find(ctx Context) ([]Item, error) {
@@ -267,7 +273,7 @@ func (r root) Find(node Node) ([]Item, error) {
 }
 
 func (r root) MatchPriority() int {
-	return 0
+	return prioHigh
 }
 
 func (_ root) find(ctx Context) ([]Item, error) {
@@ -282,7 +288,7 @@ func (c current) Find(node Node) ([]Item, error) {
 }
 
 func (c current) MatchPriority() int {
-	return 0
+	return prioMed
 }
 
 func (_ current) find(ctx Context) ([]Item, error) {
@@ -299,7 +305,7 @@ func (s step) Find(node Node) ([]Item, error) {
 }
 
 func (s step) MatchPriority() int {
-	return 0
+	return getPriority(prioMed, s.curr, s.next)
 }
 
 func (s step) find(ctx Context) ([]Item, error) {
@@ -329,7 +335,7 @@ func (a axis) Find(node Node) ([]Item, error) {
 }
 
 func (a axis) MatchPriority() int {
-	return 0
+	return getPriority(prioMed, a.next)
 }
 
 func (a axis) principalType() NodeType {
@@ -456,7 +462,7 @@ func (i identifier) Find(node Node) ([]Item, error) {
 }
 
 func (i identifier) MatchPriority() int {
-	return 0
+	return prioHigh
 }
 
 func (i identifier) find(ctx Context) ([]Item, error) {
@@ -480,7 +486,7 @@ func (n name) Find(node Node) ([]Item, error) {
 }
 
 func (n name) MatchPriority() int {
-	return 0
+	return prioMed
 }
 
 func (n name) find(ctx Context) ([]Item, error) {
@@ -502,7 +508,7 @@ func (s sequence) Find(node Node) ([]Item, error) {
 }
 
 func (s sequence) MatchPriority() int {
-	return 0
+	return prioLow
 }
 
 func (s sequence) find(ctx Context) ([]Item, error) {
@@ -528,7 +534,7 @@ func (b binary) Find(node Node) ([]Item, error) {
 }
 
 func (b binary) MatchPriority() int {
-	return 0
+	return getPriority(prioMed, b.left, b.right)
 }
 
 func (b binary) find(ctx Context) ([]Item, error) {
@@ -626,7 +632,7 @@ func (i identity) Find(node Node) ([]Item, error) {
 }
 
 func (i identity) MatchPriority() int {
-	return 0
+	return getPriority(prioMed, i.left, i.right)
 }
 
 func (i identity) find(ctx Context) ([]Item, error) {
@@ -657,7 +663,7 @@ func (r reverse) Find(node Node) ([]Item, error) {
 }
 
 func (r reverse) MatchPriority() int {
-	return 0
+	return getPriority(prioMed, r.expr)
 }
 
 func (r reverse) find(ctx Context) ([]Item, error) {
@@ -681,7 +687,7 @@ func (i literal) Find(node Node) ([]Item, error) {
 }
 
 func (i literal) MatchPriority() int {
-	return 0
+	return prioLow
 }
 
 func (i literal) find(_ Context) ([]Item, error) {
@@ -697,7 +703,7 @@ func (n number) Find(node Node) ([]Item, error) {
 }
 
 func (n number) MatchPriority() int {
-	return 0
+	return prioLow
 }
 
 func (n number) find(_ Context) ([]Item, error) {
@@ -730,7 +736,7 @@ func (k kind) Find(node Node) ([]Item, error) {
 }
 
 func (k kind) MatchPriority() int {
-	return 0
+	return prioLow
 }
 
 func (k kind) find(ctx Context) ([]Item, error) {
@@ -750,7 +756,7 @@ func (c call) Find(node Node) ([]Item, error) {
 }
 
 func (c call) MatchPriority() int {
-	return 0
+	return prioHigh
 }
 
 func (c call) find(ctx Context) ([]Item, error) {
@@ -791,7 +797,7 @@ func (a attr) Find(node Node) ([]Item, error) {
 }
 
 func (a attr) MatchPriority() int {
-	return 0
+	return prioMed
 }
 
 func (a attr) find(ctx Context) ([]Item, error) {
@@ -817,7 +823,7 @@ func (e except) Find(node Node) ([]Item, error) {
 }
 
 func (e except) MatchPriority() int {
-	return 0
+	return getPriority(prioMed, e.all...)
 }
 
 func (e except) find(ctx Context) ([]Item, error) {
@@ -844,12 +850,12 @@ type intersect struct {
 	all []Expr
 }
 
-func (i intersect) Find(node Node) ([]Item, error) {
-	return i.find(defaultContext(node))
+func (e intersect) Find(node Node) ([]Item, error) {
+	return e.find(defaultContext(node))
 }
 
-func (i intersect) MatchPriority() int {
-	return 0
+func (e intersect) MatchPriority() int {
+	return getPriority(prioMed, e.all...)
 }
 
 func (e intersect) find(ctx Context) ([]Item, error) {
@@ -882,7 +888,7 @@ func (u union) Find(node Node) ([]Item, error) {
 }
 
 func (u union) MatchPriority() int {
-	return 0
+	return getPriority(prioMed, u.all...)
 }
 
 func (u union) find(ctx Context) ([]Item, error) {
@@ -907,7 +913,7 @@ func (f filter) Find(node Node) ([]Item, error) {
 }
 
 func (f filter) MatchPriority() int {
-	return 0
+	return getPriority(prioHigh, f.expr, f.check)
 }
 
 func (f filter) find(ctx Context) ([]Item, error) {
@@ -961,7 +967,7 @@ func (e Let) Find(node Node) ([]Item, error) {
 }
 
 func (e Let) MatchPriority() int {
-	return 0
+	return prioLow
 }
 
 func (e Let) find(ctx Context) ([]Item, error) {
@@ -978,6 +984,10 @@ func (e let) Find(node Node) ([]Item, error) {
 	return e.find(defaultContext(node))
 }
 
+func (e let) MatchPriority() int {
+	return prioLow
+}
+
 func (e let) find(ctx Context) ([]Item, error) {
 	return nil, nil
 }
@@ -992,7 +1002,7 @@ func (r rng) Find(node Node) ([]Item, error) {
 }
 
 func (r rng) MatchPriority() int {
-	return 0
+	return prioLow
 }
 
 func (r rng) find(ctx Context) ([]Item, error) {
@@ -1039,7 +1049,7 @@ func (o loop) Find(node Node) ([]Item, error) {
 }
 
 func (o loop) MatchPriority() int {
-	return 0
+	return prioLow
 }
 
 func (o loop) find(ctx Context) ([]Item, error) {
@@ -1057,7 +1067,7 @@ func (c conditional) Find(node Node) ([]Item, error) {
 }
 
 func (c conditional) MatchPriority() int {
-	return 0
+	return getPriority(prioHigh, c.test)
 }
 
 func (c conditional) find(ctx Context) ([]Item, error) {
@@ -1082,8 +1092,8 @@ func (q quantified) Find(node Node) ([]Item, error) {
 	return q.find(defaultContext(node))
 }
 
-func (q qauntified) MatchPriority() int {
-	return 0
+func (q quantified) MatchPriority() int {
+	return getPriority(prioHigh, q.test)
 }
 
 func (q quantified) find(ctx Context) ([]Item, error) {
@@ -1155,7 +1165,7 @@ func (v value) Find(node Node) ([]Item, error) {
 }
 
 func (v value) MatchPriority() int {
-	return 0
+	return prioLow
 }
 
 func (v value) find(ctx Context) ([]Item, error) {
@@ -1222,7 +1232,7 @@ func (c cast) Find(node Node) ([]Item, error) {
 }
 
 func (c cast) MatchPriority() int {
-	return 0
+	return getPriority(prioLow, c.expr)
 }
 
 func (c cast) find(ctx Context) ([]Item, error) {
@@ -1253,7 +1263,7 @@ func (c castable) Find(node Node) ([]Item, error) {
 }
 
 func (c castable) MatchPriority() int {
-	return 0
+	return getPriority(prioLow, c.expr)
 }
 
 func (c castable) find(ctx Context) ([]Item, error) {
@@ -1407,4 +1417,11 @@ func toBool(v any) bool {
 	default:
 		return false
 	}
+}
+
+func getPriority(base int, values ...Expr) int {
+	for i := range values {
+		base += values[i].MatchPriority()
+	}
+	return base
 }
