@@ -5,9 +5,11 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"iter"
 	"os"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -640,7 +642,7 @@ func (s *Stylesheet) Match(node xml.Node, mode string) (*Template, error) {
 		}
 		m := TemplateMatch{
 			Template: t,
-			Priority: prio,
+			Priority: prio + t.Priority,
 		}
 		results = append(results, &m)
 	}
@@ -725,8 +727,6 @@ type Template struct {
 	Mode     string
 	Priority int
 	Fragment xml.Node
-
-	params xml.Environ[string]
 }
 
 func (t *Template) Clone() *Template {
@@ -1240,8 +1240,36 @@ func executeForeach(node, datum xml.Node, style *Stylesheet) error {
 		return err
 	}
 
-	for i := range items {
-		value := items[i].Node()
+	var it iter.Seq[xml.Item]
+	if el.Nodes[0].QualifiedName() == "xsl:sort" {
+		x := el.Nodes[0].(*xml.Element)
+		ix := slices.IndexFunc(x.Attrs, func(a xml.Attribute) bool {
+			return a.Name == "select"
+		})
+		if ix < 0 {
+			return fmt.Errorf("xsl:sort: missing select attribute")
+		}
+		var (
+			query = x.Attrs[ix].Value()
+			order string
+		)
+		ix = slices.IndexFunc(x.Attrs, func(a xml.Attribute) bool {
+			return a.Name == "order"
+		})
+		if ix >= 0 {
+			order = x.Attrs[ix].Value()
+		}
+		el.RemoveNode(0)
+		it, err = foreachItems(items, query, order)
+		if err != nil {
+			return err
+		}
+	} else {
+		it = slices.Values(items)
+	}
+
+	for i := range it {
+		value := i.Node()
 		for _, n := range el.Nodes {
 			c := cloneNode(n)
 			if c == nil {
@@ -1254,6 +1282,47 @@ func executeForeach(node, datum xml.Node, style *Stylesheet) error {
 		}
 	}
 	return nil
+}
+
+func foreachItems(items []xml.Item, orderBy, orderDir string) (iter.Seq[xml.Item], error) {
+	expr, err := xml.CompileString(orderBy)
+	if err != nil {
+		return nil, err
+	}
+	getString := func(is []xml.Item) string {
+		if len(is) == 0 {
+			return ""
+		}
+		val := is[0].Value()
+		return val.(string)
+	}
+	var compare func(string, string) bool
+	if orderDir == "descending" {
+		compare = func(str1, str2 string) bool {
+			return strings.Compare(str1, str2) >= 0
+		}
+	} else {
+		compare = func(str1, str2 string) bool {
+			return strings.Compare(str1, str2) < 0
+		}
+	}
+	fn := func(yield func(xml.Item) bool) {
+		is := slices.Clone(items)
+		sort.Slice(is, func(i, j int) bool {
+			x1, err1 := expr.Find(is[i].Node())
+			x2, err2 := expr.Find(is[j].Node())
+			if err1 != nil || err2 != nil {
+				return false
+			}
+			return compare(getString(x1), getString(x2))
+		})
+		for i := range is {
+			if !yield(is[i]) {
+				break
+			}
+		}
+	}
+	return fn, nil
 }
 
 func executeValueOf(node, datum xml.Node, style *Stylesheet) error {
