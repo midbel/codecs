@@ -26,10 +26,10 @@ type registeredBuiltin struct {
 	QName
 	MinArg int
 	MaxArg int
-	Func   builtinFunc
+	Func   BuiltinFunc
 }
 
-func registerFunc(name, space string, fn builtinFunc) registeredBuiltin {
+func registerFunc(name, space string, fn BuiltinFunc) registeredBuiltin {
 	qn := QName{
 		Name:  name,
 		Space: space,
@@ -37,6 +37,21 @@ func registerFunc(name, space string, fn builtinFunc) registeredBuiltin {
 	return registeredBuiltin{
 		QName: qn,
 		Func:  fn,
+	}
+}
+
+func RegisterBuiltin(qn QName, fn BuiltinFunc) {
+	r := registeredBuiltin{
+		QName: qn,
+		Func: fn,
+	}
+	ix := slices.IndexFunc(builtins, func(b registeredBuiltin) bool {
+		return b.QName == qn
+	})
+	if ix < 0 {
+		builtins = append(builtins, r)
+	} else {
+		builtins[ix] = r
 	}
 }
 
@@ -176,7 +191,7 @@ var builtins = []registeredBuiltin{
 	registerFunc("exit-code", "process", callXYZ),
 }
 
-func findBuiltin(qn QName) (builtinFunc, error) {
+func findBuiltin(qn QName) (BuiltinFunc, error) {
 	ix := slices.IndexFunc(builtins, func(rg registeredBuiltin) bool {
 		return qn.QualifiedName() == rg.QualifiedName()
 	})
@@ -186,7 +201,7 @@ func findBuiltin(qn QName) (builtinFunc, error) {
 	return builtins[ix].Func, nil
 }
 
-type builtinFunc func(Context, []Expr) ([]Item, error)
+type BuiltinFunc func(Context, []Expr) ([]Item, error)
 
 func callXYZ(ctx Context, args []Expr) ([]Item, error) {
 	return nil, errImplemented

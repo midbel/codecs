@@ -1430,7 +1430,81 @@ func executeFallback(node, datum xml.Node, style *Stylesheet) error {
 }
 
 func executeForeachGroup(node, datum xml.Node, style *Stylesheet) error {
-	return errImplemented
+	el := node.(*xml.Element)
+	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
+		return a.Name == "select"
+	})
+	if ix < 0 {
+		return fmt.Errorf("for-each-group: missing select attribute")
+	}
+	parent, ok := el.Parent().(*xml.Element)
+	if !ok {
+		return fmt.Errorf("for-each-group: xml element expected as parent")
+	}
+	parent.RemoveNode(el.Position())
+
+	expr, err := xml.CompileString(el.Attrs[ix].Value())
+	if err != nil {
+		return err
+	}
+	var items []xml.Item
+	if e, ok := expr.(interface {
+		FindWithEnv(xml.Node, xml.Environ[xml.Expr]) ([]xml.Item, error)
+	}); ok {
+		items, err = e.FindWithEnv(datum, style)
+	} else {
+		items, err = expr.Find(datum)
+	}
+	if err != nil || len(items) == 0 {
+		return err
+	}
+
+	ix = slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
+		return a.Name == "group-by"
+	})
+	if ix < 0 {
+		return fmt.Errorf("for-each-group: missing group-by attribute")
+	}
+	grpby, err := xml.CompileString(el.Attrs[ix].Value())
+	if err != nil {
+		return err
+	}
+	groups := make(map[string][]xml.Item)
+	for i := range items {
+		is, err := grpby.Find(items[i].Node())
+		if err != nil {
+			return err
+		}
+		key := is[0].Value().(string)
+		groups[key] = append(groups[key], items[i])
+	}
+
+	for key, items := range groups {
+		currentGrp := func(_ xml.Context, _ []xml.Expr) ([]xml.Item, error) {
+			return items, nil
+		}
+		currentKey := func(_ xml.Context, _ []xml.Expr) ([]xml.Item, error) {
+			i := xml.NewLiteralItem(key)
+			return []xml.Item{i}, nil
+		}
+
+		xml.RegisterBuiltin(xml.LocalName("current-group"), currentGrp)
+		xml.RegisterBuiltin(xml.QualifiedName("current-group", "fn"), currentGrp)
+		xml.RegisterBuiltin(xml.LocalName("current-grouping-key"), currentKey)
+		xml.RegisterBuiltin(xml.QualifiedName("current-grouping-key", "fn"), currentKey)
+
+		for _, n := range el.Nodes {
+			c := cloneNode(n)
+			if c == nil {
+				continue
+			}
+			parent.Append(c)
+			if err := transformNode(c, datum, style); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func executeMerge(node, datum xml.Node, style *Stylesheet) error {

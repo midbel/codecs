@@ -109,6 +109,10 @@ type literalItem struct {
 	value any
 }
 
+func NewLiteralItem(value any) Item {
+	return createLiteral(value)
+}
+
 func createLiteral(value any) Item {
 	return literalItem{
 		value: value,
@@ -158,6 +162,10 @@ func (i literalItem) Value() any {
 
 type nodeItem struct {
 	node Node
+}
+
+func NewNodeItem(node Node) Item {
+	return createNode(node)
 }
 
 func createNode(node Node) Item {
