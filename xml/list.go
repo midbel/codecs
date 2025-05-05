@@ -65,7 +65,7 @@ func (e *Env[T]) Clone() Environ[T] {
 	x.values = make(map[string]T)
 	maps.Copy(e.values, x.values)
 
-	if c, ok := e.parent.(interface { Clone() Environ[T] }); ok {
+	if c, ok := e.parent.(interface{ Clone() Environ[T] }); ok {
 		x.parent = c.Clone()
 	}
 	return &x

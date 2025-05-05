@@ -168,8 +168,9 @@ type Stylesheet struct {
 	Modes       []*Mode
 	AttrSet     []*AttributeSet
 
-	vars   xml.Environ[xml.Expr]
-	params xml.Environ[xml.Expr]
+	vars     xml.Environ[xml.Expr]
+	params   xml.Environ[xml.Expr]
+	builtins xml.Environ[xml.BuiltinFunc]
 
 	output    []*OutputSettings
 	Templates []*Template
@@ -186,12 +187,11 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 	}
 	sheet := Stylesheet{
 		vars:        xml.Empty[xml.Expr](),
+		params:      xml.Empty[xml.Expr](),
 		Context:     contextDir,
 		currentMode: &unnamedMode,
 	}
-	sheet.Modes = append(sheet.Modes, &unnamedMode)
-	sheet.Templates, err = loadTemplates(doc)
-	if err != nil {
+	if err = sheet.loadTemplates(doc); err != nil {
 		return nil, err
 	}
 
@@ -204,10 +204,10 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 	} else {
 		sheet.output = append(sheet.output, defaultOutput())
 	}
-	if sheet.params, err = loadParams(doc); err != nil {
+	if err = sheet.loadParams(doc); err != nil {
 		return nil, err
 	}
-	if sheet.AttrSet, err = loadAttributeSet(doc); err != nil {
+	if err = sheet.loadAttributeSet(doc); err != nil {
 		return nil, err
 	}
 	if err := includesSheet(&sheet, doc); err != nil {
@@ -231,7 +231,7 @@ func defaultOutput() *OutputSettings {
 }
 
 func includesSheet(sheet *Stylesheet, doc xml.Node) error {
-	query, err := xml.CompileString("/xsl:stylesheet/xsl:include")
+	query, err := sheet.CompileQuery("/xsl:stylesheet/xsl:include")
 	if err != nil {
 		return err
 	}
@@ -249,7 +249,7 @@ func includesSheet(sheet *Stylesheet, doc xml.Node) error {
 }
 
 func importsSheet(sheet *Stylesheet, doc xml.Node) error {
-	query, err := xml.CompileString("/xsl:stylesheet/xsl:import")
+	query, err := sheet.CompileQuery("/xsl:stylesheet/xsl:import")
 	if err != nil {
 		return err
 	}
@@ -266,16 +266,15 @@ func importsSheet(sheet *Stylesheet, doc xml.Node) error {
 	return nil
 }
 
-func loadAttributeSet(doc xml.Node) ([]*AttributeSet, error) {
-	query, err := xml.CompileString("/xsl:stylesheet/xsl:attribute-set")
+func (s *Stylesheet) loadAttributeSet(doc xml.Node) error {
+	query, err := s.CompileQuery("/xsl:stylesheet/xsl:attribute-set")
 	if err != nil {
-		return nil, err
+		return err
 	}
 	items, err := query.Find(doc)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	var set []*AttributeSet
 	for i := range items {
 		n := items[i].Node().(*xml.Element)
 		if n == nil {
@@ -285,7 +284,7 @@ func loadAttributeSet(doc xml.Node) ([]*AttributeSet, error) {
 			return a.Name == "name"
 		})
 		if ix < 0 {
-			return nil, fmt.Errorf("attribute-set: missing name attribute")
+			return fmt.Errorf("attribute-set: missing name attribute")
 		}
 		as := AttributeSet{
 			Name: n.Attrs[ix].Value(),
@@ -299,32 +298,28 @@ func loadAttributeSet(doc xml.Node) ([]*AttributeSet, error) {
 				return a.Name == "name"
 			})
 			if ix < 0 {
-				return nil, fmt.Errorf("attribute: missing name attribute")
+				return fmt.Errorf("attribute: missing name attribute")
 			}
 			attr := xml.NewAttribute(xml.LocalName(n.Attrs[ix].Value()), n.Value())
 			as.Attrs = append(as.Attrs, attr)
 		}
-		set = append(set, &as)
+		s.AttrSet = append(s.AttrSet, &as)
 	}
-	return set, nil
+	return nil
 }
 
-func loadModes(doc xml.Node) ([]*Mode, error) {
-	query, err := xml.CompileString("/xsl:stylesheet/xsl:mode")
+func (s *Stylesheet) loadModes(doc xml.Node) error {
+	query, err := s.CompileQuery("/xsl:stylesheet/xsl:mode")
 	if err != nil {
-		return nil, err
+		return err
 	}
 	items, err := query.Find(doc)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	var modes []*Mode
+	s.Modes = append(s.Modes, &unnamedMode)
 	if len(items) == 0 {
-		m := Mode{
-			NoMatch: MatchFail,
-		}
-		modes := append(modes, &m)
-		return modes, nil
+		return nil
 	}
 	for i := range items {
 		n := items[i].Node().(*xml.Element)
@@ -345,21 +340,20 @@ func loadModes(doc xml.Node) ([]*Mode, error) {
 			default:
 			}
 		}
-		modes = append(modes, &m)
+		s.Modes = append(s.Modes, &m)
 	}
-	return modes, nil
+	return nil
 }
 
-func loadParams(doc xml.Node) (xml.Environ[xml.Expr], error) {
-	query, err := xml.CompileString("/xsl:stylesheet/xsl:param")
+func (s *Stylesheet) loadParams(doc xml.Node) error {
+	query, err := s.CompileQuery("/xsl:stylesheet/xsl:param")
 	if err != nil {
-		return nil, err
+		return err
 	}
 	items, err := query.Find(doc)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	env := xml.Empty[xml.Expr]()
 	for i := range items {
 		n := items[i].Node().(*xml.Element)
 		if n == nil {
@@ -369,7 +363,7 @@ func loadParams(doc xml.Node) (xml.Environ[xml.Expr], error) {
 			return a.Name == "name"
 		})
 		if ix < 0 {
-			return nil, fmt.Errorf("param: missing name attribute")
+			return fmt.Errorf("param: missing name attribute")
 		}
 		ident := n.Attrs[ix].Value()
 		ix = slices.IndexFunc(n.Attrs, func(a xml.Attribute) bool {
@@ -378,18 +372,18 @@ func loadParams(doc xml.Node) (xml.Environ[xml.Expr], error) {
 		if ix >= 0 {
 			expr, err := xml.CompileString(n.Attrs[ix].Value())
 			if err != nil {
-				return nil, err
+				return err
 			}
-			env.Define(ident, expr)
+			s.params.Define(ident, expr)
 		} else {
 			if len(n.Nodes) != 1 {
-				return nil, fmt.Errorf("only one node expected")
+				return fmt.Errorf("only one node expected")
 			}
 			n := cloneNode(n.Nodes[0])
-			env.Define(ident, xml.NewValueFromNode(n))
+			s.params.Define(ident, xml.NewValueFromNode(n))
 		}
 	}
-	return env, nil
+	return nil
 }
 
 func loadOutput(doc xml.Node) ([]*OutputSettings, error) {
@@ -429,16 +423,15 @@ func loadOutput(doc xml.Node) ([]*OutputSettings, error) {
 	return list, nil
 }
 
-func loadTemplates(doc xml.Node) ([]*Template, error) {
-	query, err := xml.CompileString("/xsl:stylesheet/xsl:template")
+func (s *Stylesheet) loadTemplates(doc xml.Node) error {
+	query, err := s.CompileQuery("/xsl:stylesheet/xsl:template")
 	if err != nil {
-		return nil, err
+		return err
 	}
 	items, err := query.Find(doc)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	var list []*Template
 	for _, el := range items {
 		el, ok := el.Node().(*xml.Element)
 		if !ok {
@@ -452,7 +445,7 @@ func loadTemplates(doc xml.Node) ([]*Template, error) {
 			case "priority":
 				p, err := strconv.Atoi(attr)
 				if err != nil {
-					return nil, err
+					return err
 				}
 				t.Priority = p
 			case "name":
@@ -467,9 +460,18 @@ func loadTemplates(doc xml.Node) ([]*Template, error) {
 			default:
 			}
 		}
-		list = append(list, &t)
+		s.Templates = append(s.Templates, &t)
 	}
-	return list, nil
+	return nil
+}
+
+func (s *Stylesheet) CompileQuery(query string) (xml.Expr, error) {
+	q, err := xml.CompileString(query)
+	if err != nil {
+		return nil, err
+	}
+
+	return q, nil
 }
 
 func (s *Stylesheet) Generate(w io.Writer, doc *xml.Document) error {
@@ -558,7 +560,7 @@ func (s *Stylesheet) Define(param string, expr xml.Expr) {
 }
 
 func (s *Stylesheet) DefineParam(param, value string) error {
-	expr, err := xml.CompileString(value)
+	expr, err := s.CompileQuery(value)
 	if err != nil {
 		return err
 	}
@@ -635,7 +637,7 @@ func (s *Stylesheet) Match(node xml.Node, mode string) (*Template, error) {
 		if t.isRoot() || t.Mode != mode || t.Name != "" {
 			continue
 		}
-		expr, err := xml.CompileString(t.Match)
+		expr, err := s.CompileQuery(t.Match)
 		if err != nil {
 			continue
 		}
@@ -850,7 +852,7 @@ func executeVariable(node, datum xml.Node, style *Stylesheet) error {
 		return a.Name == "select"
 	})
 	if ix >= 0 {
-		query, err := xml.CompileString(el.Attrs[ix].Value())
+		query, err := style.CompileQuery(el.Attrs[ix].Value())
 		if err != nil {
 			return err
 		}
@@ -991,7 +993,7 @@ func executeApplyTemplates(node, datum xml.Node, style *Stylesheet) error {
 		return a.Name == "select"
 	})
 	if ix >= 0 {
-		query, err := xml.CompileString(el.Attrs[ix].Value())
+		query, err := style.CompileQuery(el.Attrs[ix].Value())
 		if err != nil {
 			return err
 		}
@@ -1171,7 +1173,7 @@ func executeIf(node, datum xml.Node, style *Stylesheet) error {
 }
 
 func executeChoose(node, datum xml.Node, style *Stylesheet) error {
-	query, err := xml.CompileString("./xsl:when")
+	query, err := style.CompileQuery("./xsl:when")
 	if err != nil {
 		return err
 	}
@@ -1206,7 +1208,7 @@ func executeChoose(node, datum xml.Node, style *Stylesheet) error {
 		}
 	}
 
-	if query, err = xml.CompileString("./xsl:otherwise"); err != nil {
+	if query, err = style.CompileQuery("./xsl:otherwise"); err != nil {
 		return err
 	}
 	if items, err = query.Find(node); err != nil {
@@ -1243,7 +1245,7 @@ func executeForeach(node, datum xml.Node, style *Stylesheet) error {
 	}
 	parent.RemoveNode(el.Position())
 
-	expr, err := xml.CompileString(el.Attrs[ix].Value())
+	expr, err := style.CompileQuery(el.Attrs[ix].Value())
 	if err != nil {
 		return err
 	}
@@ -1352,7 +1354,7 @@ func executeValueOf(node, datum xml.Node, style *Stylesheet) error {
 	if ix < 0 {
 		return fmt.Errorf("value-of: missing select attribute")
 	}
-	expr, err := xml.CompileString(el.Attrs[ix].Value())
+	expr, err := style.CompileQuery(el.Attrs[ix].Value())
 	if err != nil {
 		return err
 	}
@@ -1462,7 +1464,7 @@ func executeForeachGroup(node, datum xml.Node, style *Stylesheet) error {
 	}
 	parent.RemoveNode(el.Position())
 
-	expr, err := xml.CompileString(el.Attrs[ix].Value())
+	expr, err := style.CompileQuery(el.Attrs[ix].Value())
 	if err != nil {
 		return err
 	}
@@ -1484,7 +1486,7 @@ func executeForeachGroup(node, datum xml.Node, style *Stylesheet) error {
 	if ix < 0 {
 		return fmt.Errorf("for-each-group: missing group-by attribute")
 	}
-	grpby, err := xml.CompileString(el.Attrs[ix].Value())
+	grpby, err := style.CompileQuery(el.Attrs[ix].Value())
 	if err != nil {
 		return err
 	}
@@ -1506,12 +1508,10 @@ func executeForeachGroup(node, datum xml.Node, style *Stylesheet) error {
 			i := xml.NewLiteralItem(key)
 			return []xml.Item{i}, nil
 		}
-		_ = currentGrp
-		_ = currentKey
-		// xml.RegisterBuiltin(xml.LocalName("current-group"), currentGrp)
-		// xml.RegisterBuiltin(xml.QualifiedName("current-group", "fn"), currentGrp)
-		// xml.RegisterBuiltin(xml.LocalName("current-grouping-key"), currentKey)
-		// xml.RegisterBuiltin(xml.QualifiedName("current-grouping-key", "fn"), currentKey)
+		style.builtins.Define("current-group", currentGrp)
+		style.builtins.Define("fn:current-group", currentGrp)
+		style.builtins.Define("current-grouping-key", currentKey)
+		style.builtins.Define("fn:current-grouping-key", currentKey)
 
 		for _, n := range el.Nodes {
 			c := cloneNode(n)

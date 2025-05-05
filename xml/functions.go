@@ -181,6 +181,14 @@ func init() {
 	}
 }
 
+func DefaultBuiltin() Environ[BuiltinFunc] {
+	c, ok := builtinEnv.(interface{ Clone() Environ[BuiltinFunc] })
+	if ok {
+		return c.Clone()
+	}
+	return builtinEnv
+}
+
 type BuiltinFunc func(Context, []Expr) ([]Item, error)
 
 func callXYZ(ctx Context, args []Expr) ([]Item, error) {

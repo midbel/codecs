@@ -166,15 +166,11 @@ func defaultContext(n Node) Context {
 }
 
 func createContext(n Node, pos, size int) Context {
-	env := builtinEnv
-	if c, ok := env.( interface{ Clone() Environ[BuiltinFunc] }); ok {
-		env = c.Clone()
-	}
 	return Context{
-		Node:  n,
-		Index: pos,
-		Size:  size,
-		Builtins: env,
+		Node:     n,
+		Index:    pos,
+		Size:     size,
+		Builtins: DefaultBuiltin(),
 	}
 }
 
