@@ -48,7 +48,6 @@ func init() {
 		xml.QualifiedName("on-empty", "xsl"):        executeOnEmpty,
 		xml.QualifiedName("on-not-empty", "xsl"):    executeOnNotEmpty,
 		xml.QualifiedName("try", "xsl"):             wrap(executeTry),
-		xml.QualifiedName("catch", "xsl"):           wrap(executeCatch),
 		xml.QualifiedName("variable", "xsl"):        executeVariable,
 		xml.QualifiedName("result-document", "xsl"): executeResultDocument,
 		xml.QualifiedName("source-document", "xsl"): executeSourceDocument,
@@ -1106,11 +1105,26 @@ func executeWithParam(node, datum xml.Node, style *Stylesheet) error {
 }
 
 func executeTry(node, datum xml.Node, style *Stylesheet) error {
-	return errImplemented
-}
-
-func executeCatch(node, datum xml.Node, style *Stylesheet) error {
-	return errImplemented
+	el := node.(*xml.Element)
+	ix := slices.IndexFunc(el.Nodes, func(n xml.Node) bool {
+		return n.QualifiedName() == "xsl:catch"
+	})
+	var catch xml.Node
+	if ix != -1 && ix != len(el.Nodes)-1 {
+		return fmt.Errorf("xsl:try: xsl:catch should be the last element")
+	}
+	if ix >= 0 {
+		catch = el.Nodes[ix]
+		el.RemoveNode(ix)
+	}
+	if err := processNode(el, datum, style); err != nil {
+		if catch != nil {
+			style.Enter()
+			defer style.Leave()
+			return processNode(el, datum, style)
+		}
+	}
+	return nil
 }
 
 func executeWherePopulated(node, datum xml.Node, style *Stylesheet) error {
