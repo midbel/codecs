@@ -465,6 +465,18 @@ func (s *Stylesheet) loadTemplates(doc xml.Node) error {
 	return nil
 }
 
+func (s *Stylesheet) ExecuteQuery(query string, datum xml.Node) ([]xml.Item, error) {
+	q, err := s.CompileQuery(query)
+	if err != nil {
+		return nil, err
+	}
+	e, ok := q.(interface{FindWithEnv(xml.Node, xml.Environ[xml.Expr]) ([]xml.Item, error) })
+	if ok {
+		return e.FindWithEnv(datum, s)
+	}
+	return q.Find(datum)
+}
+
 func (s *Stylesheet) CompileQuery(query string) (xml.Expr, error) {
 	q, err := xml.CompileString(query)
 	if err != nil {
@@ -1245,18 +1257,7 @@ func executeForeach(node, datum xml.Node, style *Stylesheet) error {
 	}
 	parent.RemoveNode(el.Position())
 
-	expr, err := style.CompileQuery(el.Attrs[ix].Value())
-	if err != nil {
-		return err
-	}
-	var items []xml.Item
-	if e, ok := expr.(interface {
-		FindWithEnv(xml.Node, xml.Environ[xml.Expr]) ([]xml.Item, error)
-	}); ok {
-		items, err = e.FindWithEnv(datum, style)
-	} else {
-		items, err = expr.Find(datum)
-	}
+	items, err := style.ExecuteQuery(el.Attrs[ix].Value(), datum)
 	if err != nil || len(items) == 0 {
 		return err
 	}
@@ -1354,19 +1355,8 @@ func executeValueOf(node, datum xml.Node, style *Stylesheet) error {
 	if ix < 0 {
 		return fmt.Errorf("value-of: missing select attribute")
 	}
-	expr, err := style.CompileQuery(el.Attrs[ix].Value())
-	if err != nil {
-		return err
-	}
-	var items []xml.Item
-	if e, ok := expr.(interface {
-		FindWithEnv(xml.Node, xml.Environ[xml.Expr]) ([]xml.Item, error)
-	}); ok {
-		items, err = e.FindWithEnv(datum, style)
-	} else {
-		items, err = expr.Find(datum)
-	}
 	parent, ok := el.Parent().(*xml.Element)
+	items, err := style.ExecuteQuery(el.Attrs[ix].Value(), datum)
 	if err != nil || len(items) == 0 {
 		return parent.RemoveNode(el.Position())
 	}
@@ -1464,18 +1454,7 @@ func executeForeachGroup(node, datum xml.Node, style *Stylesheet) error {
 	}
 	parent.RemoveNode(el.Position())
 
-	expr, err := style.CompileQuery(el.Attrs[ix].Value())
-	if err != nil {
-		return err
-	}
-	var items []xml.Item
-	if e, ok := expr.(interface {
-		FindWithEnv(xml.Node, xml.Environ[xml.Expr]) ([]xml.Item, error)
-	}); ok {
-		items, err = e.FindWithEnv(datum, style)
-	} else {
-		items, err = expr.Find(datum)
-	}
+	items, err := style.ExecuteQuery(el.Attrs[ix].Value(), datum)
 	if err != nil || len(items) == 0 {
 		return err
 	}
