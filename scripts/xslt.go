@@ -188,6 +188,7 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 	sheet := Stylesheet{
 		vars:        xml.Empty[xml.Expr](),
 		params:      xml.Empty[xml.Expr](),
+		builtins:    xml.DefaultBuiltin(),
 		Context:     contextDir,
 		currentMode: &unnamedMode,
 	}

@@ -230,6 +230,52 @@ func isSelf(axis string) bool {
 	return axis == selfAxis || axis == ancestorSelfAxis || axis == descendantSelfAxis
 }
 
+type Query struct {
+	expr     Expr
+	env      Environ[Expr]
+	builtins Environ[BuiltinFunc]
+}
+
+func Build(query string) (*Query, error) {
+	expr, err := CompileString(query)
+	if err != nil {
+		return nil, err
+	}
+	q := Query{
+		expr: expr,
+	}
+	return &q, nil
+}
+
+func (q *Query) SetBuiltins(set Environ[BuiltinFunc]) {
+	q.builtins = set
+}
+
+func (q *Query) SetEnv(env Environ[Expr]) {
+	q.env = env
+}
+
+func (q *Query) Find(node Node) ([]Item, error) {
+	ctx := Context{
+		Node:     node,
+		Size:     1,
+		Index:    1,
+		Builtins: q.builtins,
+		Environ:  q.env,
+	}
+	if ctx.Builtins == nil {
+		ctx.Builtins = DefaultBuiltin()
+	}
+	if ctx.Environ == nil {
+		ctx.Environ = Empty[Expr]()
+	}
+	return q.find(ctx)
+}
+
+func (q *Query) find(ctx Context) ([]Item, error) {
+	return q.expr.find(ctx)
+}
+
 type query struct {
 	expr Expr
 }
