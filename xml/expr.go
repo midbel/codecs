@@ -154,7 +154,9 @@ type Context struct {
 	Index         int
 	Size          int
 	PrincipalType NodeType
+
 	Environ[Expr]
+	Builtins Environ[BuiltinFunc]
 }
 
 func defaultContext(n Node) Context {
@@ -164,10 +166,15 @@ func defaultContext(n Node) Context {
 }
 
 func createContext(n Node, pos, size int) Context {
+	env := builtinEnv
+	if c, ok := env.( interface{ Clone() Environ[BuiltinFunc] }); ok {
+		env = c.Clone()
+	}
 	return Context{
 		Node:  n,
 		Index: pos,
 		Size:  size,
+		Builtins: env,
 	}
 }
 
@@ -760,7 +767,7 @@ func (c call) MatchPriority() int {
 }
 
 func (c call) find(ctx Context) ([]Item, error) {
-	fn, err := findBuiltin(c.QName)
+	fn, err := ctx.Builtins.Resolve(c.QualifiedName())
 	if err != nil {
 		return c.callUserDefinedFunction(ctx)
 	}

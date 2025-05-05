@@ -1506,11 +1506,12 @@ func executeForeachGroup(node, datum xml.Node, style *Stylesheet) error {
 			i := xml.NewLiteralItem(key)
 			return []xml.Item{i}, nil
 		}
-
-		xml.RegisterBuiltin(xml.LocalName("current-group"), currentGrp)
-		xml.RegisterBuiltin(xml.QualifiedName("current-group", "fn"), currentGrp)
-		xml.RegisterBuiltin(xml.LocalName("current-grouping-key"), currentKey)
-		xml.RegisterBuiltin(xml.QualifiedName("current-grouping-key", "fn"), currentKey)
+		_ = currentGrp
+		_ = currentKey
+		// xml.RegisterBuiltin(xml.LocalName("current-group"), currentGrp)
+		// xml.RegisterBuiltin(xml.QualifiedName("current-group", "fn"), currentGrp)
+		// xml.RegisterBuiltin(xml.LocalName("current-grouping-key"), currentKey)
+		// xml.RegisterBuiltin(xml.QualifiedName("current-grouping-key", "fn"), currentKey)
 
 		for _, n := range el.Nodes {
 			c := cloneNode(n)

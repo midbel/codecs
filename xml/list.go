@@ -60,6 +60,17 @@ func (e *Env[T]) Merge(other Environ[T]) {
 	maps.Copy(e.values, x.values)
 }
 
+func (e *Env[T]) Clone() Environ[T] {
+	var x Env[T]
+	x.values = make(map[string]T)
+	maps.Copy(e.values, x.values)
+
+	if c, ok := e.parent.(interface { Clone() Environ[T] }); ok {
+		x.parent = c.Clone()
+	}
+	return &x
+}
+
 type Item interface {
 	Node() Node
 	Value() any

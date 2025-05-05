@@ -30,28 +30,9 @@ type registeredBuiltin struct {
 }
 
 func registerFunc(name, space string, fn BuiltinFunc) registeredBuiltin {
-	qn := QName{
-		Name:  name,
-		Space: space,
-	}
 	return registeredBuiltin{
-		QName: qn,
+		QName: QualifiedName(name, space),
 		Func:  fn,
-	}
-}
-
-func RegisterBuiltin(qn QName, fn BuiltinFunc) {
-	r := registeredBuiltin{
-		QName: qn,
-		Func: fn,
-	}
-	ix := slices.IndexFunc(builtins, func(b registeredBuiltin) bool {
-		return b.QName == qn
-	})
-	if ix < 0 {
-		builtins = append(builtins, r)
-	} else {
-		builtins[ix] = r
 	}
 }
 
@@ -191,14 +172,13 @@ var builtins = []registeredBuiltin{
 	registerFunc("exit-code", "process", callXYZ),
 }
 
-func findBuiltin(qn QName) (BuiltinFunc, error) {
-	ix := slices.IndexFunc(builtins, func(rg registeredBuiltin) bool {
-		return qn.QualifiedName() == rg.QualifiedName()
-	})
-	if ix < 0 {
-		return nil, fmt.Errorf("%s: %s function", qn.QualifiedName(), ErrUndefined)
+var builtinEnv Environ[BuiltinFunc]
+
+func init() {
+	builtinEnv = Empty[BuiltinFunc]()
+	for _, b := range builtins {
+		builtinEnv.Define(b.QualifiedName(), b.Func)
 	}
-	return builtins[ix].Func, nil
 }
 
 type BuiltinFunc func(Context, []Expr) ([]Item, error)
