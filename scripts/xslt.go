@@ -375,9 +375,18 @@ func loadParams(doc xml.Node) (xml.Environ[xml.Expr], error) {
 		ix = slices.IndexFunc(n.Attrs, func(a xml.Attribute) bool {
 			return a.Name == "select"
 		})
-		_ = ident
 		if ix >= 0 {
-
+			expr, err := xml.CompileString(n.Attrs[ix].Value())
+			if err != nil {
+				return nil, err
+			}
+			env.Define(ident, expr)
+		} else {
+			if len(n.Nodes) != 1 {
+				return nil, fmt.Errorf("only one node expected")
+			}
+			n := cloneNode(n.Nodes[0])
+			env.Define(ident, xml.NewValueFromNode(n))
 		}
 	}
 	return env, nil
@@ -549,17 +558,12 @@ func (s *Stylesheet) Define(param string, expr xml.Expr) {
 }
 
 func (s *Stylesheet) DefineParam(param, value string) error {
-	var (
-		expr xml.Expr
-		err  error
-	)
-	if value != "" {
-		expr, err = xml.CompileString(value)
+	expr, err := xml.CompileString(value)
+	if err != nil {
+		return err
 	}
-	if err == nil {
-		s.params.Define(param, expr)
-	}
-	return err
+	s.params.Define(param, expr)
+	return nil
 }
 
 func (s *Stylesheet) GetOutput(name string) *OutputSettings {
