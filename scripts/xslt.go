@@ -470,7 +470,9 @@ func (s *Stylesheet) ExecuteQuery(query string, datum xml.Node) ([]xml.Item, err
 	if err != nil {
 		return nil, err
 	}
-	e, ok := q.(interface{FindWithEnv(xml.Node, xml.Environ[xml.Expr]) ([]xml.Item, error) })
+	e, ok := q.(interface {
+		FindWithEnv(xml.Node, xml.Environ[xml.Expr]) ([]xml.Item, error)
+	})
 	if ok {
 		return e.FindWithEnv(datum, s)
 	}
