@@ -853,10 +853,11 @@ func executeVariable(node, datum xml.Node, style *Stylesheet) error {
 		}
 		style.Define(ident, query)
 	} else {
-		// node variable - to be implemented
-		if len(el.Nodes) == 0 {
-			return fmt.Errorf("no child nodes for variables")
+		if len(el.Nodes) != 1 {
+			return fmt.Errorf("only one node expected")
 		}
+		n := cloneNode(el.Nodes[0])
+		style.Define(ident, xml.NewValueFromNode(n))
 	}
 	if r, ok := el.Parent().(interface{ RemoveNode(int) error }); ok {
 		return r.RemoveNode(el.Position())

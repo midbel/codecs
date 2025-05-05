@@ -1160,6 +1160,16 @@ type value struct {
 	item Item
 }
 
+func NewValue(item Item) Expr {
+	return value{
+		item: item,
+	}
+}
+
+func NewValueFromNode(node Node) Expr {
+	return NewValue(createNode(node))
+}
+
 func (v value) Find(node Node) ([]Item, error) {
 	return v.find(defaultContext(node))
 }
