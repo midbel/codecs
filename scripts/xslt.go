@@ -163,7 +163,7 @@ func (m Mode) Unnamed() bool {
 }
 
 type Stylesheet struct {
-	namespace string
+	namespace   string
 	Mode        string
 	currentMode *Mode
 	Modes       []*Mode
@@ -567,8 +567,24 @@ func (s *Stylesheet) DefineParam(param, value string) error {
 	if err != nil {
 		return err
 	}
-	s.params.Define(param, expr)
+	s.DefineExprParam(param, expr)
 	return nil
+}
+
+func (s Stylesheet) EvalParam(param, query string, datum xml.Node) error {
+	items, err := s.ExecuteQuery(query, datum)
+	if err != nil {
+		return err
+	}
+	if len(items) != 1 {
+		return fmt.Errorf("invalid sequence")
+	}
+	s.DefineExprParam(param, xml.NewValue(items[0]))
+	return nil
+}
+
+func (s *Stylesheet) DefineExprParam(param string, expr xml.Expr) {
+	s.params.Define(param, expr)
 }
 
 func (s *Stylesheet) GetOutput(name string) *OutputSettings {
@@ -680,7 +696,7 @@ func (s *Stylesheet) prepare(tpl *Template) error {
 		return fmt.Errorf("template: fragment expected xml element")
 	}
 	for _, n := range slices.Clone(el.Nodes) {
-		if n.QualifiedName() != "xsl:param" {
+		if n.QualifiedName() != s.getQualifiedName("param") {
 			break
 		}
 		e := n.(*xml.Element)
@@ -788,20 +804,17 @@ func processNode(node, datum xml.Node, style *Stylesheet) error {
 		el    = node.(*xml.Element)
 		nodes = slices.Clone(el.Nodes)
 	)
-	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
-		return a.QName == xml.QualifiedName("use-attribute-sets", "xsl")
-	})
-	if ix >= 0 {
-		ax := slices.IndexFunc(style.AttrSet, func(set *AttributeSet) bool {
-			return set.Name == el.Attrs[ix].Value()
+	if ident, err := getAttribute(el, "use-attribute-sets"); err == nil {
+		ix := slices.IndexFunc(style.AttrSet, func(set *AttributeSet) bool {
+			return set.Name == ident
 		})
-		if ax < 0 {
+		if ix < 0 {
 			return fmt.Errorf("attribute-set not defined")
 		}
-		for _, a := range style.AttrSet[ax].Attrs {
+		for _, a := range style.AttrSet[ix].Attrs {
 			el.SetAttribute(a)
 		}
-		el.RemoveAttr(el.Attrs[ix].Position())
+		// el.RemoveAttr(el.Attrs[ix].Position())
 	}
 	for i := range nodes {
 		if nodes[i].Type() != xml.TypeElement {
@@ -964,7 +977,7 @@ func executeApplyTemplates(node, datum xml.Node, style *Stylesheet) error {
 	mode, err := getAttribute(el, "mode")
 	if err != nil {
 		mode = style.CurrentMode()
-	} 
+	}
 	tpl, err := style.Match(datum, mode)
 	if err != nil {
 		return err
@@ -1042,7 +1055,7 @@ func executeWithParam(node, datum xml.Node, style *Stylesheet) error {
 	if err != nil {
 		return err
 	}
-	return style.DefineParam(ident, value)
+	return style.EvalParam(ident, value, datum)
 }
 
 func executeTry(node, datum xml.Node, style *Stylesheet) error {
