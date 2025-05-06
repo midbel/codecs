@@ -276,27 +276,23 @@ func (s *Stylesheet) loadAttributeSet(doc xml.Node) error {
 		if n == nil {
 			continue
 		}
-		ix := slices.IndexFunc(n.Attrs, func(a xml.Attribute) bool {
-			return a.Name == "name"
-		})
-		if ix < 0 {
-			return fmt.Errorf("attribute-set: missing name attribute")
+		ident, err := getAttribute(n, "name")
+		if err != nil {
+			return err
 		}
 		as := AttributeSet{
-			Name: n.Attrs[ix].Value(),
+			Name: ident,
 		}
 		for _, n := range n.Nodes {
 			n := n.(*xml.Element)
 			if n == nil {
 				continue
 			}
-			ix := slices.IndexFunc(n.Attrs, func(a xml.Attribute) bool {
-				return a.Name == "name"
-			})
-			if ix < 0 {
-				return fmt.Errorf("attribute: missing name attribute")
+			ident, err := getAttribute(n, "name")
+			if err != nil {
+				return err
 			}
-			attr := xml.NewAttribute(xml.LocalName(n.Attrs[ix].Value()), n.Value())
+			attr := xml.NewAttribute(xml.LocalName(ident), n.Value())
 			as.Attrs = append(as.Attrs, attr)
 		}
 		s.AttrSet = append(s.AttrSet, &as)
@@ -355,18 +351,12 @@ func (s *Stylesheet) loadParams(doc xml.Node) error {
 		if n == nil {
 			continue
 		}
-		ix := slices.IndexFunc(n.Attrs, func(a xml.Attribute) bool {
-			return a.Name == "name"
-		})
-		if ix < 0 {
-			return fmt.Errorf("param: missing name attribute")
+		ident, err := getAttribute(n, "name")
+		if err != nil {
+			return err
 		}
-		ident := n.Attrs[ix].Value()
-		ix = slices.IndexFunc(n.Attrs, func(a xml.Attribute) bool {
-			return a.Name == "select"
-		})
-		if ix >= 0 {
-			expr, err := s.CompileQuery(n.Attrs[ix].Value())
+		if query, err := getAttribute(n, "select"); err == nil {
+			expr, err := s.CompileQuery(query)
 			if err != nil {
 				return err
 			}
@@ -593,6 +583,11 @@ func (s *Stylesheet) GetOutput(name string) *OutputSettings {
 
 func (s *Stylesheet) CurrentMode() string {
 	return s.Mode
+}
+
+func (s *Stylesheet) getQualifiedName(name string) string {
+	qn := xml.QualifiedName(name, s.namespace)
+	return qn.QualifiedName()
 }
 
 func (s *Stylesheet) Find(name, mode string) (*Template, error) {
