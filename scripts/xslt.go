@@ -196,14 +196,8 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 		return nil, err
 	}
 
-	out, err := loadOutput(doc)
-	if err != nil {
+	if err := sheet.loadOutput(doc); err != nil {
 		return nil, err
-	}
-	if out != nil {
-		sheet.output = out
-	} else {
-		sheet.output = append(sheet.output, defaultOutput())
 	}
 	if err = sheet.loadParams(doc); err != nil {
 		return nil, err
@@ -371,7 +365,7 @@ func (s *Stylesheet) loadParams(doc xml.Node) error {
 			return a.Name == "select"
 		})
 		if ix >= 0 {
-			expr, err := xml.CompileString(n.Attrs[ix].Value())
+			expr, err := s.CompileQuery(n.Attrs[ix].Value())
 			if err != nil {
 				return err
 			}
@@ -387,16 +381,11 @@ func (s *Stylesheet) loadParams(doc xml.Node) error {
 	return nil
 }
 
-func loadOutput(doc xml.Node) ([]*OutputSettings, error) {
-	query, err := xml.CompileString("/xsl:stylesheet/xsl:output")
+func (s *Stylesheet) loadOutput(doc xml.Node) error {
+	items, err := s.ExecuteQuery("/xsl:stylesheet/xsl:output", doc)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	items, err := query.Find(doc)
-	if err != nil {
-		return nil, err
-	}
-	var list []*OutputSettings
 	for i := range items {
 		var (
 			node = items[i].Node().(*xml.Element)
@@ -419,17 +408,16 @@ func loadOutput(doc xml.Node) ([]*OutputSettings, error) {
 			default:
 			}
 		}
-		list = append(list, &out)
+		s.output = append(s.output, &out)
 	}
-	return list, nil
+	if len(s.output) == 0 {
+		s.output = append(s.output, defaultOutput())
+	}
+	return nil
 }
 
 func (s *Stylesheet) loadTemplates(doc xml.Node) error {
-	query, err := s.CompileQuery("/xsl:stylesheet/xsl:template")
-	if err != nil {
-		return err
-	}
-	items, err := query.Find(doc)
+	items, err := s.ExecuteQuery("/xsl:stylesheet/xsl:template", doc)
 	if err != nil {
 		return err
 	}
@@ -481,12 +469,21 @@ func (s *Stylesheet) ExecuteQuery(query string, datum xml.Node) ([]xml.Item, err
 }
 
 func (s *Stylesheet) CompileQuery(query string) (xml.Expr, error) {
-	q, err := xml.CompileString(query)
+	q, err := xml.Build(query)
 	if err != nil {
 		return nil, err
 	}
-
+	q.Environ = s
+	q.Builtins = xml.DefaultBuiltin()
 	return q, nil
+}
+
+func (s *Stylesheet) TestNode(query string, datum xml.Node) (bool, error) {
+	items, err := s.ExecuteQuery(query, datum)
+	if err != nil {
+		return false, err
+	}
+	return isTrue(items), nil
 }
 
 func (s *Stylesheet) Generate(w io.Writer, doc *xml.Document) error {
@@ -561,8 +558,8 @@ func (s *Stylesheet) Resolve(ident string) (xml.Expr, error) {
 	if err == nil {
 		return expr, nil
 	}
-	for _, x := range s.Others {
-		e, err := x.Resolve(ident)
+	for i := range s.Others {
+		e, err := s.Others[i].Resolve(ident)
 		if err == nil {
 			return e, nil
 		}
@@ -722,19 +719,15 @@ func (s *Stylesheet) prepare(tpl *Template) error {
 		if ix < 0 {
 			return fmt.Errorf("param: missing name attribute")
 		}
-		var (
-			ident = e.Attrs[ix].Value()
-			value string
-		)
+		ident := e.Attrs[ix].Value()
 
 		ix = slices.IndexFunc(e.Attrs, func(a xml.Attribute) bool {
 			return a.Name == "select"
 		})
 		if ix >= 0 {
-			value = e.Attrs[ix].Value()
-		}
-		if err := s.DefineParam(ident, value); err != nil {
-			return err
+			if err := s.DefineParam(ident, e.Attrs[ix].Value()); err != nil {
+				return err
+			}
 		}
 		el.RemoveNode(n.Position())
 	}
@@ -752,6 +745,7 @@ type Template struct {
 func (t *Template) Clone() *Template {
 	var tpl Template
 	tpl.Fragment = cloneNode(t.Fragment)
+	tpl.Name = t.Name
 	return &tpl
 }
 
@@ -1168,7 +1162,7 @@ func executeIf(node, datum xml.Node, style *Stylesheet) error {
 	if ix < 0 {
 		return fmt.Errorf("if: missing test attribute")
 	}
-	ok, err := testNode(el.Attrs[ix].Value(), datum, style)
+	ok, err := style.TestNode(el.Attrs[ix].Value(), datum)
 	if err != nil {
 		return err
 	}
@@ -1204,7 +1198,7 @@ func executeChoose(node, datum xml.Node, style *Stylesheet) error {
 		if x < 0 {
 			return fmt.Errorf("choose: missing test attribute")
 		}
-		ok, err := testNode(n.Attrs[x].Value(), datum, style)
+		ok, err := style.TestNode(n.Attrs[x].Value(), datum)
 		if err != nil {
 			return err
 		}
@@ -1511,25 +1505,6 @@ func executeForeachGroup(node, datum xml.Node, style *Stylesheet) error {
 
 func executeMerge(node, datum xml.Node, style *Stylesheet) error {
 	return errImplemented
-}
-
-func testNode(expr string, datum xml.Node, env xml.Environ[xml.Expr]) (bool, error) {
-	query, err := xml.CompileString(expr)
-	if err != nil {
-		return false, err
-	}
-	var items []xml.Item
-	if e, ok := query.(interface {
-		FindWithEnv(xml.Node, xml.Environ[xml.Expr]) ([]xml.Item, error)
-	}); ok {
-		items, err = e.FindWithEnv(datum, env)
-	} else {
-		items, err = query.Find(datum)
-	}
-	if err != nil {
-		return false, err
-	}
-	return isTrue(items), nil
 }
 
 func isTrue(items []xml.Item) bool {

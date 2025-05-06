@@ -63,7 +63,7 @@ func (e *Env[T]) Merge(other Environ[T]) {
 func (e *Env[T]) Clone() Environ[T] {
 	var x Env[T]
 	x.values = make(map[string]T)
-	maps.Copy(e.values, x.values)
+	maps.Copy(x.values, e.values)
 
 	if c, ok := e.parent.(interface{ Clone() Environ[T] }); ok {
 		x.parent = c.Clone()
@@ -188,6 +188,9 @@ func createNode(node Node) Item {
 func (i nodeItem) Assert(expr Expr, env Environ[Expr]) ([]Item, error) {
 	ctx := createContext(i.node, 1, 1)
 	ctx.Environ = env
+	if ctx.Builtins == nil {
+		ctx.Builtins = DefaultBuiltin()
+	}
 	return expr.find(ctx)
 }
 
@@ -275,4 +278,10 @@ func greatestValue[T string | float64](items []T) T {
 		res = max(items[i], res)
 	}
 	return res
+}
+
+type Sequence []Item
+
+func (s Sequence) IsTrue() bool {
+	return false
 }

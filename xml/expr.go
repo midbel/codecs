@@ -231,9 +231,9 @@ func isSelf(axis string) bool {
 }
 
 type Query struct {
-	expr     Expr
-	env      Environ[Expr]
-	builtins Environ[BuiltinFunc]
+	expr Expr
+	Environ[Expr]
+	Builtins Environ[BuiltinFunc]
 }
 
 func Build(query string) (*Query, error) {
@@ -247,21 +247,13 @@ func Build(query string) (*Query, error) {
 	return &q, nil
 }
 
-func (q *Query) SetBuiltins(set Environ[BuiltinFunc]) {
-	q.builtins = set
-}
-
-func (q *Query) SetEnv(env Environ[Expr]) {
-	q.env = env
-}
-
 func (q *Query) Find(node Node) ([]Item, error) {
 	ctx := Context{
 		Node:     node,
 		Size:     1,
 		Index:    1,
-		Builtins: q.builtins,
-		Environ:  q.env,
+		Builtins: q.Builtins,
+		Environ:  q.Environ,
 	}
 	if ctx.Builtins == nil {
 		ctx.Builtins = DefaultBuiltin()
@@ -272,7 +264,17 @@ func (q *Query) Find(node Node) ([]Item, error) {
 	return q.find(ctx)
 }
 
+func (q *Query) MatchPriority() int {
+	if q.expr == nil {
+		return prioLow
+	}
+	return q.expr.MatchPriority()
+}
+
 func (q *Query) find(ctx Context) ([]Item, error) {
+	if q.expr == nil {
+		return nil, fmt.Errorf("no query given")
+	}
 	return q.expr.find(ctx)
 }
 
@@ -295,6 +297,9 @@ func (q query) MatchPriority() int {
 }
 
 func (q query) find(ctx Context) ([]Item, error) {
+	if ctx.Builtins == nil {
+		ctx.Builtins = DefaultBuiltin()
+	}
 	return q.expr.find(ctx)
 }
 
@@ -1213,6 +1218,10 @@ func NewValue(item Item) Expr {
 	return value{
 		item: item,
 	}
+}
+
+func NewValueFromLiteral(value any) Expr {
+	return NewValue(createLiteral(value))
 }
 
 func NewValueFromNode(node Node) Expr {
