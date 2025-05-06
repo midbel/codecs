@@ -163,6 +163,7 @@ func (m Mode) Unnamed() bool {
 }
 
 type Stylesheet struct {
+	namespace string
 	Mode        string
 	currentMode *Mode
 	Modes       []*Mode
@@ -615,28 +616,6 @@ func (s *Stylesheet) Find(name, mode string) (*Template, error) {
 }
 
 func (s *Stylesheet) Match(node xml.Node, mode string) (*Template, error) {
-	hasMatch := func(expr xml.Expr) (bool, int) {
-		var (
-			depth int
-			curr  = node
-		)
-		for curr != nil {
-			items, err := expr.Find(curr)
-			if err != nil {
-				break
-			}
-			if len(items) > 0 {
-				ok := slices.ContainsFunc(items, func(i xml.Item) bool {
-					n := i.Node()
-					return n.Identity() == node.Identity()
-				})
-				return ok, depth + expr.MatchPriority()
-			}
-			depth--
-			curr = curr.Parent()
-		}
-		return false, 0
-	}
 	if mode == "" {
 		mode = s.CurrentMode()
 	}
@@ -653,7 +632,7 @@ func (s *Stylesheet) Match(node xml.Node, mode string) (*Template, error) {
 		if err != nil {
 			continue
 		}
-		ok, prio := hasMatch(expr)
+		ok, prio := isTemplateMatch(expr, node)
 		if !ok {
 			continue
 		}
@@ -713,19 +692,12 @@ func (s *Stylesheet) prepare(tpl *Template) error {
 		if e == nil {
 			continue
 		}
-		ix := slices.IndexFunc(e.Attrs, func(a xml.Attribute) bool {
-			return a.Name == "name"
-		})
-		if ix < 0 {
-			return fmt.Errorf("param: missing name attribute")
+		ident, err := getAttribute(e, "name")
+		if err != nil {
+			return err
 		}
-		ident := e.Attrs[ix].Value()
-
-		ix = slices.IndexFunc(e.Attrs, func(a xml.Attribute) bool {
-			return a.Name == "select"
-		})
-		if ix >= 0 {
-			if err := s.DefineParam(ident, e.Attrs[ix].Value()); err != nil {
+		if value, err := getAttribute(e, "select"); err == nil {
+			if err := s.DefineParam(ident, value); err != nil {
 				return err
 			}
 		}
@@ -850,18 +822,12 @@ func processNode(node, datum xml.Node, style *Stylesheet) error {
 
 func executeVariable(node, datum xml.Node, style *Stylesheet) error {
 	el := node.(*xml.Element)
-	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
-		return a.Name == "name"
-	})
-	if ix < 0 {
-		return fmt.Errorf("variable: missing required name attribute")
+	ident, err := getAttribute(el, "name")
+	if err != nil {
+		return err
 	}
-	ident := el.Attrs[ix].Value()
-	ix = slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
-		return a.Name == "select"
-	})
-	if ix >= 0 {
-		query, err := style.CompileQuery(el.Attrs[ix].Value())
+	if value, err := getAttribute(el, "select"); err == nil {
+		query, err := style.CompileQuery(value)
 		if err != nil {
 			return err
 		}
@@ -881,35 +847,29 @@ func executeVariable(node, datum xml.Node, style *Stylesheet) error {
 
 func executeImport(node, datum xml.Node, style *Stylesheet) error {
 	el := node.(*xml.Element)
-	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
-		return a.Name == "href"
-	})
-	if ix < 0 {
-		return fmt.Errorf("import: missing href attribute")
+	file, err := getAttribute(el, "href")
+	if err != nil {
+		return err
 	}
-	return style.ImportSheet(el.Attrs[ix].Value())
+	return style.ImportSheet(file)
 }
 
 func executeInclude(node, datum xml.Node, style *Stylesheet) error {
 	el := node.(*xml.Element)
-	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
-		return a.Name == "href"
-	})
-	if ix < 0 {
-		return fmt.Errorf("include: missing href attribute")
+	file, err := getAttribute(el, "href")
+	if err != nil {
+		return err
 	}
-	return style.IncludeSheet(el.Attrs[ix].Value())
+	return style.IncludeSheet(file)
 }
 
 func executeSourceDocument(node, datum xml.Node, style *Stylesheet) error {
 	el := node.(*xml.Element)
-	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
-		return a.Name == "href"
-	})
-	if ix < 0 {
-		return fmt.Errorf("source-document: missing href attribute")
+	file, err := getAttribute(el, "href")
+	if err != nil {
+		return err
 	}
-	doc, err := loadDocument(filepath.Join(style.Context, el.Attrs[ix].Value()))
+	doc, err := loadDocument(filepath.Join(style.Context, file))
 	if err != nil {
 		return err
 	}
@@ -934,24 +894,16 @@ func executeSourceDocument(node, datum xml.Node, style *Stylesheet) error {
 
 func executeResultDocument(node, datum xml.Node, style *Stylesheet) error {
 	el := node.(*xml.Element)
-	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
-		return a.Name == "href"
-	})
 	var (
 		file string
 		outn string
+		err  error
 	)
-	if ix < 0 {
-		return fmt.Errorf("result-document: missing href attribute")
+	file, err = getAttribute(el, "href")
+	if err != nil {
+		return err
 	}
-	file = el.Attrs[ix].Value()
-
-	ix = slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
-		return a.Name == "format"
-	})
-	if ix >= 0 {
-		outn = el.Attrs[ix].Value()
-	}
+	outn, _ = getAttribute(el, "format")
 	var doc xml.Document
 	for _, n := range slices.Clone(el.Nodes) {
 		c := cloneNode(n)
@@ -998,11 +950,8 @@ func executeApplyImport(node, datum xml.Node, style *Stylesheet) error {
 
 func executeApplyTemplates(node, datum xml.Node, style *Stylesheet) error {
 	el := node.(*xml.Element)
-	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
-		return a.Name == "select"
-	})
-	if ix >= 0 {
-		query, err := style.CompileQuery(el.Attrs[ix].Value())
+	if value, err := getAttribute(el, "select"); err == nil {
+		query, err := style.CompileQuery(value)
 		if err != nil {
 			return err
 		}
@@ -1017,13 +966,10 @@ func executeApplyTemplates(node, datum xml.Node, style *Stylesheet) error {
 		}
 		datum = items[0].Node()
 	}
-	ix = slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
-		return a.Name == "mode"
-	})
-	mode := style.Mode
-	if ix >= 0 {
-		mode = el.Attrs[ix].Value()
-	}
+	mode, err := getAttribute(el, "mode")
+	if err != nil {
+		mode = style.CurrentMode()
+	} 
 	tpl, err := style.Match(datum, mode)
 	if err != nil {
 		return err
@@ -1057,21 +1003,13 @@ func executeApplyTemplates(node, datum xml.Node, style *Stylesheet) error {
 
 func executeCallTemplate(node, datum xml.Node, style *Stylesheet) error {
 	el := node.(*xml.Element)
-	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
-		return a.Name == "name"
-	})
-	if ix < 0 {
-		return fmt.Errorf("call-template: missing name attribute")
+	name, err := getAttribute(el, "name")
+	if err != nil {
+		return err
 	}
-	var (
-		name = el.Attrs[ix].Value()
-		mode = style.Mode
-	)
-	ix = slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
-		return a.Name == "mode"
-	})
-	if ix >= 0 {
-		mode = el.Attrs[ix].Value()
+	mode, err := getAttribute(el, "mode")
+	if err != nil {
+		mode = style.CurrentMode()
 	}
 	tpl, err := style.Find(name, mode)
 	if err != nil {
@@ -1101,22 +1039,15 @@ func executeCallTemplate(node, datum xml.Node, style *Stylesheet) error {
 
 func executeWithParam(node, datum xml.Node, style *Stylesheet) error {
 	el := node.(*xml.Element)
-
-	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
-		return a.Name == "name"
-	})
-	if ix < 0 {
-		return fmt.Errorf("with-param: missing name attribute")
+	ident, err := getAttribute(el, "name")
+	if err != nil {
+		return err
 	}
-	ident := el.Attrs[ix].Value()
-
-	ix = slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
-		return a.Name == "select"
-	})
-	if ix < 0 {
-		return fmt.Errorf("with-param: missing select attribute")
+	value, err := getAttribute(el, "select")
+	if err != nil {
+		return err
 	}
-	return style.DefineParam(ident, el.Attrs[ix].Value())
+	return style.DefineParam(ident, value)
 }
 
 func executeTry(node, datum xml.Node, style *Stylesheet) error {
@@ -1156,13 +1087,11 @@ func executeOnNotEmpty(node, datum xml.Node, style *Stylesheet) error {
 
 func executeIf(node, datum xml.Node, style *Stylesheet) error {
 	el := node.(*xml.Element)
-	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
-		return a.Name == "test"
-	})
-	if ix < 0 {
-		return fmt.Errorf("if: missing test attribute")
+	test, err := getAttribute(el, "test")
+	if err != nil {
+		return err
 	}
-	ok, err := style.TestNode(el.Attrs[ix].Value(), datum)
+	ok, err := style.TestNode(test, datum)
 	if err != nil {
 		return err
 	}
@@ -1192,13 +1121,11 @@ func executeChoose(node, datum xml.Node, style *Stylesheet) error {
 	}
 	for i := range items {
 		n := items[i].Node().(*xml.Element)
-		x := slices.IndexFunc(n.Attrs, func(a xml.Attribute) bool {
-			return a.Name == "test"
-		})
-		if x < 0 {
-			return fmt.Errorf("choose: missing test attribute")
+		test, err := getAttribute(n, "test")
+		if err != nil {
+			return err
 		}
-		ok, err := style.TestNode(n.Attrs[x].Value(), datum)
+		ok, err := style.TestNode(test, datum)
 		if err != nil {
 			return err
 		}
@@ -1242,11 +1169,9 @@ func executeChoose(node, datum xml.Node, style *Stylesheet) error {
 
 func executeForeach(node, datum xml.Node, style *Stylesheet) error {
 	el := node.(*xml.Element)
-	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
-		return a.Name == "select"
-	})
-	if ix < 0 {
-		return fmt.Errorf("for-each: missing select attribute")
+	query, err := getAttribute(el, "select")
+	if err != nil {
+		return err
 	}
 	parent, ok := el.Parent().(*xml.Element)
 	if !ok {
@@ -1254,7 +1179,7 @@ func executeForeach(node, datum xml.Node, style *Stylesheet) error {
 	}
 	parent.RemoveNode(el.Position())
 
-	items, err := style.ExecuteQuery(el.Attrs[ix].Value(), datum)
+	items, err := style.ExecuteQuery(query, datum)
 	if err != nil || len(items) == 0 {
 		return err
 	}
@@ -1262,22 +1187,11 @@ func executeForeach(node, datum xml.Node, style *Stylesheet) error {
 	var it iter.Seq[xml.Item]
 	if el.Nodes[0].QualifiedName() == "xsl:sort" {
 		x := el.Nodes[0].(*xml.Element)
-		ix := slices.IndexFunc(x.Attrs, func(a xml.Attribute) bool {
-			return a.Name == "select"
-		})
-		if ix < 0 {
-			return fmt.Errorf("xsl:sort: missing select attribute")
+		query, err := getAttribute(x, "select")
+		if err != nil {
+			return err
 		}
-		var (
-			query = x.Attrs[ix].Value()
-			order string
-		)
-		ix = slices.IndexFunc(x.Attrs, func(a xml.Attribute) bool {
-			return a.Name == "order"
-		})
-		if ix >= 0 {
-			order = x.Attrs[ix].Value()
-		}
+		order, _ := getAttribute(x, "order")
 		el.RemoveNode(0)
 		it, err = foreachItems(items, query, order)
 		if err != nil {
@@ -1346,14 +1260,12 @@ func foreachItems(items []xml.Item, orderBy, orderDir string) (iter.Seq[xml.Item
 
 func executeValueOf(node, datum xml.Node, style *Stylesheet) error {
 	el := node.(*xml.Element)
-	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
-		return a.Name == "select"
-	})
-	if ix < 0 {
-		return fmt.Errorf("value-of: missing select attribute")
+	query, err := getAttribute(el, "select")
+	if err != nil {
+		return err
 	}
 	parent, ok := el.Parent().(*xml.Element)
-	items, err := style.ExecuteQuery(el.Attrs[ix].Value(), datum)
+	items, err := style.ExecuteQuery(query, datum)
 	if err != nil || len(items) == 0 {
 		return parent.RemoveNode(el.Position())
 	}
@@ -1383,13 +1295,11 @@ func executeMessage(node, datum xml.Node, style *Stylesheet) error {
 
 func executeElement(node, datum xml.Node, style *Stylesheet) error {
 	el := node.(*xml.Element)
-	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
-		return a.Name == "name"
-	})
-	if ix < 0 {
-		return fmt.Errorf("element: missing name attribute")
+	ident, err := getAttribute(el, "name")
+	if err != nil {
+		return err
 	}
-	qn, err := xml.ParseName(el.Attrs[ix].Value())
+	qn, err := xml.ParseName(ident)
 	if err != nil {
 		return err
 	}
@@ -1439,11 +1349,9 @@ func executeFallback(node, datum xml.Node, style *Stylesheet) error {
 
 func executeForeachGroup(node, datum xml.Node, style *Stylesheet) error {
 	el := node.(*xml.Element)
-	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
-		return a.Name == "select"
-	})
-	if ix < 0 {
-		return fmt.Errorf("for-each-group: missing select attribute")
+	query, err := getAttribute(el, "select")
+	if err != nil {
+		return err
 	}
 	parent, ok := el.Parent().(*xml.Element)
 	if !ok {
@@ -1451,18 +1359,16 @@ func executeForeachGroup(node, datum xml.Node, style *Stylesheet) error {
 	}
 	parent.RemoveNode(el.Position())
 
-	items, err := style.ExecuteQuery(el.Attrs[ix].Value(), datum)
+	items, err := style.ExecuteQuery(query, datum)
 	if err != nil || len(items) == 0 {
 		return err
 	}
 
-	ix = slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
-		return a.Name == "group-by"
-	})
-	if ix < 0 {
-		return fmt.Errorf("for-each-group: missing group-by attribute")
+	key, err := getAttribute(el, "group-by")
+	if err != nil {
+		return err
 	}
-	grpby, err := style.CompileQuery(el.Attrs[ix].Value())
+	grpby, err := style.CompileQuery(key)
 	if err != nil {
 		return err
 	}
@@ -1535,6 +1441,16 @@ func cloneNode(n xml.Node) xml.Node {
 	return cloner.Clone()
 }
 
+func getAttribute(el *xml.Element, ident string) (string, error) {
+	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
+		return a.Name == ident
+	})
+	if ix < 0 {
+		return "", fmt.Errorf("%s: missing attribute %q", el.QualifiedName(), ident)
+	}
+	return el.Attrs[ix].Value(), nil
+}
+
 func loadDocument(file string) (*xml.Document, error) {
 	r, err := os.Open(file)
 	if err != nil {
@@ -1549,4 +1465,27 @@ func loadDocument(file string) (*xml.Document, error) {
 func writeDoctypeHTML(w io.Writer) error {
 	_, err := io.WriteString(w, "<!DOCTYPE html>")
 	return err
+}
+
+func isTemplateMatch(expr xml.Expr, node xml.Node) (bool, int) {
+	var (
+		depth int
+		curr  = node
+	)
+	for curr != nil {
+		items, err := expr.Find(curr)
+		if err != nil {
+			break
+		}
+		if len(items) > 0 {
+			ok := slices.ContainsFunc(items, func(i xml.Item) bool {
+				n := i.Node()
+				return n.Identity() == node.Identity()
+			})
+			return ok, depth + expr.MatchPriority()
+		}
+		depth--
+		curr = curr.Parent()
+	}
+	return false, 0
 }
