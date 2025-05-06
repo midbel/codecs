@@ -16,6 +16,8 @@ import (
 	"github.com/midbel/codecs/xml"
 )
 
+const xsltNamespaceUri = "http://www.w3.org/1999/XSL/Transform"
+
 var (
 	errImplemented = errors.New("not implemented")
 	errUndefined   = errors.New("undefined")
@@ -799,11 +801,61 @@ func transformNode(node, datum xml.Node, style *Stylesheet) error {
 	return processNode(node, datum, style)
 }
 
+func processAVT(node, datum xml.Node, style *Stylesheet) error {
+	el := node.(*xml.Element)
+	for i, a := range el.Attrs {
+		var (
+			value = a.Value()
+			parts []string
+		)
+		for q := range iterAVT(value) {
+			items, err := style.ExecuteQuery(q, datum)
+			if err != nil {
+				return err
+			}
+			if len(items) != 1 {
+				return fmt.Errorf("invalid sequence")
+			}
+			v := items[0].Value().(string)
+			parts = append(parts, v)
+		}
+		el.Attrs[i].Datum = strings.Join(parts, "")
+	}
+	return nil
+}
+
+func iterAVT(str string) iter.Seq[string] {
+	fn := func(yield func(string) bool) {
+		var offset int
+		for {
+			ix := strings.IndexRune(str[offset:], '{')
+			if ix < 0 {
+				break
+			}
+			ix++
+			offset += ix
+			ix = strings.IndexRune(str[offset:], '}')
+			if ix < 0 {
+				break
+			}
+			if !yield(str[offset : offset+ix]) {
+				break
+			}
+			ix++
+			offset += ix
+		}
+	}
+	return fn
+}
+
 func processNode(node, datum xml.Node, style *Stylesheet) error {
 	var (
 		el    = node.(*xml.Element)
 		nodes = slices.Clone(el.Nodes)
 	)
+	if err := processAVT(node, datum, style); err != nil {
+		return err
+	}
 	if ident, err := getAttribute(el, "use-attribute-sets"); err == nil {
 		ix := slices.IndexFunc(style.AttrSet, func(set *AttributeSet) bool {
 			return set.Name == ident

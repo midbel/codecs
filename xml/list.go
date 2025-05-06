@@ -285,3 +285,7 @@ type Sequence []Item
 func (s Sequence) IsTrue() bool {
 	return false
 }
+
+func (s Sequence) Join() string {
+	return ""
+}
