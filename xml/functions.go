@@ -143,28 +143,45 @@ var builtins = []registeredBuiltin{
 	registerFunc("date", "xs", callDate),
 	registerFunc("decimal", "", callDecimal),
 	registerFunc("decimal", "xs", callDecimal),
-	// extensions functions
+}
+
+var fileFuncs = []registeredBuiltin{
 	registerFunc("read-file", "file", callReadFile),
 	registerFunc("write-file", "file", callWriteFile),
 	registerFunc("exists", "file", callFileExists),
 	registerFunc("delete", "file", callDeleteFile),
 	registerFunc("list", "file", callListDir),
+}
+
+var binaryFuncs = []registeredBuiltin{
 	registerFunc("encode", "binary", callXYZ),
 	registerFunc("decode", "binary", callXYZ),
 	registerFunc("concat", "binary", callXYZ),
 	registerFunc("substring", "binary", callXYZ),
-	registerFunc("send", "http", callXYZ),
-	registerFunc("get", "http", callHttpGet),
-	registerFunc("post", "http", callHttpPost),
+}
+
+var cryptoFuncs = []registeredBuiltin{
 	registerFunc("hash", "crypto", callHash),
 	registerFunc("hmac", "crypto", callHmac),
 	registerFunc("encrypt", "crypto", callXYZ),
 	registerFunc("decrypt", "crypto", callXYZ),
 	registerFunc("sign", "crypto", callXYZ),
 	registerFunc("verify", "crypto", callXYZ),
+}
+
+var httpFuncs = []registeredBuiltin{
+	registerFunc("send", "http", callXYZ),
+	registerFunc("get", "http", callHttpGet),
+	registerFunc("post", "http", callHttpPost),
+}
+
+var archiveFuncs = []registeredBuiltin{
 	registerFunc("entries", "archive", callXYZ),
 	registerFunc("extract", "archive", callXYZ),
 	registerFunc("create", "archive", callXYZ),
+}
+
+var processFuncs = []registeredBuiltin{
 	registerFunc("execute", "process", callXYZ),
 	registerFunc("wait", "process", callXYZ),
 	registerFunc("stdout", "process", callXYZ),
@@ -175,9 +192,54 @@ var builtins = []registeredBuiltin{
 var builtinEnv Environ[BuiltinFunc]
 
 func init() {
-	builtinEnv = Empty[BuiltinFunc]()
-	for _, b := range builtins {
-		builtinEnv.Define(b.QualifiedName(), b.Func)
+	builtinEnv = defaultFuncset()
+}
+
+type funcset struct {
+	Environ[BuiltinFunc]
+}
+
+func defaultFuncset() Environ[BuiltinFunc] {
+	set := funcset{
+		Environ: Empty[BuiltinFunc](),
+	}
+	set.enableFuncSet(builtins)
+	return &set
+}
+
+func (f *funcset) Clone() Environ[BuiltinFunc] {
+	c, ok := f.Environ.(interface{ Clone() Environ[BuiltinFunc] })
+	if !ok {
+		return f
+	}
+	var x funcset
+	x.Environ = c.Clone()
+	return &x
+}
+
+func (f *funcset) EnableProcess() {
+	f.enableFuncSet(processFuncs)
+}
+
+func (f *funcset) EnableHTTP() {
+	f.enableFuncSet(httpFuncs)
+}
+
+func (f *funcset) EnableFile() {
+	f.enableFuncSet(fileFuncs)
+}
+
+func (f *funcset) EnableBinary() {
+	f.enableFuncSet(binaryFuncs)
+}
+
+func (f *funcset) EnableCrypto() {
+	f.enableFuncSet(cryptoFuncs)
+}
+
+func (f *funcset) enableFuncSet(set []registeredBuiltin) {
+	for _, b := range set {
+		f.Define(b.QualifiedName(), b.Func)
 	}
 }
 
