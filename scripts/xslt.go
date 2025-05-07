@@ -808,7 +808,11 @@ func processAVT(node, datum xml.Node, style *Stylesheet) error {
 			value = a.Value()
 			parts []string
 		)
-		for q := range iterAVT(value) {
+		for q, ok := range iterAVT(value) {
+			if !ok {
+				parts = append(parts, q)
+				continue
+			}
 			items, err := style.ExecuteQuery(q, datum)
 			if err != nil {
 				return err
@@ -824,25 +828,31 @@ func processAVT(node, datum xml.Node, style *Stylesheet) error {
 	return nil
 }
 
-func iterAVT(str string) iter.Seq[string] {
-	fn := func(yield func(string) bool) {
+func iterAVT(str string) iter.Seq2[string, bool] {
+	fn := func(yield func(string, bool) bool) {
 		var offset int
 		for {
-			ix := strings.IndexRune(str[offset:], '{')
+			var (
+				ix  = strings.IndexRune(str[offset:], '{')
+				ptr = offset
+			)
 			if ix < 0 {
+				yield(str[offset:], false)
 				break
 			}
-			ix++
-			offset += ix
+			offset += ix + 1
 			ix = strings.IndexRune(str[offset:], '}')
 			if ix < 0 {
+				yield(str[offset-1:], false)
 				break
 			}
-			if !yield(str[offset : offset+ix]) {
+			if !yield(str[ptr:offset-1], false) {
 				break
 			}
-			ix++
-			offset += ix
+			if !yield(str[offset:offset+ix], true) {
+				break
+			}
+			offset += ix + 1
 		}
 	}
 	return fn
