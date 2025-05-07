@@ -215,6 +215,17 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 		return nil, err
 	}
 
+	root := doc.Root().(*xml.Element)
+	if root != nil {
+		all := root.Namespaces()
+		ix := slices.IndexFunc(all, func(n xml.NS) bool {
+			return n.Uri == xsltNamespaceUri
+		})
+		if ix >= 0 {
+			sheet.namespace = all[ix].Prefix
+		}
+	}
+
 	return &sheet, nil
 }
 

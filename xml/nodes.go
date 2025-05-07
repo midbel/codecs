@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -48,6 +47,15 @@ type Node interface {
 	path() []int
 }
 
+type NS struct {
+	Prefix string
+	Uri    string
+}
+
+func (n NS) Default() bool {
+	return n.Prefix == ""
+}
+
 type BaseNode struct {
 	Nodes    []Node
 	parent   Node
@@ -68,8 +76,7 @@ type Document struct {
 	Version  string
 	Encoding string
 
-	Namespaces []string
-	Nodes      []Node
+	Nodes []Node
 }
 
 func NewDocument(root Node) *Document {
@@ -380,7 +387,6 @@ type Element struct {
 	QName
 	Attrs []Attribute
 	Nodes []Node
-	NS    map[string]string
 
 	parent   Node
 	position int
@@ -389,15 +395,30 @@ type Element struct {
 func NewElement(name QName) *Element {
 	return &Element{
 		QName: name,
-		NS:    make(map[string]string),
 	}
+}
+
+func (e *Element) Namespaces() []NS {
+	var ns []NS
+	for _, a := range e.Attrs {
+		if a.Name == "xmlns" || a.Space == "xmlns" {
+			n := NS{
+				Prefix: a.Name,
+				Uri: a.Value(),
+			}
+			if n.Prefix == a.Name {
+				n.Prefix = ""
+			}
+			ns = append(ns, n)
+		}
+	}
+	return ns
 }
 
 func (e *Element) Clone() Node {
 	c := &Element{
 		QName:    e.QName,
 		Attrs:    slices.Clone(e.Attrs),
-		NS:       maps.Clone(e.NS),
 		parent:   e.parent,
 		position: e.position,
 	}
