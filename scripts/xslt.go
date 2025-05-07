@@ -80,15 +80,18 @@ func main() {
 		mode   = flag.String("m", "", "mode")
 		file   = flag.String("f", "", "file")
 		dir    = flag.String("d", ".", "context directory")
-		params []string
+		params = make(map[string]xml.Expr)
 	)
 	flag.Func("p", "template parameter", func(str string) error {
-		_, _, ok := strings.Cut(str, "=")
+		ident, query, ok := strings.Cut(str, "=")
 		if !ok {
 			return fmt.Errorf("invalid parameter")
 		}
-		params = append(params, str)
-		return nil
+		expr, err := xml.CompileString(query)
+		if err == nil {
+			params[ident] = expr
+		}
+		return err
 	})
 	flag.Parse()
 
@@ -105,9 +108,8 @@ func main() {
 	}
 	sheet.Mode = *mode
 
-	for _, p := range params {
-		k, v, _ := strings.Cut(p, "=")
-		sheet.DefineParam(k, v)
+	for ident, expr := range params {
+		sheet.DefineExprParam(ident, expr)
 	}
 
 	var w io.Writer = os.Stdout
@@ -200,23 +202,7 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 		currentMode: &unnamedMode,
 		namespace:   xsltNamespacePrefix,
 	}
-	if err = sheet.loadTemplates(doc); err != nil {
-		return nil, err
-	}
-
-	if err := sheet.loadOutput(doc); err != nil {
-		return nil, err
-	}
-	if err = sheet.loadParams(doc); err != nil {
-		return nil, err
-	}
-	if err = sheet.loadAttributeSet(doc); err != nil {
-		return nil, err
-	}
-	if err := includesSheet(&sheet, doc); err != nil {
-		return nil, err
-	}
-	if err := importsSheet(&sheet, doc); err != nil {
+	if err := sheet.init(doc); err != nil {
 		return nil, err
 	}
 
@@ -422,6 +408,28 @@ func (s *Stylesheet) loadOutput(doc xml.Node) error {
 	if len(s.output) == 0 {
 		s.output = append(s.output, defaultOutput())
 	}
+	return nil
+}
+
+func (s *Stylesheet) init(doc xml.Node) error {
+	if err := s.loadTemplates(doc); err != nil {
+		return err
+	}
+	if err := s.loadOutput(doc); err != nil {
+		return err
+	}
+	if err := s.loadParams(doc); err != nil {
+		return err
+	}
+	if err := s.loadAttributeSet(doc); err != nil {
+		return err
+	}
+	if err := includesSheet(s, doc); err != nil {
+		return err
+	}
+	if err := importsSheet(s, doc); err != nil {
+		return err
+	}	
 	return nil
 }
 
