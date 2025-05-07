@@ -25,6 +25,7 @@ var (
 	errImplemented = errors.New("not implemented")
 	errUndefined   = errors.New("undefined")
 	errSkip        = errors.New("skip")
+	ErrTerminate = errors.New("terminate")
 )
 
 type executeFunc func(xml.Node, xml.Node, *Stylesheet) error
@@ -1376,11 +1377,31 @@ func executeValueOf(node, datum xml.Node, style *Stylesheet) error {
 }
 
 func executeCopy(node, datum xml.Node, style *Stylesheet) error {
-	return errImplemented
+	return executeCopyOf(node, datum, style)
 }
 
 func executeCopyOf(node, datum xml.Node, style *Stylesheet) error {
-	return errImplemented
+	el := node.(*xml.Element)
+	query, err := getAttribute(el, "select")
+	if err != nil {
+		return err
+	}
+	items, err := style.ExecuteQuery(query, datum)
+	if err != nil {
+		return err
+	}
+	var list []xml.Node
+	for i := range items {
+		c := cloneNode(items[i].Node())
+		if c != nil {
+			list = append(list, c)
+		}
+	}
+	parent, ok := el.Parent().(*xml.Element)
+	if !ok {
+		return fmt.Errorf("xml element expected")
+	}
+	return parent.InsertNodes(el.Position(), list)
 }
 
 func executeSequence(node, datum xml.Node, style *Stylesheet) error {
@@ -1388,7 +1409,19 @@ func executeSequence(node, datum xml.Node, style *Stylesheet) error {
 }
 
 func executeMessage(node, datum xml.Node, style *Stylesheet) error {
-	return errImplemented
+	var (
+		parts []string
+		el = node.(*xml.Element)
+	)
+	for _, n := range el.Nodes {
+		parts = append(parts, n.Value())
+	}
+	fmt.Fprintln(os.Stderr, strings.Join(parts, ""))
+
+	if quit, err := getAttribute(el, "terminate"); err == nil && quit == "yes" {
+		return ErrTerminate
+	}
+	return nil
 }
 
 func executeElement(node, datum xml.Node, style *Stylesheet) error {
