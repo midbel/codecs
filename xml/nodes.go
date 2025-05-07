@@ -404,9 +404,9 @@ func (e *Element) Namespaces() []NS {
 		if a.Name == "xmlns" || a.Space == "xmlns" {
 			n := NS{
 				Prefix: a.Name,
-				Uri: a.Value(),
+				Uri:    a.Value(),
 			}
-			if n.Prefix == a.Name {
+			if n.Prefix == "xmlns" {
 				n.Prefix = ""
 			}
 			ns = append(ns, n)

@@ -16,7 +16,10 @@ import (
 	"github.com/midbel/codecs/xml"
 )
 
-const xsltNamespaceUri = "http://www.w3.org/1999/XSL/Transform"
+const (
+	xsltNamespaceUri    = "http://www.w3.org/1999/XSL/Transform"
+	xsltNamespacePrefix = "xsl"
+)
 
 var (
 	errImplemented = errors.New("not implemented")
@@ -39,34 +42,34 @@ func init() {
 		return fn
 	}
 	executers = map[xml.QName]executeFunc{
-		xml.QualifiedName("for-each", "xsl"):        wrap(executeForeach),
-		xml.QualifiedName("value-of", "xsl"):        executeValueOf,
-		xml.QualifiedName("call-template", "xsl"):   wrap(executeCallTemplate),
-		xml.QualifiedName("apply-templates", "xsl"): wrap(executeApplyTemplates),
-		xml.QualifiedName("apply-imports", "xsl"):   wrap(executeApplyImport),
-		xml.QualifiedName("if", "xsl"):              wrap(executeIf),
-		xml.QualifiedName("choose", "xsl"):          wrap(executeChoose),
-		xml.QualifiedName("where-populated", "xsl"): executeWithParam,
-		xml.QualifiedName("on-empty", "xsl"):        executeOnEmpty,
-		xml.QualifiedName("on-not-empty", "xsl"):    executeOnNotEmpty,
-		xml.QualifiedName("try", "xsl"):             wrap(executeTry),
-		xml.QualifiedName("variable", "xsl"):        executeVariable,
-		xml.QualifiedName("result-document", "xsl"): executeResultDocument,
-		xml.QualifiedName("source-document", "xsl"): executeSourceDocument,
-		xml.QualifiedName("import", "xsl"):          executeImport,
-		xml.QualifiedName("include", "xsl"):         executeInclude,
-		xml.QualifiedName("with-param", "xsl"):      executeWithParam,
-		xml.QualifiedName("copy", "xsl"):            executeCopy,
-		xml.QualifiedName("copy-of", "xsl"):         executeCopyOf,
-		xml.QualifiedName("sequence", "xsl"):        executeSequence,
-		xml.QualifiedName("element", "xsl"):         executeElement,
-		xml.QualifiedName("attribute", "xsl"):       executeAttribute,
-		xml.QualifiedName("text", "xsl"):            executeText,
-		xml.QualifiedName("comment", "xsl"):         executeComment,
-		xml.QualifiedName("message", "xsl"):         executeMessage,
-		xml.QualifiedName("fallback", "xsl"):        executeFallback,
-		xml.QualifiedName("merge", "xsl"):           executeMerge,
-		xml.QualifiedName("for-each-group", "xsl"):  executeForeachGroup,
+		xml.QualifiedName("for-each", xsltNamespacePrefix):        wrap(executeForeach),
+		xml.QualifiedName("value-of", xsltNamespacePrefix):        executeValueOf,
+		xml.QualifiedName("call-template", xsltNamespacePrefix):   wrap(executeCallTemplate),
+		xml.QualifiedName("apply-templates", xsltNamespacePrefix): wrap(executeApplyTemplates),
+		xml.QualifiedName("apply-imports", xsltNamespacePrefix):   wrap(executeApplyImport),
+		xml.QualifiedName("if", xsltNamespacePrefix):              wrap(executeIf),
+		xml.QualifiedName("choose", xsltNamespacePrefix):          wrap(executeChoose),
+		xml.QualifiedName("where-populated", xsltNamespacePrefix): executeWithParam,
+		xml.QualifiedName("on-empty", xsltNamespacePrefix):        executeOnEmpty,
+		xml.QualifiedName("on-not-empty", xsltNamespacePrefix):    executeOnNotEmpty,
+		xml.QualifiedName("try", xsltNamespacePrefix):             wrap(executeTry),
+		xml.QualifiedName("variable", xsltNamespacePrefix):        executeVariable,
+		xml.QualifiedName("result-document", xsltNamespacePrefix): executeResultDocument,
+		xml.QualifiedName("source-document", xsltNamespacePrefix): executeSourceDocument,
+		xml.QualifiedName("import", xsltNamespacePrefix):          executeImport,
+		xml.QualifiedName("include", xsltNamespacePrefix):         executeInclude,
+		xml.QualifiedName("with-param", xsltNamespacePrefix):      executeWithParam,
+		xml.QualifiedName("copy", xsltNamespacePrefix):            executeCopy,
+		xml.QualifiedName("copy-of", xsltNamespacePrefix):         executeCopyOf,
+		xml.QualifiedName("sequence", xsltNamespacePrefix):        executeSequence,
+		xml.QualifiedName("element", xsltNamespacePrefix):         executeElement,
+		xml.QualifiedName("attribute", xsltNamespacePrefix):       executeAttribute,
+		xml.QualifiedName("text", xsltNamespacePrefix):            executeText,
+		xml.QualifiedName("comment", xsltNamespacePrefix):         executeComment,
+		xml.QualifiedName("message", xsltNamespacePrefix):         executeMessage,
+		xml.QualifiedName("fallback", xsltNamespacePrefix):        executeFallback,
+		xml.QualifiedName("merge", xsltNamespacePrefix):           executeMerge,
+		xml.QualifiedName("for-each-group", xsltNamespacePrefix):  executeForeachGroup,
 	}
 }
 
@@ -194,6 +197,7 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 		builtins:    xml.DefaultBuiltin(),
 		Context:     contextDir,
 		currentMode: &unnamedMode,
+		namespace:   xsltNamespacePrefix,
 	}
 	if err = sheet.loadTemplates(doc); err != nil {
 		return nil, err
@@ -802,12 +806,15 @@ func transformNode(node, datum xml.Node, style *Stylesheet) error {
 	if !ok {
 		return fmt.Errorf("node: xml element expected (got %T)", el)
 	}
-	fn, ok := executers[el.QName]
-	if ok {
-		if fn == nil {
-			return fmt.Errorf("%s not yet implemented", el.QName)
+	if el.Space == style.namespace {
+		el.Space = xsltNamespacePrefix
+		fn, ok := executers[el.QName]
+		if ok {
+			if fn == nil {
+				return fmt.Errorf("%s not yet implemented", el.QName)
+			}
+			return fn(node, datum, style)
 		}
-		return fn(node, datum, style)
 	}
 	return processNode(node, datum, style)
 }
@@ -1345,15 +1352,25 @@ func executeValueOf(node, datum xml.Node, style *Stylesheet) error {
 	if err != nil {
 		return err
 	}
+	sep, err := getAttribute(el, "separator")
+	if err != nil {
+		sep = " "
+	}
 	parent, ok := el.Parent().(*xml.Element)
+	if !ok {
+		return fmt.Errorf("value-of: xml element expected as parent")
+	}
 	items, err := style.ExecuteQuery(query, datum)
 	if err != nil || len(items) == 0 {
 		return parent.RemoveNode(el.Position())
 	}
-	text := xml.NewText(items[0].Node().Value())
-	if !ok {
-		return fmt.Errorf("value-of: xml element expected as parent")
+
+	var parts []string
+	for i := range items {
+		parts = append(parts, items[i].Node().Value())
 	}
+
+	text := xml.NewText(strings.Join(parts, sep))
 	parent.ReplaceNode(el.Position(), text)
 	return nil
 }
