@@ -194,6 +194,9 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 	if err != nil {
 		return nil, err
 	}
+	if contextDir == "" {
+		contextDir = filepath.Dir(file)
+	}
 	sheet := Stylesheet{
 		vars:        xml.Empty[xml.Expr](),
 		params:      xml.Empty[xml.Expr](),
@@ -214,6 +217,11 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 		})
 		if ix >= 0 {
 			sheet.namespace = all[ix].Prefix
+			for e, fn := range executers {
+				delete(executers, e)
+				e.Space = sheet.namespace
+				executers[e] = fn
+			}
 		}
 	}
 
@@ -434,9 +442,6 @@ func (s *Stylesheet) loadTemplates(doc xml.Node) error {
 				t.Name = attr
 			case "match":
 				t.Match = attr
-				if t.Match == "" {
-					t.Match = "."
-				}
 			case "mode":
 				t.Mode = attr
 			default:
@@ -452,16 +457,14 @@ func (s *Stylesheet) ExecuteQuery(query string, datum xml.Node) ([]xml.Item, err
 }
 
 func (s *Stylesheet) ExecuteQueryWithNS(query, ns string, datum xml.Node) ([]xml.Item, error) {
+	if query == "" {
+		i := xml.NewNodeItem(datum)
+		return []xml.Item{i}, nil
+	}
 	q, err := s.CompileQueryWithNS(query, ns)
 	if err != nil {
 		return nil, err
 	}
-	// e, ok := q.(interface {
-	// 	FindWithEnv(xml.Node, xml.Environ[xml.Expr]) ([]xml.Item, error)
-	// })
-	// if ok {
-	// 	return e.FindWithEnv(datum, s)
-	// }
 	return q.Find(datum)
 }
 
@@ -517,8 +520,7 @@ func (s *Stylesheet) Generate(w io.Writer, doc *xml.Document) error {
 }
 
 func (s *Stylesheet) ImportSheet(file string) error {
-	file = filepath.Join(s.Context, file)
-	other, err := Load(file, s.Context)
+	other, err := Load(filepath.Join(s.Context, file), s.Context)
 	if err != nil {
 		return err
 	}
@@ -528,8 +530,7 @@ func (s *Stylesheet) ImportSheet(file string) error {
 }
 
 func (s *Stylesheet) IncludeSheet(file string) error {
-	file = filepath.Join(s.Context, file)
-	other, err := Load(file, s.Context)
+	other, err := Load(filepath.Join(s.Context, file), s.Context)
 	if err != nil {
 		return err
 	}
@@ -750,7 +751,7 @@ func (t *Template) Clone() *Template {
 }
 
 func (t *Template) Execute(datum xml.Node, style *Stylesheet) ([]xml.Node, error) {
-	value, err := t.getData(datum)
+	value, err := t.getData(datum, style)
 	if err != nil {
 		return nil, err
 	}
@@ -779,15 +780,8 @@ func (t *Template) execute(current, datum xml.Node, style *Stylesheet) error {
 	return transformNode(current, datum, style)
 }
 
-func (t *Template) getData(datum xml.Node) (xml.Node, error) {
-	if t.Match == "" {
-		return datum, nil
-	}
-	query, err := xml.CompileString(t.Match)
-	if err != nil {
-		return nil, err
-	}
-	items, err := query.Find(datum)
+func (t *Template) getData(datum xml.Node, style *Stylesheet) (xml.Node, error) {
+	items, err := style.ExecuteQuery(t.Match, datum)
 	if err != nil {
 		return nil, err
 	}
@@ -806,15 +800,12 @@ func transformNode(node, datum xml.Node, style *Stylesheet) error {
 	if !ok {
 		return fmt.Errorf("node: xml element expected (got %T)", el)
 	}
-	if el.Space == style.namespace {
-		el.Space = xsltNamespacePrefix
-		fn, ok := executers[el.QName]
-		if ok {
-			if fn == nil {
-				return fmt.Errorf("%s not yet implemented", el.QName)
-			}
-			return fn(node, datum, style)
+	fn, ok := executers[el.QName]
+	if ok {
+		if fn == nil {
+			return fmt.Errorf("%s not yet implemented", el.QName)
 		}
+		return fn(node, datum, style)
 	}
 	return processNode(node, datum, style)
 }
@@ -835,11 +826,10 @@ func processAVT(node, datum xml.Node, style *Stylesheet) error {
 			if err != nil {
 				return err
 			}
-			if len(items) != 1 {
-				return fmt.Errorf("invalid sequence")
+			for i := range items {
+				v := items[i].Value().(string)
+				parts = append(parts, v)
 			}
-			v := items[0].Value().(string)
-			parts = append(parts, v)
 		}
 		el.Attrs[i].Datum = strings.Join(parts, "")
 	}
