@@ -45,6 +45,49 @@ func atRoot(expr Expr) bool {
 	}
 }
 
+func updateNS(expr Expr, ns string) Expr {
+	switch e := expr.(type) {
+	case name:
+		e.Space = ns
+		return e
+	case query:
+		e.expr = updateNS(e.expr, ns)
+		return e
+	case union:
+		for i := range e.all {
+			e.all[i] = updateNS(e.all[i], ns)
+		}
+		return e
+	case intersect:
+		for i := range e.all {
+			e.all[i] = updateNS(e.all[i], ns)
+		}
+		return e
+	case except:
+		for i := range e.all {
+			e.all[i] = updateNS(e.all[i], ns)
+		}
+		return e
+	case step:
+		e.curr = updateNS(e.curr, ns)
+		e.next = updateNS(e.next, ns)
+		return e
+	case filter:
+		e.expr = updateNS(e.expr, ns)
+		return e
+	case axis:
+		e.next = updateNS(e.next, ns)
+		return e
+	case call:
+		for i := range e.args {
+			e.args[i] = updateNS(e.args[i], ns)
+		}
+		return e
+	default:
+		return expr
+	}
+}
+
 func fromBase(expr, base Expr) Expr {
 	switch e := expr.(type) {
 	case query:
@@ -262,6 +305,13 @@ func (q *Query) Find(node Node) ([]Item, error) {
 		ctx.Environ = Empty[Expr]()
 	}
 	return q.find(ctx)
+}
+
+func (q *Query) UseNamespace(ns string) {
+	if q.expr == nil {
+		return
+	}
+	q.expr = updateNS(q.expr, ns)
 }
 
 func (q *Query) MatchPriority() int {

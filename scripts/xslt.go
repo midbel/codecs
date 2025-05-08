@@ -25,7 +25,7 @@ var (
 	errImplemented = errors.New("not implemented")
 	errUndefined   = errors.New("undefined")
 	errSkip        = errors.New("skip")
-	ErrTerminate = errors.New("terminate")
+	ErrTerminate   = errors.New("terminate")
 )
 
 type executeFunc func(xml.Node, xml.Node, *Stylesheet) error
@@ -231,11 +231,7 @@ func defaultOutput() *OutputSettings {
 }
 
 func includesSheet(sheet *Stylesheet, doc xml.Node) error {
-	query, err := sheet.CompileQuery("/xsl:stylesheet/xsl:include")
-	if err != nil {
-		return err
-	}
-	items, err := query.Find(doc)
+	items, err := sheet.queryXSL("/stylesheet/include", doc)
 	if err != nil {
 		return err
 	}
@@ -249,11 +245,7 @@ func includesSheet(sheet *Stylesheet, doc xml.Node) error {
 }
 
 func importsSheet(sheet *Stylesheet, doc xml.Node) error {
-	query, err := sheet.CompileQuery("/xsl:stylesheet/xsl:import")
-	if err != nil {
-		return err
-	}
-	items, err := query.Find(doc)
+	items, err := sheet.queryXSL("/stylesheet/import", doc)
 	if err != nil {
 		return err
 	}
@@ -267,11 +259,7 @@ func importsSheet(sheet *Stylesheet, doc xml.Node) error {
 }
 
 func (s *Stylesheet) loadAttributeSet(doc xml.Node) error {
-	query, err := s.CompileQuery("/xsl:stylesheet/xsl:attribute-set")
-	if err != nil {
-		return err
-	}
-	items, err := query.Find(doc)
+	items, err := s.queryXSL("/stylesheet/attribute-set", doc)
 	if err != nil {
 		return err
 	}
@@ -305,17 +293,9 @@ func (s *Stylesheet) loadAttributeSet(doc xml.Node) error {
 }
 
 func (s *Stylesheet) loadModes(doc xml.Node) error {
-	query, err := s.CompileQuery("/xsl:stylesheet/xsl:mode")
+	items, err := s.queryXSL("/stylesheet/mode", doc)
 	if err != nil {
 		return err
-	}
-	items, err := query.Find(doc)
-	if err != nil {
-		return err
-	}
-	s.Modes = append(s.Modes, &unnamedMode)
-	if len(items) == 0 {
-		return nil
 	}
 	for i := range items {
 		n := items[i].Node().(*xml.Element)
@@ -342,11 +322,7 @@ func (s *Stylesheet) loadModes(doc xml.Node) error {
 }
 
 func (s *Stylesheet) loadParams(doc xml.Node) error {
-	query, err := s.CompileQuery("/xsl:stylesheet/xsl:param")
-	if err != nil {
-		return err
-	}
-	items, err := query.Find(doc)
+	items, err := s.queryXSL("/stylesheet/param", doc)
 	if err != nil {
 		return err
 	}
@@ -377,7 +353,7 @@ func (s *Stylesheet) loadParams(doc xml.Node) error {
 }
 
 func (s *Stylesheet) loadOutput(doc xml.Node) error {
-	items, err := s.ExecuteQuery("/xsl:stylesheet/xsl:output", doc)
+	items, err := s.queryXSL("/stylesheet/output", doc)
 	if err != nil {
 		return err
 	}
@@ -429,12 +405,12 @@ func (s *Stylesheet) init(doc xml.Node) error {
 	}
 	if err := importsSheet(s, doc); err != nil {
 		return err
-	}	
+	}
 	return nil
 }
 
 func (s *Stylesheet) loadTemplates(doc xml.Node) error {
-	items, err := s.ExecuteQuery("/xsl:stylesheet/xsl:template", doc)
+	items, err := s.queryXSL("/stylesheet/template", doc)
 	if err != nil {
 		return err
 	}
@@ -472,26 +448,41 @@ func (s *Stylesheet) loadTemplates(doc xml.Node) error {
 }
 
 func (s *Stylesheet) ExecuteQuery(query string, datum xml.Node) ([]xml.Item, error) {
-	q, err := s.CompileQuery(query)
+	return s.ExecuteQueryWithNS(query, "", datum)
+}
+
+func (s *Stylesheet) ExecuteQueryWithNS(query, ns string, datum xml.Node) ([]xml.Item, error) {
+	q, err := s.CompileQueryWithNS(query, ns)
 	if err != nil {
 		return nil, err
 	}
-	e, ok := q.(interface {
-		FindWithEnv(xml.Node, xml.Environ[xml.Expr]) ([]xml.Item, error)
-	})
-	if ok {
-		return e.FindWithEnv(datum, s)
-	}
+	// e, ok := q.(interface {
+	// 	FindWithEnv(xml.Node, xml.Environ[xml.Expr]) ([]xml.Item, error)
+	// })
+	// if ok {
+	// 	return e.FindWithEnv(datum, s)
+	// }
 	return q.Find(datum)
 }
 
+func (s *Stylesheet) queryXSL(query string, datum xml.Node) ([]xml.Item, error) {
+	return s.ExecuteQueryWithNS(query, s.namespace, datum)
+}
+
 func (s *Stylesheet) CompileQuery(query string) (xml.Expr, error) {
+	return s.CompileQueryWithNS(query, "")
+}
+
+func (s *Stylesheet) CompileQueryWithNS(query, ns string) (xml.Expr, error) {
 	q, err := xml.Build(query)
 	if err != nil {
 		return nil, err
 	}
 	q.Environ = s
 	q.Builtins = xml.DefaultBuiltin()
+	if ns != "" {
+		q.UseNamespace(ns)
+	}
 	return q, nil
 }
 
@@ -618,7 +609,7 @@ func (s *Stylesheet) GetOutput(name string) *OutputSettings {
 		return o.Name == name
 	})
 	if ix < 0 && name != "" {
-		return s.GetOutput("")
+		return defaultOutput()
 	}
 	return s.output[ix]
 }
@@ -1419,7 +1410,7 @@ func executeSequence(node, datum xml.Node, style *Stylesheet) error {
 func executeMessage(node, datum xml.Node, style *Stylesheet) error {
 	var (
 		parts []string
-		el = node.(*xml.Element)
+		el    = node.(*xml.Element)
 	)
 	for _, n := range el.Nodes {
 		parts = append(parts, n.Value())
