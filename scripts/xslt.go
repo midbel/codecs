@@ -1424,12 +1424,15 @@ func executeValueOf(node, datum xml.Node, style *Stylesheet) error {
 		return parent.RemoveNode(el.Position())
 	}
 
-	var parts []string
+	var str strings.Builder
 	for i := range items {
-		parts = append(parts, items[i].Node().Value())
+		if i > 0 {
+			str.WriteString(sep)
+		}
+		str.WriteString(items[i].Node().Value())
 	}
 
-	text := xml.NewText(strings.Join(parts, sep))
+	text := xml.NewText(str.String())
 	parent.ReplaceNode(el.Position(), text)
 	return nil
 }
