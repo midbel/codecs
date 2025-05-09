@@ -1107,7 +1107,7 @@ func executeApply(node, datum xml.Node, style *Stylesheet, match matchFunc) erro
 		return err
 	}
 	var (
-		el      = node.(*xml.Element)
+		el = node.(*xml.Element)
 		mode, _ = getAttribute(el, "mode")
 		results []xml.Node
 	)
@@ -1121,12 +1121,11 @@ func executeApply(node, datum xml.Node, style *Stylesheet, match matchFunc) erro
 			}
 			return err
 		}
-		params, err := style.ExecuteQuery("./*[self::with-param][not(preceding-sibling::*[not(self::with-param)])]", el)
-		if err != nil {
-			return err
-		}
-		for _, n := range params {
-			if err := transformNode(n.Node(), datum, style); err != nil {
+		for _, n := range el.Nodes {
+			if n.QualifiedName() != style.getQualifiedName("with-param") {
+				return fmt.Errorf("apply-templates: invalid child node %s", n.QualifiedName())
+			}
+			if err := transformNode(n, datum, style); err != nil {
 				return err
 			}
 		}
