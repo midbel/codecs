@@ -1029,14 +1029,7 @@ func executeApplyImport(node, datum xml.Node, style *Stylesheet) error {
 func executeApplyTemplates(node, datum xml.Node, style *Stylesheet) error {
 	el := node.(*xml.Element)
 	if value, err := getAttribute(el, "select"); err == nil {
-		query, err := style.CompileQuery(value)
-		if err != nil {
-			return err
-		}
-		items, err := query.Find(datum)
-		if err != nil {
-			return err
-		}
+		items, err := style.ExecuteQuery(value, datum)
 		if len(items) == 0 {
 			if r, ok := node.Parent().(interface{ RemoveNode(int) error }); ok {
 				return r.RemoveNode(node.Position())
@@ -1053,7 +1046,7 @@ func executeApplyTemplates(node, datum xml.Node, style *Stylesheet) error {
 		return err
 	}
 	for _, n := range el.Nodes {
-		if n.QualifiedName() != "xsl:with-param" {
+		if n.QualifiedName() != style.getQualifiedName("with-param") {
 			return fmt.Errorf("apply-templates: invalid child node %s", n.QualifiedName())
 		}
 		if err := transformNode(n, datum, style); err != nil {
@@ -1095,7 +1088,7 @@ func executeCallTemplate(node, datum xml.Node, style *Stylesheet) error {
 	}
 
 	for _, n := range el.Nodes {
-		if n.QualifiedName() != "xsl:with-param" {
+		if n.QualifiedName() != style.getQualifiedName("with-param") {
 			return fmt.Errorf("call-templates: invalid child node %s", n.QualifiedName())
 		}
 		if err := transformNode(n, datum, style); err != nil {
@@ -1131,7 +1124,7 @@ func executeWithParam(node, datum xml.Node, style *Stylesheet) error {
 func executeTry(node, datum xml.Node, style *Stylesheet) error {
 	el := node.(*xml.Element)
 	ix := slices.IndexFunc(el.Nodes, func(n xml.Node) bool {
-		return n.QualifiedName() == "xsl:catch"
+		return n.QualifiedName() == style.getQualifiedName("catch")
 	})
 	var catch xml.Node
 	if ix != -1 && ix != len(el.Nodes)-1 {
@@ -1189,11 +1182,7 @@ func executeIf(node, datum xml.Node, style *Stylesheet) error {
 }
 
 func executeChoose(node, datum xml.Node, style *Stylesheet) error {
-	query, err := style.CompileQuery("./xsl:when")
-	if err != nil {
-		return err
-	}
-	items, err := query.Find(node)
+	items, err := style.queryXSL("/when", datum)
 	if err != nil {
 		return err
 	}
@@ -1222,10 +1211,7 @@ func executeChoose(node, datum xml.Node, style *Stylesheet) error {
 		}
 	}
 
-	if query, err = style.CompileQuery("./xsl:otherwise"); err != nil {
-		return err
-	}
-	if items, err = query.Find(node); err != nil {
+	if items, err = style.queryXSL("otherwise", node); err != nil {
 		return err
 	}
 	if len(items) == 0 {
@@ -1263,7 +1249,7 @@ func executeForeach(node, datum xml.Node, style *Stylesheet) error {
 	}
 
 	var it iter.Seq[xml.Item]
-	if el.Nodes[0].QualifiedName() == "xsl:sort" {
+	if el.Nodes[0].QualifiedName() == style.getQualifiedName("sort") {
 		x := el.Nodes[0].(*xml.Element)
 		query, err := getAttribute(x, "select")
 		if err != nil {

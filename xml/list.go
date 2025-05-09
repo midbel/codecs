@@ -282,10 +282,29 @@ func greatestValue[T string | float64](items []T) T {
 
 type Sequence []Item
 
-func (s Sequence) IsTrue() bool {
+func NewSequence() Sequence {
+	var seq Sequence
+	return seq
+}
+
+func (s *Sequence) Append(item Item) {
+	*s = append(*s, item)
+}
+
+func (s *Sequence) IsTrue() bool {
+	if len(*s) == 0 {
+		return false
+	}
+	if len(*s) > 1 {
+		return (*s)[0].True()
+	}
 	return false
 }
 
-func (s Sequence) Join() string {
+func (s *Sequence) IsSingleton() bool {
+	return len(s) == 1
+}
+
+func (s *Sequence) String() string {
 	return ""
 }
