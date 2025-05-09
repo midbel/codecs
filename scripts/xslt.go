@@ -723,10 +723,7 @@ func (s *Stylesheet) whenTemplateNotFound(err error, mode string, node, datum xm
 	default:
 		return err
 	}
-	if r, ok := node.Parent().(interface{ ReplaceNode(int, xml.Node) error }); ok {
-		return r.ReplaceNode(node.Position(), tmp)
-	}
-	return nil
+	return replaceNode(node, tmp)
 }
 
 func (s *Stylesheet) getMode(mode string) *Mode {
@@ -1014,12 +1011,7 @@ func executeSourceDocument(node, datum xml.Node, style *Stylesheet) error {
 		}
 		nodes = append(nodes, c)
 	}
-	if i, ok := el.Parent().(interface{ InsertNodes(int, []xml.Node) error }); ok {
-		if err := i.InsertNodes(el.Position(), nodes); err != nil {
-			return err
-		}
-	}
-	return nil
+	return insertNodes(el, nodes...)
 }
 
 func executeResultDocument(node, datum xml.Node, style *Stylesheet) error {
@@ -1117,9 +1109,7 @@ func executeApply(node, datum xml.Node, style *Stylesheet, match matchFunc) erro
 			results = append(results, c)
 		}
 	}
-	parent := el.Parent().(*xml.Element)
-	parent.InsertNodes(el.Position(), results)
-	return nil
+	return insertNodes(el, results...)
 }
 
 func executeApplyImport(node, datum xml.Node, style *Stylesheet) error {
@@ -1150,12 +1140,7 @@ func executeCallTemplate(node, datum xml.Node, style *Stylesheet) error {
 	if err != nil {
 		return err
 	}
-	if i, ok := el.Parent().(interface{ InsertNodes(int, []xml.Node) error }); ok {
-		if err := i.InsertNodes(el.Position(), nodes); err != nil {
-			return err
-		}
-	}
-	return nil
+	return insertNodes(el, nodes...)
 }
 
 func getNodesForTemplate(node, datum xml.Node, style *Stylesheet) ([]xml.Node, error) {
@@ -1256,10 +1241,7 @@ func executeIf(node, datum xml.Node, style *Stylesheet) error {
 	if err = processNode(node, datum, style); err != nil {
 		return err
 	}
-	if i, ok := el.Parent().(interface{ InsertNodes(int, []xml.Node) error }); ok {
-		return i.InsertNodes(el.Position(), el.Nodes)
-	}
-	return nil
+	return insertNodes(el, el.Nodes...)
 }
 
 func executeChoose(node, datum xml.Node, style *Stylesheet) error {
@@ -1429,10 +1411,9 @@ func executeValueOf(node, datum xml.Node, style *Stylesheet) error {
 		}
 		str.WriteString(items[i].Node().Value())
 	}
-
 	text := xml.NewText(str.String())
-	parent.ReplaceNode(el.Position(), text)
-	return nil
+	return replaceNode(node, text)
+	// return parent.ReplaceNode(node.Position(), text)
 }
 
 func executeCopy(node, datum xml.Node, style *Stylesheet) error {
@@ -1456,11 +1437,7 @@ func executeCopyOf(node, datum xml.Node, style *Stylesheet) error {
 			list = append(list, c)
 		}
 	}
-	parent, ok := el.Parent().(*xml.Element)
-	if !ok {
-		return fmt.Errorf("xml element expected")
-	}
-	return parent.InsertNodes(el.Position(), list)
+	return insertNodes(el, list...)
 }
 
 func executeSequence(node, datum xml.Node, style *Stylesheet) error {
@@ -1497,8 +1474,8 @@ func executeElement(node, datum xml.Node, style *Stylesheet) error {
 		curr  = xml.NewElement(qn)
 		nodes = slices.Clone(el.Nodes)
 	)
-	if r, ok := el.Parent().(interface{ ReplaceNode(int, xml.Node) error }); ok {
-		r.ReplaceNode(el.Position(), curr)
+	if err := replaceNode(el, curr); err != nil {
+		return err
 	}
 	for i := range nodes {
 		c := cloneNode(nodes[i])
@@ -1519,18 +1496,12 @@ func executeAttribute(node, datum xml.Node, style *Stylesheet) error {
 
 func executeText(node, datum xml.Node, style *Stylesheet) error {
 	text := xml.NewText(node.Value())
-	if r, ok := node.Parent().(interface{ ReplaceAt(int, xml.Node) error }); ok {
-		return r.ReplaceAt(node.Position(), text)
-	}
-	return nil
+	return replaceNode(node, text)
 }
 
 func executeComment(node, datum xml.Node, style *Stylesheet) error {
 	comment := xml.NewComment(node.Value())
-	if r, ok := node.Parent().(interface{ ReplaceAt(int, xml.Node) error }); ok {
-		return r.ReplaceAt(node.Position(), comment)
-	}
-	return nil
+	return replaceNode(node, comment)
 }
 
 func executeFallback(node, datum xml.Node, style *Stylesheet) error {
@@ -1678,4 +1649,37 @@ func isTemplateMatch(expr xml.Expr, node xml.Node) (bool, int) {
 		curr = curr.Parent()
 	}
 	return false, 0
+}
+
+func removeNode(elem xml.Node) error {
+	// p := node.Parent()
+	// r, ok := p.(interface{ RemoveNode(int) error})
+	// if !ok {
+	// 	return fmt.Errorf("node can not be removed from parent element of %s", elem.QualifiedName())
+	// }
+	return nil
+}
+
+func replaceNode(elem, node xml.Node) error {
+	if node == nil {
+		return nil
+	}
+	p := elem.Parent()
+	r, ok := p.(interface{ ReplaceNode(int, xml.Node) error })
+	if !ok {
+		return fmt.Errorf("node can not be replaced from parent element of %s", elem.QualifiedName())
+	}
+	return r.ReplaceNode(elem.Position(), node)
+}
+
+func insertNodes(elem xml.Node, nodes ...xml.Node) error {
+	if len(nodes) == 0 {
+		return nil
+	}
+	p := elem.Parent()
+	i, ok := p.(interface{ InsertNodes(int, []xml.Node) error })
+	if !ok {
+		return fmt.Errorf("nodes can not be inserted to parent element of %s", elem.QualifiedName())
+	}
+	return i.InsertNodes(elem.Position(), nodes)
 }
