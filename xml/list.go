@@ -302,7 +302,7 @@ func (s *Sequence) IsTrue() bool {
 }
 
 func (s *Sequence) IsSingleton() bool {
-	return len(s) == 1
+	return len(*s) == 1
 }
 
 func (s *Sequence) String() string {
