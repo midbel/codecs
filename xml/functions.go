@@ -754,7 +754,10 @@ func callPosition(ctx Context, args []Expr) ([]Item, error) {
 }
 
 func callLast(ctx Context, args []Expr) ([]Item, error) {
-	return singleValue(float64(ctx.Size)), nil
+	if ctx.Index != ctx.Size {
+		return nil, nil
+	}
+	return singleNode(ctx.Node), nil
 }
 
 func callCurrentDate(ctx Context, args []Expr) ([]Item, error) {
