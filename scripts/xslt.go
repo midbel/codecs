@@ -1413,7 +1413,6 @@ func executeValueOf(node, datum xml.Node, style *Stylesheet) error {
 	}
 	text := xml.NewText(str.String())
 	return replaceNode(node, text)
-	// return parent.ReplaceNode(node.Position(), text)
 }
 
 func executeCopy(node, datum xml.Node, style *Stylesheet) error {
@@ -1651,13 +1650,16 @@ func isTemplateMatch(expr xml.Expr, node xml.Node) (bool, int) {
 	return false, 0
 }
 
-func removeNode(elem xml.Node) error {
-	// p := node.Parent()
-	// r, ok := p.(interface{ RemoveNode(int) error})
-	// if !ok {
-	// 	return fmt.Errorf("node can not be removed from parent element of %s", elem.QualifiedName())
-	// }
-	return nil
+func removeNode(elem, node xml.Node) error {
+	if node == nil {
+		return nil
+	}
+	p := elem.Parent()
+	r, ok := p.(interface{ RemoveNode(int) error})
+	if !ok {
+		return fmt.Errorf("node can not be removed from parent element of %s", elem.QualifiedName())
+	}
+	return r.RemoveNode(node.Position())
 }
 
 func replaceNode(elem, node xml.Node) error {
