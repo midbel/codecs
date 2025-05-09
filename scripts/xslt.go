@@ -1074,25 +1074,6 @@ func executeResultDocument(node, datum xml.Node, style *Stylesheet) error {
 	return errSkip
 }
 
-func getNodesForTemplate(node, datum xml.Node, style *Stylesheet) ([]xml.Node, error) {
-	var (
-		el  = node.(*xml.Element)
-		res []xml.Node
-	)
-	if value, err := getAttribute(el, "select"); err == nil {
-		items, err := style.ExecuteQuery(value, datum)
-		if err != nil {
-			return nil, err
-		}
-		for i := range items {
-			res = append(res, items[i].Node())
-		}
-	} else {
-		res = slices.Clone(el.Nodes)
-	}
-	return res, nil
-}
-
 type matchFunc func(xml.Node, string) (*Template, error)
 
 func executeApply(node, datum xml.Node, style *Stylesheet, match matchFunc) error {
@@ -1121,13 +1102,8 @@ func executeApply(node, datum xml.Node, style *Stylesheet, match matchFunc) erro
 			}
 			return err
 		}
-		for _, n := range el.Nodes {
-			if n.QualifiedName() != style.getQualifiedName("with-param") {
-				return fmt.Errorf("apply-templates: invalid child node %s", n.QualifiedName())
-			}
-			if err := transformNode(n, datum, style); err != nil {
-				return err
-			}
+		if err := applyParams(node, datum, style); err != nil {
+			return err
 		}
 		frag := tpl.Fragment.(*xml.Element)
 		for _, n := range slices.Clone(frag.Nodes) {
@@ -1166,13 +1142,8 @@ func executeCallTemplate(node, datum xml.Node, style *Stylesheet) error {
 		return style.whenTemplateNotFound(err, mode, node, datum)
 	}
 
-	for _, n := range el.Nodes {
-		if n.QualifiedName() != style.getQualifiedName("with-param") {
-			return fmt.Errorf("call-templates: invalid child node %s", n.QualifiedName())
-		}
-		if err := transformNode(n, datum, style); err != nil {
-			return err
-		}
+	if err := applyParams(node, datum, style); err != nil {
+		return err
 	}
 
 	nodes, err := tpl.Execute(datum, style)
@@ -1184,6 +1155,38 @@ func executeCallTemplate(node, datum xml.Node, style *Stylesheet) error {
 			return err
 		}
 	}
+	return nil
+}
+
+func getNodesForTemplate(node, datum xml.Node, style *Stylesheet) ([]xml.Node, error) {
+	var (
+		el  = node.(*xml.Element)
+		res []xml.Node
+	)
+	if value, err := getAttribute(el, "select"); err == nil {
+		items, err := style.ExecuteQuery(value, datum)
+		if err != nil {
+			return nil, err
+		}
+		for i := range items {
+			res = append(res, items[i].Node())
+		}
+	} else {
+		res = slices.Clone(el.Nodes)
+	}
+	return res, nil
+}
+
+func applyParams(node, datum xml.Node, style *Stylesheet) error {
+	el := node.(*xml.Element)
+	for _, n := range el.Nodes {
+		if n.QualifiedName() != style.getQualifiedName("with-param") {
+			return fmt.Errorf("%s: invalid child node %s", node.QualifiedName(), n.QualifiedName())
+		}
+		if err := transformNode(n, datum, style); err != nil {
+			return err
+		}
+	}	
 	return nil
 }
 
@@ -1217,8 +1220,9 @@ func executeTry(node, datum xml.Node, style *Stylesheet) error {
 		if catch != nil {
 			style.Enter()
 			defer style.Leave()
-			return processNode(el, datum, style)
-		}
+			return processNode(catch, datum, style)
+		} 
+		return err
 	}
 	return nil
 }
