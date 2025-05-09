@@ -139,6 +139,16 @@ type OutputSettings struct {
 	OmitProlog bool
 }
 
+func defaultOutput() *OutputSettings {
+	out := &OutputSettings{
+		Method:   "xml",
+		Version:  "1.0",
+		Encoding: "UTF-8",
+		Indent:   true,
+	}
+	return out
+}
+
 type MatchMode int8
 
 const (
@@ -149,11 +159,6 @@ const (
 	MatchTextOnlyCopy
 	MatchFail
 )
-
-type AttributeSet struct {
-	Name  string
-	Attrs []xml.Attribute
-}
 
 type Mode struct {
 	Name       string
@@ -168,6 +173,11 @@ var unnamedMode = Mode{
 
 func (m Mode) Unnamed() bool {
 	return m.Name == ""
+}
+
+type AttributeSet struct {
+	Name  string
+	Attrs []xml.Attribute
 }
 
 type Stylesheet struct {
@@ -228,18 +238,8 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 	return &sheet, nil
 }
 
-func defaultOutput() *OutputSettings {
-	out := &OutputSettings{
-		Method:   "xml",
-		Version:  "1.0",
-		Encoding: "UTF-8",
-		Indent:   true,
-	}
-	return out
-}
-
 func includesSheet(sheet *Stylesheet, doc xml.Node) error {
-	items, err := sheet.queryXSL("/stylesheet/include", doc)
+	items, err := sheet.queryXSL("/stylesheet/include | /transform/include", doc)
 	if err != nil {
 		return err
 	}
@@ -253,7 +253,7 @@ func includesSheet(sheet *Stylesheet, doc xml.Node) error {
 }
 
 func importsSheet(sheet *Stylesheet, doc xml.Node) error {
-	items, err := sheet.queryXSL("/stylesheet/import", doc)
+	items, err := sheet.queryXSL("/stylesheet/import | /transform/import", doc)
 	if err != nil {
 		return err
 	}
@@ -267,7 +267,7 @@ func importsSheet(sheet *Stylesheet, doc xml.Node) error {
 }
 
 func (s *Stylesheet) loadAttributeSet(doc xml.Node) error {
-	items, err := s.queryXSL("/stylesheet/attribute-set", doc)
+	items, err := s.queryXSL("/stylesheet/attribute-set | /transform/attribute-set", doc)
 	if err != nil {
 		return err
 	}
@@ -301,7 +301,7 @@ func (s *Stylesheet) loadAttributeSet(doc xml.Node) error {
 }
 
 func (s *Stylesheet) loadModes(doc xml.Node) error {
-	items, err := s.queryXSL("/stylesheet/mode", doc)
+	items, err := s.queryXSL("/stylesheet/mode | /transform/mode", doc)
 	if err != nil {
 		return err
 	}
@@ -320,7 +320,9 @@ func (s *Stylesheet) loadModes(doc xml.Node) error {
 			case "on-multiple-match":
 				m.MultiMatch = MatchFail
 			case "warning-on-no-match":
+				// TODO
 			case "warning-on-multiple-match":
+				// TODO
 			default:
 			}
 		}
@@ -330,7 +332,7 @@ func (s *Stylesheet) loadModes(doc xml.Node) error {
 }
 
 func (s *Stylesheet) loadParams(doc xml.Node) error {
-	items, err := s.queryXSL("/stylesheet/param", doc)
+	items, err := s.queryXSL("/stylesheet/param | transform/param", doc)
 	if err != nil {
 		return err
 	}
@@ -361,7 +363,7 @@ func (s *Stylesheet) loadParams(doc xml.Node) error {
 }
 
 func (s *Stylesheet) loadOutput(doc xml.Node) error {
-	items, err := s.queryXSL("/stylesheet/output", doc)
+	items, err := s.queryXSL("/stylesheet/output | /transform/output", doc)
 	if err != nil {
 		return err
 	}
@@ -418,7 +420,7 @@ func (s *Stylesheet) init(doc xml.Node) error {
 }
 
 func (s *Stylesheet) loadTemplates(doc xml.Node) error {
-	items, err := s.queryXSL("/stylesheet/template", doc)
+	items, err := s.queryXSL("/stylesheet/template | /transform/template", doc)
 	if err != nil {
 		return err
 	}
@@ -644,16 +646,13 @@ func (s *Stylesheet) Find(name, mode string) (*Template, error) {
 	return tpl, nil
 }
 
-func (s *Stylesheet) Match(node xml.Node, mode string) (*Template, error) {
-	if mode == "" {
-		mode = s.CurrentMode()
-	}
+func (s *Stylesheet) getMatchingTemplates(list []*Template, node xml.Node, mode string) (*Template, error) {
 	type TemplateMatch struct {
 		*Template
 		Priority int
 	}
 	var results []*TemplateMatch
-	for _, t := range s.Templates {
+	for _, t := range list {
 		if t.isRoot() || t.Mode != mode || t.Name != "" {
 			continue
 		}
@@ -679,12 +678,65 @@ func (s *Stylesheet) Match(node xml.Node, mode string) (*Template, error) {
 		s.prepare(tpl)
 		return tpl, nil
 	}
+	return nil, fmt.Errorf("no template found matching given node (%s)", node.QualifiedName())
+}
+
+func (s *Stylesheet) MatchImport(node xml.Node, mode string) (*Template, error) {
 	for _, s := range s.Others {
 		if tpl, err := s.Match(node, mode); err == nil {
 			return tpl, err
 		}
 	}
 	return nil, fmt.Errorf("no template found matching given node (%s)", node.QualifiedName())
+}
+
+func (s *Stylesheet) Match(node xml.Node, mode string) (*Template, error) {
+	tpl, err := s.getMatchingTemplates(s.Templates, node, mode)
+	if err == nil {
+		return tpl, nil
+	}
+	return s.MatchImport(node, mode)
+}
+
+func (s *Stylesheet) whenTemplateNotFound(err error, mode string, node, datum xml.Node) error {
+	var tmp xml.Node
+	switch mode := s.getMode(mode); mode.NoMatch {
+	case MatchDeepCopy:
+		tmp = cloneNode(datum)
+	case MatchShallowCopy:
+		qn, err := xml.ParseName(datum.QualifiedName())
+		if err != nil {
+			return err
+		}
+		tmp = xml.NewElement(qn)
+		if el, ok := datum.(*xml.Element); ok {
+			a := tmp.(*xml.Element)
+			for i := range el.Attrs {
+				a.SetAttribute(el.Attrs[i])
+			}
+			tmp = a
+		}
+	case MatchTextOnlyCopy:
+		tmp = xml.NewText(datum.Value())
+	case MatchFail:
+		return err
+	default:
+		return err
+	}
+	if r, ok := node.Parent().(interface{ ReplaceNode(int, xml.Node) error }); ok {
+		return r.ReplaceNode(node.Position(), tmp)
+	}
+	return nil
+}
+
+func (s *Stylesheet) getMode(mode string) *Mode {
+	ix := slices.IndexFunc(s.Modes, func(m *Mode) bool {
+		return m.Name == mode
+	})
+	if ix < 0 {
+		return &unnamedMode
+	}
+	return s.Modes[ix]
 }
 
 func (s *Stylesheet) Execute(doc xml.Node) (xml.Node, error) {
@@ -1022,54 +1074,82 @@ func executeResultDocument(node, datum xml.Node, style *Stylesheet) error {
 	return errSkip
 }
 
-func executeApplyImport(node, datum xml.Node, style *Stylesheet) error {
-	return nil
-}
-
-func executeApplyTemplates(node, datum xml.Node, style *Stylesheet) error {
-	el := node.(*xml.Element)
+func getNodesForTemplate(node, datum xml.Node, style *Stylesheet) ([]xml.Node, error) {
+	var (
+		el  = node.(*xml.Element)
+		res []xml.Node
+	)
 	if value, err := getAttribute(el, "select"); err == nil {
 		items, err := style.ExecuteQuery(value, datum)
-		if len(items) == 0 {
-			if r, ok := node.Parent().(interface{ RemoveNode(int) error }); ok {
-				return r.RemoveNode(node.Position())
-			}
+		if err != nil {
+			return nil, err
 		}
-		datum = items[0].Node()
+		for i := range items {
+			res = append(res, items[i].Node())
+		}
+	} else {
+		res = slices.Clone(el.Nodes)
 	}
-	mode, err := getAttribute(el, "mode")
-	if err != nil {
-		mode = style.CurrentMode()
-	}
-	tpl, err := style.Match(datum, mode)
+	return res, nil
+}
+
+type matchFunc func(xml.Node, string) (*Template, error)
+
+func executeApply(node, datum xml.Node, style *Stylesheet, match matchFunc) error {
+	nodes, err := getNodesForTemplate(node, datum, style)
 	if err != nil {
 		return err
 	}
-	for _, n := range el.Nodes {
-		if n.QualifiedName() != style.getQualifiedName("with-param") {
-			return fmt.Errorf("apply-templates: invalid child node %s", n.QualifiedName())
+	if len(nodes) == 0 {
+		if r, ok := node.Parent().(interface{ RemoveNode(int) error }); ok {
+			err = r.RemoveNode(node.Position())
 		}
-		if err := transformNode(n, datum, style); err != nil {
+		return err
+	}
+	el := node.(*xml.Element)
+	mode, _ := getAttribute(el, "mode")
+	var results []xml.Node
+	for _, datum := range nodes {
+		tpl, err := match(datum, mode)
+		if err != nil {
+			for i := range nodes {
+				if err = style.whenTemplateNotFound(err, mode, node, nodes[i]); err != nil {
+					return err
+				}
+			}
 			return err
 		}
-	}
-	var (
-		parent = el.Parent().(*xml.Element)
-		frag   = tpl.Fragment.(*xml.Element)
-		nodes  []xml.Node
-	)
-	for _, n := range slices.Clone(frag.Nodes) {
-		c := cloneNode(n)
-		if c == nil {
-			continue
+		for _, n := range el.Nodes {
+			if n.QualifiedName() != style.getQualifiedName("with-param") {
+				return fmt.Errorf("apply-templates: invalid child node %s", n.QualifiedName())
+			}
+			if err := transformNode(n, datum, style); err != nil {
+				return err
+			}
 		}
-		if err := transformNode(c, datum, style); err != nil {
-			return err
+		frag := tpl.Fragment.(*xml.Element)
+		for _, n := range slices.Clone(frag.Nodes) {
+			c := cloneNode(n)
+			if c == nil {
+				continue
+			}
+			if err := transformNode(c, datum, style); err != nil {
+				return err
+			}
+			results = append(results, c)
 		}
-		nodes = append(nodes, c)
 	}
-	parent.InsertNodes(el.Position(), nodes)
+	parent := el.Parent().(*xml.Element)
+	parent.InsertNodes(el.Position(), results)
 	return nil
+}
+
+func executeApplyImport(node, datum xml.Node, style *Stylesheet) error {
+	return executeApply(node, datum, style, style.MatchImport)
+}
+
+func executeApplyTemplates(node, datum xml.Node, style *Stylesheet) error {
+	return executeApply(node, datum, style, style.Match)
 }
 
 func executeCallTemplate(node, datum xml.Node, style *Stylesheet) error {
@@ -1078,13 +1158,10 @@ func executeCallTemplate(node, datum xml.Node, style *Stylesheet) error {
 	if err != nil {
 		return err
 	}
-	mode, err := getAttribute(el, "mode")
-	if err != nil {
-		mode = style.CurrentMode()
-	}
+	mode, _ := getAttribute(el, "mode")
 	tpl, err := style.Find(name, mode)
 	if err != nil {
-		return err
+		return style.whenTemplateNotFound(err, mode, node, datum)
 	}
 
 	for _, n := range el.Nodes {

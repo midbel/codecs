@@ -42,7 +42,7 @@ func (s *Stylesheet) matchTemplateByNode(node xml.Node, mode string) (*Template,
 	return nil, nil
 }
 
-func (s *Stylesheet) execQuery(query string, node xml.Node) ([]xml.Item, error) {
+func (s *Stylesheet) executeQuery(query string, node xml.Node) ([]xml.Item, error) {
 	return nil, nil
 }
 
