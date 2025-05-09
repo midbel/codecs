@@ -1088,7 +1088,7 @@ func executeApply(node, datum xml.Node, style *Stylesheet, match matchFunc) erro
 		return err
 	}
 	var (
-		el = node.(*xml.Element)
+		el      = node.(*xml.Element)
 		mode, _ = getAttribute(el, "mode")
 		results []xml.Node
 	)
@@ -1186,7 +1186,7 @@ func applyParams(node, datum xml.Node, style *Stylesheet) error {
 		if err := transformNode(n, datum, style); err != nil {
 			return err
 		}
-	}	
+	}
 	return nil
 }
 
@@ -1205,23 +1205,21 @@ func executeWithParam(node, datum xml.Node, style *Stylesheet) error {
 
 func executeTry(node, datum xml.Node, style *Stylesheet) error {
 	el := node.(*xml.Element)
-	ix := slices.IndexFunc(el.Nodes, func(n xml.Node) bool {
-		return n.QualifiedName() == style.getQualifiedName("catch")
-	})
-	var catch xml.Node
-	if ix != -1 && ix != len(el.Nodes)-1 {
-		return fmt.Errorf("xsl:try: xsl:catch should be the last element")
+	items, err := style.queryXSL("./catch[last()]", node)
+	if err != nil {
+		return err
 	}
-	if ix >= 0 {
-		catch = el.Nodes[ix]
-		el.RemoveNode(ix)
+	if len(items) > 1 {
+		return fmt.Errorf("only one catch element is allowed")
 	}
 	if err := processNode(el, datum, style); err != nil {
-		if catch != nil {
+		if len(items) > 0 {
+			catch := items[0].Node()
+			el.RemoveNode(catch.Position())
 			style.Enter()
 			defer style.Leave()
 			return processNode(catch, datum, style)
-		} 
+		}
 		return err
 	}
 	return nil
