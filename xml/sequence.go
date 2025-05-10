@@ -20,6 +20,18 @@ func NewSequence() Sequence {
 	return seq
 }
 
+func Singleton(value any) Sequence {
+	var item Item
+	if n, ok := value.(Node); ok {
+		item = createNode(n)
+	} else {
+		item = createLiteral(value)
+	}
+	var seq Sequence
+	seq.Append(item)
+	return seq
+}
+
 func (s *Sequence) Append(item Item) {
 	*s = append(*s, item)
 }
@@ -58,16 +70,6 @@ func (s *Sequence) Every(test func(i Item) bool) bool {
 func createSingle(item Item) Sequence {
 	var list []Item
 	return append(list, item)
-}
-
-func singleValue(value any) Sequence {
-	literal := createLiteral(value)
-	return createSingle(literal)
-}
-
-func singleNode(value Node) Sequence {
-	node := createNode(value)
-	return createSingle(node)
 }
 
 func isTrue(list []Item) bool {

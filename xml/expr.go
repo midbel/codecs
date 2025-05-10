@@ -367,7 +367,7 @@ func (w wildcard) find(ctx Context) (Sequence, error) {
 	if ctx.Type() != TypeElement {
 		return nil, nil
 	}
-	return singleNode(ctx.Node), nil
+	return Singleton(ctx.Node), nil
 }
 
 type root struct{}
@@ -382,7 +382,7 @@ func (r root) MatchPriority() int {
 
 func (_ root) find(ctx Context) (Sequence, error) {
 	root := ctx.Root()
-	return singleNode(root.Node), nil
+	return Singleton(root.Node), nil
 }
 
 type current struct{}
@@ -396,7 +396,7 @@ func (c current) MatchPriority() int {
 }
 
 func (_ current) find(ctx Context) (Sequence, error) {
-	return singleNode(ctx.Node), nil
+	return Singleton(ctx.Node), nil
 }
 
 type step struct {
@@ -595,12 +595,12 @@ func (n name) MatchPriority() int {
 
 func (n name) find(ctx Context) (Sequence, error) {
 	if n.Space == "*" && n.Name == ctx.LocalName() {
-		return singleNode(ctx.Node), nil
+		return Singleton(ctx.Node), nil
 	}
 	if ctx.QualifiedName() != n.QualifiedName() {
 		return nil, nil
 	}
-	return singleNode(ctx.Node), nil
+	return Singleton(ctx.Node), nil
 }
 
 type sequence struct {
@@ -720,20 +720,20 @@ func (b binary) find(ctx Context) (Sequence, error) {
 		res, err = ok, err1
 	case opBefore:
 		if left.Empty() || right.Empty() {
-			return singleValue(false), nil
+			return Singleton(false), nil
 		}
 		ok := isBefore(left[0].Node(), right[0].Node())
-		return singleValue(ok), nil
+		return Singleton(ok), nil
 	case opAfter:
 		if left.Empty() || right.Empty() {
-			return singleValue(false), nil
+			return Singleton(false), nil
 		}
 		ok := isAfter(left[0].Node(), right[0].Node())
-		return singleValue(ok), nil
+		return Singleton(ok), nil
 	default:
 		return nil, errImplemented
 	}
-	return singleValue(res), err
+	return Singleton(res), err
 }
 
 type identity struct {
@@ -759,13 +759,13 @@ func (i identity) find(ctx Context) (Sequence, error) {
 		return nil, err
 	}
 	if left.Empty() || right.Empty() {
-		return singleValue(false), nil
+		return Singleton(false), nil
 	}
 	var (
 		n1 = left[0].Node()
 		n2 = right[0].Node()
 	)
-	return singleValue(n1.Identity() == n2.Identity()), nil
+	return Singleton(n1.Identity() == n2.Identity()), nil
 }
 
 type reverse struct {
@@ -789,7 +789,7 @@ func (r reverse) find(ctx Context) (Sequence, error) {
 	if err == nil {
 		x = -x
 	}
-	return singleValue(x), err
+	return Singleton(x), err
 }
 
 type literal struct {
@@ -805,7 +805,7 @@ func (i literal) MatchPriority() int {
 }
 
 func (i literal) find(_ Context) (Sequence, error) {
-	return singleValue(i.expr), nil
+	return Singleton(i.expr), nil
 }
 
 type number struct {
@@ -821,7 +821,7 @@ func (n number) MatchPriority() int {
 }
 
 func (n number) find(_ Context) (Sequence, error) {
-	return singleValue(n.expr), nil
+	return Singleton(n.expr), nil
 }
 
 func isKind(str string) bool {
@@ -855,7 +855,7 @@ func (k kind) MatchPriority() int {
 
 func (k kind) find(ctx Context) (Sequence, error) {
 	if k.kind == typeAll || ctx.Type() == k.kind {
-		return singleNode(ctx.Node), nil
+		return Singleton(ctx.Node), nil
 	}
 	return nil, nil
 }
@@ -925,7 +925,7 @@ func (a attr) find(ctx Context) (Sequence, error) {
 	if ix < 0 {
 		return nil, nil
 	}
-	return singleNode(&el.Attrs[ix]), nil
+	return Singleton(&el.Attrs[ix]), nil
 }
 
 type except struct {
@@ -1231,12 +1231,12 @@ func (q quantified) find(ctx Context) (Sequence, error) {
 			return nil, err
 		}
 		if !isTrue(res) && q.every {
-			return singleValue(false), nil
+			return Singleton(false), nil
 		} else if isTrue(res) && !q.every {
-			return singleValue(true), nil
+			return Singleton(true), nil
 		}
 	}
-	return singleValue(true), nil
+	return Singleton(true), nil
 }
 
 func combine(list []binding, ctx Context) iter.Seq2[[]Item, error] {

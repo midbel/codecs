@@ -301,7 +301,7 @@ func callHash(ctx Context, args []Expr) (Sequence, error) {
 			return nil, fmt.Errorf("%s: unsupported output encoding", encoding)
 		}
 	}
-	return singleValue(str), nil
+	return Singleton(str), nil
 }
 
 func callHmac(ctx Context, args []Expr) (Sequence, error) {
@@ -354,7 +354,7 @@ func callHmac(ctx Context, args []Expr) (Sequence, error) {
 			return nil, fmt.Errorf("%s: unsupported output encoding", encoding)
 		}
 	}
-	return singleValue(str), nil
+	return Singleton(str), nil
 }
 
 func callHttpGet(ctx Context, args []Expr) (Sequence, error) {
@@ -375,7 +375,7 @@ func callHttpGet(ctx Context, args []Expr) (Sequence, error) {
 	if _, err := io.Copy(&body, res.Body); err != nil {
 		return nil, err
 	}
-	return singleValue(body.String()), nil
+	return Singleton(body.String()), nil
 }
 
 func callHttpPost(ctx Context, args []Expr) (Sequence, error) {
@@ -405,7 +405,7 @@ func callHttpPost(ctx Context, args []Expr) (Sequence, error) {
 	if _, err := io.Copy(&body, res.Body); err != nil {
 		return nil, err
 	}
-	return singleValue(body.String()), nil
+	return Singleton(body.String()), nil
 }
 
 func callReadFile(ctx Context, args []Expr) (Sequence, error) {
@@ -418,7 +418,7 @@ func callReadFile(ctx Context, args []Expr) (Sequence, error) {
 	}
 	buf, err := os.ReadFile(file)
 	if err == nil {
-		return singleValue(string(buf)), nil
+		return Singleton(string(buf)), nil
 	}
 	return nil, err
 }
@@ -448,7 +448,7 @@ func callFileExists(ctx Context, args []Expr) (Sequence, error) {
 		return nil, err
 	}
 	_, err = os.Stat(file)
-	return singleValue(err == nil), err
+	return Singleton(err == nil), err
 }
 
 func callDeleteFile(ctx Context, args []Expr) (Sequence, error) {
@@ -490,7 +490,7 @@ func callRound(ctx Context, args []Expr) (Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	return singleValue(math.Round(val)), nil
+	return Singleton(math.Round(val)), nil
 }
 
 func callFloor(ctx Context, args []Expr) (Sequence, error) {
@@ -501,7 +501,7 @@ func callFloor(ctx Context, args []Expr) (Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	return singleValue(math.Floor(val)), nil
+	return Singleton(math.Floor(val)), nil
 }
 
 func callCeil(ctx Context, args []Expr) (Sequence, error) {
@@ -512,7 +512,7 @@ func callCeil(ctx Context, args []Expr) (Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	return singleValue(math.Ceil(val)), nil
+	return Singleton(math.Ceil(val)), nil
 }
 
 func callAbs(ctx Context, args []Expr) (Sequence, error) {
@@ -523,7 +523,7 @@ func callAbs(ctx Context, args []Expr) (Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	return singleValue(math.Abs(val)), nil
+	return Singleton(math.Abs(val)), nil
 }
 
 func callNumber(ctx Context, args []Expr) (Sequence, error) {
@@ -543,7 +543,7 @@ func callNumber(ctx Context, args []Expr) (Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	return singleValue(val), nil
+	return Singleton(val), nil
 }
 
 func callExists(ctx Context, args []Expr) (Sequence, error) {
@@ -554,7 +554,7 @@ func callExists(ctx Context, args []Expr) (Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	return singleValue(!items.Empty()), nil
+	return Singleton(!items.Empty()), nil
 }
 
 func callDistinctValues(ctx Context, args []Expr) (Sequence, error) {
@@ -569,7 +569,7 @@ func callEmpty(ctx Context, args []Expr) (Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	return singleValue(items.Empty()), nil
+	return Singleton(items.Empty()), nil
 }
 
 func callHead(ctx Context, args []Expr) (Sequence, error) {
@@ -620,7 +620,7 @@ func callDecimal(ctx Context, args []Expr) (Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	return singleValue(val), nil
+	return Singleton(val), nil
 }
 
 func callSum(ctx Context, args []Expr) (Sequence, error) {
@@ -639,7 +639,7 @@ func callSum(ctx Context, args []Expr) (Sequence, error) {
 		}
 		result += v
 	}
-	return singleValue(result), nil
+	return Singleton(result), nil
 }
 
 func callAvg(ctx Context, args []Expr) (Sequence, error) {
@@ -661,7 +661,7 @@ func callAvg(ctx Context, args []Expr) (Sequence, error) {
 		}
 		result += v
 	}
-	return singleValue(result / float64(len(items))), nil
+	return Singleton(result / float64(len(items))), nil
 }
 
 func callCount(ctx Context, args []Expr) (Sequence, error) {
@@ -672,7 +672,7 @@ func callCount(ctx Context, args []Expr) (Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	return singleValue(float64(len(items))), nil
+	return Singleton(float64(len(items))), nil
 }
 
 func callMin(ctx Context, args []Expr) (Sequence, error) {
@@ -688,7 +688,7 @@ func callMin(ctx Context, args []Expr) (Sequence, error) {
 		list, _ := convert[string](items, toString)
 		res = lowestValue(list)
 	}
-	return singleValue(res), nil
+	return Singleton(res), nil
 }
 
 func callMax(ctx Context, args []Expr) (Sequence, error) {
@@ -704,7 +704,7 @@ func callMax(ctx Context, args []Expr) (Sequence, error) {
 		list, _ := convert[string](items, toString)
 		res = greatestValue(list)
 	}
-	return singleValue(res), nil
+	return Singleton(res), nil
 }
 
 func callZeroOrOne(ctx Context, args []Expr) (Sequence, error) {
@@ -750,14 +750,14 @@ func callExactlyOne(ctx Context, args []Expr) (Sequence, error) {
 }
 
 func callPosition(ctx Context, args []Expr) (Sequence, error) {
-	return singleValue(float64(ctx.Index)), nil
+	return Singleton(float64(ctx.Index)), nil
 }
 
 func callLast(ctx Context, args []Expr) (Sequence, error) {
 	if ctx.Index != ctx.Size {
 		return nil, nil
 	}
-	return singleNode(ctx.Node), nil
+	return Singleton(ctx.Node), nil
 }
 
 func callCurrentDate(ctx Context, args []Expr) (Sequence, error) {
@@ -765,7 +765,7 @@ func callCurrentDate(ctx Context, args []Expr) (Sequence, error) {
 }
 
 func callCurrentDatetime(ctx Context, args []Expr) (Sequence, error) {
-	return singleValue(time.Now()), nil
+	return Singleton(time.Now()), nil
 }
 
 func callDate(ctx Context, args []Expr) (Sequence, error) {
@@ -780,19 +780,19 @@ func callDate(ctx Context, args []Expr) (Sequence, error) {
 	if err != nil {
 		return nil, ErrCast
 	}
-	return singleValue(v), nil
+	return Singleton(v), nil
 }
 
 func callString(ctx Context, args []Expr) (Sequence, error) {
 	if len(args) == 0 {
-		return singleValue(ctx.Value()), nil
+		return Singleton(ctx.Value()), nil
 	}
 	items, err := expandArgs(ctx, args)
 	if err != nil {
 		return nil, err
 	}
 	if len(items) == 0 {
-		return singleValue(""), nil
+		return Singleton(""), nil
 	}
 	if !items[0].Atomic() {
 		return callString(DefaultContext(items[0].Node()), nil)
@@ -808,7 +808,7 @@ func callString(ctx Context, args []Expr) (Sequence, error) {
 	default:
 		return nil, errType
 	}
-	return singleValue(str), nil
+	return Singleton(str), nil
 }
 
 func callCompare(ctx Context, args []Expr) (Sequence, error) {
@@ -824,7 +824,7 @@ func callCompare(ctx Context, args []Expr) (Sequence, error) {
 		return nil, err
 	}
 	cmp := strings.Compare(fst, snd)
-	return singleValue(float64(cmp)), nil
+	return Singleton(float64(cmp)), nil
 }
 
 func callConcat(ctx Context, args []Expr) (Sequence, error) {
@@ -847,7 +847,7 @@ func callConcat(ctx Context, args []Expr) (Sequence, error) {
 		list = append(list, str)
 	}
 	str := strings.Join(list, "")
-	return singleValue(str), nil
+	return Singleton(str), nil
 }
 
 func callStringJoin(ctx Context, args []Expr) (Sequence, error) {
@@ -870,7 +870,7 @@ func callStringJoin(ctx Context, args []Expr) (Sequence, error) {
 		}
 	}
 	str := strings.Join(list, sep)
-	return singleValue(str), nil
+	return Singleton(str), nil
 }
 
 func callSubstring(ctx Context, args []Expr) (Sequence, error) {
@@ -907,20 +907,20 @@ func callSubstring(ctx Context, args []Expr) (Sequence, error) {
 		size = float64(z) - beg
 	}
 	str = str[int(beg) : int(beg)+int(size)]
-	return singleValue(str), nil
+	return Singleton(str), nil
 }
 
 func callStringLength(ctx Context, args []Expr) (Sequence, error) {
 	if len(args) == 0 {
 		str := ctx.Value()
-		return singleValue(float64(len(str))), nil
+		return Singleton(float64(len(str))), nil
 	}
 	items, err := expandArgs(ctx, args)
 	if err != nil {
 		return nil, err
 	}
 	if len(items) == 0 {
-		return singleValue(0.0), nil
+		return Singleton(0.0), nil
 	}
 	if !items[0].Atomic() {
 		return callStringLength(DefaultContext(items[0].Node()), nil)
@@ -929,7 +929,7 @@ func callStringLength(ctx Context, args []Expr) (Sequence, error) {
 	if !ok {
 		return nil, errType
 	}
-	return singleValue(float64(len(str))), nil
+	return Singleton(float64(len(str))), nil
 }
 
 func callNormalizeSpace(ctx Context, args []Expr) (Sequence, error) {
@@ -957,7 +957,7 @@ func callNormalizeSpace(ctx Context, args []Expr) (Sequence, error) {
 		return r
 	}
 	str = strings.TrimSpace(str)
-	return singleValue(strings.Map(clear, str)), nil
+	return Singleton(strings.Map(clear, str)), nil
 }
 
 func callUppercase(ctx Context, args []Expr) (Sequence, error) {
@@ -968,7 +968,7 @@ func callUppercase(ctx Context, args []Expr) (Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	return singleValue(strings.ToUpper(str)), nil
+	return Singleton(strings.ToUpper(str)), nil
 }
 
 func callLowercase(ctx Context, args []Expr) (Sequence, error) {
@@ -979,7 +979,7 @@ func callLowercase(ctx Context, args []Expr) (Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	return singleValue(strings.ToLower(str)), nil
+	return Singleton(strings.ToLower(str)), nil
 }
 
 func callTranslate(ctx Context, args []Expr) (Sequence, error) {
@@ -1009,7 +1009,7 @@ func callTranslate(ctx Context, args []Expr) (Sequence, error) {
 		}
 		return -1
 	}, str)
-	return singleValue(str), errImplemented
+	return Singleton(str), errImplemented
 }
 
 func callContains(ctx Context, args []Expr) (Sequence, error) {
@@ -1025,7 +1025,7 @@ func callContains(ctx Context, args []Expr) (Sequence, error) {
 		return nil, err
 	}
 	res := strings.Contains(fst, snd)
-	return singleValue(res), nil
+	return Singleton(res), nil
 }
 
 func callStartsWith(ctx Context, args []Expr) (Sequence, error) {
@@ -1047,7 +1047,7 @@ func callStartsWith(ctx Context, args []Expr) (Sequence, error) {
 		return callFalse(ctx, args)
 	}
 	res := strings.HasPrefix(fst, snd)
-	return singleValue(res), nil
+	return Singleton(res), nil
 }
 
 func callEndsWith(ctx Context, args []Expr) (Sequence, error) {
@@ -1069,7 +1069,7 @@ func callEndsWith(ctx Context, args []Expr) (Sequence, error) {
 		return callFalse(ctx, args)
 	}
 	res := strings.HasSuffix(fst, snd)
-	return singleValue(res), nil
+	return Singleton(res), nil
 }
 
 func callTokenize(ctx Context, args []Expr) (Sequence, error) {
@@ -1108,7 +1108,7 @@ func callMatches(ctx Context, args []Expr) (Sequence, error) {
 		return nil, err
 	}
 	ok, err := regexp.MatchString(snd, fst)
-	return singleValue(ok), err
+	return Singleton(ok), err
 }
 
 func callSubstringAfter(ctx Context, args []Expr) (Sequence, error) {
@@ -1125,9 +1125,9 @@ func callSubstringAfter(ctx Context, args []Expr) (Sequence, error) {
 	}
 	_, str, ok := strings.Cut(fst, snd)
 	if !ok {
-		return singleValue(""), nil
+		return Singleton(""), nil
 	}
-	return singleValue(str), nil
+	return Singleton(str), nil
 }
 
 func callSubstringBefore(ctx Context, args []Expr) (Sequence, error) {
@@ -1144,46 +1144,46 @@ func callSubstringBefore(ctx Context, args []Expr) (Sequence, error) {
 	}
 	str, _, ok := strings.Cut(fst, snd)
 	if !ok {
-		return singleValue(""), nil
+		return Singleton(""), nil
 	}
-	return singleValue(str), nil
+	return Singleton(str), nil
 }
 
 func callName(ctx Context, args []Expr) (Sequence, error) {
 	if len(args) == 0 {
 		n := ctx.QualifiedName()
-		return singleValue(n), nil
+		return Singleton(n), nil
 	}
 	items, err := expandArgs(ctx, args)
 	if err != nil {
 		return nil, err
 	}
 	if len(items) == 0 {
-		return singleValue(""), nil
+		return Singleton(""), nil
 	}
 	n, ok := items[0].(nodeItem)
 	if !ok {
 		return nil, errType
 	}
-	return singleValue(n.Node().QualifiedName()), nil
+	return Singleton(n.Node().QualifiedName()), nil
 }
 
 func callLocalName(ctx Context, args []Expr) (Sequence, error) {
 	if len(args) == 0 {
-		return singleValue(ctx.LocalName()), nil
+		return Singleton(ctx.LocalName()), nil
 	}
 	items, err := expandArgs(ctx, args)
 	if err != nil {
 		return nil, err
 	}
 	if len(items) == 0 {
-		return singleValue(""), nil
+		return Singleton(""), nil
 	}
 	n, ok := items[0].(nodeItem)
 	if !ok {
 		return nil, errType
 	}
-	return singleValue(n.Node().LocalName()), nil
+	return Singleton(n.Node().LocalName()), nil
 }
 
 func callRoot(ctx Context, args []Expr) (Sequence, error) {
@@ -1198,7 +1198,7 @@ func callRoot(ctx Context, args []Expr) (Sequence, error) {
 	}
 	if len(args) == 0 {
 		n := get(ctx.Node)
-		return singleNode(n), nil
+		return Singleton(n), nil
 	}
 	items, err := expandArgs(ctx, args)
 	if err != nil {
@@ -1209,7 +1209,7 @@ func callRoot(ctx Context, args []Expr) (Sequence, error) {
 		return nil, errType
 	}
 	root := get(n.Node())
-	return singleNode(root), nil
+	return Singleton(root), nil
 }
 
 func callPath(ctx Context, args []Expr) (Sequence, error) {
@@ -1227,7 +1227,7 @@ func callPath(ctx Context, args []Expr) (Sequence, error) {
 
 	if len(args) == 0 {
 		list := get(ctx.Node)
-		return singleValue(strings.Join(list, "/")), nil
+		return Singleton(strings.Join(list, "/")), nil
 	}
 	items, err := expandArgs(ctx, args)
 	if err != nil {
@@ -1243,7 +1243,7 @@ func callPath(ctx Context, args []Expr) (Sequence, error) {
 func callHasChildren(ctx Context, args []Expr) (Sequence, error) {
 	if len(args) == 0 {
 		nodes := ctx.Nodes()
-		return singleValue(len(nodes) > 0), nil
+		return Singleton(len(nodes) > 0), nil
 	}
 	items, err := expandArgs(ctx, args)
 	if err != nil {
@@ -1272,7 +1272,7 @@ func callBoolean(ctx Context, args []Expr) (Sequence, error) {
 	if items.Empty() {
 		return callFalse(ctx, args)
 	}
-	return singleValue(items[0].True()), nil
+	return Singleton(items[0].True()), nil
 }
 
 func callNot(ctx Context, args []Expr) (Sequence, error) {
@@ -1289,11 +1289,11 @@ func callNot(ctx Context, args []Expr) (Sequence, error) {
 }
 
 func callTrue(_ Context, _ []Expr) (Sequence, error) {
-	return singleValue(true), nil
+	return Singleton(true), nil
 }
 
 func callFalse(_ Context, _ []Expr) (Sequence, error) {
-	return singleValue(false), nil
+	return Singleton(false), nil
 }
 
 func getFloatFromExpr(expr Expr, ctx Context) (float64, error) {
