@@ -719,7 +719,9 @@ func (b binary) find(ctx Context) ([]Item, error) {
 		}
 		res, err = ok, err1
 	case opBefore:
+		return nil, errImplemented
 	case opAfter:
+		return nil, errImplemented
 	default:
 		return nil, errImplemented
 	}
@@ -1041,7 +1043,7 @@ func (f filter) find(ctx Context) ([]Item, error) {
 		var keep bool
 		switch x := res[0].Value().(type) {
 		case float64:
-			keep = int(x) == j
+			keep = int(x) == j+1
 		case bool:
 			keep = x
 		default:

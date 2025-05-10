@@ -1292,10 +1292,6 @@ func executeForeach(node, datum xml.Node, style *Stylesheet) error {
 	if err != nil {
 		return err
 	}
-	parent, ok := el.Parent().(*xml.Element)
-	if !ok {
-		return fmt.Errorf("for-each: xml element expected as parent")
-	}
 	if err := removeSelf(node); err != nil {
 		return err
 	}
@@ -1324,6 +1320,10 @@ func executeForeach(node, datum xml.Node, style *Stylesheet) error {
 		it = slices.Values(items)
 	}
 
+	parent, ok := el.Parent().(*xml.Element)
+	if !ok {
+		return fmt.Errorf("for-each: xml element expected as parent")
+	}
 	for i := range it {
 		value := i.Node()
 		for _, n := range el.Nodes {
