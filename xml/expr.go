@@ -627,6 +627,166 @@ func (s sequence) find(ctx Context) (Sequence, error) {
 	return list, nil
 }
 
+type BinaryFunc func(Sequence, Sequence) (Sequence, error)
+
+func doAdd(left, right Sequence) (Sequence, error) {
+	return apply(left, right, func(left, right float64) (float64, error) {
+		return left + right, nil
+	})
+}
+
+func doSub(left, right Sequence) (Sequence, error) {
+	return apply(left, right, func(left, right float64) (float64, error) {
+		return left - right, nil
+	})
+}
+
+func doMul(left, right Sequence) (Sequence, error) {
+	return apply(left, right, func(left, right float64) (float64, error) {
+		return left * right, nil
+	})
+}
+
+func doDiv(left, right Sequence) (Sequence, error) {
+	return apply(left, right, func(left, right float64) (float64, error) {
+		if right == 0 {
+			return 0, errZero
+		}
+		return left / right, nil
+	})
+}
+
+func doMod(left, right Sequence) (Sequence, error) {
+	return apply(left, right, func(left, right float64) (float64, error) {
+		if right == 0 {
+			return 0, errZero
+		}
+		return math.Mod(left, right), nil
+	})
+}
+
+func doConcat(left, right Sequence) (Sequence, error) {
+	var str1, str2 string
+	if !left.Empty() {
+		str1, _ = toString(left[0].Value())
+	}
+	if !right.Empty() {
+		str2, _ = toString(right[0].Value())
+	}
+	return Singleton(str1 + str2), nil
+}
+
+func doAnd(left, right Sequence) (Sequence, error) {
+	ok := isTrue(left) && isTrue(right)
+	return Singleton(ok), nil
+}
+
+func doOr(left, right Sequence) (Sequence, error) {
+	ok := isTrue(left) || isTrue(right)
+	return Singleton(ok), nil
+}
+
+func doBefore(left, right Sequence) (Sequence, error) {
+	if left.Empty() || right.Empty() {
+		return Singleton(false), nil
+	}
+	ok := isBefore(left[0].Node(), right[0].Node())
+	return Singleton(ok), nil
+}
+
+func doAfter(left, right Sequence) (Sequence, error) {
+	if left.Empty() || right.Empty() {
+		return Singleton(false), nil
+	}
+	ok := isAfter(left[0].Node(), right[0].Node())
+	return Singleton(ok), nil
+}
+
+func doEqual(left, right Sequence) (Sequence, error) {
+	res, err := isEqual(left, right)
+	return Singleton(res), err
+}
+
+func doNotEqual(left, right Sequence) (Sequence, error) {
+	res, err := isEqual(left, right)
+	if err != nil {
+		return nil, err
+	}
+	return Singleton(!res), nil
+}
+
+func doLesser(left, right Sequence) (Sequence, error) {
+	res, err := isLess(left, right)
+	if err != nil {
+		return nil, err
+	}
+	return Singleton(res), nil
+}
+
+func doLessEq(left, right Sequence) (Sequence, error) {
+	ok, err := isEqual(left, right)
+	if err != nil {
+		return nil, err
+	}
+	if ok {
+		return Singleton(ok), nil
+	}
+	ok, err = isLess(left, right)
+	if err != nil {
+		return nil, err
+	}
+	return Singleton(ok), nil
+}
+
+func doGreater(left, right Sequence) (Sequence, error) {
+	ok, err := isEqual(left, right)
+	if err != nil {
+		return nil, err
+	}
+	if ok {
+		return Singleton(false), nil
+	}
+	ok, err = isLess(left, right)
+	if err != nil {
+		return nil, err
+	}
+	return Singleton(!ok), nil
+}
+
+func doGreatEq(left, right Sequence) (Sequence, error) {
+	ok, err := isEqual(left, right)
+	if err != nil {
+		return nil, err
+	}
+	if ok {
+		return Singleton(ok), nil
+	}
+	ok, err = isLess(left, right)
+	if err != nil {
+		return nil, err
+	}
+	return Singleton(!ok), nil
+}
+
+var binaryOp = map[rune]BinaryFunc{
+	opAdd:    doAdd,
+	opSub:    doSub,
+	opMul:    doMul,
+	opDiv:    doDiv,
+	opMod:    doMod,
+	opConcat: doConcat,
+	opAnd:    doAnd,
+	opOr:     doOr,
+	opBefore: doBefore,
+	opAfter:  doAfter,
+	opEq:     doEqual,
+	opNe:     doNotEqual,
+	opLt:     doLesser,
+	opLe:     doLessEq,
+	opGt:     doGreater,
+	opGe:     doGreatEq,
+}
+
 type binary struct {
 	left  Expr
 	right Expr
@@ -650,90 +810,11 @@ func (b binary) find(ctx Context) (Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	var res any
-	switch b.op {
-	case opAdd:
-		res, err = apply(left, right, func(left, right float64) (float64, error) {
-			return left + right, nil
-		})
-	case opSub:
-		res, err = apply(left, right, func(left, right float64) (float64, error) {
-			return left - right, nil
-		})
-	case opMul:
-		res, err = apply(left, right, func(left, right float64) (float64, error) {
-			return left * right, nil
-		})
-	case opDiv:
-		res, err = apply(left, right, func(left, right float64) (float64, error) {
-			if right == 0 {
-				return 0, errZero
-			}
-			return left / right, nil
-		})
-	case opMod:
-		res, err = apply(left, right, func(left, right float64) (float64, error) {
-			if right == 0 {
-				return 0, errZero
-			}
-			return math.Mod(left, right), nil
-		})
-	case opConcat:
-		var str1, str2 string
-		if !left.Empty() {
-			str1, _ = toString(left[0].Value())
-		}
-		if !right.Empty() {
-			str2, _ = toString(right[0].Value())
-		}
-		res = str1 + str2
-	case opAnd:
-		res = isTrue(left) && isTrue(right)
-	case opOr:
-		res = isTrue(left) || isTrue(right)
-	case opEq:
-		res, err = isEqual(left, right)
-	case opNe:
-		ok, err1 := isEqual(left, right)
-		res, err = !ok, err1
-	case opLt:
-		res, err = isLess(left, right)
-	case opLe:
-		ok, err1 := isEqual(left, right)
-		if !ok {
-			ok, err1 = isLess(left, right)
-		}
-		res, err = ok, err1
-	case opGt:
-		ok, err1 := isEqual(left, right)
-		if !ok {
-			ok, err1 = isLess(left, right)
-			ok = !ok
-		}
-		res, err = ok, err1
-	case opGe:
-		ok, err1 := isEqual(left, right)
-		if !ok {
-			ok, err1 = isLess(left, right)
-			ok = !ok
-		}
-		res, err = ok, err1
-	case opBefore:
-		if left.Empty() || right.Empty() {
-			return Singleton(false), nil
-		}
-		ok := isBefore(left[0].Node(), right[0].Node())
-		return Singleton(ok), nil
-	case opAfter:
-		if left.Empty() || right.Empty() {
-			return Singleton(false), nil
-		}
-		ok := isAfter(left[0].Node(), right[0].Node())
-		return Singleton(ok), nil
-	default:
+	fn, ok := binaryOp[b.op]
+	if !ok {
 		return nil, errImplemented
 	}
-	return Singleton(res), err
+	return fn(left, right)
 }
 
 type identity struct {
@@ -1438,12 +1519,9 @@ func isAfter(left, right Node) bool {
 	return len(p1) > len(p2)
 }
 
-func apply(left, right Sequence, do func(left, right float64) (float64, error)) (any, error) {
-	if left.Empty() {
-		return math.NaN(), nil
-	}
-	if right.Empty() {
-		return math.NaN(), nil
+func apply(left, right Sequence, do func(left, right float64) (float64, error)) (Sequence, error) {
+	if left.Empty() || right.Empty() {
+		return Singleton(math.NaN()), nil
 	}
 	x, err := toFloat(left[0].Value())
 	if err != nil {
@@ -1453,7 +1531,11 @@ func apply(left, right Sequence, do func(left, right float64) (float64, error)) 
 	if err != nil {
 		return nil, err
 	}
-	return do(x, y)
+	res, err := do(x, y)
+	if err != nil {
+		return nil, err
+	}
+	return Singleton(res), nil
 }
 
 func compareItems(left, right Sequence, cmp func(left, right Item) (bool, error)) (bool, error) {
