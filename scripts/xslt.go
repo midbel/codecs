@@ -509,7 +509,7 @@ func (s *Stylesheet) Generate(w io.Writer, doc *xml.Document) error {
 
 func (s *Stylesheet) writeDocument(w io.Writer, format string, doc *xml.Document) error {
 	var (
-		writer = xml.NewWriter(w)
+		writer  = xml.NewWriter(w)
 		setting = s.GetOutput(format)
 	)
 	if !setting.Indent {
@@ -1536,10 +1536,10 @@ func executeForeachGroup(node, datum xml.Node, style *Stylesheet) error {
 	}
 
 	for key, items := range groups {
-		currentGrp := func(_ xml.Context, _ []xml.Expr) ([]xml.Item, error) {
+		currentGrp := func(_ xml.Context, _ []xml.Expr) (xml.Sequence, error) {
 			return items, nil
 		}
-		currentKey := func(_ xml.Context, _ []xml.Expr) ([]xml.Item, error) {
+		currentKey := func(_ xml.Context, _ []xml.Expr) (xml.Sequence, error) {
 			i := xml.NewLiteralItem(key)
 			return []xml.Item{i}, nil
 		}

@@ -1,5 +1,11 @@
 package xml
 
+import (
+	"fmt"
+	"strings"
+	"time"
+)
+
 type Item interface {
 	Node() Node
 	Value() any
@@ -28,7 +34,7 @@ func (s *Sequence) IsTrue() bool {
 	return false
 }
 
-func (s *Sequence) IsSingleton() bool {
+func (s *Sequence) Singleton() bool {
 	return len(*s) == 1
 }
 

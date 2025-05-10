@@ -51,7 +51,7 @@ type Function struct {
 	body []xml.Expr
 }
 
-func (f Function) Call(ctx xml.Context, args []xml.Expr) ([]xml.Item, error) {
+func (f Function) Call(ctx xml.Context, args []xml.Expr) (xml.Sequence, error) {
 	if len(args) != len(f.args) {
 		return nil, fmt.Errorf("invalid number of arguments given")
 	}

@@ -169,12 +169,12 @@ const (
 )
 
 type Callable interface {
-	Call(ctx Context, args []Expr) ([]Item, error)
+	Call(ctx Context, args []Expr) (Sequence, error)
 }
 
-func Call(ctx Context, body []Expr) ([]Item, error) {
+func Call(ctx Context, body []Expr) (Sequence, error) {
 	var (
-		is  []Item
+		is  Sequence
 		err error
 	)
 	for i := range body {
@@ -187,8 +187,8 @@ func Call(ctx Context, body []Expr) ([]Item, error) {
 }
 
 type Expr interface {
-	Find(Node) ([]Item, error)
-	find(Context) ([]Item, error)
+	Find(Node) (Sequence, error)
+	find(Context) (Sequence, error)
 	MatchPriority() int
 }
 
@@ -202,7 +202,7 @@ type Context struct {
 	Builtins Environ[BuiltinFunc]
 }
 
-func defaultContext(n Node) Context {
+func DefaultContext(n Node) Context {
 	ctx := createContext(n, 1, 1)
 	ctx.Environ = Empty[Expr]()
 	return ctx
@@ -290,7 +290,7 @@ func Build(query string) (*Query, error) {
 	return &q, nil
 }
 
-func (q *Query) Find(node Node) ([]Item, error) {
+func (q *Query) Find(node Node) (Sequence, error) {
 	ctx := Context{
 		Node:     node,
 		Size:     1,
@@ -321,7 +321,7 @@ func (q *Query) MatchPriority() int {
 	return q.expr.MatchPriority()
 }
 
-func (q *Query) find(ctx Context) ([]Item, error) {
+func (q *Query) find(ctx Context) (Sequence, error) {
 	if q.expr == nil {
 		return nil, fmt.Errorf("no query given")
 	}
@@ -332,21 +332,21 @@ type query struct {
 	expr Expr
 }
 
-func (q query) FindWithEnv(node Node, env Environ[Expr]) ([]Item, error) {
+func (q query) FindWithEnv(node Node, env Environ[Expr]) (Sequence, error) {
 	ctx := createContext(node, 1, 1)
 	ctx.Environ = env
 	return q.find(ctx)
 }
 
-func (q query) Find(node Node) ([]Item, error) {
-	return q.find(defaultContext(node))
+func (q query) Find(node Node) (Sequence, error) {
+	return q.find(DefaultContext(node))
 }
 
 func (q query) MatchPriority() int {
 	return q.expr.MatchPriority()
 }
 
-func (q query) find(ctx Context) ([]Item, error) {
+func (q query) find(ctx Context) (Sequence, error) {
 	if ctx.Builtins == nil {
 		ctx.Builtins = DefaultBuiltin()
 	}
@@ -355,15 +355,15 @@ func (q query) find(ctx Context) ([]Item, error) {
 
 type wildcard struct{}
 
-func (w wildcard) Find(node Node) ([]Item, error) {
-	return w.find(defaultContext(node))
+func (w wildcard) Find(node Node) (Sequence, error) {
+	return w.find(DefaultContext(node))
 }
 
 func (w wildcard) MatchPriority() int {
 	return prioLow
 }
 
-func (w wildcard) find(ctx Context) ([]Item, error) {
+func (w wildcard) find(ctx Context) (Sequence, error) {
 	if ctx.Type() != TypeElement {
 		return nil, nil
 	}
@@ -372,30 +372,30 @@ func (w wildcard) find(ctx Context) ([]Item, error) {
 
 type root struct{}
 
-func (r root) Find(node Node) ([]Item, error) {
-	return r.find(defaultContext(node).Root())
+func (r root) Find(node Node) (Sequence, error) {
+	return r.find(DefaultContext(node).Root())
 }
 
 func (r root) MatchPriority() int {
 	return prioHigh
 }
 
-func (_ root) find(ctx Context) ([]Item, error) {
+func (_ root) find(ctx Context) (Sequence, error) {
 	root := ctx.Root()
 	return singleNode(root.Node), nil
 }
 
 type current struct{}
 
-func (c current) Find(node Node) ([]Item, error) {
-	return c.find(defaultContext(node))
+func (c current) Find(node Node) (Sequence, error) {
+	return c.find(DefaultContext(node))
 }
 
 func (c current) MatchPriority() int {
 	return prioMed
 }
 
-func (_ current) find(ctx Context) ([]Item, error) {
+func (_ current) find(ctx Context) (Sequence, error) {
 	return singleNode(ctx.Node), nil
 }
 
@@ -404,15 +404,15 @@ type step struct {
 	next Expr
 }
 
-func (s step) Find(node Node) ([]Item, error) {
-	return s.find(defaultContext(node))
+func (s step) Find(node Node) (Sequence, error) {
+	return s.find(DefaultContext(node))
 }
 
 func (s step) MatchPriority() int {
 	return getPriority(prioMed, s.curr, s.next)
 }
 
-func (s step) find(ctx Context) ([]Item, error) {
+func (s step) find(ctx Context) (Sequence, error) {
 	is, err := s.curr.find(ctx)
 	if err != nil {
 		return nil, err
@@ -434,8 +434,8 @@ type axis struct {
 	next Expr
 }
 
-func (a axis) Find(node Node) ([]Item, error) {
-	return a.find(defaultContext(node))
+func (a axis) Find(node Node) (Sequence, error) {
+	return a.find(DefaultContext(node))
 }
 
 func (a axis) MatchPriority() int {
@@ -451,7 +451,7 @@ func (a axis) principalType() NodeType {
 	}
 }
 
-func (a axis) find(ctx Context) ([]Item, error) {
+func (a axis) find(ctx Context) (Sequence, error) {
 	var list []Item
 	ctx.PrincipalType = a.principalType()
 	if isSelf(a.kind) && ctx.Type() != TypeDocument {
@@ -526,7 +526,7 @@ func (a axis) find(ctx Context) ([]Item, error) {
 	return list, nil
 }
 
-func (a axis) descendant(ctx Context) ([]Item, error) {
+func (a axis) descendant(ctx Context) (Sequence, error) {
 	if !isNode(ctx.Node) {
 		return nil, nil
 	}
@@ -543,7 +543,7 @@ func (a axis) descendant(ctx Context) ([]Item, error) {
 	return list, nil
 }
 
-func (a axis) child(ctx Context) ([]Item, error) {
+func (a axis) child(ctx Context) (Sequence, error) {
 	var (
 		list  []Item
 		nodes = ctx.Nodes()
@@ -561,15 +561,15 @@ type identifier struct {
 	ident string
 }
 
-func (i identifier) Find(node Node) ([]Item, error) {
-	return i.find(defaultContext(node))
+func (i identifier) Find(node Node) (Sequence, error) {
+	return i.find(DefaultContext(node))
 }
 
 func (i identifier) MatchPriority() int {
 	return prioHigh
 }
 
-func (i identifier) find(ctx Context) ([]Item, error) {
+func (i identifier) find(ctx Context) (Sequence, error) {
 	expr, err := ctx.Resolve(i.ident)
 	if err != nil {
 		return nil, err
@@ -585,15 +585,15 @@ type name struct {
 	QName
 }
 
-func (n name) Find(node Node) ([]Item, error) {
-	return n.find(defaultContext(node))
+func (n name) Find(node Node) (Sequence, error) {
+	return n.find(DefaultContext(node))
 }
 
 func (n name) MatchPriority() int {
 	return prioMed
 }
 
-func (n name) find(ctx Context) ([]Item, error) {
+func (n name) find(ctx Context) (Sequence, error) {
 	if n.Space == "*" && n.Name == ctx.LocalName() {
 		return singleNode(ctx.Node), nil
 	}
@@ -607,15 +607,15 @@ type sequence struct {
 	all []Expr
 }
 
-func (s sequence) Find(node Node) ([]Item, error) {
-	return s.find(defaultContext(node))
+func (s sequence) Find(node Node) (Sequence, error) {
+	return s.find(DefaultContext(node))
 }
 
 func (s sequence) MatchPriority() int {
 	return prioLow
 }
 
-func (s sequence) find(ctx Context) ([]Item, error) {
+func (s sequence) find(ctx Context) (Sequence, error) {
 	var list []Item
 	for i := range s.all {
 		is, err := s.all[i].find(ctx)
@@ -633,15 +633,15 @@ type binary struct {
 	op    rune
 }
 
-func (b binary) Find(node Node) ([]Item, error) {
-	return b.find(defaultContext(node))
+func (b binary) Find(node Node) (Sequence, error) {
+	return b.find(DefaultContext(node))
 }
 
 func (b binary) MatchPriority() int {
 	return getPriority(prioMed, b.left, b.right)
 }
 
-func (b binary) find(ctx Context) ([]Item, error) {
+func (b binary) find(ctx Context) (Sequence, error) {
 	left, err := b.left.find(ctx)
 	if err != nil {
 		return nil, err
@@ -723,7 +723,7 @@ func (b binary) find(ctx Context) ([]Item, error) {
 			return singleValue(false), nil
 		}
 		ok := isBefore(left[0].Node(), right[0].Node())
-		return singleValue(ok), nil 
+		return singleValue(ok), nil
 	case opAfter:
 		if isEmpty(left) || isEmpty(right) {
 			return singleValue(false), nil
@@ -741,15 +741,15 @@ type identity struct {
 	right Expr
 }
 
-func (i identity) Find(node Node) ([]Item, error) {
-	return i.find(defaultContext(node))
+func (i identity) Find(node Node) (Sequence, error) {
+	return i.find(DefaultContext(node))
 }
 
 func (i identity) MatchPriority() int {
 	return getPriority(prioMed, i.left, i.right)
 }
 
-func (i identity) find(ctx Context) ([]Item, error) {
+func (i identity) find(ctx Context) (Sequence, error) {
 	left, err := i.left.find(ctx)
 	if err != nil {
 		return nil, err
@@ -772,15 +772,15 @@ type reverse struct {
 	expr Expr
 }
 
-func (r reverse) Find(node Node) ([]Item, error) {
-	return r.find(defaultContext(node))
+func (r reverse) Find(node Node) (Sequence, error) {
+	return r.find(DefaultContext(node))
 }
 
 func (r reverse) MatchPriority() int {
 	return getPriority(prioMed, r.expr)
 }
 
-func (r reverse) find(ctx Context) ([]Item, error) {
+func (r reverse) find(ctx Context) (Sequence, error) {
 	v, err := r.expr.find(ctx)
 	if err != nil {
 		return nil, err
@@ -796,15 +796,15 @@ type literal struct {
 	expr string
 }
 
-func (i literal) Find(node Node) ([]Item, error) {
-	return i.find(defaultContext(node))
+func (i literal) Find(node Node) (Sequence, error) {
+	return i.find(DefaultContext(node))
 }
 
 func (i literal) MatchPriority() int {
 	return prioLow
 }
 
-func (i literal) find(_ Context) ([]Item, error) {
+func (i literal) find(_ Context) (Sequence, error) {
 	return singleValue(i.expr), nil
 }
 
@@ -812,15 +812,15 @@ type number struct {
 	expr float64
 }
 
-func (n number) Find(node Node) ([]Item, error) {
-	return n.find(defaultContext(node))
+func (n number) Find(node Node) (Sequence, error) {
+	return n.find(DefaultContext(node))
 }
 
 func (n number) MatchPriority() int {
 	return prioLow
 }
 
-func (n number) find(_ Context) ([]Item, error) {
+func (n number) find(_ Context) (Sequence, error) {
 	return singleValue(n.expr), nil
 }
 
@@ -845,15 +845,15 @@ type kind struct {
 	localType string
 }
 
-func (k kind) Find(node Node) ([]Item, error) {
-	return k.find(defaultContext(node))
+func (k kind) Find(node Node) (Sequence, error) {
+	return k.find(DefaultContext(node))
 }
 
 func (k kind) MatchPriority() int {
 	return prioLow
 }
 
-func (k kind) find(ctx Context) ([]Item, error) {
+func (k kind) find(ctx Context) (Sequence, error) {
 	if k.kind == typeAll || ctx.Type() == k.kind {
 		return singleNode(ctx.Node), nil
 	}
@@ -865,15 +865,15 @@ type call struct {
 	args []Expr
 }
 
-func (c call) Find(node Node) ([]Item, error) {
-	return c.find(defaultContext(node))
+func (c call) Find(node Node) (Sequence, error) {
+	return c.find(DefaultContext(node))
 }
 
 func (c call) MatchPriority() int {
 	return prioHigh
 }
 
-func (c call) find(ctx Context) ([]Item, error) {
+func (c call) find(ctx Context) (Sequence, error) {
 	fn, err := ctx.Builtins.Resolve(c.QualifiedName())
 	if err != nil {
 		return c.callUserDefinedFunction(ctx)
@@ -888,7 +888,7 @@ func (c call) find(ctx Context) ([]Item, error) {
 	return items, err
 }
 
-func (c call) callUserDefinedFunction(ctx Context) ([]Item, error) {
+func (c call) callUserDefinedFunction(ctx Context) (Sequence, error) {
 	res, ok := ctx.Environ.(interface {
 		ResolveFunc(string) (Callable, error)
 	})
@@ -906,15 +906,15 @@ type attr struct {
 	ident string
 }
 
-func (a attr) Find(node Node) ([]Item, error) {
-	return a.find(defaultContext(node))
+func (a attr) Find(node Node) (Sequence, error) {
+	return a.find(DefaultContext(node))
 }
 
 func (a attr) MatchPriority() int {
 	return prioMed
 }
 
-func (a attr) find(ctx Context) ([]Item, error) {
+func (a attr) find(ctx Context) (Sequence, error) {
 	if ctx.Type() != TypeElement {
 		return nil, nil
 	}
@@ -932,15 +932,15 @@ type except struct {
 	all []Expr
 }
 
-func (e except) Find(node Node) ([]Item, error) {
-	return e.find(defaultContext(node))
+func (e except) Find(node Node) (Sequence, error) {
+	return e.find(DefaultContext(node))
 }
 
 func (e except) MatchPriority() int {
 	return getPriority(prioMed, e.all...)
 }
 
-func (e except) find(ctx Context) ([]Item, error) {
+func (e except) find(ctx Context) (Sequence, error) {
 	var list []Item
 	for i := range e.all {
 		res, err := e.all[i].find(ctx)
@@ -964,15 +964,15 @@ type intersect struct {
 	all []Expr
 }
 
-func (e intersect) Find(node Node) ([]Item, error) {
-	return e.find(defaultContext(node))
+func (e intersect) Find(node Node) (Sequence, error) {
+	return e.find(DefaultContext(node))
 }
 
 func (e intersect) MatchPriority() int {
 	return getPriority(prioMed, e.all...)
 }
 
-func (e intersect) find(ctx Context) ([]Item, error) {
+func (e intersect) find(ctx Context) (Sequence, error) {
 	var list []Item
 	for i := range e.all {
 		res, err := e.all[i].find(ctx)
@@ -997,15 +997,15 @@ type union struct {
 	all []Expr
 }
 
-func (u union) Find(node Node) ([]Item, error) {
-	return u.find(defaultContext(node))
+func (u union) Find(node Node) (Sequence, error) {
+	return u.find(DefaultContext(node))
 }
 
 func (u union) MatchPriority() int {
 	return getPriority(prioMed, u.all...)
 }
 
-func (u union) find(ctx Context) ([]Item, error) {
+func (u union) find(ctx Context) (Sequence, error) {
 	var list []Item
 	for i := range u.all {
 		res, err := u.all[i].find(ctx)
@@ -1022,15 +1022,15 @@ type filter struct {
 	check Expr
 }
 
-func (f filter) Find(node Node) ([]Item, error) {
-	return f.find(defaultContext(node))
+func (f filter) Find(node Node) (Sequence, error) {
+	return f.find(DefaultContext(node))
 }
 
 func (f filter) MatchPriority() int {
 	return getPriority(prioHigh, f.expr, f.check)
 }
 
-func (f filter) find(ctx Context) ([]Item, error) {
+func (f filter) find(ctx Context) (Sequence, error) {
 	list, err := f.expr.find(ctx)
 	if err != nil {
 		return nil, err
@@ -1076,15 +1076,15 @@ func Assign(ident string, expr Expr) Expr {
 	}
 }
 
-func (e Let) Find(node Node) ([]Item, error) {
-	return e.find(defaultContext(node))
+func (e Let) Find(node Node) (Sequence, error) {
+	return e.find(DefaultContext(node))
 }
 
 func (e Let) MatchPriority() int {
 	return prioLow
 }
 
-func (e Let) find(ctx Context) ([]Item, error) {
+func (e Let) find(ctx Context) (Sequence, error) {
 	ctx.Define(e.ident, e.expr)
 	return nil, nil
 }
@@ -1094,15 +1094,15 @@ type let struct {
 	expr  Expr
 }
 
-func (e let) Find(node Node) ([]Item, error) {
-	return e.find(defaultContext(node))
+func (e let) Find(node Node) (Sequence, error) {
+	return e.find(DefaultContext(node))
 }
 
 func (e let) MatchPriority() int {
 	return prioLow
 }
 
-func (e let) find(ctx Context) ([]Item, error) {
+func (e let) find(ctx Context) (Sequence, error) {
 	return nil, nil
 }
 
@@ -1111,15 +1111,15 @@ type rng struct {
 	right Expr
 }
 
-func (r rng) Find(node Node) ([]Item, error) {
-	return r.find(defaultContext(node))
+func (r rng) Find(node Node) (Sequence, error) {
+	return r.find(DefaultContext(node))
 }
 
 func (r rng) MatchPriority() int {
 	return prioLow
 }
 
-func (r rng) find(ctx Context) ([]Item, error) {
+func (r rng) find(ctx Context) (Sequence, error) {
 	left, err := r.left.find(ctx)
 	if err != nil {
 		return nil, err
@@ -1158,15 +1158,15 @@ type loop struct {
 	body  Expr
 }
 
-func (o loop) Find(node Node) ([]Item, error) {
-	return o.find(defaultContext(node))
+func (o loop) Find(node Node) (Sequence, error) {
+	return o.find(DefaultContext(node))
 }
 
 func (o loop) MatchPriority() int {
 	return prioLow
 }
 
-func (o loop) find(ctx Context) ([]Item, error) {
+func (o loop) find(ctx Context) (Sequence, error) {
 	return nil, nil
 }
 
@@ -1176,15 +1176,15 @@ type conditional struct {
 	alt  Expr
 }
 
-func (c conditional) Find(node Node) ([]Item, error) {
-	return c.find(defaultContext(node))
+func (c conditional) Find(node Node) (Sequence, error) {
+	return c.find(DefaultContext(node))
 }
 
 func (c conditional) MatchPriority() int {
 	return getPriority(prioHigh, c.test)
 }
 
-func (c conditional) find(ctx Context) ([]Item, error) {
+func (c conditional) find(ctx Context) (Sequence, error) {
 	res, err := c.test.find(ctx)
 	if err != nil {
 		return nil, err
@@ -1202,15 +1202,15 @@ type quantified struct {
 	every bool
 }
 
-func (q quantified) Find(node Node) ([]Item, error) {
-	return q.find(defaultContext(node))
+func (q quantified) Find(node Node) (Sequence, error) {
+	return q.find(DefaultContext(node))
 }
 
 func (q quantified) MatchPriority() int {
 	return getPriority(prioHigh, q.test)
 }
 
-func (q quantified) find(ctx Context) ([]Item, error) {
+func (q quantified) find(ctx Context) (Sequence, error) {
 	env := ctx.Environ
 	ctx.Environ = Enclosed(ctx)
 	defer func() {
@@ -1288,15 +1288,15 @@ func NewValueFromNode(node Node) Expr {
 	return NewValue(createNode(node))
 }
 
-func (v value) Find(node Node) ([]Item, error) {
-	return v.find(defaultContext(node))
+func (v value) Find(node Node) (Sequence, error) {
+	return v.find(DefaultContext(node))
 }
 
 func (v value) MatchPriority() int {
 	return prioLow
 }
 
-func (v value) find(ctx Context) ([]Item, error) {
+func (v value) find(ctx Context) (Sequence, error) {
 	return []Item{v.item}, nil
 }
 
@@ -1355,15 +1355,15 @@ func As(expr Expr, name QName) Expr {
 	}
 }
 
-func (c cast) Find(node Node) ([]Item, error) {
-	return c.find(defaultContext(node))
+func (c cast) Find(node Node) (Sequence, error) {
+	return c.find(DefaultContext(node))
 }
 
 func (c cast) MatchPriority() int {
 	return getPriority(prioLow, c.expr)
 }
 
-func (c cast) find(ctx Context) ([]Item, error) {
+func (c cast) find(ctx Context) (Sequence, error) {
 	is, err := c.expr.find(ctx)
 	if err != nil {
 		return nil, err
@@ -1386,15 +1386,15 @@ type castable struct {
 	kind Type
 }
 
-func (c castable) Find(node Node) ([]Item, error) {
-	return c.find(defaultContext(node))
+func (c castable) Find(node Node) (Sequence, error) {
+	return c.find(DefaultContext(node))
 }
 
 func (c castable) MatchPriority() int {
 	return getPriority(prioLow, c.expr)
 }
 
-func (c castable) find(ctx Context) ([]Item, error) {
+func (c castable) find(ctx Context) (Sequence, error) {
 	is, err := c.expr.find(ctx)
 	if err != nil {
 		return nil, err

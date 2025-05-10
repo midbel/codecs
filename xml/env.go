@@ -1,11 +1,12 @@
 package xml
 
 import (
+	"errors"
 	"fmt"
 	"maps"
-	"strings"
-	"time"
 )
+
+var ErrDefined = errors.New("undefined identifier")
 
 type Environ[T any] interface {
 	Resolve(string) (T, error)
@@ -42,7 +43,7 @@ func (e *Env[T]) Resolve(ident string) (T, error) {
 		return e.parent.Resolve(ident)
 	}
 	var t T
-	return t, fmt.Errorf("%s: identifier not defined", ident)
+	return t, fmt.Errorf("%s: %w", ErrDefined)
 }
 
 func (e *Env[T]) Unwrap() Environ[T] {
