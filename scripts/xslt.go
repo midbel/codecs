@@ -144,7 +144,7 @@ func defaultOutput() *OutputSettings {
 		Method:   "xml",
 		Version:  "1.0",
 		Encoding: "UTF-8",
-		Indent:   true,
+		Indent:   false,
 	}
 	return out
 }
@@ -504,21 +504,24 @@ func (s *Stylesheet) Generate(w io.Writer, doc *xml.Document) error {
 	if err != nil {
 		return err
 	}
-	writer := xml.NewWriter(w)
-	if len(s.output) > 0 {
-		out := s.output[0]
-		if !out.Indent {
-			writer.WriterOptions |= xml.OptionCompact
-		}
-		if out.OmitProlog {
-			writer.WriterOptions |= xml.OptionNoProlog
-		}
-		if out.Method == "html" {
-			writer.PrologWriter = xml.PrologWriterFunc(writeDoctypeHTML)
-		}
+	return s.writeDocument(w, "", result.(*xml.Document))
+}
+
+func (s *Stylesheet) writeDocument(w io.Writer, format string, doc *xml.Document) error {
+	var (
+		writer = xml.NewWriter(w)
+		setting = s.GetOutput(format)
+	)
+	if !setting.Indent {
+		writer.WriterOptions |= xml.OptionCompact
 	}
-	writer.Write(result.(*xml.Document))
-	return nil
+	if setting.OmitProlog {
+		writer.WriterOptions |= xml.OptionNoProlog
+	}
+	if setting.Method == "html" && (setting.Version == "5" || setting.Version == "5.0") {
+		writer.PrologWriter = xml.PrologWriterFunc(writeDoctypeHTML)
+	}
+	return writer.Write(doc)
 }
 
 func (s *Stylesheet) ImportSheet(file string) error {
@@ -935,7 +938,7 @@ func processNode(node, datum xml.Node, style *Stylesheet) error {
 		for _, a := range style.AttrSet[ix].Attrs {
 			el.SetAttribute(a)
 		}
-		// el.RemoveAttr(el.Attrs[ix].Position())
+		el.RemoveAttr(el.Attrs[ix].Position())
 	}
 	for i := range nodes {
 		if nodes[i].Type() != xml.TypeElement {
@@ -1049,20 +1052,7 @@ func writeDocument(file, format string, doc *xml.Document, style *Stylesheet) er
 	}
 	defer w.Close()
 
-	writer := xml.NewWriter(w)
-	if out := style.GetOutput(format); out != nil {
-		if !out.Indent {
-			writer.WriterOptions |= xml.OptionCompact
-		}
-		if out.OmitProlog {
-			writer.WriterOptions |= xml.OptionNoProlog
-		}
-		if out.Method == "html" && (out.Version == "5" || out.Version == "5.0") {
-			writer.PrologWriter = xml.PrologWriterFunc(writeDoctypeHTML)
-		}
-	}
-	writer.Write(doc)
-	return nil
+	return style.writeDocument(w, format, doc)
 }
 
 type matchFunc func(xml.Node, string) (*Template, error)
