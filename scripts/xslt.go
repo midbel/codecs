@@ -1015,16 +1015,7 @@ func executeSourceDocument(node, datum xml.Node, style *Stylesheet) error {
 
 func executeResultDocument(node, datum xml.Node, style *Stylesheet) error {
 	el := node.(*xml.Element)
-	var (
-		file string
-		outn string
-		err  error
-	)
-	file, err = getAttribute(el, "href")
-	if err != nil {
-		return err
-	}
-	outn, _ = getAttribute(el, "format")
+
 	var doc xml.Document
 	for _, n := range slices.Clone(el.Nodes) {
 		c := cloneNode(n)
@@ -1036,10 +1027,22 @@ func executeResultDocument(node, datum xml.Node, style *Stylesheet) error {
 		}
 		doc.Nodes = append(doc.Nodes, c)
 	}
+
+	file, err := getAttribute(el, "href")
+	if err != nil {
+		return err
+	}
+	format, _ := getAttribute(el, "format")
+	if err := writeDocument(file, format, &doc, style); err != nil {
+		return err
+	}
 	if err := removeSelf(node); err != nil {
 		return err
 	}
+	return errSkip
+}
 
+func writeDocument(file, format string, doc *xml.Document, style *Stylesheet) error {
 	w, err := os.Create(file)
 	if err != nil {
 		return err
@@ -1047,7 +1050,7 @@ func executeResultDocument(node, datum xml.Node, style *Stylesheet) error {
 	defer w.Close()
 
 	writer := xml.NewWriter(w)
-	if out := style.GetOutput(outn); out != nil {
+	if out := style.GetOutput(format); out != nil {
 		if !out.Indent {
 			writer.WriterOptions |= xml.OptionCompact
 		}
@@ -1058,8 +1061,8 @@ func executeResultDocument(node, datum xml.Node, style *Stylesheet) error {
 			writer.PrologWriter = xml.PrologWriterFunc(writeDoctypeHTML)
 		}
 	}
-	writer.Write(&doc)
-	return errSkip
+	writer.Write(doc)
+	return nil
 }
 
 type matchFunc func(xml.Node, string) (*Template, error)
@@ -1518,9 +1521,6 @@ func executeForeachGroup(node, datum xml.Node, style *Stylesheet) error {
 	if !ok {
 		return fmt.Errorf("for-each-group: xml element expected as parent")
 	}
-	if err := removeSelf(node); err != nil {
-		return err
-	}
 
 	items, err := style.ExecuteQuery(query, datum)
 	if err != nil || len(items) == 0 {
@@ -1569,7 +1569,7 @@ func executeForeachGroup(node, datum xml.Node, style *Stylesheet) error {
 			}
 		}
 	}
-	return nil
+	return removeSelf(node)
 }
 
 func executeMerge(node, datum xml.Node, style *Stylesheet) error {
