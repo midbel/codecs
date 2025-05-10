@@ -436,7 +436,7 @@ func (e *Element) Clone() Node {
 
 func (e *Element) RemoveNode(at int) error {
 	if at < 0 || at >= len(e.Nodes) {
-		return fmt.Errorf("bad index")
+		return fmt.Errorf("%s: removing node with bad index (%d - %d)", e.QualifiedName(), at, len(e.Nodes))
 	}
 	e.Nodes = slices.Delete(e.Nodes, at, at+1)
 	for i := range e.Nodes[at:] {
@@ -447,7 +447,7 @@ func (e *Element) RemoveNode(at int) error {
 
 func (e *Element) ReplaceNode(at int, node Node) error {
 	if at < 0 || at >= len(e.Nodes) {
-		return fmt.Errorf("bad index")
+		return fmt.Errorf("%s: replacing node with bad index (%d - %d)", e.QualifiedName(), at, len(e.Nodes))
 	}
 	node.setParent(e)
 	node.setPosition(at)
@@ -461,7 +461,7 @@ func (e *Element) InsertNode(at int, node Node) error {
 
 func (e *Element) InsertNodes(at int, nodes []Node) error {
 	if at < 0 || at >= len(e.Nodes) {
-		return fmt.Errorf("bad index")
+		return fmt.Errorf("%s: inserting nodes with bad index (%d - %d)", e.QualifiedName(), at, len(e.Nodes))
 	}
 	var (
 		before = e.Nodes[:at]

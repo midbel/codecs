@@ -779,7 +779,9 @@ func (s *Stylesheet) prepare(tpl *Template) error {
 				return err
 			}
 		}
-		el.RemoveNode(n.Position())
+		if err := removeNode(el, n); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -966,10 +968,7 @@ func executeVariable(node, datum xml.Node, style *Stylesheet) error {
 		n := cloneNode(el.Nodes[0])
 		style.Define(ident, xml.NewValueFromNode(n))
 	}
-	if r, ok := el.Parent().(interface{ RemoveNode(int) error }); ok {
-		return r.RemoveNode(el.Position())
-	}
-	return nil
+	return removeSelf(node)
 }
 
 func executeImport(node, datum xml.Node, style *Stylesheet) error {
@@ -1037,11 +1036,8 @@ func executeResultDocument(node, datum xml.Node, style *Stylesheet) error {
 		}
 		doc.Nodes = append(doc.Nodes, c)
 	}
-
-	if r, ok := el.Parent().(interface{ RemoveNode(int) error }); ok {
-		if err := r.RemoveNode(el.Position()); err != nil {
-			return err
-		}
+	if err := removeSelf(node); err != nil {
+		return err
 	}
 
 	w, err := os.Create(file)
@@ -1074,10 +1070,7 @@ func executeApply(node, datum xml.Node, style *Stylesheet, match matchFunc) erro
 		return err
 	}
 	if len(nodes) == 0 {
-		if r, ok := node.Parent().(interface{ RemoveNode(int) error }); ok {
-			err = r.RemoveNode(node.Position())
-		}
-		return err
+		return removeNode(node, node)
 	}
 	var (
 		el      = node.(*xml.Element)
@@ -1200,7 +1193,9 @@ func executeTry(node, datum xml.Node, style *Stylesheet) error {
 	if err := processNode(el, datum, style); err != nil {
 		if len(items) > 0 {
 			catch := items[0].Node()
-			el.RemoveNode(catch.Position())
+			if err := removeNode(node, catch); err != nil {
+				return err
+			}
 			style.Enter()
 			defer style.Leave()
 			return processNode(catch, datum, style)
@@ -1233,10 +1228,7 @@ func executeIf(node, datum xml.Node, style *Stylesheet) error {
 		return err
 	}
 	if !ok {
-		if r, ok := el.Parent().(interface{ RemoveNode(int) error }); ok {
-			return r.RemoveNode(el.Position())
-		}
-		return nil
+		return removeSelf(el)
 	}
 	if err = processNode(node, datum, style); err != nil {
 		return err
@@ -1304,7 +1296,9 @@ func executeForeach(node, datum xml.Node, style *Stylesheet) error {
 	if !ok {
 		return fmt.Errorf("for-each: xml element expected as parent")
 	}
-	parent.RemoveNode(el.Position())
+	if err := removeSelf(node); err != nil {
+		return err
+	}
 
 	items, err := style.ExecuteQuery(query, datum)
 	if err != nil || len(items) == 0 {
@@ -1319,7 +1313,9 @@ func executeForeach(node, datum xml.Node, style *Stylesheet) error {
 			return err
 		}
 		order, _ := getAttribute(x, "order")
-		el.RemoveNode(0)
+		if err := removeAt(x, 0); err != nil {
+			return err
+		}
 		it, err = foreachItems(items, query, order)
 		if err != nil {
 			return err
@@ -1395,13 +1391,9 @@ func executeValueOf(node, datum xml.Node, style *Stylesheet) error {
 	if err != nil {
 		sep = " "
 	}
-	parent, ok := el.Parent().(*xml.Element)
-	if !ok {
-		return fmt.Errorf("value-of: xml element expected as parent")
-	}
 	items, err := style.ExecuteQuery(query, datum)
 	if err != nil || len(items) == 0 {
-		return parent.RemoveNode(el.Position())
+		return removeSelf(node)
 	}
 
 	var str strings.Builder
@@ -1517,7 +1509,9 @@ func executeForeachGroup(node, datum xml.Node, style *Stylesheet) error {
 	if !ok {
 		return fmt.Errorf("for-each-group: xml element expected as parent")
 	}
-	parent.RemoveNode(el.Position())
+	if err := removeSelf(node); err != nil {
+		return err
+	}
 
 	items, err := style.ExecuteQuery(query, datum)
 	if err != nil || len(items) == 0 {
@@ -1654,12 +1648,20 @@ func removeNode(elem, node xml.Node) error {
 	if node == nil {
 		return nil
 	}
+	return removeAt(elem, node.Position())
+}
+
+func removeAt(elem xml.Node, pos int) error {
 	p := elem.Parent()
-	r, ok := p.(interface{ RemoveNode(int) error})
+	r, ok := p.(interface{ RemoveNode(int) error })
 	if !ok {
 		return fmt.Errorf("node can not be removed from parent element of %s", elem.QualifiedName())
 	}
-	return r.RemoveNode(node.Position())
+	return r.RemoveNode(pos)
+}
+
+func removeSelf(elem xml.Node) error {
+	return removeNode(elem, elem)
 }
 
 func replaceNode(elem, node xml.Node) error {
