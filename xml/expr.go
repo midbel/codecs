@@ -1539,10 +1539,7 @@ func apply(left, right Sequence, do func(left, right float64) (float64, error)) 
 }
 
 func compareItems(left, right Sequence, cmp func(left, right Item) (bool, error)) (bool, error) {
-	if left.Empty() {
-		return false, nil
-	}
-	if right.Empty() {
+	if left.Empty() || right.Empty() {
 		return false, nil
 	}
 	for i := range left {
