@@ -779,7 +779,7 @@ func (s *Stylesheet) prepare(tpl *Template) error {
 				return err
 			}
 		}
-		if err := removeNode(el, n); err != nil {
+		if err := removeSelf(n); err != nil {
 			return err
 		}
 	}
@@ -1102,7 +1102,7 @@ func executeApply(node, datum xml.Node, style *Stylesheet, match matchFunc) erro
 			results = append(results, c)
 		}
 	}
-	return insertNodes(el, results...)
+	return insertNodes(node, results...)
 }
 
 func executeApplyImport(node, datum xml.Node, style *Stylesheet) error {
@@ -1150,7 +1150,7 @@ func getNodesForTemplate(node, datum xml.Node, style *Stylesheet) ([]xml.Node, e
 			res = append(res, items[i].Node())
 		}
 	} else {
-		res = slices.Clone(el.Nodes)
+		res = []xml.Node{datum}
 	}
 	return res, nil
 }
@@ -1166,6 +1166,30 @@ func applyParams(node, datum xml.Node, style *Stylesheet) error {
 		}
 	}
 	return nil
+}
+
+func applySort(node xml.Node, items []xml.Item, style *Stylesheet) (iter.Seq[xml.Item], error) {
+	sorts, err := style.queryXSL("./sort[1]", node)
+	if err != nil {
+		return nil, err
+	}
+	if len(sorts) == 0 {
+		return slices.Values(items), nil
+	}
+	tmp := sorts[0].Node()
+	if err := removeSelf(tmp); err != nil {
+		return nil, err
+	}
+	elem, ok := tmp.(*xml.Element)
+	if !ok {
+		return nil, fmt.Errorf("sort: expected xml element")
+	}
+	query, err := getAttribute(elem, "select")
+	if err != nil {
+		return nil, err
+	}
+	order, _ := getAttribute(elem, "order")
+	return foreachItems(items, query, order)
 }
 
 func executeWithParam(node, datum xml.Node, style *Stylesheet) error {
@@ -1292,35 +1316,20 @@ func executeForeach(node, datum xml.Node, style *Stylesheet) error {
 	if err != nil {
 		return err
 	}
-	if err := removeSelf(node); err != nil {
-		return err
-	}
 
 	items, err := style.ExecuteQuery(query, datum)
-	if err != nil || len(items) == 0 {
+	if err != nil {
+		return err
+	}
+	if len(items) == 0 {
+		return removeSelf(node)
+	}
+	it, err := applySort(node, items, style)
+	if err != nil {
 		return err
 	}
 
-	var it iter.Seq[xml.Item]
-	if el.Nodes[0].QualifiedName() == style.getQualifiedName("sort") {
-		x := el.Nodes[0].(*xml.Element)
-		query, err := getAttribute(x, "select")
-		if err != nil {
-			return err
-		}
-		order, _ := getAttribute(x, "order")
-		if err := removeAt(x, 0); err != nil {
-			return err
-		}
-		it, err = foreachItems(items, query, order)
-		if err != nil {
-			return err
-		}
-	} else {
-		it = slices.Values(items)
-	}
-
-	parent, ok := el.Parent().(*xml.Element)
+	parent, ok := node.Parent().(*xml.Element)
 	if !ok {
 		return fmt.Errorf("for-each: xml element expected as parent")
 	}
@@ -1337,7 +1346,7 @@ func executeForeach(node, datum xml.Node, style *Stylesheet) error {
 			}
 		}
 	}
-	return nil
+	return removeSelf(node)
 }
 
 func foreachItems(items []xml.Item, orderBy, orderDir string) (iter.Seq[xml.Item], error) {
