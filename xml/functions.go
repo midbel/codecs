@@ -554,7 +554,7 @@ func callExists(ctx Context, args []Expr) (Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	return singleValue(!isEmpty(items)), nil
+	return singleValue(!items.Empty()), nil
 }
 
 func callDistinctValues(ctx Context, args []Expr) (Sequence, error) {
@@ -569,7 +569,7 @@ func callEmpty(ctx Context, args []Expr) (Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	return singleValue(isEmpty(items)), nil
+	return singleValue(items.Empty()), nil
 }
 
 func callHead(ctx Context, args []Expr) (Sequence, error) {
@@ -580,7 +580,7 @@ func callHead(ctx Context, args []Expr) (Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	if isEmpty(items) {
+	if items.Empty() {
 		return nil, nil
 	}
 	return createSingle(items[0]), nil
@@ -594,7 +594,7 @@ func callTail(ctx Context, args []Expr) (Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	if isEmpty(items) {
+	if items.Empty() {
 		return nil, nil
 	}
 	return items[1:], nil
@@ -681,7 +681,7 @@ func callMin(ctx Context, args []Expr) (Sequence, error) {
 		return nil, err
 	}
 	var res any
-	if every(items, isFloat) {
+	if items.Every(isFloat) {
 		list, _ := convert[float64](items, toFloat)
 		res = lowestValue(list)
 	} else {
@@ -697,7 +697,7 @@ func callMax(ctx Context, args []Expr) (Sequence, error) {
 		return nil, err
 	}
 	var res any
-	if every(items, isFloat) {
+	if items.Every(isFloat) {
 		list, _ := convert[float64](items, toFloat)
 		res = greatestValue(list)
 	} else {
@@ -1269,7 +1269,7 @@ func callBoolean(ctx Context, args []Expr) (Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	if isEmpty(items) {
+	if items.Empty() {
 		return callFalse(ctx, args)
 	}
 	return singleValue(items[0].True()), nil

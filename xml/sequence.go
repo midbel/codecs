@@ -24,7 +24,7 @@ func (s *Sequence) Append(item Item) {
 	*s = append(*s, item)
 }
 
-func (s *Sequence) IsTrue() bool {
+func (s *Sequence) True() bool {
 	if len(*s) == 0 {
 		return false
 	}
@@ -32,6 +32,10 @@ func (s *Sequence) IsTrue() bool {
 		return (*s)[0].True()
 	}
 	return false
+}
+
+func (s *Sequence) Empty() bool {
+	return len(*s) == 0
 }
 
 func (s *Sequence) Singleton() bool {
@@ -42,27 +46,28 @@ func (s *Sequence) String() string {
 	return ""
 }
 
-func createSingle(item Item) []Item {
+func (s *Sequence) Every(test func(i Item) bool) bool {
+	for i := range *s {
+		if !test((*s)[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func createSingle(item Item) Sequence {
 	var list []Item
 	return append(list, item)
 }
 
-func singleValue(value any) []Item {
+func singleValue(value any) Sequence {
 	literal := createLiteral(value)
 	return createSingle(literal)
 }
 
-func singleNode(value Node) []Item {
+func singleNode(value Node) Sequence {
 	node := createNode(value)
 	return createSingle(node)
-}
-
-func isSingleton(list []Item) bool {
-	return len(list) == 1
-}
-
-func isEmpty(list []Item) bool {
-	return len(list) == 0
 }
 
 func isTrue(list []Item) bool {
@@ -199,15 +204,6 @@ func isFloat(i Item) bool {
 	return ok
 }
 
-func every(items []Item, test func(i Item) bool) bool {
-	for i := range items {
-		if !test(items[i]) {
-			return false
-		}
-	}
-	return true
-}
-
 func convert[T string | float64](items []Item, do func(any) (T, error)) ([]T, error) {
 	var list []T
 	for i := range items {
@@ -218,28 +214,4 @@ func convert[T string | float64](items []Item, do func(any) (T, error)) ([]T, er
 		list = append(list, x)
 	}
 	return list, nil
-}
-
-func lowestValue[T string | float64](items []T) T {
-	var res T
-	for i := range items {
-		if i == 0 {
-			res = items[i]
-			continue
-		}
-		res = min(items[i], res)
-	}
-	return res
-}
-
-func greatestValue[T string | float64](items []T) T {
-	var res T
-	for i := range items {
-		if i == 0 {
-			res = items[i]
-			continue
-		}
-		res = max(items[i], res)
-	}
-	return res
 }

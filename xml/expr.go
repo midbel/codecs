@@ -680,10 +680,10 @@ func (b binary) find(ctx Context) (Sequence, error) {
 		})
 	case opConcat:
 		var str1, str2 string
-		if !isEmpty(left) {
+		if !left.Empty() {
 			str1, _ = toString(left[0].Value())
 		}
-		if !isEmpty(right) {
+		if !right.Empty() {
 			str2, _ = toString(right[0].Value())
 		}
 		res = str1 + str2
@@ -719,13 +719,13 @@ func (b binary) find(ctx Context) (Sequence, error) {
 		}
 		res, err = ok, err1
 	case opBefore:
-		if isEmpty(left) || isEmpty(right) {
+		if left.Empty() || right.Empty() {
 			return singleValue(false), nil
 		}
 		ok := isBefore(left[0].Node(), right[0].Node())
 		return singleValue(ok), nil
 	case opAfter:
-		if isEmpty(left) || isEmpty(right) {
+		if left.Empty() || right.Empty() {
 			return singleValue(false), nil
 		}
 		ok := isAfter(left[0].Node(), right[0].Node())
@@ -758,7 +758,7 @@ func (i identity) find(ctx Context) (Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	if isEmpty(left) || isEmpty(right) {
+	if left.Empty() || right.Empty() {
 		return singleValue(false), nil
 	}
 	var (
@@ -1041,7 +1041,7 @@ func (f filter) find(ctx Context) (Sequence, error) {
 		if err != nil {
 			continue
 		}
-		if isEmpty(res) {
+		if res.Empty() {
 			continue
 		}
 		if !res[0].Atomic() && isTrue(res) {
@@ -1128,7 +1128,7 @@ func (r rng) find(ctx Context) (Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	if isEmpty(left) || isEmpty(right) {
+	if left.Empty() || right.Empty() {
 		return nil, nil
 	}
 	beg, err := toFloat(left[0].Value())
@@ -1438,11 +1438,11 @@ func isAfter(left, right Node) bool {
 	return len(p1) > len(p2)
 }
 
-func apply(left, right []Item, do func(left, right float64) (float64, error)) (any, error) {
-	if isEmpty(left) {
+func apply(left, right Sequence, do func(left, right float64) (float64, error)) (any, error) {
+	if left.Empty() {
 		return math.NaN(), nil
 	}
-	if isEmpty(right) {
+	if right.Empty() {
 		return math.NaN(), nil
 	}
 	x, err := toFloat(left[0].Value())
@@ -1456,11 +1456,11 @@ func apply(left, right []Item, do func(left, right float64) (float64, error)) (a
 	return do(x, y)
 }
 
-func compareItems(left, right []Item, cmp func(left, right Item) (bool, error)) (bool, error) {
-	if isEmpty(left) {
+func compareItems(left, right Sequence, cmp func(left, right Item) (bool, error)) (bool, error) {
+	if left.Empty() {
 		return false, nil
 	}
-	if isEmpty(right) {
+	if right.Empty() {
 		return false, nil
 	}
 	for i := range left {
@@ -1474,7 +1474,7 @@ func compareItems(left, right []Item, cmp func(left, right Item) (bool, error)) 
 	return false, nil
 }
 
-func isLess(left, right []Item) (bool, error) {
+func isLess(left, right Sequence) (bool, error) {
 	return compareItems(left, right, func(left, right Item) (bool, error) {
 		switch x := left.Value().(type) {
 		case float64:
@@ -1493,7 +1493,7 @@ func isLess(left, right []Item) (bool, error) {
 
 }
 
-func isEqual(left, right []Item) (bool, error) {
+func isEqual(left, right Sequence) (bool, error) {
 	return compareItems(left, right, func(left, right Item) (bool, error) {
 		switch x := left.Value().(type) {
 		case float64:
@@ -1575,6 +1575,30 @@ func toBool(v any) bool {
 	default:
 		return false
 	}
+}
+
+func lowestValue[T string | float64](items []T) T {
+	var res T
+	for i := range items {
+		if i == 0 {
+			res = items[i]
+			continue
+		}
+		res = min(items[i], res)
+	}
+	return res
+}
+
+func greatestValue[T string | float64](items []T) T {
+	var res T
+	for i := range items {
+		if i == 0 {
+			res = items[i]
+			continue
+		}
+		res = max(items[i], res)
+	}
+	return res
 }
 
 func getPriority(base int, values ...Expr) int {
