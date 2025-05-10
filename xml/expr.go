@@ -719,9 +719,15 @@ func (b binary) find(ctx Context) ([]Item, error) {
 		}
 		res, err = ok, err1
 	case opBefore:
-		return nil, errImplemented
+		if isEmpty(left) || isEmpty(right) {
+			return singleValue(false), nil
+		}
+		return isBefore(left[0].Node(), right[0].Node()), nil
 	case opAfter:
-		return nil, errImplemented
+		if isEmpty(left) || isEmpty(right) {
+			return singleValue(false), nil
+		}
+		return isAfter(left[0].Node(), right[0].Node()), nil
 	default:
 		return nil, errImplemented
 	}
@@ -1398,6 +1404,36 @@ func (c castable) find(ctx Context) ([]Item, error) {
 		is[i] = c.kind.IsCastable(is[i].Value())
 	}
 	return is, nil
+}
+
+func isBefore(left, right Node) bool {
+	var (
+		p1 = left.path()
+		p2 = right.path()
+	)
+	for i := 0; i < len(p1) && i < len(p2); i++ {
+		if p1[i] < p2[i] {
+			return true
+		} else if p1[i] > p2[i] {
+			return false
+		}
+	}
+	return len(p1) < len(p2)
+}
+
+func isAfter(left, right Node) bool {
+	var (
+		p1 = left.path()
+		p2 = right.path()
+	)
+	for i := 0; i < len(p1) && i < len(p2); i++ {
+		if p1[i] > p2[i] {
+			return true
+		} else if p1[i] < p2[i] {
+			return false
+		}
+	}
+	return len(p1) > len(p2)
 }
 
 func apply(left, right []Item, do func(left, right float64) (float64, error)) (any, error) {
