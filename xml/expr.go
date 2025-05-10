@@ -722,12 +722,14 @@ func (b binary) find(ctx Context) ([]Item, error) {
 		if isEmpty(left) || isEmpty(right) {
 			return singleValue(false), nil
 		}
-		return isBefore(left[0].Node(), right[0].Node()), nil
+		ok := isBefore(left[0].Node(), right[0].Node())
+		return singleValue(ok), nil 
 	case opAfter:
 		if isEmpty(left) || isEmpty(right) {
 			return singleValue(false), nil
 		}
-		return isAfter(left[0].Node(), right[0].Node()), nil
+		ok := isAfter(left[0].Node(), right[0].Node())
+		return singleValue(ok), nil
 	default:
 		return nil, errImplemented
 	}
