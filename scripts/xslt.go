@@ -1075,11 +1075,24 @@ func executeWithParam(node, datum xml.Node, style *Stylesheet) (xml.Sequence, er
 	if err != nil {
 		return nil, err
 	}
-	value, err := getAttribute(el, "select")
-	if err != nil {
-		return nil, err
+	if query, err := getAttribute(el, "select"); err == nil {
+		style.EvalParam(ident, query, datum)
+	} else {
+		var res xml.Sequence
+		for _, n := range slices.Clone(el.Nodes) {
+			c := cloneNode(n)
+			if c == nil {
+				continue
+			}
+			seq, err := transformNode(c, datum, style)
+			if err != nil {
+				return nil, err
+			}
+			res = slices.Concat(res, seq)
+		}
+		style.DefineExprParam(ident, xml.NewValueFromSequence(res))
 	}
-	return nil, style.EvalParam(ident, value, datum)
+	return nil, removeSelf(node)
 }
 
 func executeApplyImport(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
