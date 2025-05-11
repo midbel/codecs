@@ -1302,9 +1302,7 @@ func (q quantified) find(ctx Context) (Sequence, error) {
 			return nil, err
 		}
 		for j, item := range items {
-			val := value{
-				item: item,
-			}
+			val := NewValue(item)
 			ctx.Environ.Define(q.binds[j].ident, val)
 		}
 		res, err := q.test.find(ctx)
@@ -1352,12 +1350,20 @@ func combine(list []binding, ctx Context) iter.Seq2[[]Item, error] {
 }
 
 type value struct {
-	item Item
+	seq Sequence
 }
 
 func NewValue(item Item) Expr {
+	seq := NewSequence()
+	seq.Append(item)
 	return value{
-		item: item,
+		seq: seq,
+	}
+}
+
+func NewValueFromSequence(seq Sequence) Expr {
+	return value{
+		seq: slices.Clone(seq),
 	}
 }
 
@@ -1378,7 +1384,7 @@ func (v value) MatchPriority() int {
 }
 
 func (v value) find(ctx Context) (Sequence, error) {
-	return []Item{v.item}, nil
+	return slices.Clone(v.seq), nil
 }
 
 type Type struct {

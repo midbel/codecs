@@ -180,6 +180,19 @@ type AttributeSet struct {
 	Attrs []xml.Attribute
 }
 
+type Context struct {
+	CurrentNode xml.Node
+	Index       int
+	Size        int
+	Mode        string
+
+	*Stylesheet
+
+	Vars     xml.Environ[xml.Expr]
+	Params   xml.Environ[xml.Expr]
+	Builtins xml.Environ[xml.BuiltinFunc]
+}
+
 type Stylesheet struct {
 	namespace   string
 	Mode        string
@@ -454,11 +467,11 @@ func (s *Stylesheet) loadTemplates(doc xml.Node) error {
 	return nil
 }
 
-func (s *Stylesheet) ExecuteQuery(query string, datum xml.Node) ([]xml.Item, error) {
+func (s *Stylesheet) ExecuteQuery(query string, datum xml.Node) (xml.Sequence, error) {
 	return s.ExecuteQueryWithNS(query, "", datum)
 }
 
-func (s *Stylesheet) ExecuteQueryWithNS(query, ns string, datum xml.Node) ([]xml.Item, error) {
+func (s *Stylesheet) ExecuteQueryWithNS(query, ns string, datum xml.Node) (xml.Sequence, error) {
 	if query == "" {
 		i := xml.NewNodeItem(datum)
 		return []xml.Item{i}, nil
@@ -470,7 +483,7 @@ func (s *Stylesheet) ExecuteQueryWithNS(query, ns string, datum xml.Node) ([]xml
 	return q.Find(datum)
 }
 
-func (s *Stylesheet) queryXSL(query string, datum xml.Node) ([]xml.Item, error) {
+func (s *Stylesheet) queryXSL(query string, datum xml.Node) (xml.Sequence, error) {
 	return s.ExecuteQueryWithNS(query, s.namespace, datum)
 }
 
@@ -907,14 +920,15 @@ func iterAVT(str string) iter.Seq2[string, bool] {
 }
 
 func transformNode(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
-	el, ok := node.(*xml.Element)
+	fmt.Println(node.QualifiedName())
+	elem, ok := node.(*xml.Element)
 	if !ok {
-		return nil, fmt.Errorf("node: xml element expected (got %T)", el)
+		return nil, fmt.Errorf("node: xml element expected (got %s)", elem.QualifiedName())
 	}
-	fn, ok := executers[el.QName]
+	fn, ok := executers[elem.QName]
 	if ok {
 		if fn == nil {
-			return nil, fmt.Errorf("%s not yet implemented", el.QName)
+			return nil, fmt.Errorf("%s not yet implemented", elem.QualifiedName())
 		}
 		return fn(node, datum, style)
 	}
@@ -923,13 +937,13 @@ func transformNode(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error
 
 func processNode(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
 	var (
-		el    = node.(*xml.Element)
-		nodes = slices.Clone(el.Nodes)
+		elem  = node.(*xml.Element)
+		nodes = slices.Clone(elem.Nodes)
 	)
 	if err := processAVT(node, datum, style); err != nil {
 		return nil, err
 	}
-	if ident, err := getAttribute(el, "use-attribute-sets"); err == nil {
+	if ident, err := getAttribute(elem, "use-attribute-sets"); err == nil {
 		ix := slices.IndexFunc(style.AttrSet, func(set *AttributeSet) bool {
 			return set.Name == ident
 		})
@@ -937,9 +951,9 @@ func processNode(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) 
 			return nil, fmt.Errorf("attribute-set not defined")
 		}
 		for _, a := range style.AttrSet[ix].Attrs {
-			el.SetAttribute(a)
+			elem.SetAttribute(a)
 		}
-		el.RemoveAttr(el.Attrs[ix].Position())
+		elem.RemoveAttr(elem.Attrs[ix].Position())
 	}
 	res := xml.NewSequence()
 	for i := range nodes {
@@ -1039,11 +1053,19 @@ func executeVariable(node, datum xml.Node, style *Stylesheet) (xml.Sequence, err
 		}
 		style.Define(ident, query)
 	} else {
-		if len(el.Nodes) != 1 {
-			return nil, fmt.Errorf("only one node expected")
+		var res xml.Sequence
+		for _, n := range slices.Clone(el.Nodes) {
+			c := cloneNode(n)
+			if c == nil {
+				continue
+			}
+			seq, err := transformNode(c, datum, style)
+			if err != nil {
+				return nil, err
+			}
+			res = slices.Concat(res, seq)
 		}
-		n := cloneNode(el.Nodes[0])
-		style.Define(ident, xml.NewValueFromNode(n))
+		style.Define(ident, xml.NewValueFromSequence(res))
 	}
 	return nil, removeSelf(node)
 }
@@ -1309,7 +1331,8 @@ func executeValueOf(node, datum xml.Node, style *Stylesheet) (xml.Sequence, erro
 		if i > 0 {
 			str.WriteString(sep)
 		}
-		str.WriteString(items[i].Node().Value())
+		v := items[i].Value().(string)
+		str.WriteString(v)
 	}
 	text := xml.NewText(str.String())
 	return nil, replaceNode(node, text)
@@ -1368,7 +1391,12 @@ func executeOnNotEmpty(node, datum xml.Node, style *Stylesheet) (xml.Sequence, e
 }
 
 func executeSequence(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
-	return nil, errImplemented
+	elem := node.(*xml.Element)
+	query, err := getAttribute(elem, "select")
+	if err != nil {
+		return nil, err
+	}
+	return style.ExecuteQuery(query, datum)
 }
 
 func executeElement(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
