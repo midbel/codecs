@@ -612,10 +612,7 @@ func (s Stylesheet) EvalParam(param, query string, datum xml.Node) error {
 	if err != nil {
 		return err
 	}
-	if len(items) != 1 {
-		return fmt.Errorf("invalid sequence")
-	}
-	s.DefineExprParam(param, xml.NewValue(items[0]))
+	s.DefineExprParam(param, xml.NewValueFromSequence(items))
 	return nil
 }
 
