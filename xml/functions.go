@@ -143,6 +143,8 @@ var builtins = []registeredBuiltin{
 	registerFunc("date", "xs", callDate),
 	registerFunc("decimal", "", callDecimal),
 	registerFunc("decimal", "xs", callDecimal),
+	registerFunc("doc", "fn", callDoc),
+	registerFunc("doc", "", callDoc),
 }
 
 var fileFuncs = []registeredBuiltin{
@@ -1294,6 +1296,28 @@ func callTrue(_ Context, _ []Expr) (Sequence, error) {
 
 func callFalse(_ Context, _ []Expr) (Sequence, error) {
 	return Singleton(false), nil
+}
+
+func callDoc(ctx Context, args []Expr) (Sequence, error) {
+	if len(args) != 0 {
+		return nil, errArgument
+	}
+	file, err := getStringFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	r, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+
+	p := NewParser(r)
+	n, err := p.Parse()
+	if err != nil {
+		return nil, err
+	}
+	return Singleton(n), nil
 }
 
 func getFloatFromExpr(expr Expr, ctx Context) (float64, error) {
