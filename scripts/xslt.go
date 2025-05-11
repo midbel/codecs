@@ -920,7 +920,6 @@ func iterAVT(str string) iter.Seq2[string, bool] {
 }
 
 func transformNode(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
-	fmt.Println(node.QualifiedName())
 	elem, ok := node.(*xml.Element)
 	if !ok {
 		return nil, fmt.Errorf("node: xml element expected (got %s)", elem.QualifiedName())

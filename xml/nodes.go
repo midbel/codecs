@@ -439,8 +439,8 @@ func (e *Element) RemoveNode(at int) error {
 		return fmt.Errorf("%s: removing node with bad index (%d - %d)", e.QualifiedName(), at, len(e.Nodes))
 	}
 	e.Nodes = slices.Delete(e.Nodes, at, at+1)
-	for i := range e.Nodes[at:] {
-		e.Nodes[i].setPosition(at + i)
+	for i := range e.Nodes {
+		e.Nodes[i].setPosition(i)
 	}
 	return nil
 }
