@@ -28,13 +28,13 @@ var (
 	ErrTerminate   = errors.New("terminate")
 )
 
-type executeFunc func(xml.Node, xml.Node, *Stylesheet) error
+type executeFunc func(xml.Node, xml.Node, *Stylesheet) (xml.Sequence, error)
 
 var executers map[xml.QName]executeFunc
 
 func init() {
 	wrap := func(exec executeFunc) executeFunc {
-		fn := func(node, datum xml.Node, sheet *Stylesheet) error {
+		fn := func(node, datum xml.Node, sheet *Stylesheet) (xml.Sequence, error) {
 			sheet.Enter()
 			defer sheet.Leave()
 
@@ -244,7 +244,7 @@ func includesSheet(sheet *Stylesheet, doc xml.Node) error {
 		return err
 	}
 	for _, i := range items {
-		err := executeInclude(i.Node(), doc, sheet)
+		_, err := executeInclude(i.Node(), doc, sheet)
 		if err != nil {
 			return err
 		}
@@ -258,7 +258,7 @@ func importsSheet(sheet *Stylesheet, doc xml.Node) error {
 		return err
 	}
 	for _, i := range items {
-		err := executeImport(i.Node(), doc, sheet)
+		_, err := executeImport(i.Node(), doc, sheet)
 		if err != nil {
 			return err
 		}
@@ -831,7 +831,8 @@ func (t *Template) Execute(datum xml.Node, style *Stylesheet) ([]xml.Node, error
 }
 
 func (t *Template) execute(current, datum xml.Node, style *Stylesheet) error {
-	return transformNode(current, datum, style)
+	_, err := transformNode(current, datum, style)
+	return err
 }
 
 func (t *Template) getData(datum xml.Node, style *Stylesheet) (xml.Node, error) {
@@ -849,19 +850,19 @@ func (t *Template) isRoot() bool {
 	return t.Match == "/"
 }
 
-func transformNode(node, datum xml.Node, style *Stylesheet) error {
+func transformNode(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
 	el, ok := node.(*xml.Element)
 	if !ok {
-		return fmt.Errorf("node: xml element expected (got %T)", el)
+		return nil, fmt.Errorf("node: xml element expected (got %T)", el)
 	}
 	fn, ok := executers[el.QName]
 	if ok {
 		if fn == nil {
-			return fmt.Errorf("%s not yet implemented", el.QName)
+			return nil, fmt.Errorf("%s not yet implemented", el.QName)
 		}
 		return fn(node, datum, style)
 	}
-	return processNode(node, datum, style)
+	return nil, processNode(node, datum, style)
 }
 
 func processAVT(node, datum xml.Node, style *Stylesheet) error {
@@ -944,7 +945,7 @@ func processNode(node, datum xml.Node, style *Stylesheet) error {
 		if nodes[i].Type() != xml.TypeElement {
 			continue
 		}
-		err := transformNode(nodes[i], datum, style)
+		_, err := transformNode(nodes[i], datum, style)
 		if err != nil {
 			return err
 		}
@@ -952,55 +953,55 @@ func processNode(node, datum xml.Node, style *Stylesheet) error {
 	return nil
 }
 
-func executeVariable(node, datum xml.Node, style *Stylesheet) error {
+func executeVariable(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
 	el := node.(*xml.Element)
 	ident, err := getAttribute(el, "name")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if value, err := getAttribute(el, "select"); err == nil {
 		query, err := style.CompileQuery(value)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		style.Define(ident, query)
 	} else {
 		if len(el.Nodes) != 1 {
-			return fmt.Errorf("only one node expected")
+			return nil, fmt.Errorf("only one node expected")
 		}
 		n := cloneNode(el.Nodes[0])
 		style.Define(ident, xml.NewValueFromNode(n))
 	}
-	return removeSelf(node)
+	return nil, removeSelf(node)
 }
 
-func executeImport(node, datum xml.Node, style *Stylesheet) error {
+func executeImport(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
 	el := node.(*xml.Element)
 	file, err := getAttribute(el, "href")
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return style.ImportSheet(file)
+	return nil, style.ImportSheet(file)
 }
 
-func executeInclude(node, datum xml.Node, style *Stylesheet) error {
+func executeInclude(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
 	el := node.(*xml.Element)
 	file, err := getAttribute(el, "href")
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return style.IncludeSheet(file)
+	return nil, style.IncludeSheet(file)
 }
 
-func executeSourceDocument(node, datum xml.Node, style *Stylesheet) error {
+func executeSourceDocument(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
 	el := node.(*xml.Element)
 	file, err := getAttribute(el, "href")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	doc, err := loadDocument(filepath.Join(style.Context, file))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var nodes []xml.Node
 	for _, n := range slices.Clone(el.Nodes) {
@@ -1008,15 +1009,15 @@ func executeSourceDocument(node, datum xml.Node, style *Stylesheet) error {
 		if c == nil {
 			continue
 		}
-		if err := transformNode(n, doc, style); err != nil {
-			return err
+		if _, err := transformNode(n, doc, style); err != nil {
+			return nil, err
 		}
 		nodes = append(nodes, c)
 	}
-	return insertNodes(el, nodes...)
+	return nil, insertNodes(el, nodes...)
 }
 
-func executeResultDocument(node, datum xml.Node, style *Stylesheet) error {
+func executeResultDocument(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
 	el := node.(*xml.Element)
 
 	var doc xml.Document
@@ -1025,24 +1026,24 @@ func executeResultDocument(node, datum xml.Node, style *Stylesheet) error {
 		if c == nil {
 			continue
 		}
-		if err := transformNode(c, datum, style); err != nil {
-			return err
+		if _, err := transformNode(c, datum, style); err != nil {
+			return nil, err
 		}
 		doc.Nodes = append(doc.Nodes, c)
 	}
 
 	file, err := getAttribute(el, "href")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	format, _ := getAttribute(el, "format")
 	if err := writeDocument(file, format, &doc, style); err != nil {
-		return err
+		return nil, err
 	}
 	if err := removeSelf(node); err != nil {
-		return err
+		return nil, err
 	}
-	return errSkip
+	return nil, errSkip
 }
 
 func writeDocument(file, format string, doc *xml.Document, style *Stylesheet) error {
@@ -1057,13 +1058,13 @@ func writeDocument(file, format string, doc *xml.Document, style *Stylesheet) er
 
 type matchFunc func(xml.Node, string) (*Template, error)
 
-func executeApply(node, datum xml.Node, style *Stylesheet, match matchFunc) error {
+func executeApply(node, datum xml.Node, style *Stylesheet, match matchFunc) (xml.Sequence, error) {
 	nodes, err := getNodesForTemplate(node, datum, style)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if len(nodes) == 0 {
-		return removeNode(node, node)
+		return nil, removeNode(node, node)
 	}
 	var (
 		el      = node.(*xml.Element)
@@ -1075,13 +1076,13 @@ func executeApply(node, datum xml.Node, style *Stylesheet, match matchFunc) erro
 		if err != nil {
 			for i := range nodes {
 				if err = style.whenTemplateNotFound(err, mode, node, nodes[i]); err != nil {
-					return err
+					return nil, err
 				}
 			}
-			return err
+			return nil, err
 		}
 		if err := applyParams(node, datum, style); err != nil {
-			return err
+			return nil, err
 		}
 		frag := tpl.Fragment.(*xml.Element)
 		for _, n := range slices.Clone(frag.Nodes) {
@@ -1089,44 +1090,44 @@ func executeApply(node, datum xml.Node, style *Stylesheet, match matchFunc) erro
 			if c == nil {
 				continue
 			}
-			if err := transformNode(c, datum, style); err != nil {
-				return err
+			if _, err := transformNode(c, datum, style); err != nil {
+				return nil, err
 			}
 			results = append(results, c)
 		}
 	}
-	return insertNodes(node, results...)
+	return nil, insertNodes(node, results...)
 }
 
-func executeApplyImport(node, datum xml.Node, style *Stylesheet) error {
+func executeApplyImport(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
 	return executeApply(node, datum, style, style.MatchImport)
 }
 
-func executeApplyTemplates(node, datum xml.Node, style *Stylesheet) error {
+func executeApplyTemplates(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
 	return executeApply(node, datum, style, style.Match)
 }
 
-func executeCallTemplate(node, datum xml.Node, style *Stylesheet) error {
+func executeCallTemplate(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
 	el := node.(*xml.Element)
 	name, err := getAttribute(el, "name")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	mode, _ := getAttribute(el, "mode")
 	tpl, err := style.Find(name, mode)
 	if err != nil {
-		return style.whenTemplateNotFound(err, mode, node, datum)
+		return nil, style.whenTemplateNotFound(err, mode, node, datum)
 	}
 
 	if err := applyParams(node, datum, style); err != nil {
-		return err
+		return nil, err
 	}
 
 	nodes, err := tpl.Execute(datum, style)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return insertNodes(el, nodes...)
+	return nil, insertNodes(el, nodes...)
 }
 
 func getNodesForTemplate(node, datum xml.Node, style *Stylesheet) ([]xml.Node, error) {
@@ -1154,7 +1155,7 @@ func applyParams(node, datum xml.Node, style *Stylesheet) error {
 		if n.QualifiedName() != style.getQualifiedName("with-param") {
 			return fmt.Errorf("%s: invalid child node %s", node.QualifiedName(), n.QualifiedName())
 		}
-		if err := transformNode(n, datum, style); err != nil {
+		if _, err := transformNode(n, datum, style); err != nil {
 			return err
 		}
 	}
@@ -1185,146 +1186,146 @@ func applySort(node xml.Node, items []xml.Item, style *Stylesheet) (iter.Seq[xml
 	return foreachItems(items, query, order)
 }
 
-func executeWithParam(node, datum xml.Node, style *Stylesheet) error {
+func executeWithParam(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
 	el := node.(*xml.Element)
 	ident, err := getAttribute(el, "name")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	value, err := getAttribute(el, "select")
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return style.EvalParam(ident, value, datum)
+	return nil, style.EvalParam(ident, value, datum)
 }
 
-func executeTry(node, datum xml.Node, style *Stylesheet) error {
+func executeTry(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
 	el := node.(*xml.Element)
 	items, err := style.queryXSL("./catch[last()]", node)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if len(items) > 1 {
-		return fmt.Errorf("only one catch element is allowed")
+		return nil, fmt.Errorf("only one catch element is allowed")
 	}
 	if err := processNode(el, datum, style); err != nil {
 		if len(items) > 0 {
 			catch := items[0].Node()
 			if err := removeNode(node, catch); err != nil {
-				return err
+				return nil, err
 			}
 			style.Enter()
 			defer style.Leave()
-			return processNode(catch, datum, style)
+			return nil, processNode(catch, datum, style)
 		}
-		return err
+		return nil, err
 	}
-	return nil
+	return nil, nil
 }
 
-func executeWherePopulated(node, datum xml.Node, style *Stylesheet) error {
-	return errImplemented
+func executeWherePopulated(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
+	return nil, errImplemented
 }
 
-func executeOnEmpty(node, datum xml.Node, style *Stylesheet) error {
-	return errImplemented
+func executeOnEmpty(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
+	return nil, errImplemented
 }
 
-func executeOnNotEmpty(node, datum xml.Node, style *Stylesheet) error {
-	return errImplemented
+func executeOnNotEmpty(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
+	return nil, errImplemented
 }
 
-func executeIf(node, datum xml.Node, style *Stylesheet) error {
+func executeIf(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
 	el := node.(*xml.Element)
 	test, err := getAttribute(el, "test")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	ok, err := style.TestNode(test, datum)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !ok {
-		return removeSelf(el)
+		return nil, removeSelf(el)
 	}
 	if err = processNode(node, datum, style); err != nil {
-		return err
+		return nil, err
 	}
-	return insertNodes(el, el.Nodes...)
+	return nil, insertNodes(el, el.Nodes...)
 }
 
-func executeChoose(node, datum xml.Node, style *Stylesheet) error {
+func executeChoose(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
 	items, err := style.queryXSL("/when", datum)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	for i := range items {
 		n := items[i].Node().(*xml.Element)
 		test, err := getAttribute(n, "test")
 		if err != nil {
-			return err
+			return nil, err
 		}
 		ok, err := style.TestNode(test, datum)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if ok {
 			if err := processNode(n, datum, style); err != nil {
-				return err
+				return nil, err
 			}
 			var (
 				pt = n.Parent()
 				gp = pt.Parent()
 			)
 			if i, ok := gp.(interface{ InsertNodes(int, []xml.Node) error }); ok {
-				return i.InsertNodes(pt.Position(), n.Nodes)
+				return nil, i.InsertNodes(pt.Position(), n.Nodes)
 			}
-			return nil
+			return nil, nil
 		}
 	}
 
 	if items, err = style.queryXSL("otherwise", node); err != nil {
-		return err
+		return nil, err
 	}
 	if len(items) == 0 {
-		return nil
+		return nil, nil
 	}
 	n := items[0].Node().(*xml.Element)
 	if err := processNode(n, datum, style); err != nil {
-		return err
+		return nil, err
 	}
 	var (
 		pt = n.Parent()
 		gp = pt.Parent()
 	)
 	if i, ok := gp.(interface{ InsertNodes(int, []xml.Node) error }); ok {
-		return i.InsertNodes(pt.Position(), n.Nodes)
+		return nil, i.InsertNodes(pt.Position(), n.Nodes)
 	}
-	return nil
+	return nil, nil
 }
 
-func executeForeach(node, datum xml.Node, style *Stylesheet) error {
+func executeForeach(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
 	el := node.(*xml.Element)
 	query, err := getAttribute(el, "select")
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	items, err := style.ExecuteQuery(query, datum)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if len(items) == 0 {
-		return removeSelf(node)
+		return nil, removeSelf(node)
 	}
 	it, err := applySort(node, items, style)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	parent, ok := node.Parent().(*xml.Element)
 	if !ok {
-		return fmt.Errorf("for-each: xml element expected as parent")
+		return nil, fmt.Errorf("for-each: xml element expected as parent")
 	}
 	for i := range it {
 		value := i.Node()
@@ -1334,12 +1335,12 @@ func executeForeach(node, datum xml.Node, style *Stylesheet) error {
 				continue
 			}
 			parent.Append(c)
-			if err := transformNode(c, value, style); err != nil {
-				return err
+			if _, err := transformNode(c, value, style); err != nil {
+				return nil, err
 			}
 		}
 	}
-	return removeSelf(node)
+	return nil, removeSelf(node)
 }
 
 func foreachItems(items []xml.Item, orderBy, orderDir string) (iter.Seq[xml.Item], error) {
@@ -1383,11 +1384,11 @@ func foreachItems(items []xml.Item, orderBy, orderDir string) (iter.Seq[xml.Item
 	return fn, nil
 }
 
-func executeValueOf(node, datum xml.Node, style *Stylesheet) error {
+func executeValueOf(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
 	el := node.(*xml.Element)
 	query, err := getAttribute(el, "select")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	sep, err := getAttribute(el, "separator")
 	if err != nil {
@@ -1395,7 +1396,7 @@ func executeValueOf(node, datum xml.Node, style *Stylesheet) error {
 	}
 	items, err := style.ExecuteQuery(query, datum)
 	if err != nil || len(items) == 0 {
-		return removeSelf(node)
+		return nil, removeSelf(node)
 	}
 
 	var str strings.Builder
@@ -1406,22 +1407,22 @@ func executeValueOf(node, datum xml.Node, style *Stylesheet) error {
 		str.WriteString(items[i].Node().Value())
 	}
 	text := xml.NewText(str.String())
-	return replaceNode(node, text)
+	return nil, replaceNode(node, text)
 }
 
-func executeCopy(node, datum xml.Node, style *Stylesheet) error {
+func executeCopy(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
 	return executeCopyOf(node, datum, style)
 }
 
-func executeCopyOf(node, datum xml.Node, style *Stylesheet) error {
+func executeCopyOf(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
 	el := node.(*xml.Element)
 	query, err := getAttribute(el, "select")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	items, err := style.ExecuteQuery(query, datum)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var list []xml.Node
 	for i := range items {
@@ -1430,14 +1431,14 @@ func executeCopyOf(node, datum xml.Node, style *Stylesheet) error {
 			list = append(list, c)
 		}
 	}
-	return insertNodes(el, list...)
+	return nil, insertNodes(el, list...)
 }
 
-func executeSequence(node, datum xml.Node, style *Stylesheet) error {
-	return errImplemented
+func executeSequence(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
+	return nil, errImplemented
 }
 
-func executeMessage(node, datum xml.Node, style *Stylesheet) error {
+func executeMessage(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
 	var (
 		parts []string
 		el    = node.(*xml.Element)
@@ -1448,27 +1449,27 @@ func executeMessage(node, datum xml.Node, style *Stylesheet) error {
 	fmt.Fprintln(os.Stderr, strings.Join(parts, ""))
 
 	if quit, err := getAttribute(el, "terminate"); err == nil && quit == "yes" {
-		return ErrTerminate
+		return nil, ErrTerminate
 	}
-	return nil
+	return nil, nil
 }
 
-func executeElement(node, datum xml.Node, style *Stylesheet) error {
+func executeElement(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
 	el := node.(*xml.Element)
 	ident, err := getAttribute(el, "name")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	qn, err := xml.ParseName(ident)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var (
 		curr  = xml.NewElement(qn)
 		nodes = slices.Clone(el.Nodes)
 	)
 	if err := replaceNode(el, curr); err != nil {
-		return err
+		return nil, err
 	}
 	for i := range nodes {
 		c := cloneNode(nodes[i])
@@ -1476,60 +1477,60 @@ func executeElement(node, datum xml.Node, style *Stylesheet) error {
 			continue
 		}
 		curr.Append(c)
-		if err := transformNode(c, datum, style); err != nil {
-			return err
+		if _, err := transformNode(c, datum, style); err != nil {
+			return nil, err
 		}
 	}
-	return nil
+	return nil, nil
 }
 
-func executeAttribute(node, datum xml.Node, style *Stylesheet) error {
-	return errImplemented
+func executeAttribute(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
+	return nil, errImplemented
 }
 
-func executeText(node, datum xml.Node, style *Stylesheet) error {
+func executeText(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
 	text := xml.NewText(node.Value())
-	return replaceNode(node, text)
+	return nil, replaceNode(node, text)
 }
 
-func executeComment(node, datum xml.Node, style *Stylesheet) error {
+func executeComment(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
 	comment := xml.NewComment(node.Value())
-	return replaceNode(node, comment)
+	return nil, replaceNode(node, comment)
 }
 
-func executeFallback(node, datum xml.Node, style *Stylesheet) error {
-	return errImplemented
+func executeFallback(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
+	return nil, errImplemented
 }
 
-func executeForeachGroup(node, datum xml.Node, style *Stylesheet) error {
+func executeForeachGroup(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
 	el := node.(*xml.Element)
 	query, err := getAttribute(el, "select")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	parent, ok := el.Parent().(*xml.Element)
 	if !ok {
-		return fmt.Errorf("for-each-group: xml element expected as parent")
+		return nil, fmt.Errorf("for-each-group: xml element expected as parent")
 	}
 
 	items, err := style.ExecuteQuery(query, datum)
 	if err != nil || len(items) == 0 {
-		return err
+		return nil, err
 	}
 
 	key, err := getAttribute(el, "group-by")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	grpby, err := style.CompileQuery(key)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	groups := make(map[string][]xml.Item)
 	for i := range items {
 		is, err := grpby.Find(items[i].Node())
 		if err != nil {
-			return err
+			return nil, err
 		}
 		key := is[0].Value().(string)
 		groups[key] = append(groups[key], items[i])
@@ -1554,16 +1555,16 @@ func executeForeachGroup(node, datum xml.Node, style *Stylesheet) error {
 				continue
 			}
 			parent.Append(c)
-			if err := transformNode(c, datum, style); err != nil {
-				return err
+			if _, err := transformNode(c, datum, style); err != nil {
+				return nil, err
 			}
 		}
 	}
-	return removeSelf(node)
+	return nil, removeSelf(node)
 }
 
-func executeMerge(node, datum xml.Node, style *Stylesheet) error {
-	return errImplemented
+func executeMerge(node, datum xml.Node, style *Stylesheet) (xml.Sequence, error) {
+	return nil, errImplemented
 }
 
 func isTrue(items []xml.Item) bool {
