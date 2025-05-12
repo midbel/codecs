@@ -29,12 +29,12 @@ var (
 	ErrTerminate   = errors.New("terminate")
 )
 
-type executeFunc func(xml.Node, xml.Node, *Stylesheet) (xml.Sequence, error)
+type ExecuteFunc func(xml.Node, xml.Node, *Stylesheet) (xml.Sequence, error)
 
-var executers map[xml.QName]executeFunc
+var executers map[xml.QName]ExecuteFunc
 
 func init() {
-	wrap := func(exec executeFunc) executeFunc {
+	wrap := func(exec ExecuteFunc) ExecuteFunc {
 		fn := func(node, datum xml.Node, sheet *Stylesheet) (xml.Sequence, error) {
 			sheet.Enter()
 			defer sheet.Leave()
@@ -43,7 +43,7 @@ func init() {
 		}
 		return fn
 	}
-	executers = map[xml.QName]executeFunc{
+	executers = map[xml.QName]ExecuteFunc{
 		xml.QualifiedName("for-each", xsltNamespacePrefix):        wrap(executeForeach),
 		xml.QualifiedName("value-of", xsltNamespacePrefix):        executeValueOf,
 		xml.QualifiedName("call-template", xsltNamespacePrefix):   wrap(executeCallTemplate),
@@ -221,7 +221,6 @@ type Stylesheet struct {
 	Templates []*Template
 
 	Context  string
-	Imported bool
 	Others   []*Stylesheet
 }
 
@@ -290,6 +289,19 @@ func importsSheet(sheet *Stylesheet, doc xml.Node) error {
 		}
 	}
 	return nil
+}
+
+func (s *Stylesheet) createContext(node xml.Node) *Context {
+	ctx := Context{
+		CurrentNode: node,
+		Size:        1,
+		Index:       1,
+		Stylesheet:  s,
+		Vars:        xml.Enclosed[xml.Expr](s.vars),
+		Params:      xml.Enclosed[xml.Expr](s.params),
+		Builtins:    xml.Enclosed[xml.BuiltinFunc](s.builtins),
+	}
+	return &ctx
 }
 
 func (s *Stylesheet) loadAttributeSet(doc xml.Node) error {
@@ -525,14 +537,6 @@ func (s *Stylesheet) TestNode(query string, datum xml.Node) (bool, error) {
 	return isTrue(items), nil
 }
 
-func (s *Stylesheet) Generate(w io.Writer, doc *xml.Document) error {
-	result, err := s.Execute(doc)
-	if err != nil {
-		return err
-	}
-	return s.writeDocument(w, "", result.(*xml.Document))
-}
-
 func (s *Stylesheet) writeDocument(w io.Writer, format string, doc *xml.Document) error {
 	var (
 		writer  = xml.NewWriter(w)
@@ -555,7 +559,6 @@ func (s *Stylesheet) ImportSheet(file string) error {
 	if err != nil {
 		return err
 	}
-	other.Imported = true
 	s.Others = append(s.Others, other)
 	return nil
 }
@@ -760,6 +763,14 @@ func (s *Stylesheet) getMode(mode string) *Mode {
 		return &unnamedMode
 	}
 	return s.Modes[ix]
+}
+
+func (s *Stylesheet) Generate(w io.Writer, doc *xml.Document) error {
+	result, err := s.Execute(doc)
+	if err != nil {
+		return err
+	}
+	return s.writeDocument(w, "", result.(*xml.Document))
 }
 
 func (s *Stylesheet) Execute(doc xml.Node) (xml.Node, error) {
