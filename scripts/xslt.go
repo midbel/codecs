@@ -189,9 +189,19 @@ type Context struct {
 
 	*Stylesheet
 
-	Vars     xml.Environ[xml.Expr]
-	Params   xml.Environ[xml.Expr]
-	Builtins xml.Environ[xml.BuiltinFunc]
+	// Vars     xml.Environ[xml.Expr]
+	// Params   xml.Environ[xml.Expr]
+	// Builtins xml.Environ[xml.BuiltinFunc]
+}
+
+func (c *Context) Sub(node xml.Node) *Context {
+	child := Context{
+		CurrentNode: node,
+		Index:       1,
+		Mode:        1,
+		Stylesheet:  c.Stylesheet,
+	}
+	return &child
 }
 
 type Stylesheet struct {
