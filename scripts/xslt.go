@@ -189,9 +189,9 @@ type Context struct {
 
 	*Stylesheet
 
-	// Vars     xml.Environ[xml.Expr]
-	// Params   xml.Environ[xml.Expr]
-	// Builtins xml.Environ[xml.BuiltinFunc]
+	Vars     xml.Environ[xml.Expr]
+	Params   xml.Environ[xml.Expr]
+	Builtins xml.Environ[xml.BuiltinFunc]
 }
 
 func (c *Context) Sub(node xml.Node) *Context {
@@ -200,6 +200,8 @@ func (c *Context) Sub(node xml.Node) *Context {
 		Index:       1,
 		Mode:        1,
 		Stylesheet:  c.Stylesheet,
+		Vars:        xml.Enclosed[xml.Expr](c.Vars),
+		Params:      xml.Enclosed[xml.Expr](c.Params),
 	}
 	return &child
 }
