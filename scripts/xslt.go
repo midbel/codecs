@@ -198,7 +198,7 @@ func (c *Context) Sub(node xml.Node) *Context {
 	child := Context{
 		CurrentNode: node,
 		Index:       1,
-		Mode:        1,
+		Size:        1,
 		Stylesheet:  c.Stylesheet,
 		Vars:        xml.Enclosed[xml.Expr](c.Vars),
 		Params:      xml.Enclosed[xml.Expr](c.Params),
@@ -878,11 +878,11 @@ func processAVT(node, datum xml.Node, style *Stylesheet) error {
 	for i, a := range el.Attrs {
 		var (
 			value = a.Value()
-			parts []string
+			str   strings.Builder
 		)
 		for q, ok := range iterAVT(value) {
 			if !ok {
-				parts = append(parts, q)
+				str.WriteString(q)
 				continue
 			}
 			items, err := style.ExecuteQuery(q, datum)
@@ -890,11 +890,10 @@ func processAVT(node, datum xml.Node, style *Stylesheet) error {
 				return err
 			}
 			for i := range items {
-				v := items[i].Value().(string)
-				parts = append(parts, v)
+				str.WriteString(toString(items[i]))
 			}
 		}
-		el.Attrs[i].Datum = strings.Join(parts, "")
+		el.Attrs[i].Datum = str.String()
 	}
 	return nil
 }
@@ -1353,19 +1352,7 @@ func executeValueOf(node, datum xml.Node, style *Stylesheet) (xml.Sequence, erro
 		if i > 0 {
 			str.WriteString(sep)
 		}
-		var v string
-		switch x := items[i].Value().(type) {
-		case time.Time:
-			v = x.Format("2006-01-02")
-		case float64:
-			v = strconv.FormatFloat(x, 'f', -1, 64)
-		case []byte:
-		case string:
-			v = x
-		default:
-			continue
-		}
-		str.WriteString(v)
+		str.WriteString(toString(items[i]))
 	}
 	text := xml.NewText(str.String())
 	return nil, replaceNode(node, text)
@@ -1749,4 +1736,19 @@ func insertNodes(elem xml.Node, nodes ...xml.Node) error {
 		return fmt.Errorf("nodes can not be inserted to parent element of %s", elem.QualifiedName())
 	}
 	return i.InsertNodes(elem.Position(), nodes)
+}
+
+func toString(item xml.Item) string {
+	var v string
+	switch x := item.Value().(type) {
+	case time.Time:
+		v = x.Format("2006-01-02")
+	case float64:
+		v = strconv.FormatFloat(x, 'f', -1, 64)
+	case []byte:
+	case string:
+		v = x
+	default:
+	}
+	return v
 }
