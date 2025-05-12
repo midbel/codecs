@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/midbel/codecs/xml"
 )
@@ -1340,7 +1341,18 @@ func executeValueOf(node, datum xml.Node, style *Stylesheet) (xml.Sequence, erro
 		if i > 0 {
 			str.WriteString(sep)
 		}
-		v := items[i].Value().(string)
+		var v string
+		switch x := items[i].Value().(type) {
+		case time.Time:
+			v = x.Format("2006-01-02")
+		case float64:
+			v = strconv.FormatFloat(x, 'f', -1, 64)
+		case []byte:
+		case string:
+			v = x
+		default:
+			continue
+		}
 		str.WriteString(v)
 	}
 	text := xml.NewText(str.String())
@@ -1518,7 +1530,7 @@ func getNodesForTemplate(node, datum xml.Node, style *Stylesheet) ([]xml.Node, e
 
 func applyParams(node, datum xml.Node, style *Stylesheet) error {
 	el := node.(*xml.Element)
-	for _, n := range el.Nodes {
+	for _, n := range slices.Clone(el.Nodes) {
 		if n.QualifiedName() != style.getQualifiedName("with-param") {
 			return fmt.Errorf("%s: invalid child node %s", node.QualifiedName(), n.QualifiedName())
 		}
