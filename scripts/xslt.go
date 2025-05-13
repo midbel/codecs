@@ -258,6 +258,7 @@ func (c *Context) Resolve(ident string) (xml.Expr, error) {
 		return expr, nil
 	}
 	expr, err = c.Params.Resolve(ident)
+	fmt.Println(">>>>>>> Context.Resolve", ident, expr)
 	if err == nil {
 		return expr, nil
 	}
@@ -278,9 +279,14 @@ func (c *Context) DefineParam(param, value string) error {
 }
 
 func (c *Context) EvalParam(param, query string, datum xml.Node) error {
+	fmt.Println(param, query, xml.WriteNode(datum))
 	items, err := c.ExecuteQuery(query, datum)
 	if err != nil {
 		return err
+	}
+	fmt.Println(">>>>", param)
+	for i := range items {
+		fmt.Println(">> value: ", items[i].Value())
 	}
 	c.DefineExprParam(param, xml.NewValueFromSequence(items))
 	return nil
@@ -288,6 +294,35 @@ func (c *Context) EvalParam(param, query string, datum xml.Node) error {
 
 func (c *Context) DefineExprParam(param string, expr xml.Expr) {
 	c.Params.Define(param, expr)
+}
+
+func (c *Context) prepare(tpl *Template) error {
+	el := tpl.Fragment.(*xml.Element)
+	if el == nil {
+		return fmt.Errorf("template: fragment expected xml element")
+	}
+	for _, n := range slices.Clone(el.Nodes) {
+		if n.QualifiedName() != c.getQualifiedName("param") {
+			break
+		}
+		e := n.(*xml.Element)
+		if e == nil {
+			continue
+		}
+		ident, err := getAttribute(e, "name")
+		if err != nil {
+			return err
+		}
+		if value, err := getAttribute(e, "select"); err == nil {
+			if err := c.DefineParam(ident, value); err != nil {
+				return err
+			}
+		}
+		if err := removeSelf(n); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type Stylesheet struct {
@@ -721,7 +756,6 @@ func (s *Stylesheet) Find(name, mode string) (*Template, error) {
 		return nil, fmt.Errorf("template %s not found", name)
 	}
 	tpl := s.Templates[ix].Clone()
-	s.prepare(tpl)
 	return tpl, nil
 }
 
@@ -754,7 +788,7 @@ func (s *Stylesheet) getMatchingTemplates(list []*Template, node xml.Node, mode 
 			return m2.Priority - m1.Priority
 		})
 		tpl := results[0].Template.Clone()
-		s.prepare(tpl)
+		// s.prepare(tpl)
 		return tpl, nil
 	}
 	return nil, fmt.Errorf("no template found matching given node (%s)", node.QualifiedName())
@@ -845,35 +879,6 @@ func (s *Stylesheet) Execute(doc xml.Node) (xml.Node, error) {
 	return nil, err
 }
 
-func (s *Stylesheet) prepare(tpl *Template) error {
-	el := tpl.Fragment.(*xml.Element)
-	if el == nil {
-		return fmt.Errorf("template: fragment expected xml element")
-	}
-	for _, n := range slices.Clone(el.Nodes) {
-		if n.QualifiedName() != s.getQualifiedName("param") {
-			break
-		}
-		e := n.(*xml.Element)
-		if e == nil {
-			continue
-		}
-		ident, err := getAttribute(e, "name")
-		if err != nil {
-			return err
-		}
-		if value, err := getAttribute(e, "select"); err == nil {
-			if err := s.DefineParam(ident, value); err != nil {
-				return err
-			}
-		}
-		if err := removeSelf(n); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 type Template struct {
 	Name     string
 	Match    string
@@ -890,17 +895,19 @@ func (t *Template) Clone() *Template {
 }
 
 func (t *Template) Execute(ctx *Context) ([]xml.Node, error) {
+	if err := ctx.prepare(t); err != nil {
+		return nil, err
+	}
 	values, err := t.getData(ctx)
 	if err != nil {
 		return nil, err
 	}
-	el, ok := t.Fragment.(*xml.Element)
-	if !ok {
-		return nil, fmt.Errorf("template: xml element expected")
-	}
 	var nodes []xml.Node
 	for i := range values {
-		sub := ctx.Sub(values[i])		
+		var (
+			sub = ctx.Sub(values[i])
+			el  = t.Fragment.(*xml.Element)
+		)
 		for _, n := range slices.Clone(el.Nodes) {
 			c := cloneNode(n)
 			if c == nil {
@@ -1073,7 +1080,7 @@ func executeSourceDocument(ctx *Context, node xml.Node) (xml.Sequence, error) {
 	}
 	var (
 		nodes []xml.Node
-		sub = ctx.Sub(doc)
+		sub   = ctx.Sub(doc)
 	)
 	for _, n := range slices.Clone(el.Nodes) {
 		c := cloneNode(n)
@@ -1192,7 +1199,6 @@ func executeCallTemplate(ctx *Context, node xml.Node) (xml.Sequence, error) {
 	if err != nil {
 		return nil, ctx.whenTemplateNotFound(err, mode, node, ctx.CurrentNode)
 	}
-
 	if err := applyParams(ctx, node); err != nil {
 		return nil, err
 	}
@@ -1402,6 +1408,7 @@ func executeChoose(ctx *Context, node xml.Node) (xml.Sequence, error) {
 func executeValueOf(ctx *Context, node xml.Node) (xml.Sequence, error) {
 	el := node.(*xml.Element)
 	query, err := getAttribute(el, "select")
+	fmt.Println("value-of", ctx.CurrentNode.QualifiedName(), node.QualifiedName(), query)
 	if err != nil {
 		return nil, err
 	}
@@ -1410,6 +1417,7 @@ func executeValueOf(ctx *Context, node xml.Node) (xml.Sequence, error) {
 		sep = " "
 	}
 	items, err := ctx.ExecuteQuery(query, ctx.CurrentNode)
+	fmt.Println(">>>", items)
 	if err != nil || len(items) == 0 {
 		return nil, removeSelf(node)
 	}
@@ -1656,16 +1664,22 @@ func executeApply(ctx *Context, node xml.Node, match matchFunc) (xml.Sequence, e
 			}
 			return nil, err
 		}
+		if err := ctx.prepare(tpl); err != nil {
+			return nil, err
+		}
 		if err := applyParams(ctx, node); err != nil {
 			return nil, err
 		}
-		frag := tpl.Fragment.(*xml.Element)
+		var (
+			frag = tpl.Fragment.(*xml.Element)
+			sub  = ctx.Sub(datum)
+		)
 		for _, n := range slices.Clone(frag.Nodes) {
 			c := cloneNode(n)
 			if c == nil {
 				continue
 			}
-			if _, err := transformNode(ctx, c); err != nil {
+			if _, err := transformNode(sub, c); err != nil {
 				return nil, err
 			}
 			results = append(results, c)
