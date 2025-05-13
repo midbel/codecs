@@ -107,7 +107,7 @@ func main() {
 	sheet.Mode = *mode
 
 	for ident, expr := range params {
-		sheet.DefineExprParam(ident, expr)
+		sheet.SetParam(ident, expr)
 	}
 
 	var w io.Writer = os.Stdout
@@ -205,6 +205,89 @@ func (c *Context) Sub(node xml.Node) *Context {
 		Params:      xml.Enclosed[xml.Expr](c.Params),
 	}
 	return &child
+}
+
+func (c *Context) ExecuteQuery(query string, datum xml.Node) (xml.Sequence, error) {
+	return c.ExecuteQueryWithNS(query, "", datum)
+}
+
+func (c *Context) ExecuteQueryWithNS(query, ns string, datum xml.Node) (xml.Sequence, error) {
+	if query == "" {
+		i := xml.NewNodeItem(datum)
+		return []xml.Item{i}, nil
+	}
+	q, err := c.CompileQueryWithNS(query, ns)
+	if err != nil {
+		return nil, err
+	}
+	return q.Find(datum)
+}
+
+func (c *Context) queryXSL(query string, datum xml.Node) (xml.Sequence, error) {
+	return s.ExecuteQueryWithNS(query, c.namespace, datum)
+}
+
+func (c *Context) CompileQuery(query string) (xml.Expr, error) {
+	return c.CompileQueryWithNS(query, "")
+}
+
+func (c *Context) CompileQueryWithNS(query, ns string) (xml.Expr, error) {
+	q, err := xml.Build(query)
+	if err != nil {
+		return nil, err
+	}
+	q.Environ = c
+	q.Builtins = xml.DefaultBuiltin()
+	if ns != "" {
+		q.UseNamespace(ns)
+	}
+	return q, nil
+}
+
+func (c *Context) TestNode(query string, datum xml.Node) (bool, error) {
+	items, err := c.ExecuteQuery(query, datum)
+	if err != nil {
+		return false, err
+	}
+	return isTrue(items), nil
+}
+
+func (c *Context) Resolve(ident string) (xml.Expr, error) {
+	expr, err := s.vars.Resolve(ident)
+	if err == nil {
+		return expr, nil
+	}
+	expr, err = s.params.Resolve(ident)
+	if err == nil {
+		return expr, nil
+	}
+	return c.resolve(ident)
+}
+
+func (c *Context) Define(param string, expr xml.Expr) {
+	c.Vars.Define(param, expr)
+}
+
+func (c *Context) DefineParam(param, value string) error {
+	expr, err := c.CompileQuery(value)
+	if err != nil {
+		return err
+	}
+	c.DefineExprParam(param, expr)
+	return nil
+}
+
+func (c *Context) EvalParam(param, query string, datum xml.Node) error {
+	items, err := c.ExecuteQuery(query, datum)
+	if err != nil {
+		return err
+	}
+	c.DefineExprParam(param, xml.NewValueFromSequence(items))
+	return nil
+}
+
+func (c *Context) DefineExprParam(param string, expr xml.Expr) {
+	c.Params.Define(param, expr)
 }
 
 type Stylesheet struct {
@@ -579,21 +662,11 @@ func (s *Stylesheet) IncludeSheet(file string) error {
 	return nil
 }
 
-func (s *Stylesheet) Enter() {
-	s.vars = xml.Enclosed[xml.Expr](s.vars)
-	s.params = xml.Enclosed[xml.Expr](s.params)
+func (s *Stylesheet) SetParam(ident string, expr xml.Expr) {
+	s.params.Define(ident, expr)
 }
 
-func (s *Stylesheet) Leave() {
-	if u, ok := s.vars.(interface{ Unwrap() xml.Environ[xml.Expr] }); ok {
-		s.vars = u.Unwrap()
-	}
-	if u, ok := s.params.(interface{ Unwrap() xml.Environ[xml.Expr] }); ok {
-		s.params = u.Unwrap()
-	}
-}
-
-func (s *Stylesheet) Resolve(ident string) (xml.Expr, error) {
+func (s *Stylesheet) resolve(ident string) (xml.Expr, error) {
 	expr, err := s.vars.Resolve(ident)
 	if err == nil {
 		return expr, nil
@@ -603,38 +676,12 @@ func (s *Stylesheet) Resolve(ident string) (xml.Expr, error) {
 		return expr, nil
 	}
 	for i := range s.Others {
-		e, err := s.Others[i].Resolve(ident)
+		e, err := s.Others[i].resolve(ident)
 		if err == nil {
 			return e, nil
 		}
 	}
-	return nil, nil
-}
-
-func (s *Stylesheet) Define(param string, expr xml.Expr) {
-	s.vars.Define(param, expr)
-}
-
-func (s *Stylesheet) DefineParam(param, value string) error {
-	expr, err := s.CompileQuery(value)
-	if err != nil {
-		return err
-	}
-	s.DefineExprParam(param, expr)
-	return nil
-}
-
-func (s Stylesheet) EvalParam(param, query string, datum xml.Node) error {
-	items, err := s.ExecuteQuery(query, datum)
-	if err != nil {
-		return err
-	}
-	s.DefineExprParam(param, xml.NewValueFromSequence(items))
-	return nil
-}
-
-func (s *Stylesheet) DefineExprParam(param string, expr xml.Expr) {
-	s.params.Define(param, expr)
+	return nil, err
 }
 
 func (s *Stylesheet) GetOutput(name string) *OutputSettings {
