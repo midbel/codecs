@@ -29,17 +29,14 @@ var (
 	ErrTerminate   = errors.New("terminate")
 )
 
-type ExecuteFunc func(xml.Node, xml.Node, *Stylesheet) (xml.Sequence, error)
+type ExecuteFunc func(*Context, xml.Node) (xml.Sequence, error)
 
 var executers map[xml.QName]ExecuteFunc
 
 func init() {
 	wrap := func(exec ExecuteFunc) ExecuteFunc {
-		fn := func(node, datum xml.Node, sheet *Stylesheet) (xml.Sequence, error) {
-			sheet.Enter()
-			defer sheet.Leave()
-
-			return exec(node, datum, sheet)
+		fn := func(ctx *Context, node xml.Node) (xml.Sequence, error) {
+			return exec(ctx.Self(), node)
 		}
 		return fn
 	}
@@ -192,6 +189,10 @@ type Context struct {
 	Vars     xml.Environ[xml.Expr]
 	Params   xml.Environ[xml.Expr]
 	Builtins xml.Environ[xml.BuiltinFunc]
+}
+
+func (c *Context) Self() *Context {
+	return c.Sub(c.CurrentNode)
 }
 
 func (c *Context) Sub(node xml.Node) *Context {
