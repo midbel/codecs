@@ -48,7 +48,7 @@ func init() {
 		xml.QualifiedName("apply-imports", xsltNamespacePrefix):   wrap(executeApplyImport),
 		xml.QualifiedName("if", xsltNamespacePrefix):              wrap(executeIf),
 		xml.QualifiedName("choose", xsltNamespacePrefix):          wrap(executeChoose),
-		xml.QualifiedName("where-populated", xsltNamespacePrefix): executeWithParam,
+		xml.QualifiedName("where-populated", xsltNamespacePrefix): executeWherePopulated,
 		xml.QualifiedName("on-empty", xsltNamespacePrefix):        executeOnEmpty,
 		xml.QualifiedName("on-not-empty", xsltNamespacePrefix):    executeOnNotEmpty,
 		xml.QualifiedName("try", xsltNamespacePrefix):             wrap(executeTry),
@@ -328,14 +328,6 @@ func (c *Context) Sub(node xml.Node) *Context {
 		Env:         c.Env.Sub(),
 	}
 	return &child
-}
-
-func (c *Context) Resolve(ident string) (xml.Expr, error) {
-	expr, err := c.Env.Resolve(ident)
-	if err == nil {
-		return expr, nil
-	}
-	return c.resolve(ident)
 }
 
 func (c *Context) prepare(tpl *Template) error {
@@ -1180,15 +1172,27 @@ func executeCallTemplate(ctx *Context, node xml.Node) (xml.Sequence, error) {
 	if err != nil {
 		return nil, ctx.whenTemplateNotFound(err, mode, node, ctx.CurrentNode)
 	}
+	if err := ctx.prepare(tpl); err != nil {
+		return nil, err
+	}
 	if err := applyParams(ctx, node); err != nil {
 		return nil, err
 	}
-
-	nodes, err := tpl.Execute(ctx)
-	if err != nil {
-		return nil, err
+	var (
+		parent = node.Parent().(*xml.Element)
+		frag   = cloneNode(tpl.Fragment).(*xml.Element)
+	)
+	for _, n := range slices.Clone(frag.Nodes) {
+		c := cloneNode(n)
+		if c == nil {
+			continue
+		}
+		parent.Append(c)
+		if _, err := transformNode(ctx, c); err != nil {
+			return nil, err
+		}
 	}
-	return nil, insertNodes(el, nodes...)
+	return nil, removeSelf(node)
 }
 
 func executeForeachGroup(ctx *Context, node xml.Node) (xml.Sequence, error) {
@@ -1643,16 +1647,14 @@ func executeApply(ctx *Context, node xml.Node, match matchFunc) (xml.Sequence, e
 			}
 			return nil, err
 		}
-		if err := ctx.prepare(tpl); err != nil {
+		sub := ctx.Sub(datum)
+		if err := sub.prepare(tpl); err != nil {
 			return nil, err
 		}
-		if err := applyParams(ctx, node); err != nil {
+		if err := applyParams(sub, node); err != nil {
 			return nil, err
 		}
-		var (
-			frag = tpl.Fragment.(*xml.Element)
-			sub  = ctx.Sub(datum)
-		)
+		frag := tpl.Fragment.(*xml.Element)
 		for _, n := range slices.Clone(frag.Nodes) {
 			c := cloneNode(n)
 			if c == nil {
