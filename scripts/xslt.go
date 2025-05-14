@@ -178,6 +178,133 @@ type AttributeSet struct {
 	Attrs []xml.Attribute
 }
 
+type Env struct {
+	other    Resolver
+	Vars     xml.Environ[xml.Expr]
+	Params   xml.Environ[xml.Expr]
+	Builtins xml.Environ[xml.BuiltinFunc]
+}
+
+type Resolver interface {
+	Resolve(string) (xml.Expr, error)
+}
+
+func Empty() *Env {
+	return Enclosed(nil)
+}
+
+func Enclosed(other Resolver) *Env {
+	return &Env{
+		other:    other,
+		Vars:     xml.Empty[xml.Expr](),
+		Params:   xml.Empty[xml.Expr](),
+		Builtins: xml.DefaultBuiltin(),
+	}
+}
+
+func (e *Env) Sub() *Env {
+	return &Env{
+		other:  e.other,
+		Vars:   xml.Enclosed[xml.Expr](e.Vars),
+		Params: xml.Enclosed[xml.Expr](e.Params),
+	}
+}
+
+func (e *Env) ExecuteQuery(query string, datum xml.Node) (xml.Sequence, error) {
+	return e.ExecuteQueryWithNS(query, "", datum)
+}
+
+func (e *Env) ExecuteQueryWithNS(query, namespace string, datum xml.Node) (xml.Sequence, error) {
+	if query == "" {
+		i := xml.NewNodeItem(datum)
+		return []xml.Item{i}, nil
+	}
+	q, err := e.CompileQueryWithNS(query, namespace)
+	if err != nil {
+		return nil, err
+	}
+	return q.Find(datum)
+}
+
+func (e *Env) queryXSL(query string, datum xml.Node) (xml.Sequence, error) {
+	return e.ExecuteQueryWithNS(query, "xsl", datum)
+}
+
+func (e *Env) CompileQuery(query string) (xml.Expr, error) {
+	return e.CompileQueryWithNS(query, "")
+}
+
+func (e *Env) CompileQueryWithNS(query, namespace string) (xml.Expr, error) {
+	q, err := xml.Build(query)
+	if err != nil {
+		return nil, err
+	}
+	q.Environ = e
+	q.Builtins = xml.DefaultBuiltin()
+	if namespace != "" {
+		q.UseNamespace(namespace)
+	}
+	return q, nil
+}
+
+func (e *Env) TestNode(query string, datum xml.Node) (bool, error) {
+	items, err := e.ExecuteQuery(query, datum)
+	if err != nil {
+		return false, err
+	}
+	return isTrue(items), nil
+}
+
+func (e *Env) Merge(other *Env) {
+	if m, ok := e.Vars.(interface{ Merge(xml.Environ[xml.Expr]) }); ok {
+		m.Merge(other.Vars)
+	}
+	if m, ok := e.Params.(interface{ Merge(xml.Environ[xml.Expr]) }); ok {
+		m.Merge(other.Params)
+	}
+}
+
+func (e *Env) Resolve(ident string) (xml.Expr, error) {
+	expr, err := e.Vars.Resolve(ident)
+	if err == nil {
+		return expr, nil
+	}
+	expr, err = e.Params.Resolve(ident)
+	if err == nil {
+		return expr, nil
+	}
+	if e.other != nil {
+		return e.other.Resolve(ident)
+	}
+	return nil, err
+}
+
+func (e *Env) Define(param string, expr xml.Expr) {
+	e.Vars.Define(param, expr)
+}
+
+func (e *Env) DefineParam(param, value string) error {
+	expr, err := e.CompileQuery(value)
+	if err != nil {
+		return err
+	}
+	e.DefineExprParam(param, expr)
+	return nil
+}
+
+func (e *Env) EvalParam(param, query string, datum xml.Node) error {
+	items, err := e.ExecuteQuery(query, datum)
+	if err != nil {
+		return err
+	}
+	e.DefineExprParam(param, xml.NewValueFromSequence(items))
+	return nil
+}
+
+func (e *Env) DefineExprParam(param string, expr xml.Expr) {
+	e.Params.Define(param, expr)
+}
+
 type Context struct {
 	CurrentNode xml.Node
 	Index       int
@@ -185,10 +312,7 @@ type Context struct {
 	Mode        string
 
 	*Stylesheet
-
-	Vars     xml.Environ[xml.Expr]
-	Params   xml.Environ[xml.Expr]
-	Builtins xml.Environ[xml.BuiltinFunc]
+	*Env
 }
 
 func (c *Context) Self() *Context {
@@ -201,99 +325,17 @@ func (c *Context) Sub(node xml.Node) *Context {
 		Index:       1,
 		Size:        1,
 		Stylesheet:  c.Stylesheet,
-		Vars:        xml.Enclosed[xml.Expr](c.Vars),
-		Params:      xml.Enclosed[xml.Expr](c.Params),
+		Env:         c.Env.Sub(),
 	}
 	return &child
 }
 
-func (c *Context) ExecuteQuery(query string, datum xml.Node) (xml.Sequence, error) {
-	return c.ExecuteQueryWithNS(query, "", datum)
-}
-
-func (c *Context) ExecuteQueryWithNS(query, ns string, datum xml.Node) (xml.Sequence, error) {
-	if query == "" {
-		i := xml.NewNodeItem(datum)
-		return []xml.Item{i}, nil
-	}
-	q, err := c.CompileQueryWithNS(query, ns)
-	if err != nil {
-		return nil, err
-	}
-	return q.Find(datum)
-}
-
-func (c *Context) queryXSL(query string, datum xml.Node) (xml.Sequence, error) {
-	return c.ExecuteQueryWithNS(query, c.namespace, datum)
-}
-
-func (c *Context) CompileQuery(query string) (xml.Expr, error) {
-	return c.CompileQueryWithNS(query, "")
-}
-
-func (c *Context) CompileQueryWithNS(query, ns string) (xml.Expr, error) {
-	q, err := xml.Build(query)
-	if err != nil {
-		return nil, err
-	}
-	q.Environ = c
-	q.Builtins = xml.DefaultBuiltin()
-	if ns != "" {
-		q.UseNamespace(ns)
-	}
-	return q, nil
-}
-
-func (c *Context) TestNode(query string, datum xml.Node) (bool, error) {
-	items, err := c.ExecuteQuery(query, datum)
-	if err != nil {
-		return false, err
-	}
-	return isTrue(items), nil
-}
-
 func (c *Context) Resolve(ident string) (xml.Expr, error) {
-	expr, err := c.Vars.Resolve(ident)
-	if err == nil {
-		return expr, nil
-	}
-	expr, err = c.Params.Resolve(ident)
-	fmt.Println(">>>>>>> Context.Resolve", ident, expr)
+	expr, err := c.Env.Resolve(ident)
 	if err == nil {
 		return expr, nil
 	}
 	return c.resolve(ident)
-}
-
-func (c *Context) Define(param string, expr xml.Expr) {
-	c.Vars.Define(param, expr)
-}
-
-func (c *Context) DefineParam(param, value string) error {
-	expr, err := c.CompileQuery(value)
-	if err != nil {
-		return err
-	}
-	c.DefineExprParam(param, expr)
-	return nil
-}
-
-func (c *Context) EvalParam(param, query string, datum xml.Node) error {
-	fmt.Println(param, query, xml.WriteNode(datum))
-	items, err := c.ExecuteQuery(query, datum)
-	if err != nil {
-		return err
-	}
-	fmt.Println(">>>>", param)
-	for i := range items {
-		fmt.Println(">> value: ", items[i].Value())
-	}
-	c.DefineExprParam(param, xml.NewValueFromSequence(items))
-	return nil
-}
-
-func (c *Context) DefineExprParam(param string, expr xml.Expr) {
-	c.Params.Define(param, expr)
 }
 
 func (c *Context) prepare(tpl *Template) error {
@@ -332,12 +374,9 @@ type Stylesheet struct {
 	Modes       []*Mode
 	AttrSet     []*AttributeSet
 
-	vars     xml.Environ[xml.Expr]
-	params   xml.Environ[xml.Expr]
-	builtins xml.Environ[xml.BuiltinFunc]
-
 	output    []*OutputSettings
 	Templates []*Template
+	*Env
 
 	Context string
 	Others  []*Stylesheet
@@ -352,12 +391,10 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 		contextDir = filepath.Dir(file)
 	}
 	sheet := Stylesheet{
-		vars:        xml.Empty[xml.Expr](),
-		params:      xml.Empty[xml.Expr](),
-		builtins:    xml.DefaultBuiltin(),
 		Context:     contextDir,
 		currentMode: &unnamedMode,
 		namespace:   xsltNamespacePrefix,
+		Env:         Empty(),
 	}
 	if err := sheet.init(doc); err != nil {
 		return nil, err
@@ -418,9 +455,7 @@ func (s *Stylesheet) createContext(node xml.Node) *Context {
 		Size:        1,
 		Index:       1,
 		Stylesheet:  s,
-		Vars:        xml.Enclosed[xml.Expr](s.vars),
-		Params:      xml.Enclosed[xml.Expr](s.params),
-		Builtins:    xml.Enclosed[xml.BuiltinFunc](s.builtins),
+		Env:         Enclosed(s),
 	}
 	return &ctx
 }
@@ -509,13 +544,13 @@ func (s *Stylesheet) loadParams(doc xml.Node) error {
 			if err != nil {
 				return err
 			}
-			s.params.Define(ident, expr)
+			s.Define(ident, expr)
 		} else {
 			if len(n.Nodes) != 1 {
 				return fmt.Errorf("only one node expected")
 			}
 			n := cloneNode(n.Nodes[0])
-			s.params.Define(ident, xml.NewValueFromNode(n))
+			s.Define(ident, xml.NewValueFromNode(n))
 		}
 	}
 	return nil
@@ -613,51 +648,6 @@ func (s *Stylesheet) loadTemplates(doc xml.Node) error {
 	return nil
 }
 
-func (s *Stylesheet) ExecuteQuery(query string, datum xml.Node) (xml.Sequence, error) {
-	return s.ExecuteQueryWithNS(query, "", datum)
-}
-
-func (s *Stylesheet) ExecuteQueryWithNS(query, ns string, datum xml.Node) (xml.Sequence, error) {
-	if query == "" {
-		i := xml.NewNodeItem(datum)
-		return []xml.Item{i}, nil
-	}
-	q, err := s.CompileQueryWithNS(query, ns)
-	if err != nil {
-		return nil, err
-	}
-	return q.Find(datum)
-}
-
-func (s *Stylesheet) queryXSL(query string, datum xml.Node) (xml.Sequence, error) {
-	return s.ExecuteQueryWithNS(query, s.namespace, datum)
-}
-
-func (s *Stylesheet) CompileQuery(query string) (xml.Expr, error) {
-	return s.CompileQueryWithNS(query, "")
-}
-
-func (s *Stylesheet) CompileQueryWithNS(query, ns string) (xml.Expr, error) {
-	q, err := xml.Build(query)
-	if err != nil {
-		return nil, err
-	}
-	q.Environ = s.vars
-	q.Builtins = xml.DefaultBuiltin()
-	if ns != "" {
-		q.UseNamespace(ns)
-	}
-	return q, nil
-}
-
-func (s *Stylesheet) TestNode(query string, datum xml.Node) (bool, error) {
-	items, err := s.ExecuteQuery(query, datum)
-	if err != nil {
-		return false, err
-	}
-	return isTrue(items), nil
-}
-
 func (s *Stylesheet) writeDocument(w io.Writer, format string, doc *xml.Document) error {
 	var (
 		writer  = xml.NewWriter(w)
@@ -690,25 +680,16 @@ func (s *Stylesheet) IncludeSheet(file string) error {
 		return err
 	}
 	s.Templates = append(s.Templates, other.Templates...)
-	if m, ok := s.vars.(interface{ Merge(xml.Environ[xml.Expr]) }); ok {
-		m.Merge(other.vars)
-	}
-	if m, ok := s.params.(interface{ Merge(xml.Environ[xml.Expr]) }); ok {
-		m.Merge(other.params)
-	}
+	s.Env.Merge(other.Env)
 	return nil
 }
 
 func (s *Stylesheet) SetParam(ident string, expr xml.Expr) {
-	s.params.Define(ident, expr)
+	s.Env.DefineExprParam(ident, expr)
 }
 
 func (s *Stylesheet) resolve(ident string) (xml.Expr, error) {
-	expr, err := s.vars.Resolve(ident)
-	if err == nil {
-		return expr, nil
-	}
-	expr, err = s.params.Resolve(ident)
+	expr, err := s.Env.Resolve(ident)
 	if err == nil {
 		return expr, nil
 	}
@@ -1408,7 +1389,6 @@ func executeChoose(ctx *Context, node xml.Node) (xml.Sequence, error) {
 func executeValueOf(ctx *Context, node xml.Node) (xml.Sequence, error) {
 	el := node.(*xml.Element)
 	query, err := getAttribute(el, "select")
-	fmt.Println("value-of", ctx.CurrentNode.QualifiedName(), node.QualifiedName(), query)
 	if err != nil {
 		return nil, err
 	}
@@ -1417,7 +1397,6 @@ func executeValueOf(ctx *Context, node xml.Node) (xml.Sequence, error) {
 		sep = " "
 	}
 	items, err := ctx.ExecuteQuery(query, ctx.CurrentNode)
-	fmt.Println(">>>", items)
 	if err != nil || len(items) == 0 {
 		return nil, removeSelf(node)
 	}

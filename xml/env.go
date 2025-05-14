@@ -43,7 +43,7 @@ func (e *Env[T]) Resolve(ident string) (T, error) {
 		return e.parent.Resolve(ident)
 	}
 	var t T
-	return t, fmt.Errorf("%s: %w", ErrDefined)
+	return t, fmt.Errorf("%s: %w", ident, ErrDefined)
 }
 
 func (e *Env[T]) Unwrap() Environ[T] {
