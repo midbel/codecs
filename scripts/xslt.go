@@ -909,7 +909,7 @@ func (t *Template) Execute(ctx *Context) ([]xml.Node, error) {
 		if c == nil {
 			continue
 		}
-		if err := t.execute(ctx, c); err != nil {
+		if _, err := transformNode(ctx, c); err != nil {
 			if errors.Is(err, errSkip) {
 				continue
 			}
@@ -924,11 +924,6 @@ func (t *Template) createContext(other *Context, node xml.Node) *Context {
 	other = other.Sub(node)
 	other.Env.Merge(t.env)
 	return other
-}
-
-func (t *Template) execute(ctx *Context, node xml.Node) error {
-	_, err := transformNode(ctx, node)
-	return err
 }
 
 func (t *Template) isRoot() bool {
