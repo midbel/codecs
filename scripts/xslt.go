@@ -631,6 +631,28 @@ func (s *Stylesheet) IncludeSheet(file string) error {
 	return nil
 }
 
+func (s *Stylesheet) SetAttributes(node xml.Node) error {
+	elem := node.(*xml.Element)
+	if elem == nil {
+		return nil
+	}
+	ident, err := getAttribute(elem, "use-attribute-sets")
+	if err != nil {
+		return nil
+	}
+	ix := slices.IndexFunc(s.AttrSet, func(set *AttributeSet) bool {
+		return set.Name == ident
+	})
+	if ix < 0 {
+		return fmt.Errorf("%s: attribute set not found", ident)
+	}
+	for _, a := range s.AttrSet[ix].Attrs {
+		elem.SetAttribute(a)
+	}
+	elem.RemoveAttr(elem.Attrs[ix].Position())
+	return nil
+}
+
 func (s *Stylesheet) SetParam(ident string, expr xml.Expr) {
 	s.Env.DefineExprParam(ident, expr)
 }
@@ -991,17 +1013,8 @@ func processNode(ctx *Context, node xml.Node) (xml.Sequence, error) {
 	if err := processAVT(ctx, node); err != nil {
 		return nil, err
 	}
-	if ident, err := getAttribute(elem, "use-attribute-sets"); err == nil {
-		ix := slices.IndexFunc(ctx.AttrSet, func(set *AttributeSet) bool {
-			return set.Name == ident
-		})
-		if ix < 0 {
-			return nil, fmt.Errorf("attribute-set not defined")
-		}
-		for _, a := range ctx.AttrSet[ix].Attrs {
-			elem.SetAttribute(a)
-		}
-		elem.RemoveAttr(elem.Attrs[ix].Position())
+	if err := ctx.SetAttributes(node); err != nil {
+		return nil, err
 	}
 	res := xml.NewSequence()
 	for i := range nodes {
