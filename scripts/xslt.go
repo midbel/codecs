@@ -379,14 +379,14 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 	if err != nil {
 		return nil, err
 	}
-	if contextDir == "" {
-		contextDir = filepath.Dir(file)
-	}
 	sheet := Stylesheet{
 		Context:     contextDir,
 		currentMode: &unnamedMode,
 		namespace:   xsltNamespacePrefix,
 		Env:         Empty(),
+	}
+	if sheet.contextDir == "" {
+		sheet.contextDir = filepath.Dir(file)
 	}
 
 	root := doc.Root().(*xml.Element)
