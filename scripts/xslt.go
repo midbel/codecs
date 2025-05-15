@@ -331,6 +331,34 @@ func (c *Context) Sub(node xml.Node) *Context {
 	return &child
 }
 
+func (c *Context) NotFound(node xml.Node, err error, mode string) error {
+	var tmp xml.Node
+	switch mode := c.getMode(mode); mode.NoMatch {
+	case MatchDeepCopy:
+		tmp = cloneNode(c.CurrentNode)
+	case MatchShallowCopy:
+		qn, err := xml.ParseName(c.CurrentNode.QualifiedName())
+		if err != nil {
+			return err
+		}
+		tmp = xml.NewElement(qn)
+		if el, ok := c.CurrentNode.(*xml.Element); ok {
+			a := tmp.(*xml.Element)
+			for i := range el.Attrs {
+				a.SetAttribute(el.Attrs[i])
+			}
+			tmp = a
+		}
+	case MatchTextOnlyCopy:
+		tmp = xml.NewText(c.CurrentNode.Value())
+	case MatchFail:
+		return err
+	default:
+		return err
+	}
+	return replaceNode(node, tmp)
+}
+
 type Stylesheet struct {
 	namespace   string
 	Mode        string
@@ -760,34 +788,6 @@ func (s *Stylesheet) Match(node xml.Node, mode string) (*Template, error) {
 	return s.MatchImport(node, mode)
 }
 
-func (s *Stylesheet) whenTemplateNotFound(err error, mode string, node, datum xml.Node) error {
-	var tmp xml.Node
-	switch mode := s.getMode(mode); mode.NoMatch {
-	case MatchDeepCopy:
-		tmp = cloneNode(datum)
-	case MatchShallowCopy:
-		qn, err := xml.ParseName(datum.QualifiedName())
-		if err != nil {
-			return err
-		}
-		tmp = xml.NewElement(qn)
-		if el, ok := datum.(*xml.Element); ok {
-			a := tmp.(*xml.Element)
-			for i := range el.Attrs {
-				a.SetAttribute(el.Attrs[i])
-			}
-			tmp = a
-		}
-	case MatchTextOnlyCopy:
-		tmp = xml.NewText(datum.Value())
-	case MatchFail:
-		return err
-	default:
-		return err
-	}
-	return replaceNode(node, tmp)
-}
-
 func (s *Stylesheet) getMode(mode string) *Mode {
 	ix := slices.IndexFunc(s.Modes, func(m *Mode) bool {
 		return m.Name == mode
@@ -1177,7 +1177,7 @@ func executeCallTemplate(ctx *Context, node xml.Node) (xml.Sequence, error) {
 	mode, _ := getAttribute(el, "mode")
 	tpl, err := ctx.Find(name, mode)
 	if err != nil {
-		return nil, ctx.whenTemplateNotFound(err, mode, node, ctx.CurrentNode)
+		return nil, ctx.NotFound(node, err, mode)
 	}
 	sub := tpl.createContext(ctx, ctx.CurrentNode)
 	if err := applyParams(sub, node); err != nil {
@@ -1643,7 +1643,8 @@ func executeApply(ctx *Context, node xml.Node, match matchFunc) (xml.Sequence, e
 		tpl, err := match(datum, mode)
 		if err != nil {
 			for i := range nodes {
-				if err = ctx.whenTemplateNotFound(err, mode, node, nodes[i]); err != nil {
+				sub := ctx.Sub(nodes[i])
+				if err = sub.NotFound(node, err, mode); err != nil {
 					return nil, err
 				}
 			}
