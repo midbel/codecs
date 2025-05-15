@@ -268,7 +268,6 @@ func (e *Env) Merge(other *Env) {
 }
 
 func (e *Env) Resolve(ident string) (xml.Expr, error) {
-	fmt.Println("Env.Resolve", ident)
 	expr, err := e.Vars.Resolve(ident)
 	if err == nil {
 		return expr, nil
@@ -793,12 +792,15 @@ func (s *Stylesheet) Execute(doc xml.Node) (xml.Node, error) {
 		return nil, fmt.Errorf("main template not found")
 	}
 
-	if d, ok := doc.(*xml.Document); ok {
-		doc = d.Root()
-	}
+	// if d, ok := doc.(*xml.Document); ok {
+	// 	doc = d.Root()
+	// }
 
-	ctx := s.createContext(doc)
-	root, err := s.Templates[ix].Execute(ctx)
+	var (
+		tpl = s.Templates[ix]
+		ctx = s.createContext(doc)
+	)
+	root, err := tpl.Execute(ctx)
 	if err == nil {
 		var doc xml.Document
 		doc.Nodes = append(doc.Nodes, root...)
@@ -879,16 +881,13 @@ func (t *Template) Clone() *Template {
 }
 
 func (t *Template) Execute(ctx *Context) ([]xml.Node, error) {
-	var (
-		nodes []xml.Node
-		sub   = ctx.Sub(ctx.CurrentNode)
-	)
+	var nodes []xml.Node
 	for _, n := range slices.Clone(t.Nodes) {
 		c := cloneNode(n)
 		if c == nil {
 			continue
 		}
-		if err := t.execute(sub, c); err != nil {
+		if err := t.execute(ctx, c); err != nil {
 			if errors.Is(err, errSkip) {
 				continue
 			}
@@ -899,8 +898,10 @@ func (t *Template) Execute(ctx *Context) ([]xml.Node, error) {
 	return nodes, nil
 }
 
-func (t *Template) createContext(other *Context) (*Context) {
-	return nil
+func (t *Template) createContext(other *Context, node xml.Node) *Context {
+	other = other.Sub(node)
+	other.Env.Merge(t.env)
+	return other
 }
 
 func (t *Template) execute(ctx *Context, node xml.Node) error {
@@ -1165,8 +1166,7 @@ func executeCallTemplate(ctx *Context, node xml.Node) (xml.Sequence, error) {
 	if err != nil {
 		return nil, ctx.whenTemplateNotFound(err, mode, node, ctx.CurrentNode)
 	}
-	sub := ctx.Self()
-	sub.Merge(tpl.env)
+	sub := tpl.createContext(ctx, ctx.CurrentNode)
 	if err := applyParams(sub, node); err != nil {
 		return nil, err
 	}
@@ -1560,10 +1560,8 @@ func getNodesForTemplate(ctx *Context, node xml.Node) ([]xml.Node, error) {
 		el  = node.(*xml.Element)
 		res []xml.Node
 	)
-	fmt.Println(">>>", el.QualifiedName())
-	if value, err := getAttribute(el, "select"); err == nil {
-		items, err := ctx.ExecuteQuery(value, ctx.CurrentNode)
-		fmt.Println(value, len(items), ctx.CurrentNode.QualifiedName())
+	if query, err := getAttribute(el, "select"); err == nil {
+		items, err := ctx.ExecuteQuery(query, ctx.CurrentNode)
 		if err != nil {
 			return nil, err
 		}
@@ -1638,21 +1636,15 @@ func executeApply(ctx *Context, node xml.Node, match matchFunc) (xml.Sequence, e
 			}
 			return nil, err
 		}
-		sub := ctx.Sub(datum)
-		sub.Merge(tpl.env)
+		sub := tpl.createContext(ctx, datum)
 		if err := applyParams(sub, node); err != nil {
 			return nil, err
 		}
-		for _, n := range slices.Clone(tpl.Nodes) {
-			c := cloneNode(n)
-			if c == nil {
-				continue
-			}
-			if _, err := transformNode(sub, c); err != nil {
-				return nil, err
-			}
-			results = append(results, c)
+		res, err := tpl.Execute(sub)
+		if err != nil {
+			return nil, err
 		}
+		results = slices.Concat(results, res)
 	}
 	return nil, insertNodes(node, results...)
 }
