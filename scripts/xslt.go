@@ -178,15 +178,16 @@ type AttributeSet struct {
 	Attrs []xml.Attribute
 }
 
+type Resolver interface {
+	Resolve(string) (xml.Expr, error)
+}
+
 type Env struct {
 	other    Resolver
+	Namespace string
 	Vars     xml.Environ[xml.Expr]
 	Params   xml.Environ[xml.Expr]
 	Builtins xml.Environ[xml.BuiltinFunc]
-}
-
-type Resolver interface {
-	Resolve(string) (xml.Expr, error)
 }
 
 func Empty() *Env {
@@ -205,8 +206,10 @@ func Enclosed(other Resolver) *Env {
 func (e *Env) Sub() *Env {
 	return &Env{
 		other:  e.other,
+		Namespace: e.Namespace,
 		Vars:   xml.Enclosed[xml.Expr](e.Vars),
 		Params: xml.Enclosed[xml.Expr](e.Params),
+		Builtins: e.Builtins,
 	}
 }
 
@@ -227,7 +230,7 @@ func (e *Env) ExecuteQueryWithNS(query, namespace string, datum xml.Node) (xml.S
 }
 
 func (e *Env) queryXSL(query string, datum xml.Node) (xml.Sequence, error) {
-	return e.ExecuteQueryWithNS(query, "xsl", datum)
+	return e.ExecuteQueryWithNS(query, e.Namespace, datum)
 }
 
 func (e *Env) CompileQuery(query string) (xml.Expr, error) {
@@ -240,7 +243,7 @@ func (e *Env) CompileQueryWithNS(query, namespace string) (xml.Expr, error) {
 		return nil, err
 	}
 	q.Environ = e
-	q.Builtins = xml.DefaultBuiltin()
+	q.Builtins = e.Builtins
 	if namespace != "" {
 		q.UseNamespace(namespace)
 	}
@@ -285,20 +288,18 @@ func (e *Env) Define(param string, expr xml.Expr) {
 
 func (e *Env) DefineParam(param, value string) error {
 	expr, err := e.CompileQuery(value)
-	if err != nil {
-		return err
+	if err == nil {
+		e.DefineExprParam(param, expr)
 	}
-	e.DefineExprParam(param, expr)
-	return nil
+	return err
 }
 
 func (e *Env) EvalParam(param, query string, datum xml.Node) error {
 	items, err := e.ExecuteQuery(query, datum)
-	if err != nil {
-		return err
+	if err == nil {
+		e.DefineExprParam(param, xml.NewValueFromSequence(items))
 	}
-	e.DefineExprParam(param, xml.NewValueFromSequence(items))
-	return nil
+	return err
 }
 
 func (e *Env) DefineExprParam(param string, expr xml.Expr) {
@@ -388,9 +389,6 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 		namespace:   xsltNamespacePrefix,
 		Env:         Empty(),
 	}
-	if err := sheet.init(doc); err != nil {
-		return nil, err
-	}
 
 	root := doc.Root().(*xml.Element)
 	if root != nil {
@@ -399,6 +397,7 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 			return n.Uri == xsltNamespaceUri
 		})
 		if ix >= 0 {
+			sheet.Env.Namespace = all[ix].Prefix
 			sheet.namespace = all[ix].Prefix
 			for e, fn := range executers {
 				delete(executers, e)
@@ -408,6 +407,9 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 		}
 	}
 
+	if err := sheet.init(doc); err != nil {
+		return nil, err
+	}
 	return &sheet, nil
 }
 
@@ -442,12 +444,14 @@ func importsSheet(sheet *Stylesheet, doc xml.Node) error {
 }
 
 func (s *Stylesheet) createContext(node xml.Node) *Context {
+	env := Enclosed(s)
+	env.Namespace = s.namespace
 	ctx := Context{
 		CurrentNode: node,
 		Size:        1,
 		Index:       1,
 		Stylesheet:  s,
-		Env:         Enclosed(s),
+		Env:         env,
 	}
 	return &ctx
 }
