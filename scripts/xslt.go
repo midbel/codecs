@@ -385,8 +385,8 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 		namespace:   xsltNamespacePrefix,
 		Env:         Empty(),
 	}
-	if sheet.contextDir == "" {
-		sheet.contextDir = filepath.Dir(file)
+	if sheet.Context == "" {
+		sheet.Context = filepath.Dir(file)
 	}
 
 	root := doc.Root().(*xml.Element)
@@ -872,24 +872,7 @@ func NewTemplate(node xml.Node) (*Template, error) {
 			tpl.Nodes = append(tpl.Nodes, elem.Nodes[i:]...)
 			break
 		}
-		el := n.(*xml.Element)
-		if el == nil {
-			return nil, fmt.Errorf("expected xml element for param")
-		}
-		ident, err := getAttribute(el, "name")
-		if err != nil {
-			return nil, err
-		}
-		if query, err := getAttribute(el, "select"); err == nil {
-			err = tpl.env.DefineParam(ident, query)
-		} else {
-			var seq xml.Sequence
-			for i := range el.Nodes {
-				seq.Append(xml.NewNodeItem(el.Nodes[i]))
-			}
-			tpl.env.DefineExprParam(ident, xml.NewValueFromSequence(seq))
-		}
-		if err != nil {
+		if err := processParam(n, tpl.env); err != nil {
 			return nil, err
 		}
 	}
@@ -998,6 +981,27 @@ func transformNode(ctx *Context, node xml.Node) (xml.Sequence, error) {
 		return fn(ctx, node)
 	}
 	return processNode(ctx, node)
+}
+
+func processParam(node xml.Node, env *Env) error {
+	elem, ok := node.(*xml.Element)
+	if !ok {
+		return fmt.Errorf("xml element expected")
+	}
+	ident, err := getAttribute(elem, "name")
+	if err != nil {
+		return err
+	}
+	if query, err := getAttribute(elem, "select"); err == nil {
+		err = env.DefineParam(ident, query)
+	} else {
+		var seq xml.Sequence
+		for i := range elem.Nodes {
+			seq.Append(xml.NewNodeItem(elem.Nodes[i]))
+		}
+		env.DefineExprParam(ident, xml.NewValueFromSequence(seq))
+	}
+	return err
 }
 
 func processNode(ctx *Context, node xml.Node) (xml.Sequence, error) {
