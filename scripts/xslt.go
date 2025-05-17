@@ -8,6 +8,7 @@ import (
 	"iter"
 	"os"
 	"path/filepath"
+	"maps"
 	"slices"
 	"sort"
 	"strconv"
@@ -814,10 +815,6 @@ func (s *Stylesheet) Execute(doc xml.Node) (xml.Node, error) {
 		return nil, fmt.Errorf("main template not found")
 	}
 
-	// if d, ok := doc.(*xml.Document); ok {
-	// 	doc = d.Root()
-	// }
-
 	var (
 		tpl = s.Templates[ix]
 		ctx = s.createContext(doc)
@@ -981,6 +978,28 @@ func transformNode(ctx *Context, node xml.Node) (xml.Sequence, error) {
 		return fn(ctx, node)
 	}
 	return processNode(ctx, node)
+}
+
+func appendNode(ctx *Context, node xml.Node) error {
+	elem, ok := node.(*xml.Element)
+	if !ok {
+		return fmt.Errorf("%s: expected xml element", node.QualifiedName())
+	}
+	parent, ok := node.Parent().(*xml.Element)
+	if !ok {
+		return fmt.Errorf("%s: expected xml element", node.QualifiedName())
+	}
+	for _, n := range elem.Nodes {
+		c := cloneNode(n)
+		if c == nil {
+			continue
+		}
+		parent.Append(c)
+		if _, err := transformNode(ctx, c); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func processParam(node xml.Node, env *Env) error {
@@ -1258,7 +1277,111 @@ func executeForeachGroup(ctx *Context, node xml.Node) (xml.Sequence, error) {
 }
 
 func executeMerge(ctx *Context, node xml.Node) (xml.Sequence, error) {
-	return nil, errImplemented
+	type MergeItem struct {
+		xml.Item
+		Key    string
+		Source string
+	}
+	var (
+		elem   = node.(*xml.Element)
+		action xml.Node
+		groups = make(map[string][]MergeItem)
+	)
+
+	for _, n := range elem.Nodes {
+		if n.QualifiedName() != ctx.getQualifiedName("merge-source") {
+			action = n
+			break
+		}
+		el := n.(*xml.Element)
+		ident, err := getAttribute(el, "name")
+		if err != nil {
+			return nil, err
+		}
+		var items xml.Sequence
+		if query, err := getAttribute(el, "select"); err == nil {
+			items, err = ctx.ExecuteQuery(query, ctx.CurrentNode)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, err
+		}
+		if len(el.Nodes) == 0 {
+			return nil, fmt.Errorf("missing xsl:merge-key element")
+		}
+		if query, err := getAttribute(el.Nodes[0].(*xml.Element), "select"); err != nil {
+			return nil, err
+		} else {
+			grp, err := ctx.CompileQuery(query)
+			if err != nil {
+				return nil, err
+			}
+			for i := range items {
+				is, err := grp.Find(items[i].Node())
+				if err != nil {
+					return nil, err
+				}
+				mit := MergeItem{
+					Item:   items[i],
+					Source: ident,
+					Key:    fmt.Sprint(is[0].Value()),
+				}
+				groups[mit.Key] = append(groups[mit.Key], mit)
+			}
+		}
+	}
+	if action.QualifiedName() != ctx.getQualifiedName("merge-action") {
+		return nil, fmt.Errorf("merge-action expected")
+	}
+	elem, ok := action.(*xml.Element)
+	if !ok {
+		return nil, fmt.Errorf("merge-action: expected xml element")
+	}
+
+	keys := slices.Collect(maps.Keys(groups))
+	slices.Sort(keys)
+	for _, key := range keys {
+		items := groups[key]
+		currentKey := func(_ xml.Context, _ []xml.Expr) (xml.Sequence, error) {
+			return xml.Singleton(key), nil
+		}
+		currentGrp := func(ctx xml.Context, args []xml.Expr) (xml.Sequence, error) {
+			if len(args) > 1 {
+				return nil, fmt.Errorf("too many arguments")
+			}
+			var (
+				seq xml.Sequence
+				grp string
+			)
+			if len(args) == 1 {
+				names, err := args[0].Find(ctx)
+				if err != nil {
+					return nil, err
+				}
+				if names.Empty() {
+					return nil, fmt.Errorf("no group avaialble")
+				}
+				grp = fmt.Sprint(names[0].Value())
+			}
+			for i := range items {
+				if grp != "" && items[i].Source != grp {
+					continue
+				}
+				seq.Append(items[i].Item)
+			}
+			return seq, nil
+		}
+		ctx.Builtins.Define("current-merge-group", currentGrp)
+		ctx.Builtins.Define("fn:current-merge-group", currentGrp)
+		ctx.Builtins.Define("current-merge-key", currentKey)
+		ctx.Builtins.Define("fn:current-merge-key", currentKey)
+
+		if err := appendNode(ctx, node); err != nil {
+			return nil, err
+		}
+	}
+	return nil, removeSelf(node)
 }
 
 func executeForeach(ctx *Context, node xml.Node) (xml.Sequence, error) {
