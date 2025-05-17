@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io"
 	"iter"
+	"maps"
 	"os"
 	"path/filepath"
-	"maps"
 	"slices"
 	"sort"
 	"strconv"
@@ -1342,6 +1342,8 @@ func executeMerge(ctx *Context, node xml.Node) (xml.Sequence, error) {
 	keys := slices.Collect(maps.Keys(groups))
 	slices.Sort(keys)
 	for _, key := range keys {
+		ctx := ctx.Self()
+
 		items := groups[key]
 		currentKey := func(_ xml.Context, _ []xml.Expr) (xml.Sequence, error) {
 			return xml.Singleton(key), nil
@@ -1785,15 +1787,15 @@ func executeApply(ctx *Context, node xml.Node, match matchFunc) (xml.Sequence, e
 	return nil, insertNodes(node, results...)
 }
 
-func isTrue(items []xml.Item) bool {
-	if len(items) == 0 {
+func isTrue(seq xml.Sequence) bool {
+	if seq.Empty() {
 		return false
 	}
-	var ok bool
-	if !items[0].Atomic() {
+	first, ok := seq.First()
+	if !first.Atomic() {
 		return true
 	}
-	switch res := items[0].Value().(type) {
+	switch res := first.Value().(type) {
 	case bool:
 		ok = res
 	case float64:
