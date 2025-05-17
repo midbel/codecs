@@ -27,6 +27,9 @@ func main() {
 	case "assert":
 		var a AssertCmd
 		command = a
+	case "transform":
+		var a TransformCmd
+		command = a
 	default:
 		fmt.Fprintf(os.Stderr, "%s is not a known command", cmd)
 		fmt.Fprintln(os.Stderr)

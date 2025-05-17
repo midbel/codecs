@@ -2,8 +2,8 @@ package xslt
 
 import (
 	"fmt"
-	"slices"
 	"maps"
+	"slices"
 
 	"github.com/midbel/codecs/xml"
 )
