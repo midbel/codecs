@@ -1315,17 +1315,21 @@ type Parser struct {
 	TrimSpace  bool
 	KeepEmpty  bool
 	OmitProlog bool
+	StrictNS   bool
 	MaxDepth   int
+
+	namespaces Environ[string]
 
 	piFuncs map[string]PiFunc
 }
 
 func NewParser(r io.Reader) *Parser {
 	p := Parser{
-		scan:      Scan(r),
-		TrimSpace: true,
-		MaxDepth:  MaxDepth,
-		piFuncs:   make(map[string]PiFunc),
+		scan:       Scan(r),
+		TrimSpace:  true,
+		MaxDepth:   MaxDepth,
+		piFuncs:    make(map[string]PiFunc),
+		namespaces: Empty[string](),
 	}
 	p.next()
 	p.next()
@@ -1440,6 +1444,14 @@ func (p *Parser) parseNode() (Node, error) {
 }
 
 func (p *Parser) parseElement() (Node, error) {
+	p.namespaces = Enclosed[string](p.namespaces)
+	defer func() {
+		u, ok := p.namespaces.(interface{ Unwrap() Environ[string] })
+		if !ok {
+			return
+		}
+		p.namespaces = u.Unwrap()
+	}()
 	p.next()
 	var (
 		elem Element
@@ -1448,6 +1460,9 @@ func (p *Parser) parseElement() (Node, error) {
 	if p.is(Namespace) {
 		elem.Space = p.getCurrentLiteral()
 		p.next()
+		if err := p.isDefined(elem.Space); err != nil {
+			return nil, err
+		}
 	}
 	if !p.is(Name) {
 		return nil, p.createError("element", "name is missing")
@@ -1562,6 +1577,9 @@ func (p *Parser) parseAttr() (Attribute, error) {
 	if p.is(Namespace) {
 		attr.Space = p.getCurrentLiteral()
 		p.next()
+		if err := p.isDefined(attr.Space); err != nil {
+			return attr, err
+		}
 	}
 	if !p.is(Attr) {
 		return attr, p.createError("attribute", "name is expected")
@@ -1573,6 +1591,9 @@ func (p *Parser) parseAttr() (Attribute, error) {
 	}
 	attr.Datum = p.getCurrentLiteral()
 	p.next()
+	if attr.Space == "xmlns" {
+		p.defineNS(attr.Name, attr.Datum)
+	}
 	return attr, nil
 }
 
@@ -1604,6 +1625,21 @@ func (p *Parser) parseLiteral() (Node, error) {
 		return nil, nil
 	}
 	return &text, nil
+}
+
+func (p *Parser) isDefined(ident string) error {
+	if !p.StrictNS {
+		return nil
+	}
+	if ident == "xmlns" {
+		return nil
+	}
+	_, err := p.namespaces.Resolve(ident)
+	return err
+}
+
+func (p *Parser) defineNS(ident, uri string) {
+	p.namespaces.Define(ident, uri)
 }
 
 func (p *Parser) getCurrentLiteral() string {

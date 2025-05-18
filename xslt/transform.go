@@ -2,11 +2,11 @@ package xslt
 
 import (
 	"fmt"
-	"slices"
 	"io"
-	"time"
 	"os"
+	"slices"
 	"strconv"
+	"time"
 
 	"github.com/midbel/codecs/xml"
 )

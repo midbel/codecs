@@ -2,13 +2,13 @@ package xslt
 
 import (
 	"fmt"
-	"maps"
-	"slices"
-	"strings"
-	"path/filepath"
 	"iter"
+	"maps"
 	"os"
+	"path/filepath"
+	"slices"
 	"sort"
+	"strings"
 
 	"github.com/midbel/codecs/xml"
 )
