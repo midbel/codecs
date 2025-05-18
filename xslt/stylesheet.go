@@ -76,6 +76,7 @@ type AttributeSet struct {
 type Stylesheet struct {
 	namespace   string
 	Mode        string
+	Streamable  bool
 	currentMode *Mode
 	Modes       []*Mode
 	AttrSet     []*AttributeSet
