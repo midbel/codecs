@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"slices"
+	"strconv"
 
 	"github.com/midbel/codecs/xml"
 )
@@ -287,7 +289,7 @@ func (s *Stylesheet) init(doc xml.Node) error {
 }
 
 func (s *Stylesheet) includesSheet(doc xml.Node) error {
-	items, err := sheet.Query("/stylesheet/include | /transform/include", doc)
+	items, err := s.Query("/stylesheet/include | /transform/include", doc)
 	if err != nil {
 		return err
 	}
@@ -317,7 +319,7 @@ func (s *Stylesheet) importsSheet(doc xml.Node) error {
 }
 
 func (s *Stylesheet) loadAttributeSet(doc xml.Node) error {
-	items, err := s.queryXSL("/stylesheet/attribute-set | /transform/attribute-set", doc)
+	items, err := s.Query("/stylesheet/attribute-set | /transform/attribute-set", doc)
 	if err != nil {
 		return err
 	}
@@ -351,7 +353,7 @@ func (s *Stylesheet) loadAttributeSet(doc xml.Node) error {
 }
 
 func (s *Stylesheet) loadModes(doc xml.Node) error {
-	items, err := s.queryXSL("/stylesheet/mode | /transform/mode", doc)
+	items, err := s.Query("/stylesheet/mode | /transform/mode", doc)
 	if err != nil {
 		return err
 	}
@@ -382,7 +384,7 @@ func (s *Stylesheet) loadModes(doc xml.Node) error {
 }
 
 func (s *Stylesheet) loadParams(doc xml.Node) error {
-	items, err := s.queryXSL("/stylesheet/param | transform/param", doc)
+	items, err := s.Query("/stylesheet/param | transform/param", doc)
 	if err != nil {
 		return err
 	}
@@ -396,7 +398,7 @@ func (s *Stylesheet) loadParams(doc xml.Node) error {
 			return err
 		}
 		if query, err := getAttribute(n, "select"); err == nil {
-			expr, err := s.CompileQuery(query)
+			expr, err := s.Compile(query)
 			if err != nil {
 				return err
 			}
@@ -413,7 +415,7 @@ func (s *Stylesheet) loadParams(doc xml.Node) error {
 }
 
 func (s *Stylesheet) loadOutput(doc xml.Node) error {
-	items, err := s.queryXSL("/stylesheet/output | /transform/output", doc)
+	items, err := s.Query("/stylesheet/output | /transform/output", doc)
 	if err != nil {
 		return err
 	}
@@ -448,7 +450,7 @@ func (s *Stylesheet) loadOutput(doc xml.Node) error {
 }
 
 func (s *Stylesheet) loadTemplates(doc xml.Node) error {
-	items, err := s.queryXSL("/stylesheet/template | /transform/template", doc)
+	items, err := s.Query("/stylesheet/template | /transform/template", doc)
 	if err != nil {
 		return err
 	}
@@ -508,11 +510,11 @@ func (s *Stylesheet) getMatchingTemplates(list []*Template, node xml.Node, mode 
 		if t.isRoot() || t.Mode != mode || t.Name != "" {
 			continue
 		}
-		expr, err := s.CompileQuery(t.Match)
+		expr, err := s.Compile(t.Match)
 		if err != nil {
 			continue
 		}
-		ok, prio := isTemplateMatch(expr, node)
+		ok, prio := templateMatch(expr, node)
 		if !ok {
 			continue
 		}
@@ -537,7 +539,7 @@ func (s *Stylesheet) getMode(mode string) *Mode {
 		return m.Name == mode
 	})
 	if ix < 0 {
-		return &unnamedMode
+		return unnamedMode()
 	}
 	return s.Modes[ix]
 }

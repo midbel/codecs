@@ -19,7 +19,7 @@ func processAVT(ctx *Context, node xml.Node) error {
 				str.WriteString(q)
 				continue
 			}
-			items, err := ctx.ExecuteQuery(q, ctx.CurrentNode)
+			items, err := ctx.Execute(q, ctx.CurrentNode)
 			if err != nil {
 				return err
 			}

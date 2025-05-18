@@ -29,6 +29,10 @@ func (c *Context) Sub(node xml.Node) *Context {
 	return &child
 }
 
+func (c *Context) Execute(query string, node xml.Node) (xml.Sequence, error) {
+	return c.Env.Execute(query, node)
+}
+
 func (c *Context) NotFound(node xml.Node, err error, mode string) error {
 	var tmp xml.Node
 	switch mode := c.getMode(mode); mode.NoMatch {
@@ -110,7 +114,7 @@ func (e *Env) ExecuteNS(query, namespace string, datum xml.Node) (xml.Sequence, 
 		i := xml.NewNodeItem(datum)
 		return []xml.Item{i}, nil
 	}
-	q, err := e.CompileQueryWithNS(query, namespace)
+	q, err := e.CompileNS(query, namespace)
 	if err != nil {
 		return nil, err
 	}

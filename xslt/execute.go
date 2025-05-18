@@ -4,6 +4,11 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
+	"path/filepath"
+	"iter"
+	"os"
+	"sort"
 
 	"github.com/midbel/codecs/xml"
 )
@@ -132,7 +137,7 @@ func executeVariable(ctx *Context, node xml.Node) (xml.Sequence, error) {
 		return nil, err
 	}
 	if value, err := getAttribute(el, "select"); err == nil {
-		query, err := ctx.CompileQuery(value)
+		query, err := ctx.Compile(value)
 		if err != nil {
 			return nil, err
 		}
@@ -229,7 +234,7 @@ func executeForeachGroup(ctx *Context, node xml.Node) (xml.Sequence, error) {
 		return nil, fmt.Errorf("for-each-group: xml element expected as parent")
 	}
 
-	items, err := ctx.ExecuteQuery(query, ctx.CurrentNode)
+	items, err := ctx.Execute(query, ctx.CurrentNode)
 	if err != nil || len(items) == 0 {
 		return nil, err
 	}
@@ -238,7 +243,7 @@ func executeForeachGroup(ctx *Context, node xml.Node) (xml.Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	grpby, err := ctx.CompileQuery(key)
+	grpby, err := ctx.Compile(key)
 	if err != nil {
 		return nil, err
 	}
@@ -303,7 +308,7 @@ func executeMerge(ctx *Context, node xml.Node) (xml.Sequence, error) {
 		}
 		var items xml.Sequence
 		if query, err := getAttribute(el, "select"); err == nil {
-			items, err = ctx.ExecuteQuery(query, ctx.CurrentNode)
+			items, err = ctx.Execute(query, ctx.CurrentNode)
 			if err != nil {
 				return nil, err
 			}
@@ -316,7 +321,7 @@ func executeMerge(ctx *Context, node xml.Node) (xml.Sequence, error) {
 		if query, err := getAttribute(el.Nodes[0].(*xml.Element), "select"); err != nil {
 			return nil, err
 		} else {
-			grp, err := ctx.CompileQuery(query)
+			grp, err := ctx.Compile(query)
 			if err != nil {
 				return nil, err
 			}
@@ -396,7 +401,7 @@ func executeForeach(ctx *Context, node xml.Node) (xml.Sequence, error) {
 		return nil, err
 	}
 
-	items, err := ctx.ExecuteQuery(query, ctx.CurrentNode)
+	items, err := ctx.Execute(query, ctx.CurrentNode)
 	if err != nil {
 		return nil, err
 	}
@@ -430,7 +435,7 @@ func executeForeach(ctx *Context, node xml.Node) (xml.Sequence, error) {
 
 func executeTry(ctx *Context, node xml.Node) (xml.Sequence, error) {
 	el := node.(*xml.Element)
-	items, err := ctx.queryXSL("./catch[last()]", node)
+	items, err := ctx.Query("./catch[last()]", node)
 	if err != nil {
 		return nil, err
 	}
@@ -456,7 +461,7 @@ func executeIf(ctx *Context, node xml.Node) (xml.Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	ok, err := ctx.TestNode(test, ctx.CurrentNode)
+	ok, err := ctx.Test(test, ctx.CurrentNode)
 	if err != nil {
 		return nil, err
 	}
@@ -470,7 +475,7 @@ func executeIf(ctx *Context, node xml.Node) (xml.Sequence, error) {
 }
 
 func executeChoose(ctx *Context, node xml.Node) (xml.Sequence, error) {
-	items, err := ctx.queryXSL("/when", ctx.CurrentNode)
+	items, err := ctx.Query("/when", ctx.CurrentNode)
 	if err != nil {
 		return nil, err
 	}
@@ -480,7 +485,7 @@ func executeChoose(ctx *Context, node xml.Node) (xml.Sequence, error) {
 		if err != nil {
 			return nil, err
 		}
-		ok, err := ctx.TestNode(test, ctx.CurrentNode)
+		ok, err := ctx.Test(test, ctx.CurrentNode)
 		if err != nil {
 			return nil, err
 		}
@@ -499,7 +504,7 @@ func executeChoose(ctx *Context, node xml.Node) (xml.Sequence, error) {
 		}
 	}
 
-	if items, err = ctx.queryXSL("otherwise", node); err != nil {
+	if items, err = ctx.Query("otherwise", node); err != nil {
 		return nil, err
 	}
 	if len(items) == 0 {
@@ -529,7 +534,7 @@ func executeValueOf(ctx *Context, node xml.Node) (xml.Sequence, error) {
 	if err != nil {
 		sep = " "
 	}
-	items, err := ctx.ExecuteQuery(query, ctx.CurrentNode)
+	items, err := ctx.Execute(query, ctx.CurrentNode)
 	if err != nil || len(items) == 0 {
 		return nil, removeSelf(node)
 	}
@@ -555,7 +560,7 @@ func executeCopyOf(ctx *Context, node xml.Node) (xml.Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	items, err := ctx.ExecuteQuery(query, ctx.CurrentNode)
+	items, err := ctx.Execute(query, ctx.CurrentNode)
 	if err != nil {
 		return nil, err
 	}
@@ -603,7 +608,7 @@ func executeSequence(ctx *Context, node xml.Node) (xml.Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ctx.ExecuteQuery(query, ctx.CurrentNode)
+	return ctx.Execute(query, ctx.CurrentNode)
 }
 
 func executeElement(ctx *Context, node xml.Node) (xml.Sequence, error) {
@@ -701,7 +706,7 @@ func getNodesForTemplate(ctx *Context, node xml.Node) ([]xml.Node, error) {
 		res []xml.Node
 	)
 	if query, err := getAttribute(el, "select"); err == nil {
-		items, err := ctx.ExecuteQuery(query, ctx.CurrentNode)
+		items, err := ctx.Execute(query, ctx.CurrentNode)
 		if err != nil {
 			return nil, err
 		}
@@ -728,7 +733,7 @@ func applyParams(ctx *Context, node xml.Node) error {
 }
 
 func applySort(ctx *Context, node xml.Node, items []xml.Item) (iter.Seq[xml.Item], error) {
-	sorts, err := ctx.queryXSL("./sort[1]", node)
+	sorts, err := ctx.Query("./sort[1]", node)
 	if err != nil {
 		return nil, err
 	}

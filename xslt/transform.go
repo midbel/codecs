@@ -3,6 +3,10 @@ package xslt
 import (
 	"fmt"
 	"slices"
+	"io"
+	"time"
+	"os"
+	"strconv"
 
 	"github.com/midbel/codecs/xml"
 )
@@ -176,4 +180,19 @@ func writeDocument(file, format string, doc *xml.Document, style *Stylesheet) er
 func writeDoctypeHTML(w io.Writer) error {
 	_, err := io.WriteString(w, "<!DOCTYPE html>")
 	return err
+}
+
+func toString(item xml.Item) string {
+	var v string
+	switch x := item.Value().(type) {
+	case time.Time:
+		v = x.Format("2006-01-02")
+	case float64:
+		v = strconv.FormatFloat(x, 'f', -1, 64)
+	case []byte:
+	case string:
+		v = x
+	default:
+	}
+	return v
 }
