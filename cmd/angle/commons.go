@@ -45,7 +45,8 @@ func iterDocuments(files []string) iter.Seq2[*Document, error] {
 	}
 
 	parse := func(file string) (*Document, error) {
-		doc, err := parseDocument(file, false)
+		var opts ParserOptions
+		doc, err := parseDocument(file, opts)
 		if err != nil {
 			return nil, ErrDocument
 		}
@@ -77,7 +78,15 @@ func iterDocuments(files []string) iter.Seq2[*Document, error] {
 	return fn
 }
 
-func parseDocument(file string, include bool) (*xml.Document, error) {
+type ParserOptions struct {
+	Include    bool
+	StrictNS   bool
+	KeepEmpty  bool
+	OmitProlog bool
+	Transform  bool
+}
+
+func parseDocument(file string, opts ParserOptions) (*xml.Document, error) {
 	r, err := openFile(file)
 	if err != nil {
 		return nil, err
@@ -85,8 +94,11 @@ func parseDocument(file string, include bool) (*xml.Document, error) {
 	defer r.Close()
 
 	p := xml.NewParser(r)
-	p.OmitProlog = true
-	if include {
+	p.OmitProlog = opts.OmitProlog
+	p.StrictNS = opts.StrictNS
+	p.KeepEmpty = opts.KeepEmpty
+
+	if opts.Include {
 		p.RegisterPI("angle-include", piInclude)
 	}
 	return p.Parse()
@@ -99,7 +111,8 @@ func piInclude(_ string, attrs []xml.Attribute) (xml.Node, error) {
 	if ix < 0 {
 		return nil, fmt.Errorf("filename attribute missing")
 	}
-	doc, err := parseDocument(attrs[ix].Value(), true)
+	var opts ParserOptions
+	doc, err := parseDocument(attrs[ix].Value(), opts)
 	if err != nil {
 		return nil, err
 	}

@@ -7,8 +7,8 @@ import (
 type FormatCmd struct {
 	OutFile string
 	Query   string
-	Strict  bool
 	WriterOptions
+	ParserOptions
 }
 
 func (f FormatCmd) Run(args []string) error {
@@ -18,7 +18,9 @@ func (f FormatCmd) Run(args []string) error {
 	set.BoolVar(&f.NoProlog, "no-prolog", false, "don't write the xml prolog into the output document")
 	set.BoolVar(&f.NoComment, "no-comment", false, "dont't write the comment present in the input document")
 	set.BoolVar(&f.Compact, "compact", false, "write compact output")
-	set.BoolVar(&f.Strict, "strict-ns", false, "strict namespace checking")
+	set.BoolVar(&f.StrictNS, "strict-ns", false, "strict namespace checking")
+	set.BoolVar(&f.KeepEmpty, "keep-empty", false, "keep empty element")
+	set.BoolVar(&f.OmitProlog, "omit-prolog", false, "omit xml prolog")
 	set.StringVar(&f.CaseType, "case-type", "", "rewrite element/attribute name to given case family")
 	set.StringVar(&f.OutFile, "f", "", "specify the path to the file where the document will be written")
 	set.StringVar(&f.Query, "q", "", "")
@@ -27,7 +29,7 @@ func (f FormatCmd) Run(args []string) error {
 		return err
 	}
 
-	doc, err := parseDocument(set.Arg(0), true)
+	doc, err := parseDocument(set.Arg(0), f.ParserOptions)
 	if err != nil {
 		return err
 	}

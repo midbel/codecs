@@ -1506,7 +1506,13 @@ func (p *Parser) parseElement() (Node, error) {
 }
 
 func (p *Parser) parseCloseElement(elem Element) error {
+	if elem.Space != "" && !p.is(Namespace) {
+		return p.createError("element", "closing element without namespace")
+	}
 	if p.is(Namespace) {
+		if err := p.isDefined(p.getCurrentLiteral()); err != nil {
+			return err
+		}
 		if elem.Space != p.getCurrentLiteral() {
 			return p.createError("element", "namespace mismatched with opening element")
 		}
@@ -1635,6 +1641,9 @@ func (p *Parser) isDefined(ident string) error {
 		return nil
 	}
 	_, err := p.namespaces.Resolve(ident)
+	if err != nil {
+		return fmt.Errorf("%s: namespace is not defined", ident)
+	}
 	return err
 }
 

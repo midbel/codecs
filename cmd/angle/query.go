@@ -10,6 +10,7 @@ import (
 type QueryCmd struct {
 	Root  string
 	Noout bool
+	ParserOptions
 }
 
 const queryInfo = "query took %s - %d nodes matching %q"
@@ -24,7 +25,7 @@ func (q QueryCmd) Run(args []string) error {
 	if err := set.Parse(args); err != nil {
 		return err
 	}
-	doc, err := parseDocument(set.Arg(1), true)
+	doc, err := parseDocument(set.Arg(1), q.ParserOptions)
 	if err != nil {
 		return err
 	}
