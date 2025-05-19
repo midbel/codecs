@@ -84,16 +84,14 @@ func executeSourceDocument(ctx *Context, node xml.Node) (xml.Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	var (
-		nodes []xml.Node
-		sub   = ctx.Sub(doc)
-	)
+	_ = doc // TODO
+	var nodes []xml.Node
 	for _, n := range slices.Clone(el.Nodes) {
 		c := cloneNode(n)
 		if c == nil {
 			continue
 		}
-		if _, err := transformNode(sub, c); err != nil {
+		if _, err := transformNode(ctx.Self(), c); err != nil {
 			return nil, err
 		}
 		nodes = append(nodes, c)

@@ -174,18 +174,11 @@ func (s *Stylesheet) Generate(w io.Writer, doc *xml.Document) error {
 }
 
 func (s *Stylesheet) Execute(doc xml.Node) (xml.Node, error) {
-	ix := slices.IndexFunc(s.Templates, func(t *Template) bool {
-		return t.isRoot() && t.Mode == s.CurrentMode()
-	})
-	if ix < 0 {
-		return nil, fmt.Errorf("main template not found")
+	tpl, err := s.getMainTemplate()
+	if err != nil {
+		return nil, err
 	}
-
-	var (
-		tpl = s.Templates[ix]
-		ctx = s.createContext(doc)
-	)
-	root, err := tpl.Execute(ctx)
+	root, err := tpl.Execute(s.createContext(doc))
 	if err == nil {
 		var doc xml.Document
 		doc.Nodes = append(doc.Nodes, root...)
@@ -498,6 +491,19 @@ func (s *Stylesheet) resolve(ident string) (xml.Expr, error) {
 func (s *Stylesheet) getQualifiedName(name string) string {
 	qn := xml.QualifiedName(name, s.namespace)
 	return qn.QualifiedName()
+}
+
+func (s *Stylesheet) getMainTemplate() (*Template, error) {
+	if len(s.Templates) == 1 {
+		return s.Templates[0], nil
+	}
+	ix := slices.IndexFunc(s.Templates, func(t *Template) bool {
+		return t.isRoot() && t.Mode == s.CurrentMode()
+	})
+	if ix < 0 {
+		return nil, fmt.Errorf("main template not found")
+	}
+	return s.Templates[ix], nil
 }
 
 func (s *Stylesheet) getMatchingTemplates(list []*Template, node xml.Node, mode string) (*Template, error) {
