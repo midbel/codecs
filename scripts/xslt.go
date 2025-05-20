@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"iter"
+	"log/slog"
 	"maps"
 	"os"
 	"path/filepath"
@@ -37,39 +38,57 @@ var executers map[xml.QName]ExecuteFunc
 func init() {
 	wrap := func(exec ExecuteFunc) ExecuteFunc {
 		fn := func(ctx *Context, node xml.Node) (xml.Sequence, error) {
-			return exec(ctx.Self(), node)
+			ctx.Enter(ctx)
+			defer ctx.Leave(ctx)
+			seq, err := exec(ctx.Self(), node)
+			if err != nil {
+				ctx.Error(ctx, err)
+			}
+			return seq, err
+		}
+		return fn
+	}
+	trace := func(exec ExecuteFunc) ExecuteFunc {
+		fn := func(ctx *Context, node xml.Node) (xml.Sequence, error) {
+			ctx.Enter(ctx)
+			defer ctx.Leave(ctx)
+			seq, err := exec(ctx, node)
+			if err != nil {
+				ctx.Error(ctx, err)
+			}
+			return seq, err
 		}
 		return fn
 	}
 	executers = map[xml.QName]ExecuteFunc{
 		xml.QualifiedName("for-each", xsltNamespacePrefix):        wrap(executeForeach),
-		xml.QualifiedName("value-of", xsltNamespacePrefix):        executeValueOf,
+		xml.QualifiedName("value-of", xsltNamespacePrefix):        trace(executeValueOf),
 		xml.QualifiedName("call-template", xsltNamespacePrefix):   wrap(executeCallTemplate),
 		xml.QualifiedName("apply-templates", xsltNamespacePrefix): wrap(executeApplyTemplates),
 		xml.QualifiedName("apply-imports", xsltNamespacePrefix):   wrap(executeApplyImport),
 		xml.QualifiedName("if", xsltNamespacePrefix):              wrap(executeIf),
 		xml.QualifiedName("choose", xsltNamespacePrefix):          wrap(executeChoose),
-		xml.QualifiedName("where-populated", xsltNamespacePrefix): executeWherePopulated,
-		xml.QualifiedName("on-empty", xsltNamespacePrefix):        executeOnEmpty,
-		xml.QualifiedName("on-not-empty", xsltNamespacePrefix):    executeOnNotEmpty,
+		xml.QualifiedName("where-populated", xsltNamespacePrefix): trace(executeWherePopulated),
+		xml.QualifiedName("on-empty", xsltNamespacePrefix):        trace(executeOnEmpty),
+		xml.QualifiedName("on-not-empty", xsltNamespacePrefix):    trace(executeOnNotEmpty),
 		xml.QualifiedName("try", xsltNamespacePrefix):             wrap(executeTry),
-		xml.QualifiedName("variable", xsltNamespacePrefix):        executeVariable,
-		xml.QualifiedName("result-document", xsltNamespacePrefix): executeResultDocument,
+		xml.QualifiedName("variable", xsltNamespacePrefix):        trace(executeVariable),
+		xml.QualifiedName("result-document", xsltNamespacePrefix): trace(executeResultDocument),
 		xml.QualifiedName("source-document", xsltNamespacePrefix): wrap(executeSourceDocument),
-		xml.QualifiedName("import", xsltNamespacePrefix):          executeImport,
-		xml.QualifiedName("include", xsltNamespacePrefix):         executeInclude,
-		xml.QualifiedName("with-param", xsltNamespacePrefix):      executeWithParam,
-		xml.QualifiedName("copy", xsltNamespacePrefix):            executeCopy,
-		xml.QualifiedName("copy-of", xsltNamespacePrefix):         executeCopyOf,
-		xml.QualifiedName("sequence", xsltNamespacePrefix):        executeSequence,
-		xml.QualifiedName("element", xsltNamespacePrefix):         executeElement,
-		xml.QualifiedName("attribute", xsltNamespacePrefix):       executeAttribute,
-		xml.QualifiedName("text", xsltNamespacePrefix):            executeText,
-		xml.QualifiedName("comment", xsltNamespacePrefix):         executeComment,
-		xml.QualifiedName("message", xsltNamespacePrefix):         executeMessage,
-		xml.QualifiedName("fallback", xsltNamespacePrefix):        executeFallback,
-		xml.QualifiedName("merge", xsltNamespacePrefix):           executeMerge,
-		xml.QualifiedName("for-each-group", xsltNamespacePrefix):  executeForeachGroup,
+		xml.QualifiedName("import", xsltNamespacePrefix):          trace(executeImport),
+		xml.QualifiedName("include", xsltNamespacePrefix):         trace(executeInclude),
+		xml.QualifiedName("with-param", xsltNamespacePrefix):      trace(executeWithParam),
+		xml.QualifiedName("copy", xsltNamespacePrefix):            trace(executeCopy),
+		xml.QualifiedName("copy-of", xsltNamespacePrefix):         trace(executeCopyOf),
+		xml.QualifiedName("sequence", xsltNamespacePrefix):        trace(executeSequence),
+		xml.QualifiedName("element", xsltNamespacePrefix):         trace(executeElement),
+		xml.QualifiedName("attribute", xsltNamespacePrefix):       trace(executeAttribute),
+		xml.QualifiedName("text", xsltNamespacePrefix):            trace(executeText),
+		xml.QualifiedName("comment", xsltNamespacePrefix):         trace(executeComment),
+		xml.QualifiedName("message", xsltNamespacePrefix):         trace(executeMessage),
+		xml.QualifiedName("fallback", xsltNamespacePrefix):        trace(executeFallback),
+		xml.QualifiedName("merge", xsltNamespacePrefix):           trace(executeMerge),
+		xml.QualifiedName("for-each-group", xsltNamespacePrefix):  trace(executeForeachGroup),
 	}
 }
 
@@ -79,6 +98,7 @@ func main() {
 		mode   = flag.String("m", "", "mode")
 		file   = flag.String("f", "", "file")
 		dir    = flag.String("d", ".", "context directory")
+		trace  = flag.Bool("t", false, "trace")
 		params = make(map[string]xml.Expr)
 	)
 	flag.Func("p", "template parameter", func(str string) error {
@@ -106,6 +126,9 @@ func main() {
 		os.Exit(2)
 	}
 	sheet.Mode = *mode
+	if *trace {
+		sheet.Tracer = Stdout()
+	}
 
 	for ident, expr := range params {
 		sheet.SetParam(ident, expr)
@@ -130,9 +153,9 @@ func main() {
 }
 
 type Tracer interface {
-	Enter(xml.Node)
-	Leave(xml.Node)
-	Error(xml.Node, error)
+	Enter(*Context)
+	Leave(*Context)
+	Error(*Context, error)
 }
 
 func NoopTracer() Tracer {
@@ -141,23 +164,46 @@ func NoopTracer() Tracer {
 
 type discardTracer struct{}
 
-func (_ discardTracer) Enter(_ xml.Node) {}
+func (_ discardTracer) Enter(_ *Context) {}
 
-func (_ discardTracer) Leave(_ xml.Node) {}
+func (_ discardTracer) Leave(_ *Context) {}
 
-func (_ discardTracer) Error(xml.Node, error)
+func (_ discardTracer) Error(_ *Context, _ error) {}
 
-type stdoutTracer struct{}
-
-func Stdout() Tracer {
-	return stdoutTracer{}
+type stdioTracer struct {
+	logger *slog.Logger
 }
 
-func (t stdoutTracer) Enter(_ xml.Node) {}
+func Stdout() Tracer {
+	return stdioTracer{
+		logger: stdioLogger(os.Stdout),
+	}
+}
 
-func (t stdoutTracer) Leave(_ xml.Node) {}
+func Stderr() Tracer {
+	return stdioTracer{
+		logger: stdioLogger(os.Stderr),
+	}
+}
 
-func (_ discardTracer) Error(xml.Node, error)
+func stdioLogger(w io.Writer) *slog.Logger {
+	opts := slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}
+	return slog.New(slog.NewTextHandler(w, &opts))
+}
+
+func (t stdioTracer) Enter(ctx *Context) {
+	t.logger.Debug("start processing instruction", "node", ctx.ContextNode.QualifiedName(), "depth", ctx.Depth)
+}
+
+func (t stdioTracer) Leave(ctx *Context) {
+	t.logger.Debug("done processing instruction", "node", ctx.ContextNode.QualifiedName(), "depth", ctx.Depth)
+}
+
+func (t stdioTracer) Error(ctx *Context, err error) {
+	t.logger.Error("error while processing instruction", "node", ctx.ContextNode.QualifiedName(), "depth", ctx.Depth, "err", err.Error())
+}
 
 type OutputSettings struct {
 	Name       string
