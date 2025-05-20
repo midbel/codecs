@@ -55,7 +55,7 @@ func init() {
 		xml.QualifiedName("try", xsltNamespacePrefix):             wrap(executeTry),
 		xml.QualifiedName("variable", xsltNamespacePrefix):        executeVariable,
 		xml.QualifiedName("result-document", xsltNamespacePrefix): executeResultDocument,
-		xml.QualifiedName("source-document", xsltNamespacePrefix): executeSourceDocument,
+		xml.QualifiedName("source-document", xsltNamespacePrefix): wrap(executeSourceDocument),
 		xml.QualifiedName("import", xsltNamespacePrefix):          executeImport,
 		xml.QualifiedName("include", xsltNamespacePrefix):         executeInclude,
 		xml.QualifiedName("with-param", xsltNamespacePrefix):      executeWithParam,
@@ -189,6 +189,7 @@ type Env struct {
 	Vars      xml.Environ[xml.Expr]
 	Params    xml.Environ[xml.Expr]
 	Builtins  xml.Environ[xml.BuiltinFunc]
+	Depth     int
 }
 
 func Empty() *Env {
@@ -211,6 +212,7 @@ func (e *Env) Sub() *Env {
 		Vars:      xml.Enclosed[xml.Expr](e.Vars),
 		Params:    xml.Enclosed[xml.Expr](e.Params),
 		Builtins:  e.Builtins,
+		Depth:     e.Depth + 1,
 	}
 }
 
@@ -221,7 +223,7 @@ func (e *Env) ExecuteQuery(query string, datum xml.Node) (xml.Sequence, error) {
 func (e *Env) ExecuteQueryWithNS(query, namespace string, datum xml.Node) (xml.Sequence, error) {
 	if query == "" {
 		i := xml.NewNodeItem(datum)
-		return []xml.Item{i}, nil
+		return xml.Singleton(i), nil
 	}
 	q, err := e.CompileQueryWithNS(query, namespace)
 	if err != nil {
@@ -283,8 +285,8 @@ func (e *Env) Resolve(ident string) (xml.Expr, error) {
 	return nil, err
 }
 
-func (e *Env) Define(param string, expr xml.Expr) {
-	e.Vars.Define(param, expr)
+func (e *Env) Define(ident string, expr xml.Expr) {
+	e.Vars.Define(ident, expr)
 }
 
 func (e *Env) DefineParam(param, value string) error {
@@ -309,25 +311,38 @@ func (e *Env) DefineExprParam(param string, expr xml.Expr) {
 
 type Context struct {
 	CurrentNode xml.Node
+	ContextNode xml.Node
 	Index       int
 	Size        int
 	Mode        string
+
+	Depth int
 
 	*Stylesheet
 	*Env
 }
 
+func (c *Context) Switch(node xml.Node) *Context {
+	return c.clone(c.CurrentNode, node)
+}
+
 func (c *Context) Self() *Context {
-	return c.Sub(c.CurrentNode)
+	return c.clone(c.CurrentNode, c.ContextNode)
 }
 
 func (c *Context) Sub(node xml.Node) *Context {
+	return c.clone(node, node)
+}
+
+func (c *Context) clone(currentNode, contextNode xml.Node) *Context {
 	child := Context{
-		CurrentNode: node,
+		CurrentNode: currentNode,
+		ContextNode: contextNode,
 		Index:       1,
 		Size:        1,
 		Stylesheet:  c.Stylesheet,
 		Env:         c.Env.Sub(),
+		Depth:       c.Depth + 1,
 	}
 	return &child
 }
@@ -448,6 +463,7 @@ func (s *Stylesheet) createContext(node xml.Node) *Context {
 	env.Namespace = s.namespace
 	ctx := Context{
 		CurrentNode: node,
+		ContextNode: node,
 		Size:        1,
 		Index:       1,
 		Stylesheet:  s,
@@ -928,7 +944,7 @@ func processAVT(ctx *Context, node xml.Node) error {
 				str.WriteString(q)
 				continue
 			}
-			items, err := ctx.ExecuteQuery(q, ctx.CurrentNode)
+			items, err := ctx.ExecuteQuery(q, ctx.ContextNode)
 			if err != nil {
 				return err
 			}
@@ -1043,6 +1059,7 @@ func processNode(ctx *Context, node xml.Node) (xml.Sequence, error) {
 	res := xml.NewSequence()
 	for i := range nodes {
 		if nodes[i].Type() != xml.TypeElement {
+			res.Append(xml.NewNodeItem(nodes[i]))
 			continue
 		}
 		seq, err := transformNode(ctx, nodes[i])
@@ -1082,18 +1099,24 @@ func executeSourceDocument(ctx *Context, node xml.Node) (xml.Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	var nodes []xml.Node
+	var (
+		nodes  []xml.Node
+		sub    = ctx.Switch(doc)
+		parent = node.Parent().(*xml.Element)
+	)
+
 	for _, n := range slices.Clone(el.Nodes) {
 		c := cloneNode(n)
 		if c == nil {
 			continue
 		}
-		if _, err := transformNode(ctx.Self(), c); err != nil {
+		parent.Append(c)
+		if _, err := transformNode(sub, c); err != nil {
 			return nil, err
 		}
 		nodes = append(nodes, c)
 	}
-	return nil, insertNodes(el, nodes...)
+	return nil, removeSelf(node)
 }
 
 func executeResultDocument(ctx *Context, node xml.Node) (xml.Sequence, error) {
@@ -1131,27 +1154,26 @@ func executeVariable(ctx *Context, node xml.Node) (xml.Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	if value, err := getAttribute(el, "select"); err == nil {
-		query, err := ctx.CompileQuery(value)
-		if err != nil {
-			return nil, err
-		}
-		ctx.Define(ident, query)
+	var seq xml.Sequence
+	if query, err1 := getAttribute(el, "select"); err1 == nil {
+		seq, err = ctx.ExecuteQuery(query, ctx.ContextNode)
 	} else {
-		var res xml.Sequence
 		for _, n := range slices.Clone(el.Nodes) {
 			c := cloneNode(n)
 			if c == nil {
 				continue
 			}
-			seq, err := transformNode(ctx, c)
+			res, err := transformNode(ctx, c)
 			if err != nil {
 				return nil, err
 			}
-			res = slices.Concat(res, seq)
+			seq = slices.Concat(res, res)
 		}
-		ctx.Define(ident, xml.NewValueFromSequence(res))
 	}
+	if err != nil {
+		return nil, err
+	}
+	ctx.Define(ident, xml.NewValueFromSequence(seq))
 	return nil, removeSelf(node)
 }
 
@@ -1162,7 +1184,7 @@ func executeWithParam(ctx *Context, node xml.Node) (xml.Sequence, error) {
 		return nil, err
 	}
 	if query, err := getAttribute(el, "select"); err == nil {
-		ctx.EvalParam(ident, query, ctx.CurrentNode)
+		ctx.EvalParam(ident, query, ctx.ContextNode)
 	} else {
 		var res xml.Sequence
 		for _, n := range slices.Clone(el.Nodes) {
@@ -1200,7 +1222,7 @@ func executeCallTemplate(ctx *Context, node xml.Node) (xml.Sequence, error) {
 	if err != nil {
 		return nil, ctx.NotFound(node, err, mode)
 	}
-	sub := tpl.createContext(ctx, ctx.CurrentNode)
+	sub := tpl.createContext(ctx, ctx.ContextNode)
 	if err := applyParams(sub, node); err != nil {
 		return nil, err
 	}
@@ -1229,7 +1251,7 @@ func executeForeachGroup(ctx *Context, node xml.Node) (xml.Sequence, error) {
 		return nil, fmt.Errorf("for-each-group: xml element expected as parent")
 	}
 
-	items, err := ctx.ExecuteQuery(query, ctx.CurrentNode)
+	items, err := ctx.ExecuteQuery(query, ctx.ContextNode)
 	if err != nil || len(items) == 0 {
 		return nil, err
 	}
@@ -1303,7 +1325,7 @@ func executeMerge(ctx *Context, node xml.Node) (xml.Sequence, error) {
 		}
 		var items xml.Sequence
 		if query, err := getAttribute(el, "select"); err == nil {
-			items, err = ctx.ExecuteQuery(query, ctx.CurrentNode)
+			items, err = ctx.ExecuteQuery(query, ctx.ContextNode)
 			if err != nil {
 				return nil, err
 			}
@@ -1396,7 +1418,7 @@ func executeForeach(ctx *Context, node xml.Node) (xml.Sequence, error) {
 		return nil, err
 	}
 
-	items, err := ctx.ExecuteQuery(query, ctx.CurrentNode)
+	items, err := ctx.ExecuteQuery(query, ctx.ContextNode)
 	if err != nil {
 		return nil, err
 	}
@@ -1413,14 +1435,14 @@ func executeForeach(ctx *Context, node xml.Node) (xml.Sequence, error) {
 		return nil, fmt.Errorf("for-each: xml element expected as parent")
 	}
 	for i := range it {
-		value := i.Node()
+		sub := ctx.Sub(i.Node())
 		for _, n := range el.Nodes {
 			c := cloneNode(n)
 			if c == nil {
 				continue
 			}
 			parent.Append(c)
-			if _, err := transformNode(ctx.Sub(value), c); err != nil {
+			if _, err := transformNode(sub, c); err != nil {
 				return nil, err
 			}
 		}
@@ -1456,7 +1478,7 @@ func executeIf(ctx *Context, node xml.Node) (xml.Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	ok, err := ctx.TestNode(test, ctx.CurrentNode)
+	ok, err := ctx.TestNode(test, ctx.ContextNode)
 	if err != nil {
 		return nil, err
 	}
@@ -1470,7 +1492,7 @@ func executeIf(ctx *Context, node xml.Node) (xml.Sequence, error) {
 }
 
 func executeChoose(ctx *Context, node xml.Node) (xml.Sequence, error) {
-	items, err := ctx.queryXSL("/when", ctx.CurrentNode)
+	items, err := ctx.queryXSL("/when", ctx.ContextNode)
 	if err != nil {
 		return nil, err
 	}
@@ -1480,7 +1502,7 @@ func executeChoose(ctx *Context, node xml.Node) (xml.Sequence, error) {
 		if err != nil {
 			return nil, err
 		}
-		ok, err := ctx.TestNode(test, ctx.CurrentNode)
+		ok, err := ctx.TestNode(test, ctx.ContextNode)
 		if err != nil {
 			return nil, err
 		}
@@ -1555,7 +1577,7 @@ func executeCopyOf(ctx *Context, node xml.Node) (xml.Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	items, err := ctx.ExecuteQuery(query, ctx.CurrentNode)
+	items, err := ctx.ExecuteQuery(query, ctx.ContextNode)
 	if err != nil {
 		return nil, err
 	}
@@ -1603,7 +1625,7 @@ func executeSequence(ctx *Context, node xml.Node) (xml.Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ctx.ExecuteQuery(query, ctx.CurrentNode)
+	return ctx.ExecuteQuery(query, ctx.ContextNode)
 }
 
 func executeElement(ctx *Context, node xml.Node) (xml.Sequence, error) {
@@ -1701,7 +1723,7 @@ func getNodesForTemplate(ctx *Context, node xml.Node) ([]xml.Node, error) {
 		res []xml.Node
 	)
 	if query, err := getAttribute(el, "select"); err == nil {
-		items, err := ctx.ExecuteQuery(query, ctx.CurrentNode)
+		items, err := ctx.ExecuteQuery(query, ctx.ContextNode)
 		if err != nil {
 			return nil, err
 		}
@@ -1709,7 +1731,7 @@ func getNodesForTemplate(ctx *Context, node xml.Node) ([]xml.Node, error) {
 			res = append(res, items[i].Node())
 		}
 	} else {
-		res = []xml.Node{cloneNode(ctx.CurrentNode)}
+		res = []xml.Node{cloneNode(ctx.ContextNode)}
 	}
 	return res, nil
 }
