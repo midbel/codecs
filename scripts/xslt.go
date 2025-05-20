@@ -129,6 +129,36 @@ func main() {
 	}
 }
 
+type Tracer interface {
+	Enter(xml.Node)
+	Leave(xml.Node)
+	Error(xml.Node, error)
+}
+
+func NoopTracer() Tracer {
+	return discardTracer{}
+}
+
+type discardTracer struct{}
+
+func (_ discardTracer) Enter(_ xml.Node) {}
+
+func (_ discardTracer) Leave(_ xml.Node) {}
+
+func (_ discardTracer) Error(xml.Node, error)
+
+type stdoutTracer struct{}
+
+func Stdout() Tracer {
+	return stdoutTracer{}
+}
+
+func (t stdoutTracer) Enter(_ xml.Node) {}
+
+func (t stdoutTracer) Leave(_ xml.Node) {}
+
+func (_ discardTracer) Error(xml.Node, error)
+
 type OutputSettings struct {
 	Name       string
 	Method     string
@@ -385,6 +415,7 @@ type Stylesheet struct {
 	output    []*OutputSettings
 	Templates []*Template
 	*Env
+	Tracer
 
 	Context string
 	Others  []*Stylesheet
@@ -400,6 +431,7 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 		currentMode: &unnamedMode,
 		namespace:   xsltNamespacePrefix,
 		Env:         Empty(),
+		Tracer:      NoopTracer(),
 	}
 	if sheet.Context == "" {
 		sheet.Context = filepath.Dir(file)
