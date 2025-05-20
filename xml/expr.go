@@ -225,6 +225,9 @@ func (c Context) Sub(n Node, pos int, size int) Context {
 }
 
 func (c Context) Root() Context {
+	if c.Node == nil {
+		return c
+	}
 	curr := c.Node
 	for {
 		root := curr.Parent()
