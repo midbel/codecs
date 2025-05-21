@@ -467,6 +467,35 @@ func (c *Context) Copy() *Context {
 	return child
 }
 
+func (c *Context) useBase() bool {
+	if c.base == nil || c.XslNode == nil {
+		return false
+	}
+	curr := c
+	for curr != nil && curr.XslNode != nil {
+		var ok bool
+		switch curr.XslNode.LocalName() {
+		case "source-document":
+			ok = true
+		case "for-each":
+			ok = true
+		default:
+		}
+		if ok {
+			return ok
+		}
+		curr = curr.parent
+	}
+	return false
+}
+
+func (c *Context) ExecuteQuery2(query string) (xml.Sequence, error) {
+	if c.useBase() {
+		return c.base.ExecuteQuery2(query)
+	}
+	return c.Env.ExecuteQuery(query, c.ContextNode)
+}
+
 func (c *Context) clone(xslNode, contextNode xml.Node) *Context {
 	child := Context{
 		XslNode:     xslNode,
