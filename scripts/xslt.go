@@ -398,6 +398,10 @@ type Context struct {
 	*Env
 }
 
+func (c *Context) queryXSL(query string) (xml.Sequence, error) {
+	return c.Env.queryXSL(query, c.XslNode)
+}
+
 func (c *Context) WithXsl(node xml.Node) *Context {
 	return c.clone(node, c.ContextNode)
 }
@@ -1534,7 +1538,7 @@ func executeForeach(ctx *Context) (xml.Sequence, error) {
 }
 
 func executeTry(ctx *Context) (xml.Sequence, error) {
-	items, err := ctx.queryXSL("./catch[last()]", ctx.XslNode)
+	items, err := ctx.queryXSL("./catch[last()]")
 	if err != nil {
 		return nil, err
 	}
@@ -1574,7 +1578,7 @@ func executeIf(ctx *Context) (xml.Sequence, error) {
 }
 
 func executeChoose(ctx *Context) (xml.Sequence, error) {
-	items, err := ctx.queryXSL("/when", ctx.ContextNode)
+	items, err := ctx.queryXSL("/when")
 	if err != nil {
 		return nil, err
 	}
@@ -1603,7 +1607,7 @@ func executeChoose(ctx *Context) (xml.Sequence, error) {
 		}
 	}
 
-	if items, err = ctx.queryXSL("otherwise", ctx.XslNode); err != nil {
+	if items, err = ctx.queryXSL("otherwise"); err != nil {
 		return nil, err
 	}
 	if len(items) == 0 {
@@ -1832,7 +1836,7 @@ func applyParams(ctx *Context) error {
 }
 
 func applySort(ctx *Context, items []xml.Item) (iter.Seq[xml.Item], error) {
-	sorts, err := ctx.queryXSL("./sort[1]", ctx.XslNode)
+	sorts, err := ctx.queryXSL("./sort[1]")
 	if err != nil {
 		return nil, err
 	}
