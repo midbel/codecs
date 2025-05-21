@@ -155,6 +155,15 @@ var fileFuncs = []registeredBuiltin{
 	registerFunc("list", "file", callListDir),
 }
 
+var envFuncs = []registeredBuiltin{
+	registerFunc("get", "env", callXYZ),
+}
+
+var imgFuncs = []registeredBuiltin{
+	registeredFunc("resize-png", callXYZ),
+	registeredFunc("resize-jpg", callXYZ),
+}
+
 var binaryFuncs = []registeredBuiltin{
 	registerFunc("encode", "binary", callXYZ),
 	registerFunc("decode", "binary", callXYZ),
