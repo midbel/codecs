@@ -52,6 +52,7 @@ func init() {
 		fn := func(ctx *Context) (xml.Sequence, error) {
 			ctx.Enter(ctx)
 			defer ctx.Leave(ctx)
+
 			seq, err := exec(ctx)
 			if err != nil {
 				ctx.Error(ctx, err)
@@ -201,9 +202,9 @@ func (t stdioTracer) Enter(ctx *Context) {
 	args := []any{
 		"instruction",
 		ctx.XslNode.QualifiedName(),
-		"node", 
-		ctx.ContextNode.QualifiedName(), 
-		"depth", 
+		"node",
+		ctx.ContextNode.QualifiedName(),
+		"depth",
 		ctx.Depth,
 	}
 	t.logger.Debug("start instruction", args...)
@@ -213,9 +214,9 @@ func (t stdioTracer) Leave(ctx *Context) {
 	args := []any{
 		"instruction",
 		ctx.XslNode.QualifiedName(),
-		"node", 
-		ctx.ContextNode.QualifiedName(), 
-		"depth", 
+		"node",
+		ctx.ContextNode.QualifiedName(),
+		"depth",
 		ctx.Depth,
 	}
 	t.logger.Debug("done instruction", args...)
@@ -408,9 +409,13 @@ func (e *Env) DefineExprParam(param string, expr xml.Expr) {
 type Context struct {
 	XslNode     xml.Node
 	ContextNode xml.Node
-	Index       int
-	Size        int
-	Mode        string
+
+	parent *Context
+	base   *Context
+
+	Index int
+	Size  int
+	Mode  string
 
 	Depth int
 
@@ -422,17 +427,43 @@ func (c *Context) queryXSL(query string) (xml.Sequence, error) {
 	return c.Env.queryXSL(query, c.XslNode)
 }
 
+func (c *Context) WithNodes(ctxNode, xslNode xml.Node) *Context {
+	child := c.clone(xslNode, ctxNode)
+	child.parent = c
+	child.base = c.base
+	if c.base == nil {
+		child.base = c
+	}
+	return child
+}
+
 func (c *Context) WithXsl(node xml.Node) *Context {
-	return c.clone(node, c.ContextNode)
+	child := c.clone(node, c.ContextNode)
+	child.parent = c
+	child.base = c.base
+	if child.base == nil {
+		child.base = c
+	}
+	return child
 }
 
 func (c *Context) WithXpath(node xml.Node) *Context {
-	return c.clone(c.XslNode, node)
+	child := c.clone(c.XslNode, node)
+	child.parent = c
+	child.base = c.base
+	return child
 }
 
 func (c *Context) Nest() *Context {
 	child := c.clone(c.XslNode, c.ContextNode)
 	child.Env = child.Env.Sub()
+	return child
+}
+
+func (c *Context) Copy() *Context {
+	child := c.clone(c.XslNode, c.ContextNode)
+	child.parent = c
+	child.base = c.base
 	return child
 }
 
@@ -530,6 +561,11 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 		return nil, err
 	}
 	return &sheet, nil
+}
+
+func (s *Stylesheet) LoadDocument(file string) (xml.Node, error) {
+	file = filepath.Join(s.Context, file)
+	return loadDocument(file)
 }
 
 func includesSheet(sheet *Stylesheet, doc xml.Node) error {
@@ -931,9 +967,9 @@ func (s *Stylesheet) Execute(doc xml.Node) (xml.Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	if r, ok := doc.(*xml.Document); ok {
-		doc = r.Root()
-	}
+	// if r, ok := doc.(*xml.Document); ok {
+	// 	doc = r.Root()
+	// }
 	root, err := tpl.Execute(s.createContext(doc))
 	if err == nil {
 		var doc xml.Document
@@ -1028,11 +1064,11 @@ func (t *Template) Execute(ctx *Context) ([]xml.Node, error) {
 	return nodes, nil
 }
 
-func (t *Template) createContext(other *Context, node xml.Node) *Context {
-	other = other.WithXpath(node)
-	other.Env = other.Env.Sub()
-	other.Env.Merge(t.env)
-	return other
+func (t *Template) mergeContext(other *Context) *Context {
+	child := other.Copy()
+	child.Env = child.Env.Sub()
+	child.Env.Merge(t.env)
+	return child
 }
 
 func (t *Template) isRoot() bool {
@@ -1202,13 +1238,12 @@ func executeSourceDocument(ctx *Context) (xml.Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	doc, err := loadDocument(filepath.Join(ctx.Context, file))
+	doc, err := ctx.LoadDocument(file)
 	if err != nil {
 		return nil, err
 	}
 	var (
 		nodes  []xml.Node
-		sub    = ctx.WithXpath(doc)
 		parent = el.Parent().(*xml.Element)
 	)
 
@@ -1218,7 +1253,7 @@ func executeSourceDocument(ctx *Context) (xml.Sequence, error) {
 			continue
 		}
 		parent.Append(c)
-		if _, err := transformNode(sub); err != nil {
+		if _, err := transformNode(ctx.WithNodes(doc, c)); err != nil {
 			return nil, err
 		}
 		nodes = append(nodes, c)
@@ -1329,7 +1364,7 @@ func executeCallTemplate(ctx *Context) (xml.Sequence, error) {
 	if err != nil {
 		return nil, ctx.NotFound(err, mode)
 	}
-	sub := tpl.createContext(ctx, ctx.ContextNode)
+	sub := tpl.mergeContext(ctx)
 	if err := applyParams(sub); err != nil {
 		return nil, err
 	}
@@ -1542,14 +1577,15 @@ func executeForeach(ctx *Context) (xml.Sequence, error) {
 		return nil, fmt.Errorf("for-each: xml element expected as parent")
 	}
 	for i := range it {
-		sub := ctx.WithXpath(i.Node())
+		node := i.Node()
 		for _, n := range el.Nodes {
 			c := cloneNode(n)
 			if c == nil {
 				continue
 			}
 			parent.Append(c)
-			if _, err := transformNode(sub.WithXsl(c)); err != nil {
+			sub := ctx.WithNodes(node, c)
+			if _, err := transformNode(sub); err != nil {
 				return nil, err
 			}
 		}
@@ -1850,7 +1886,7 @@ func applyParams(ctx *Context) error {
 		if n.QualifiedName() != ctx.getQualifiedName("with-param") {
 			return fmt.Errorf("%s: invalid child node %s", ctx.XslNode.QualifiedName(), n.QualifiedName())
 		}
-		if _, err := transformNode(ctx); err != nil {
+		if _, err := transformNode(ctx.WithXsl(n)); err != nil {
 			return err
 		}
 	}
@@ -1907,7 +1943,7 @@ func executeApply(ctx *Context, match matchFunc) (xml.Sequence, error) {
 			}
 			return nil, err
 		}
-		sub := tpl.createContext(ctx, datum)
+		sub := tpl.mergeContext(ctx.WithXpath(datum))
 		if err := applyParams(sub); err != nil {
 			return nil, err
 		}
