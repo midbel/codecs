@@ -160,8 +160,8 @@ var envFuncs = []registeredBuiltin{
 }
 
 var imgFuncs = []registeredBuiltin{
-	registeredFunc("resize-png", callXYZ),
-	registeredFunc("resize-jpg", callXYZ),
+	registerFunc("resize-png", "image", callXYZ),
+	registerFunc("resize-jpg", "image", callXYZ),
 }
 
 var binaryFuncs = []registeredBuiltin{
