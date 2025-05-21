@@ -193,12 +193,32 @@ func stdioLogger(w io.Writer) *slog.Logger {
 	return slog.New(slog.NewTextHandler(w, &opts))
 }
 
+func (t stdioTracer) Println(msg string) {
+	t.logger.Info(msg)
+}
+
 func (t stdioTracer) Enter(ctx *Context) {
-	t.logger.Debug("start processing instruction", "node", ctx.ContextNode.QualifiedName(), "depth", ctx.Depth)
+	args := []any{
+		"instruction",
+		ctx.XslNode.QualifiedName(),
+		"node", 
+		ctx.ContextNode.QualifiedName(), 
+		"depth", 
+		ctx.Depth,
+	}
+	t.logger.Debug("start instruction", args...)
 }
 
 func (t stdioTracer) Leave(ctx *Context) {
-	t.logger.Debug("done processing instruction", "node", ctx.ContextNode.QualifiedName(), "depth", ctx.Depth)
+	args := []any{
+		"instruction",
+		ctx.XslNode.QualifiedName(),
+		"node", 
+		ctx.ContextNode.QualifiedName(), 
+		"depth", 
+		ctx.Depth,
+	}
+	t.logger.Debug("done instruction", args...)
 }
 
 func (t stdioTracer) Error(ctx *Context, err error) {
@@ -1685,7 +1705,9 @@ func executeMessage(ctx *Context) (xml.Sequence, error) {
 	for _, n := range el.Nodes {
 		parts = append(parts, n.Value())
 	}
-	fmt.Fprintln(os.Stderr, strings.Join(parts, ""))
+	if t, ok := ctx.Tracer.(interface{ Println(string) }); ok {
+		t.Println(strings.Join(parts, ""))
+	}
 
 	if quit, err := getAttribute(el, "terminate"); err == nil && quit == "yes" {
 		return nil, ErrTerminate
