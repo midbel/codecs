@@ -386,7 +386,6 @@ func (e *Env) DefineExprParam(param string, expr xml.Expr) {
 }
 
 type Context struct {
-	CurrentNode xml.Node
 	ContextNode xml.Node
 	Index       int
 	Size        int
@@ -399,20 +398,19 @@ type Context struct {
 }
 
 func (c *Context) Switch(node xml.Node) *Context {
-	return c.clone(c.CurrentNode, node)
+	return c.clone(node)
 }
 
 func (c *Context) Self() *Context {
-	return c.clone(c.CurrentNode, c.ContextNode)
+	return c.clone(c.ContextNode)
 }
 
 func (c *Context) Sub(node xml.Node) *Context {
-	return c.clone(node, node)
+	return c.clone(node)
 }
 
-func (c *Context) clone(currentNode, contextNode xml.Node) *Context {
+func (c *Context) clone(contextNode xml.Node) *Context {
 	child := Context{
-		CurrentNode: currentNode,
 		ContextNode: contextNode,
 		Index:       1,
 		Size:        1,
@@ -427,14 +425,14 @@ func (c *Context) NotFound(node xml.Node, err error, mode string) error {
 	var tmp xml.Node
 	switch mode := c.getMode(mode); mode.NoMatch {
 	case MatchDeepCopy:
-		tmp = cloneNode(c.CurrentNode)
+		tmp = cloneNode(c.ContextNode)
 	case MatchShallowCopy:
-		qn, err := xml.ParseName(c.CurrentNode.QualifiedName())
+		qn, err := xml.ParseName(c.ContextNode.QualifiedName())
 		if err != nil {
 			return err
 		}
 		tmp = xml.NewElement(qn)
-		if el, ok := c.CurrentNode.(*xml.Element); ok {
+		if el, ok := c.ContextNode.(*xml.Element); ok {
 			a := tmp.(*xml.Element)
 			for i := range el.Attrs {
 				a.SetAttribute(el.Attrs[i])
@@ -442,7 +440,7 @@ func (c *Context) NotFound(node xml.Node, err error, mode string) error {
 			tmp = a
 		}
 	case MatchTextOnlyCopy:
-		tmp = xml.NewText(c.CurrentNode.Value())
+		tmp = xml.NewText(c.ContextNode.Value())
 	case MatchFail:
 		return err
 	default:
@@ -540,7 +538,6 @@ func (s *Stylesheet) createContext(node xml.Node) *Context {
 	env := Enclosed(s)
 	env.Namespace = s.namespace
 	ctx := Context{
-		CurrentNode: node,
 		ContextNode: node,
 		Size:        1,
 		Index:       1,
@@ -1629,7 +1626,7 @@ func executeValueOf(ctx *Context, node xml.Node) (xml.Sequence, error) {
 	if err != nil {
 		sep = " "
 	}
-	items, err := ctx.ExecuteQuery(query, ctx.CurrentNode)
+	items, err := ctx.ExecuteQuery(query, ctx.ContextNode)
 	if err != nil || len(items) == 0 {
 		return nil, removeSelf(node)
 	}
