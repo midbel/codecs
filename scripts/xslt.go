@@ -423,35 +423,34 @@ type Context struct {
 	*Env
 }
 
+func (c *Context) SelectCurrentNode() xml.Node {
+	return c.ContextNode
+}
+
+func (c *Context) SelectNode() xml.Node {
+	if c.base == nil {
+		return c.ContextNode
+	}
+	return c.base.SelectCurrentNode()
+}
+
 func (c *Context) queryXSL(query string) (xml.Sequence, error) {
 	return c.Env.queryXSL(query, c.XslNode)
 }
 
 func (c *Context) WithNodes(ctxNode, xslNode xml.Node) *Context {
 	child := c.clone(xslNode, ctxNode)
-	child.parent = c
-	child.base = c.base
-	if c.base == nil {
-		child.base = c
-	}
-	return child
+	return c.setTree(child)
 }
 
 func (c *Context) WithXsl(node xml.Node) *Context {
 	child := c.clone(node, c.ContextNode)
-	child.parent = c
-	child.base = c.base
-	if child.base == nil {
-		child.base = c
-	}
-	return child
+	return c.setTree(child)
 }
 
 func (c *Context) WithXpath(node xml.Node) *Context {
 	child := c.clone(c.XslNode, node)
-	child.parent = c
-	child.base = c.base
-	return child
+	return c.setTree(child)
 }
 
 func (c *Context) Nest() *Context {
@@ -467,33 +466,13 @@ func (c *Context) Copy() *Context {
 	return child
 }
 
-func (c *Context) useBase() bool {
-	if c.base == nil || c.XslNode == nil {
-		return false
+func (c *Context) setTree(child *Context) *Context {
+	child.parent = c
+	child.base = c.base
+	if child.base == nil {
+		child.base = c
 	}
-	curr := c
-	for curr != nil && curr.XslNode != nil {
-		var ok bool
-		switch curr.XslNode.LocalName() {
-		case "source-document":
-			ok = true
-		case "for-each":
-			ok = true
-		default:
-		}
-		if ok {
-			return ok
-		}
-		curr = curr.parent
-	}
-	return false
-}
-
-func (c *Context) ExecuteQuery2(query string) (xml.Sequence, error) {
-	if c.useBase() {
-		return c.base.ExecuteQuery2(query)
-	}
-	return c.Env.ExecuteQuery(query, c.ContextNode)
+	return child
 }
 
 func (c *Context) clone(xslNode, contextNode xml.Node) *Context {
@@ -1722,7 +1701,7 @@ func executeValueOf(ctx *Context) (xml.Sequence, error) {
 	if err != nil {
 		sep = " "
 	}
-	items, err := ctx.ExecuteQuery(query, ctx.ContextNode)
+	items, err := ctx.ExecuteQuery(query, ctx.SelectNode())
 	if err != nil || len(items) == 0 {
 		return nil, removeSelf(ctx.XslNode)
 	}
