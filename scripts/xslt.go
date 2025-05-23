@@ -410,9 +410,6 @@ type Context struct {
 	XslNode     xml.Node
 	ContextNode xml.Node
 
-	parent *Context
-	base   *Context
-
 	Index int
 	Size  int
 	Mode  string
@@ -423,34 +420,20 @@ type Context struct {
 	*Env
 }
 
-func (c *Context) SelectCurrentNode() xml.Node {
-	return c.ContextNode
-}
-
-func (c *Context) SelectNode() xml.Node {
-	if c.base == nil {
-		return c.ContextNode
-	}
-	return c.base.SelectCurrentNode()
-}
-
 func (c *Context) queryXSL(query string) (xml.Sequence, error) {
 	return c.Env.queryXSL(query, c.XslNode)
 }
 
 func (c *Context) WithNodes(ctxNode, xslNode xml.Node) *Context {
-	child := c.clone(xslNode, ctxNode)
-	return c.setTree(child)
+	return c.clone(c.XslNode, node)
 }
 
 func (c *Context) WithXsl(node xml.Node) *Context {
-	child := c.clone(node, c.ContextNode)
-	return c.setTree(child)
+	return c.clone(c.XslNode, node)
 }
 
 func (c *Context) WithXpath(node xml.Node) *Context {
-	child := c.clone(c.XslNode, node)
-	return c.setTree(child)
+	return c.clone(c.XslNode, node)
 }
 
 func (c *Context) Nest() *Context {
@@ -460,19 +443,7 @@ func (c *Context) Nest() *Context {
 }
 
 func (c *Context) Copy() *Context {
-	child := c.clone(c.XslNode, c.ContextNode)
-	child.parent = c
-	child.base = c.base
-	return child
-}
-
-func (c *Context) setTree(child *Context) *Context {
-	child.parent = c
-	child.base = c.base
-	if child.base == nil {
-		child.base = c
-	}
-	return child
+	return c.clone(c.XslNode, c.ContextNode)
 }
 
 func (c *Context) clone(xslNode, contextNode xml.Node) *Context {
@@ -1701,7 +1672,7 @@ func executeValueOf(ctx *Context) (xml.Sequence, error) {
 	if err != nil {
 		sep = " "
 	}
-	items, err := ctx.ExecuteQuery(query, ctx.SelectNode())
+	items, err := ctx.ExecuteQuery(query, ctx.ContextNode)
 	if err != nil || len(items) == 0 {
 		return nil, removeSelf(ctx.XslNode)
 	}
