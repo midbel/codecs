@@ -1132,15 +1132,15 @@ func transformNode(ctx *Context) (xml.Sequence, error) {
 }
 
 func appendNode(ctx *Context) error {
-	elem, ok := ctx.XslNode.(*xml.Element)
-	if !ok {
-		return fmt.Errorf("%s: expected xml element", ctx.XslNode.QualifiedName())
+	elem, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return ctx.errorWithContext(err)
 	}
-	parent, ok := ctx.XslNode.Parent().(*xml.Element)
-	if !ok {
-		return fmt.Errorf("%s: expected xml element", ctx.XslNode.QualifiedName())
+	parent, err := getElementFromNode(elem.Parent())
+	if err != nil {
+		return ctx.errorWithContext(err)
 	}
-	for _, n := range elem.Nodes {
+	for _, n := range slices.Clone(elem.Nodes) {
 		c := cloneNode(n)
 		if c == nil {
 			continue
@@ -1185,17 +1185,16 @@ func processNode(ctx *Context) (xml.Sequence, error) {
 	if err := ctx.SetAttributes(elem); err != nil {
 		return nil, err
 	}
-	res := xml.NewSequence()
-	for _, n := range slices.Clone(elem.Nodes) {
-		c := cloneNode(n)
-		if c == nil {
+	var (
+		nodes = slices.Clone(elem.Nodes)
+		res   = xml.NewSequence()
+	)
+	for i := range nodes {
+		if nodes[i].Type() != xml.TypeElement {
+			res.Append(xml.NewNodeItem(nodes[i]))
 			continue
 		}
-		if c.Type() != xml.TypeElement {
-			res.Append(xml.NewNodeItem(c))
-			continue
-		}
-		seq, err := transformNode(ctx.WithXsl(c))
+		seq, err := transformNode(ctx.WithXsl(nodes[i]))
 		if err != nil {
 			return nil, err
 		}
@@ -1699,12 +1698,15 @@ func executeChoose(ctx *Context) (xml.Sequence, error) {
 }
 
 func executeValueOf(ctx *Context) (xml.Sequence, error) {
-	el := ctx.XslNode.(*xml.Element)
-	query, err := getAttribute(el, "select")
+	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
 	}
-	sep, err := getAttribute(el, "separator")
+	query, err := getAttribute(elem, "select")
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
+	sep, err := getAttribute(elem, "separator")
 	if err != nil {
 		sep = " "
 	}
@@ -1729,14 +1731,17 @@ func executeCopy(ctx *Context) (xml.Sequence, error) {
 }
 
 func executeCopyOf(ctx *Context) (xml.Sequence, error) {
-	el := ctx.XslNode.(*xml.Element)
-	query, err := getAttribute(el, "select")
+	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
+	}
+	query, err := getAttribute(elem, "select")
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
 	}
 	items, err := ctx.ExecuteQuery(query, ctx.ContextNode)
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
 	}
 	var list []xml.Node
 	for i := range items {
@@ -1788,14 +1793,17 @@ func executeSequence(ctx *Context) (xml.Sequence, error) {
 }
 
 func executeElement(ctx *Context) (xml.Sequence, error) {
-	el := ctx.XslNode.(*xml.Element)
-	ident, err := getAttribute(el, "name")
+	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
+	}
+	ident, err := getAttribute(elem, "name")
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
 	}
 	qn, err := xml.ParseName(ident)
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
 	}
 	var (
 		curr  = xml.NewElement(qn)
@@ -1878,10 +1886,10 @@ func iterItems(items []xml.Item, orderBy, orderDir string) (iter.Seq[xml.Item], 
 
 func getNodesForTemplate(ctx *Context) ([]xml.Node, error) {
 	var (
-		el  = ctx.XslNode.(*xml.Element)
-		res []xml.Node
+		elem = ctx.XslNode.(*xml.Element)
+		res  []xml.Node
 	)
-	if query, err := getAttribute(el, "select"); err == nil {
+	if query, err := getAttribute(elem, "select"); err == nil {
 		items, err := ctx.ExecuteQuery(query, ctx.ContextNode)
 		if err != nil {
 			return nil, err
@@ -1896,8 +1904,11 @@ func getNodesForTemplate(ctx *Context) ([]xml.Node, error) {
 }
 
 func applyParams(ctx *Context) error {
-	el := ctx.XslNode.(*xml.Element)
-	for _, n := range slices.Clone(el.Nodes) {
+	elem, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return ctx.errorWithContext(err)
+	}
+	for _, n := range slices.Clone(elem.Nodes) {
 		if n.QualifiedName() != ctx.getQualifiedName("with-param") {
 			return fmt.Errorf("%s: invalid child node %s", ctx.XslNode.QualifiedName(), n.QualifiedName())
 		}
