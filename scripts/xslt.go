@@ -420,20 +420,27 @@ type Context struct {
 	*Env
 }
 
+func (c *Context) errorWithContext(err error) error {
+	if c.XslNode == nil {
+		return err
+	}
+	return errorWithContext(c.XslNode.QualifiedName(), err)
+}
+
 func (c *Context) queryXSL(query string) (xml.Sequence, error) {
 	return c.Env.queryXSL(query, c.XslNode)
 }
 
 func (c *Context) WithNodes(ctxNode, xslNode xml.Node) *Context {
-	return c.clone(c.XslNode, node)
+	return c.clone(xslNode, ctxNode)
 }
 
-func (c *Context) WithXsl(node xml.Node) *Context {
-	return c.clone(c.XslNode, node)
+func (c *Context) WithXsl(xslNode xml.Node) *Context {
+	return c.clone(xslNode, c.ContextNode)
 }
 
-func (c *Context) WithXpath(node xml.Node) *Context {
-	return c.clone(c.XslNode, node)
+func (c *Context) WithXpath(ctxNode xml.Node) *Context {
+	return c.clone(c.XslNode, ctxNode)
 }
 
 func (c *Context) Nest() *Context {
@@ -446,10 +453,10 @@ func (c *Context) Copy() *Context {
 	return c.clone(c.XslNode, c.ContextNode)
 }
 
-func (c *Context) clone(xslNode, contextNode xml.Node) *Context {
+func (c *Context) clone(xslNode, ctxNode xml.Node) *Context {
 	child := Context{
 		XslNode:     xslNode,
-		ContextNode: contextNode,
+		ContextNode: ctxNode,
 		Index:       1,
 		Size:        1,
 		Stylesheet:  c.Stylesheet,
@@ -1110,9 +1117,9 @@ func iterAVT(str string) iter.Seq2[string, bool] {
 }
 
 func transformNode(ctx *Context) (xml.Sequence, error) {
-	elem, ok := ctx.XslNode.(*xml.Element)
-	if !ok {
-		return nil, fmt.Errorf("node: xml element expected (got %s)", elem.QualifiedName())
+	elem, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
 	}
 	fn, ok := executers[elem.QName]
 	if ok {
@@ -1168,10 +1175,10 @@ func processParam(node xml.Node, env *Env) error {
 }
 
 func processNode(ctx *Context) (xml.Sequence, error) {
-	var (
-		elem  = ctx.XslNode.(*xml.Element)
-		nodes = slices.Clone(elem.Nodes)
-	)
+	elem, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return nil, err
+	}
 	if err := processAVT(ctx, elem); err != nil {
 		return nil, err
 	}
@@ -1179,12 +1186,16 @@ func processNode(ctx *Context) (xml.Sequence, error) {
 		return nil, err
 	}
 	res := xml.NewSequence()
-	for i := range nodes {
-		if nodes[i].Type() != xml.TypeElement {
-			res.Append(xml.NewNodeItem(nodes[i]))
+	for _, n := range slices.Clone(elem.Nodes) {
+		c := cloneNode(n)
+		if c == nil {
 			continue
 		}
-		seq, err := transformNode(ctx.WithXsl(nodes[i]))
+		if c.Type() != xml.TypeElement {
+			res.Append(xml.NewNodeItem(c))
+			continue
+		}
+		seq, err := transformNode(ctx.WithXsl(c))
 		if err != nil {
 			return nil, err
 		}
@@ -1194,57 +1205,70 @@ func processNode(ctx *Context) (xml.Sequence, error) {
 }
 
 func executeImport(ctx *Context) (xml.Sequence, error) {
-	el := ctx.XslNode.(*xml.Element)
-	file, err := getAttribute(el, "href")
+	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
+	}
+	file, err := getAttribute(elem, "href")
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
 	}
 	return nil, ctx.ImportSheet(file)
 }
 
 func executeInclude(ctx *Context) (xml.Sequence, error) {
-	el := ctx.XslNode.(*xml.Element)
-	file, err := getAttribute(el, "href")
+	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
+	}
+	file, err := getAttribute(elem, "href")
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
 	}
 	return nil, ctx.IncludeSheet(file)
 }
 
 func executeSourceDocument(ctx *Context) (xml.Sequence, error) {
-	el := ctx.XslNode.(*xml.Element)
-	file, err := getAttribute(el, "href")
+	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
+	}
+	file, err := getAttribute(elem, "href")
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
 	}
 	doc, err := ctx.LoadDocument(file)
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
 	}
-	var (
-		nodes  []xml.Node
-		parent = el.Parent().(*xml.Element)
-	)
+	parent, err := getElementFromNode(elem.Parent())
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
 
-	for _, n := range slices.Clone(el.Nodes) {
+	var nodes []xml.Node
+	for _, n := range slices.Clone(elem.Nodes) {
 		c := cloneNode(n)
 		if c == nil {
 			continue
 		}
 		parent.Append(c)
 		if _, err := transformNode(ctx.WithNodes(doc, c)); err != nil {
-			return nil, err
+			return nil, ctx.errorWithContext(err)
 		}
 		nodes = append(nodes, c)
 	}
-	return nil, removeSelf(el)
+	return nil, removeSelf(elem)
 }
 
 func executeResultDocument(ctx *Context) (xml.Sequence, error) {
-	el := ctx.XslNode.(*xml.Element)
+	elem, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
 
 	var doc xml.Document
-	for _, n := range slices.Clone(el.Nodes) {
+	for _, n := range slices.Clone(elem.Nodes) {
 		c := cloneNode(n)
 		if c == nil {
 			continue
@@ -1255,67 +1279,73 @@ func executeResultDocument(ctx *Context) (xml.Sequence, error) {
 		doc.Nodes = append(doc.Nodes, c)
 	}
 
-	file, err := getAttribute(el, "href")
+	file, err := getAttribute(elem, "href")
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
 	}
-	format, _ := getAttribute(el, "format")
+	format, _ := getAttribute(elem, "format")
 	if err := writeDocument(file, format, &doc, ctx.Stylesheet); err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
 	}
 	if err := removeSelf(ctx.XslNode); err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
 	}
 	return nil, errSkip
 }
 
 func executeVariable(ctx *Context) (xml.Sequence, error) {
-	el := ctx.XslNode.(*xml.Element)
-	ident, err := getAttribute(el, "name")
+	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
+	}
+	ident, err := getAttribute(elem, "name")
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
 	}
 	var seq xml.Sequence
-	if query, err1 := getAttribute(el, "select"); err1 == nil {
+	if query, err1 := getAttribute(elem, "select"); err1 == nil {
 		seq, err = ctx.ExecuteQuery(query, ctx.ContextNode)
 	} else {
-		for _, n := range slices.Clone(el.Nodes) {
+		for _, n := range slices.Clone(elem.Nodes) {
 			c := cloneNode(n)
 			if c == nil {
 				continue
 			}
 			res, err := transformNode(ctx.WithXsl(c))
 			if err != nil {
-				return nil, err
+				return nil, ctx.errorWithContext(err)
 			}
 			seq = slices.Concat(res, res)
 		}
 	}
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
 	}
 	ctx.Define(ident, xml.NewValueFromSequence(seq))
 	return nil, removeSelf(ctx.XslNode)
 }
 
 func executeWithParam(ctx *Context) (xml.Sequence, error) {
-	el := ctx.XslNode.(*xml.Element)
-	ident, err := getAttribute(el, "name")
+	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
 	}
-	if query, err := getAttribute(el, "select"); err == nil {
+	ident, err := getAttribute(elem, "name")
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
+	if query, err := getAttribute(elem, "select"); err == nil {
 		ctx.EvalParam(ident, query, ctx.ContextNode)
 	} else {
 		var res xml.Sequence
-		for _, n := range slices.Clone(el.Nodes) {
+		for _, n := range slices.Clone(elem.Nodes) {
 			c := cloneNode(n)
 			if c == nil {
 				continue
 			}
 			seq, err := transformNode(ctx.WithXsl(c))
 			if err != nil {
-				return nil, err
+				return nil, ctx.errorWithContext(err)
 			}
 			res = slices.Concat(res, seq)
 		}
@@ -1333,21 +1363,27 @@ func executeApplyTemplates(ctx *Context) (xml.Sequence, error) {
 }
 
 func executeCallTemplate(ctx *Context) (xml.Sequence, error) {
-	el := ctx.XslNode.(*xml.Element)
-	name, err := getAttribute(el, "name")
+	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
 	}
-	mode, _ := getAttribute(el, "mode")
+	name, err := getAttribute(elem, "name")
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
+	mode, _ := getAttribute(elem, "mode")
 	tpl, err := ctx.Find(name, mode)
 	if err != nil {
 		return nil, ctx.NotFound(err, mode)
 	}
 	sub := tpl.mergeContext(ctx)
 	if err := applyParams(sub); err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
 	}
-	parent := ctx.XslNode.Parent().(*xml.Element)
+	parent, err := getElementFromNode(elem.Parent())
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
 	for _, n := range slices.Clone(tpl.Nodes) {
 		c := cloneNode(n)
 		if c == nil {
@@ -1355,7 +1391,7 @@ func executeCallTemplate(ctx *Context) (xml.Sequence, error) {
 		}
 		parent.Append(c)
 		if _, err := transformNode(sub.WithXsl(c)); err != nil {
-			return nil, err
+			return nil, ctx.errorWithContext(err)
 		}
 	}
 	return nil, removeSelf(ctx.XslNode)
@@ -1955,12 +1991,24 @@ func isTrue(seq xml.Sequence) bool {
 	return ok
 }
 
+func errorWithContext(ctx string, err error) error {
+	return fmt.Errorf("%s: %w", ctx, err)
+}
+
 func cloneNode(n xml.Node) xml.Node {
 	cloner, ok := n.(xml.Cloner)
 	if !ok {
 		return nil
 	}
 	return cloner.Clone()
+}
+
+func getElementFromNode(node xml.Node) (*xml.Element, error) {
+	el, ok := node.(*xml.Element)
+	if !ok {
+		return nil, fmt.Errorf("%s: xml element expected", node.QualifiedName())
+	}
+	return el, nil
 }
 
 func getAttribute(el *xml.Element, ident string) (string, error) {
