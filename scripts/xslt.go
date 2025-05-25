@@ -768,10 +768,10 @@ func (s *Stylesheet) simplified(root xml.Node) error {
 		return ns.Prefix == xsltNamespacePrefix && ns.Uri == xsltNamespaceUri
 	})
 	if !ok {
-		return nil, fmt.Errorf("simplified stylesheet should declared the xsl namespace")
+		return fmt.Errorf("simplified stylesheet should declared the xsl namespace")
 	}
-	elem.RemoveAttr(xml.QualifiedName(xsltNamespacePrefix, "xmlns"))
-	tpl, err := NewTemplate(elem)$
+	elem.RemoveAttribute(xml.QualifiedName(xsltNamespacePrefix, "xmlns"))
+	tpl, err := NewTemplate(elem)
 	if err == nil {
 		tpl.Match = "/"
 		s.Templates = append(s.Templates, tpl)
@@ -1183,8 +1183,8 @@ func appendNode(ctx *Context) error {
 }
 
 func processParam(node xml.Node, env *Env) error {
-	elem, ok := node.(*xml.Element)
-	if !ok {
+	elem, err := getElementFromNode(node)
+	if err != nil {
 		return fmt.Errorf("xml element expected")
 	}
 	ident, err := getAttribute(elem, "name")
@@ -1558,31 +1558,34 @@ func executeMerge(ctx *Context) (xml.Sequence, error) {
 }
 
 func executeForeach(ctx *Context) (xml.Sequence, error) {
-	el := ctx.XslNode.(*xml.Element)
-	query, err := getAttribute(el, "select")
+	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
+	}
+	query, err := getAttribute(elem, "select")
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
 	}
 
 	items, err := ctx.ExecuteQuery(query, ctx.ContextNode)
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
 	}
 	if len(items) == 0 {
 		return nil, removeSelf(ctx.XslNode)
 	}
 	it, err := applySort(ctx, items)
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
 	}
 
-	parent, ok := ctx.XslNode.Parent().(*xml.Element)
-	if !ok {
-		return nil, fmt.Errorf("for-each: xml element expected as parent")
+	parent, err := getElementFromNode(elem.Parent())
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
 	}
 	for i := range it {
 		node := i.Node()
-		for _, n := range el.Nodes {
+		for _, n := range elem.Nodes {
 			c := cloneNode(n)
 			if c == nil {
 				continue
