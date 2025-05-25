@@ -733,7 +733,7 @@ func (s *Stylesheet) loadOutput(doc xml.Node) error {
 func (s *Stylesheet) init(doc xml.Node) error {
 	if doc, ok := doc.(*xml.Document); ok {
 		root := doc.Root()
-		if root.LocalName() != "stylsheet" && root.LocalName() != "transform" {
+		if root.LocalName() != "stylesheet" && root.LocalName() != "transform" {
 			return s.simplified(doc)
 		}
 	}
@@ -1764,8 +1764,42 @@ func executeMessage(ctx *Context) (xml.Sequence, error) {
 	return nil, nil
 }
 
-func executeWherePopulated(ctx *Context) (xml.Sequence, error) {
+func executeEvaluate(ctx *Context) (xml.Sequence, error) {
 	return nil, errImplemented
+}
+
+func executeAnalyzeString(ctx *Context) (xml.Sequence, error) {
+	return nil, errImplemented
+}
+
+func executeMatchingSubstring(ctx *Context) (xml.Sequence, error) {
+	return nil, errImplemented
+}
+
+func executeNonMatchingSubstring(ctx *Context) (xml.Sequence, error) {
+	return nil, errImplemented
+}
+
+func executeWherePopulated(ctx *Context) (xml.Sequence, error) {
+	nested := ctx.Copy().Nest()
+
+	elem, err := getElementFromNode(nested.XslNode)
+	if err != nil {
+		return nil, nested.errorWithContext(err)
+	}
+	var res xml.Sequence
+	for _, n := range elem.Nodes {
+		c := cloneNode(n)
+		if c == nil {
+			continue
+		}
+		seq, err := transformNode(nested.WithXsl(c))
+		if err != nil {
+			return nil, nested.errorWithContext(err)
+		}
+		res = slices.Concat(res, seq)
+	}
+	return res, removeSelf(elem)
 }
 
 func executeOnEmpty(ctx *Context) (xml.Sequence, error) {
