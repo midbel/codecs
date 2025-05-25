@@ -495,7 +495,7 @@ func (c *Context) NotFound(err error, mode string) error {
 }
 
 type Stylesheet struct {
-	DefaultMode     string
+	DefaultMode string
 
 	namespace   string
 	Mode        string
@@ -1459,16 +1459,20 @@ func executeForeachGroup(ctx *Context) (xml.Sequence, error) {
 	return nil, removeSelf(ctx.XslNode)
 }
 
+type MergedItem struct {
+	xml.Item
+	Key    string
+	Source string
+}
+
 func executeMerge(ctx *Context) (xml.Sequence, error) {
-	type MergeItem struct {
-		xml.Item
-		Key    string
-		Source string
+	elem, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
 	}
 	var (
-		elem   = ctx.XslNode.(*xml.Element)
 		action xml.Node
-		groups = make(map[string][]MergeItem)
+		groups = make(map[string][]MergedItem)
 	)
 
 	for _, n := range elem.Nodes {
@@ -1505,7 +1509,7 @@ func executeMerge(ctx *Context) (xml.Sequence, error) {
 				if err != nil {
 					return nil, err
 				}
-				mit := MergeItem{
+				mit := MergedItem{
 					Item:   items[i],
 					Source: ident,
 					Key:    fmt.Sprint(is[0].Value()),
@@ -1525,44 +1529,9 @@ func executeMerge(ctx *Context) (xml.Sequence, error) {
 	keys := slices.Collect(maps.Keys(groups))
 	slices.Sort(keys)
 	for _, key := range keys {
-		ctx := ctx.Nest()
-
-		items := groups[key]
-		currentKey := func(_ xml.Context, _ []xml.Expr) (xml.Sequence, error) {
-			return xml.Singleton(key), nil
-		}
-		currentGrp := func(ctx xml.Context, args []xml.Expr) (xml.Sequence, error) {
-			if len(args) > 1 {
-				return nil, fmt.Errorf("too many arguments")
-			}
-			var (
-				seq xml.Sequence
-				grp string
-			)
-			if len(args) == 1 {
-				names, err := args[0].Find(ctx)
-				if err != nil {
-					return nil, err
-				}
-				if names.Empty() {
-					return nil, fmt.Errorf("no group avaialble")
-				}
-				grp = fmt.Sprint(names[0].Value())
-			}
-			for i := range items {
-				if grp != "" && items[i].Source != grp {
-					continue
-				}
-				seq.Append(items[i].Item)
-			}
-			return seq, nil
-		}
-		ctx.Builtins.Define("current-merge-group", currentGrp)
-		ctx.Builtins.Define("fn:current-merge-group", currentGrp)
-		ctx.Builtins.Define("current-merge-key", currentKey)
-		ctx.Builtins.Define("fn:current-merge-key", currentKey)
-
-		if err := appendNode(ctx); err != nil {
+		nested := ctx.Nest()
+		defineMergeBuiltins(nested, key, groups[key])
+		if err := appendNode(nested); err != nil {
 			return nil, err
 		}
 	}
@@ -2002,6 +1971,42 @@ func isTrue(seq xml.Sequence) bool {
 	default:
 	}
 	return ok
+}
+
+func defineMergeBuiltins(nested *Context, key string, items MergedItem) {
+	currentKey := func(_ xml.Context, _ []xml.Expr) (xml.Sequence, error) {
+		return xml.Singleton(key), nil
+	}
+	currentGrp := func(ctx xml.Context, args []xml.Expr) (xml.Sequence, error) {
+		if len(args) > 1 {
+			return nil, fmt.Errorf("too many arguments")
+		}
+		var (
+			seq xml.Sequence
+			grp string
+		)
+		if len(args) == 1 {
+			names, err := args[0].Find(ctx)
+			if err != nil {
+				return nil, err
+			}
+			if names.Empty() {
+				return nil, fmt.Errorf("no group available")
+			}
+			grp = fmt.Sprint(names[0].Value())
+		}
+		for i := range items {
+			if grp != "" && items[i].Source != grp {
+				continue
+			}
+			seq.Append(items[i].Item)
+		}
+		return seq, nil
+	}
+	nested.Builtins.Define("current-merge-group", currentGrp)
+	nested.Builtins.Define("fn:current-merge-group", currentGrp)
+	nested.Builtins.Define("current-merge-key", currentKey)
+	nested.Builtins.Define("fn:current-merge-key", currentKey)
 }
 
 func errorWithContext(ctx string, err error) error {
