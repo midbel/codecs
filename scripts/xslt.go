@@ -1399,14 +1399,17 @@ func executeCallTemplate(ctx *Context) (xml.Sequence, error) {
 }
 
 func executeForeachGroup(ctx *Context) (xml.Sequence, error) {
-	el := ctx.XslNode.(*xml.Element)
-	query, err := getAttribute(el, "select")
+	elem, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
+	query, err := getAttribute(elem, "select")
 	if err != nil {
 		return nil, err
 	}
-	parent, ok := el.Parent().(*xml.Element)
-	if !ok {
-		return nil, fmt.Errorf("for-each-group: xml element expected as parent")
+	parent, err := getElementFromNode(elem.Parent())
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
 	}
 
 	items, err := ctx.ExecuteQuery(query, ctx.ContextNode)
@@ -1414,7 +1417,7 @@ func executeForeachGroup(ctx *Context) (xml.Sequence, error) {
 		return nil, err
 	}
 
-	key, err := getAttribute(el, "group-by")
+	key, err := getAttribute(elem, "group-by")
 	if err != nil {
 		return nil, err
 	}
@@ -1422,7 +1425,7 @@ func executeForeachGroup(ctx *Context) (xml.Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	groups := make(map[string][]xml.Item)
+	groups := make(map[string]xml.Sequence)
 	for i := range items {
 		is, err := grpby.Find(items[i].Node())
 		if err != nil {
@@ -1433,19 +1436,8 @@ func executeForeachGroup(ctx *Context) (xml.Sequence, error) {
 	}
 
 	for key, items := range groups {
-		currentGrp := func(_ xml.Context, _ []xml.Expr) (xml.Sequence, error) {
-			return items, nil
-		}
-		currentKey := func(_ xml.Context, _ []xml.Expr) (xml.Sequence, error) {
-			i := xml.NewLiteralItem(key)
-			return []xml.Item{i}, nil
-		}
-		ctx.Builtins.Define("current-group", currentGrp)
-		ctx.Builtins.Define("fn:current-group", currentGrp)
-		ctx.Builtins.Define("current-grouping-key", currentKey)
-		ctx.Builtins.Define("fn:current-grouping-key", currentKey)
-
-		for _, n := range el.Nodes {
+		defineForeachGroupBuiltins(ctx, key, items)
+		for _, n := range elem.Nodes {
 			c := cloneNode(n)
 			if c == nil {
 				continue
@@ -1721,7 +1713,7 @@ func executeCopyOf(ctx *Context) (xml.Sequence, error) {
 			list = append(list, c)
 		}
 	}
-	return nil, insertNodes(el, list...)
+	return nil, insertNodes(elem, list...)
 }
 
 func executeMessage(ctx *Context) (xml.Sequence, error) {
@@ -1778,9 +1770,9 @@ func executeElement(ctx *Context) (xml.Sequence, error) {
 	}
 	var (
 		curr  = xml.NewElement(qn)
-		nodes = slices.Clone(el.Nodes)
+		nodes = slices.Clone(elem.Nodes)
 	)
-	if err := replaceNode(el, curr); err != nil {
+	if err := replaceNode(elem, curr); err != nil {
 		return nil, err
 	}
 	for i := range nodes {
@@ -1973,7 +1965,22 @@ func isTrue(seq xml.Sequence) bool {
 	return ok
 }
 
-func defineMergeBuiltins(nested *Context, key string, items MergedItem) {
+func defineForeachGroupBuiltins(nested *Context, key string, seq xml.Sequence) {
+	currentGrp := func(_ xml.Context, _ []xml.Expr) (xml.Sequence, error) {
+		return seq, nil
+	}
+	currentKey := func(_ xml.Context, _ []xml.Expr) (xml.Sequence, error) {
+		i := xml.NewLiteralItem(key)
+		return []xml.Item{i}, nil
+	}
+
+	nested.Builtins.Define("current-group", currentGrp)
+	nested.Builtins.Define("fn:current-group", currentGrp)
+	nested.Builtins.Define("current-grouping-key", currentKey)
+	nested.Builtins.Define("fn:current-grouping-key", currentKey)
+}
+
+func defineMergeBuiltins(nested *Context, key string, items []MergedItem) {
 	currentKey := func(_ xml.Context, _ []xml.Expr) (xml.Sequence, error) {
 		return xml.Singleton(key), nil
 	}
