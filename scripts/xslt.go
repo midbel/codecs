@@ -731,6 +731,12 @@ func (s *Stylesheet) loadOutput(doc xml.Node) error {
 }
 
 func (s *Stylesheet) init(doc xml.Node) error {
+	if doc, ok := doc.(*xml.Document); ok {
+		root := doc.Root()
+		if root.LocalName() != "stylsheet" && root.LocalName() != "transform" {
+			return s.simplified(doc)
+		}
+	}
 	if err := s.loadTemplates(doc); err != nil {
 		return err
 	}
@@ -750,6 +756,27 @@ func (s *Stylesheet) init(doc xml.Node) error {
 		return err
 	}
 	return nil
+}
+
+func (s *Stylesheet) simplified(root xml.Node) error {
+	elem, err := getElementFromNode(root)
+	if err != nil {
+		return err
+	}
+	list := elem.Namespaces()
+	ok := slices.ContainsFunc(list, func(ns xml.NS) bool {
+		return ns.Prefix == xsltNamespacePrefix && ns.Uri == xsltNamespaceUri
+	})
+	if !ok {
+		return nil, fmt.Errorf("simplified stylesheet should declared the xsl namespace")
+	}
+	elem.RemoveAttr(xml.QualifiedName(xsltNamespacePrefix, "xmlns"))
+	tpl, err := NewTemplate(elem)$
+	if err == nil {
+		tpl.Match = "/"
+		s.Templates = append(s.Templates, tpl)
+	}
+	return err
 }
 
 func (s *Stylesheet) loadTemplates(doc xml.Node) error {
