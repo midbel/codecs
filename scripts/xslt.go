@@ -495,6 +495,8 @@ func (c *Context) NotFound(err error, mode string) error {
 }
 
 type Stylesheet struct {
+	DefaultMode     string
+
 	namespace   string
 	Mode        string
 	currentMode *Mode
