@@ -28,6 +28,7 @@ var (
 	errImplemented = errors.New("not implemented")
 	errUndefined   = errors.New("undefined")
 	errSkip        = errors.New("skip")
+	errEmpty       = errors.New("empty sequence")
 	ErrTerminate   = errors.New("terminate")
 )
 
@@ -1220,6 +1221,9 @@ func processParam(node xml.Node, env *Env) error {
 }
 
 func processNode(ctx *Context) (xml.Sequence, error) {
+	ctx.Enter(ctx)
+	defer ctx.Leave(ctx)
+
 	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
 		return nil, err

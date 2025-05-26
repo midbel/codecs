@@ -23,7 +23,7 @@ const (
 )
 
 func (n NodeType) String() string {
-	switch n{
+	switch n {
 	default:
 		return "<>"
 	case TypeDocument:
