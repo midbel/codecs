@@ -17,13 +17,26 @@ func transformNode(ctx *Context) (xml.Sequence, error) {
 		return nil, ctx.errorWithContext(err)
 	}
 	fn, ok := executers[elem.QName]
-	if ok {
-		if fn == nil {
-			return nil, fmt.Errorf("%s not yet implemented", elem.QualifiedName())
-		}
-		return fn(ctx)
+	if !ok {
+		return processNode(ctx)
 	}
-	return processNode(ctx)
+	if fn == nil {
+		return nil, fmt.Errorf("%s: %w", elem.QualifiedName(), errImplemented)
+	}
+	seq, err := fn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if seq.Len() > 0 {
+		parent, err := getElementFromNode(elem.Parent())
+		if err != nil {
+			return nil, err
+		}
+		for _, i := range seq {
+			parent.Append(i.Node())
+		}
+	}
+	return nil, nil
 }
 
 func appendNode(ctx *Context) error {

@@ -22,6 +22,25 @@ const (
 	typeAll
 )
 
+func (n NodeType) String() string {
+	switch n{
+	default:
+		return "<>"
+	case TypeDocument:
+		return "document"
+	case TypeElement:
+		return "element"
+	case TypeComment:
+		return "comment"
+	case TypeAttribute:
+		return "attribute"
+	case TypeInstruction:
+		return "pi"
+	case TypeText:
+		return "text"
+	}
+}
+
 const typeNode = TypeDocument | TypeElement | TypeComment | TypeAttribute | TypeInstruction
 
 func isNode(n Node) bool {
@@ -843,6 +862,15 @@ func NewText(text string) *Text {
 	return &Text{
 		Content: text,
 	}
+}
+
+func (t *Text) Clone() Node {
+	c := &Text{
+		Content:  t.Content,
+		parent:   t.parent,
+		position: t.position,
+	}
+	return c
 }
 
 func (_ *Text) Type() NodeType {

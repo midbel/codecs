@@ -3,8 +3,8 @@ package xslt
 import (
 	"fmt"
 	"io"
-	"os"
 	"log/slog"
+	"os"
 
 	"github.com/midbel/codecs/xml"
 )
