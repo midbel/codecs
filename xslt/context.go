@@ -1,50 +1,86 @@
 package xslt
 
 import (
+	"fmt"
+	"io"
+	"os"
+	"log/slog"
+
 	"github.com/midbel/codecs/xml"
 )
 
 type Context struct {
-	CurrentNode xml.Node
-	Index       int
-	Size        int
-	Mode        string
+	XslNode     xml.Node
+	ContextNode xml.Node
+
+	Index int
+	Size  int
+	Mode  string
+
+	Depth int
 
 	*Stylesheet
 	*Env
 }
 
-func (c *Context) Self() *Context {
-	return c.Sub(c.CurrentNode)
+func (c *Context) errorWithContext(err error) error {
+	if c.XslNode == nil {
+		return err
+	}
+	return errorWithContext(c.XslNode.QualifiedName(), err)
 }
 
-func (c *Context) Sub(node xml.Node) *Context {
+func (c *Context) queryXSL(query string) (xml.Sequence, error) {
+	return c.Env.queryXSL(query, c.XslNode)
+}
+
+func (c *Context) WithNodes(ctxNode, xslNode xml.Node) *Context {
+	return c.clone(xslNode, ctxNode)
+}
+
+func (c *Context) WithXsl(xslNode xml.Node) *Context {
+	return c.clone(xslNode, c.ContextNode)
+}
+
+func (c *Context) WithXpath(ctxNode xml.Node) *Context {
+	return c.clone(c.XslNode, ctxNode)
+}
+
+func (c *Context) Nest() *Context {
+	child := c.clone(c.XslNode, c.ContextNode)
+	child.Env = child.Env.Sub()
+	return child
+}
+
+func (c *Context) Copy() *Context {
+	return c.clone(c.XslNode, c.ContextNode)
+}
+
+func (c *Context) clone(xslNode, ctxNode xml.Node) *Context {
 	child := Context{
-		CurrentNode: node,
+		XslNode:     xslNode,
+		ContextNode: ctxNode,
 		Index:       1,
 		Size:        1,
 		Stylesheet:  c.Stylesheet,
-		Env:         c.Env.Sub(),
+		Env:         c.Env,
+		Depth:       c.Depth + 1,
 	}
 	return &child
 }
 
-func (c *Context) Execute(query string, node xml.Node) (xml.Sequence, error) {
-	return c.Env.Execute(query, node)
-}
-
-func (c *Context) NotFound(node xml.Node, err error, mode string) error {
+func (c *Context) NotFound(err error, mode string) error {
 	var tmp xml.Node
 	switch mode := c.getMode(mode); mode.NoMatch {
 	case MatchDeepCopy:
-		tmp = cloneNode(c.CurrentNode)
+		tmp = cloneNode(c.ContextNode)
 	case MatchShallowCopy:
-		qn, err := xml.ParseName(c.CurrentNode.QualifiedName())
+		qn, err := xml.ParseName(c.ContextNode.QualifiedName())
 		if err != nil {
 			return err
 		}
 		tmp = xml.NewElement(qn)
-		if el, ok := c.CurrentNode.(*xml.Element); ok {
+		if el, ok := c.ContextNode.(*xml.Element); ok {
 			a := tmp.(*xml.Element)
 			for i := range el.Attrs {
 				a.SetAttribute(el.Attrs[i])
@@ -52,13 +88,13 @@ func (c *Context) NotFound(node xml.Node, err error, mode string) error {
 			tmp = a
 		}
 	case MatchTextOnlyCopy:
-		tmp = xml.NewText(c.CurrentNode.Value())
+		tmp = xml.NewText(c.ContextNode.Value())
 	case MatchFail:
 		return err
 	default:
 		return err
 	}
-	return replaceNode(node, tmp)
+	return replaceNode(c.XslNode, tmp)
 }
 
 type Resolver interface {
@@ -71,6 +107,7 @@ type Env struct {
 	Vars      xml.Environ[xml.Expr]
 	Params    xml.Environ[xml.Expr]
 	Builtins  xml.Environ[xml.BuiltinFunc]
+	Depth     int
 }
 
 func Empty() *Env {
@@ -93,43 +130,35 @@ func (e *Env) Sub() *Env {
 		Vars:      xml.Enclosed[xml.Expr](e.Vars),
 		Params:    xml.Enclosed[xml.Expr](e.Params),
 		Builtins:  e.Builtins,
+		Depth:     e.Depth + 1,
 	}
 }
 
-func (e *Env) Merge(other *Env) {
-	if m, ok := e.Vars.(interface{ Merge(xml.Environ[xml.Expr]) }); ok {
-		m.Merge(other.Vars)
-	}
-	if m, ok := e.Params.(interface{ Merge(xml.Environ[xml.Expr]) }); ok {
-		m.Merge(other.Params)
-	}
+func (e *Env) ExecuteQuery(query string, datum xml.Node) (xml.Sequence, error) {
+	return e.ExecuteQueryWithNS(query, "", datum)
 }
 
-func (e *Env) Execute(query string, datum xml.Node) (xml.Sequence, error) {
-	return e.ExecuteNS(query, "", datum)
-}
-
-func (e *Env) ExecuteNS(query, namespace string, datum xml.Node) (xml.Sequence, error) {
+func (e *Env) ExecuteQueryWithNS(query, namespace string, datum xml.Node) (xml.Sequence, error) {
 	if query == "" {
 		i := xml.NewNodeItem(datum)
-		return []xml.Item{i}, nil
+		return xml.Singleton(i), nil
 	}
-	q, err := e.CompileNS(query, namespace)
+	q, err := e.CompileQueryWithNS(query, namespace)
 	if err != nil {
 		return nil, err
 	}
 	return q.Find(datum)
 }
 
-func (e *Env) Query(query string, datum xml.Node) (xml.Sequence, error) {
-	return e.ExecuteNS(query, e.Namespace, datum)
+func (e *Env) queryXSL(query string, datum xml.Node) (xml.Sequence, error) {
+	return e.ExecuteQueryWithNS(query, e.Namespace, datum)
 }
 
-func (e *Env) Compile(query string) (xml.Expr, error) {
-	return e.CompileNS(query, "")
+func (e *Env) CompileQuery(query string) (xml.Expr, error) {
+	return e.CompileQueryWithNS(query, "")
 }
 
-func (e *Env) CompileNS(query, namespace string) (xml.Expr, error) {
+func (e *Env) CompileQueryWithNS(query, namespace string) (xml.Expr, error) {
 	q, err := xml.Build(query)
 	if err != nil {
 		return nil, err
@@ -142,12 +171,21 @@ func (e *Env) CompileNS(query, namespace string) (xml.Expr, error) {
 	return q, nil
 }
 
-func (e *Env) Test(query string, datum xml.Node) (bool, error) {
-	items, err := e.Execute(query, datum)
+func (e *Env) TestNode(query string, datum xml.Node) (bool, error) {
+	items, err := e.ExecuteQuery(query, datum)
 	if err != nil {
 		return false, err
 	}
 	return isTrue(items), nil
+}
+
+func (e *Env) Merge(other *Env) {
+	if m, ok := e.Vars.(interface{ Merge(xml.Environ[xml.Expr]) }); ok {
+		m.Merge(other.Vars)
+	}
+	if m, ok := e.Params.(interface{ Merge(xml.Environ[xml.Expr]) }); ok {
+		m.Merge(other.Params)
+	}
 }
 
 func (e *Env) Resolve(ident string) (xml.Expr, error) {
@@ -165,14 +203,22 @@ func (e *Env) Resolve(ident string) (xml.Expr, error) {
 	return nil, err
 }
 
-func (e *Env) Define(param string, expr xml.Expr) {
-	e.Vars.Define(param, expr)
+func (e *Env) Define(ident string, expr xml.Expr) {
+	e.Vars.Define(ident, expr)
 }
 
 func (e *Env) DefineParam(param, value string) error {
-	expr, err := e.Compile(value)
+	expr, err := e.CompileQuery(value)
 	if err == nil {
 		e.DefineExprParam(param, expr)
+	}
+	return err
+}
+
+func (e *Env) EvalParam(param, query string, datum xml.Node) error {
+	items, err := e.ExecuteQuery(query, datum)
+	if err == nil {
+		e.DefineExprParam(param, xml.NewValueFromSequence(items))
 	}
 	return err
 }
@@ -181,12 +227,77 @@ func (e *Env) DefineExprParam(param string, expr xml.Expr) {
 	e.Params.Define(param, expr)
 }
 
-func (e *Env) EvalParam(param, query string, datum xml.Node) error {
-	items, err := e.Execute(query, datum)
-	if err == nil {
-		e.DefineExprParam(param, xml.NewValueFromSequence(items))
+type Tracer interface {
+	Enter(*Context)
+	Leave(*Context)
+	Error(*Context, error)
+}
+
+func NoopTracer() Tracer {
+	return discardTracer{}
+}
+
+type discardTracer struct{}
+
+func (_ discardTracer) Enter(_ *Context) {}
+
+func (_ discardTracer) Leave(_ *Context) {}
+
+func (_ discardTracer) Error(_ *Context, _ error) {}
+
+type stdioTracer struct {
+	logger *slog.Logger
+}
+
+func Stdout() Tracer {
+	return stdioTracer{
+		logger: stdioLogger(os.Stdout),
 	}
-	return err
+}
+
+func Stderr() Tracer {
+	return stdioTracer{
+		logger: stdioLogger(os.Stderr),
+	}
+}
+
+func stdioLogger(w io.Writer) *slog.Logger {
+	opts := slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}
+	return slog.New(slog.NewTextHandler(w, &opts))
+}
+
+func (t stdioTracer) Println(msg string) {
+	t.logger.Info(msg)
+}
+
+func (t stdioTracer) Enter(ctx *Context) {
+	args := []any{
+		"instruction",
+		ctx.XslNode.QualifiedName(),
+		"node",
+		ctx.ContextNode.QualifiedName(),
+		"depth",
+		ctx.Depth,
+	}
+	t.logger.Debug("start instruction", args...)
+}
+
+func (t stdioTracer) Leave(ctx *Context) {
+	args := []any{
+		"instruction",
+		ctx.XslNode.QualifiedName(),
+		"node",
+		ctx.ContextNode.QualifiedName(),
+		"depth",
+		ctx.Depth,
+	}
+	t.logger.Debug("done instruction", args...)
+}
+
+func (t stdioTracer) Error(ctx *Context, err error) {
+	t.logger.Error("error while processing instruction", "node", ctx.ContextNode.QualifiedName(), "depth", ctx.Depth, "err", err.Error())
 }
 
 func isTrue(seq xml.Sequence) bool {
@@ -207,4 +318,8 @@ func isTrue(seq xml.Sequence) bool {
 	default:
 	}
 	return ok
+}
+
+func errorWithContext(ctx string, err error) error {
+	return fmt.Errorf("%s: %w", ctx, err)
 }

@@ -11,37 +11,37 @@ import (
 	"github.com/midbel/codecs/xml"
 )
 
-func transformNode(ctx *Context, node xml.Node) (xml.Sequence, error) {
-	elem, ok := node.(*xml.Element)
-	if !ok {
-		return nil, fmt.Errorf("node: xml element expected (got %s)", elem.QualifiedName())
+func transformNode(ctx *Context) (xml.Sequence, error) {
+	elem, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
 	}
 	fn, ok := executers[elem.QName]
 	if ok {
 		if fn == nil {
 			return nil, fmt.Errorf("%s not yet implemented", elem.QualifiedName())
 		}
-		return fn(ctx, node)
+		return fn(ctx)
 	}
-	return processNode(ctx, node)
+	return processNode(ctx)
 }
 
-func appendNode(ctx *Context, node xml.Node) error {
-	elem, ok := node.(*xml.Element)
-	if !ok {
-		return fmt.Errorf("%s: expected xml element", node.QualifiedName())
+func appendNode(ctx *Context) error {
+	elem, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return ctx.errorWithContext(err)
 	}
-	parent, ok := node.Parent().(*xml.Element)
-	if !ok {
-		return fmt.Errorf("%s: expected xml element", node.QualifiedName())
+	parent, err := getElementFromNode(elem.Parent())
+	if err != nil {
+		return ctx.errorWithContext(err)
 	}
-	for _, n := range elem.Nodes {
+	for _, n := range slices.Clone(elem.Nodes) {
 		c := cloneNode(n)
 		if c == nil {
 			continue
 		}
 		parent.Append(c)
-		if _, err := transformNode(ctx, c); err != nil {
+		if _, err := transformNode(ctx.WithXsl(c)); err != nil {
 			return err
 		}
 	}
@@ -49,8 +49,8 @@ func appendNode(ctx *Context, node xml.Node) error {
 }
 
 func processParam(node xml.Node, env *Env) error {
-	elem, ok := node.(*xml.Element)
-	if !ok {
+	elem, err := getElementFromNode(node)
+	if err != nil {
 		return fmt.Errorf("xml element expected")
 	}
 	ident, err := getAttribute(elem, "name")
@@ -69,23 +69,27 @@ func processParam(node xml.Node, env *Env) error {
 	return err
 }
 
-func processNode(ctx *Context, node xml.Node) (xml.Sequence, error) {
+func processNode(ctx *Context) (xml.Sequence, error) {
+	elem, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return nil, err
+	}
+	if err := processAVT(ctx); err != nil {
+		return nil, err
+	}
+	if err := ctx.SetAttributes(elem); err != nil {
+		return nil, err
+	}
 	var (
-		elem  = node.(*xml.Element)
 		nodes = slices.Clone(elem.Nodes)
+		res   = xml.NewSequence()
 	)
-	if err := processAVT(ctx, node); err != nil {
-		return nil, err
-	}
-	if err := ctx.SetAttributes(node); err != nil {
-		return nil, err
-	}
-	res := xml.NewSequence()
 	for i := range nodes {
 		if nodes[i].Type() != xml.TypeElement {
+			res.Append(xml.NewNodeItem(nodes[i]))
 			continue
 		}
-		seq, err := transformNode(ctx, nodes[i])
+		seq, err := transformNode(ctx.WithXsl(nodes[i]))
 		if err != nil {
 			return nil, err
 		}
@@ -144,6 +148,14 @@ func insertNodes(elem xml.Node, nodes ...xml.Node) error {
 		return fmt.Errorf("nodes can not be inserted to parent element of %s", elem.QualifiedName())
 	}
 	return i.InsertNodes(elem.Position(), nodes)
+}
+
+func getElementFromNode(node xml.Node) (*xml.Element, error) {
+	el, ok := node.(*xml.Element)
+	if !ok {
+		return nil, fmt.Errorf("%s: xml element expected", node.QualifiedName())
+	}
+	return el, nil
 }
 
 func getAttribute(el *xml.Element, ident string) (string, error) {

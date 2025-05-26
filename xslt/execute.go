@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"iter"
 	"maps"
-	"os"
-	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
@@ -13,239 +11,289 @@ import (
 	"github.com/midbel/codecs/xml"
 )
 
-type ExecuteFunc func(*Context, xml.Node) (xml.Sequence, error)
+type ExecuteFunc func(*Context) (xml.Sequence, error)
 
 var executers map[xml.QName]ExecuteFunc
 
 func init() {
-	wrap := func(exec ExecuteFunc) ExecuteFunc {
-		fn := func(ctx *Context, node xml.Node) (xml.Sequence, error) {
-			return exec(ctx.Self(), node)
+	nest := func(exec ExecuteFunc) ExecuteFunc {
+		fn := func(ctx *Context) (xml.Sequence, error) {
+			ctx.Enter(ctx)
+			defer ctx.Leave(ctx)
+			seq, err := exec(ctx.Nest())
+			if err != nil {
+				ctx.Error(ctx, err)
+			}
+			return seq, err
+		}
+		return fn
+	}
+	trace := func(exec ExecuteFunc) ExecuteFunc {
+		fn := func(ctx *Context) (xml.Sequence, error) {
+			ctx.Enter(ctx)
+			defer ctx.Leave(ctx)
+
+			seq, err := exec(ctx)
+			if err != nil {
+				ctx.Error(ctx, err)
+			}
+			return seq, err
 		}
 		return fn
 	}
 	executers = map[xml.QName]ExecuteFunc{
-		xml.QualifiedName("for-each", xsltNamespacePrefix):        wrap(executeForeach),
-		xml.QualifiedName("value-of", xsltNamespacePrefix):        executeValueOf,
-		xml.QualifiedName("call-template", xsltNamespacePrefix):   wrap(executeCallTemplate),
-		xml.QualifiedName("apply-templates", xsltNamespacePrefix): wrap(executeApplyTemplates),
-		xml.QualifiedName("apply-imports", xsltNamespacePrefix):   wrap(executeApplyImport),
-		xml.QualifiedName("if", xsltNamespacePrefix):              wrap(executeIf),
-		xml.QualifiedName("choose", xsltNamespacePrefix):          wrap(executeChoose),
-		xml.QualifiedName("where-populated", xsltNamespacePrefix): executeWherePopulated,
-		xml.QualifiedName("on-empty", xsltNamespacePrefix):        executeOnEmpty,
-		xml.QualifiedName("on-not-empty", xsltNamespacePrefix):    executeOnNotEmpty,
-		xml.QualifiedName("try", xsltNamespacePrefix):             wrap(executeTry),
-		xml.QualifiedName("variable", xsltNamespacePrefix):        executeVariable,
-		xml.QualifiedName("result-document", xsltNamespacePrefix): executeResultDocument,
-		xml.QualifiedName("source-document", xsltNamespacePrefix): executeSourceDocument,
-		xml.QualifiedName("import", xsltNamespacePrefix):          executeImport,
-		xml.QualifiedName("include", xsltNamespacePrefix):         executeInclude,
-		xml.QualifiedName("with-param", xsltNamespacePrefix):      executeWithParam,
-		xml.QualifiedName("copy", xsltNamespacePrefix):            executeCopy,
-		xml.QualifiedName("copy-of", xsltNamespacePrefix):         executeCopyOf,
-		xml.QualifiedName("sequence", xsltNamespacePrefix):        executeSequence,
-		xml.QualifiedName("element", xsltNamespacePrefix):         executeElement,
-		xml.QualifiedName("attribute", xsltNamespacePrefix):       executeAttribute,
-		xml.QualifiedName("text", xsltNamespacePrefix):            executeText,
-		xml.QualifiedName("comment", xsltNamespacePrefix):         executeComment,
-		xml.QualifiedName("message", xsltNamespacePrefix):         executeMessage,
-		xml.QualifiedName("fallback", xsltNamespacePrefix):        executeFallback,
-		xml.QualifiedName("merge", xsltNamespacePrefix):           executeMerge,
-		xml.QualifiedName("for-each-group", xsltNamespacePrefix):  executeForeachGroup,
+		xml.QualifiedName("for-each", xsltNamespacePrefix):        nest(executeForeach),
+		xml.QualifiedName("value-of", xsltNamespacePrefix):        trace(executeValueOf),
+		xml.QualifiedName("call-template", xsltNamespacePrefix):   nest(executeCallTemplate),
+		xml.QualifiedName("apply-templates", xsltNamespacePrefix): nest(executeApplyTemplates),
+		xml.QualifiedName("apply-imports", xsltNamespacePrefix):   nest(executeApplyImport),
+		xml.QualifiedName("if", xsltNamespacePrefix):              nest(executeIf),
+		xml.QualifiedName("choose", xsltNamespacePrefix):          nest(executeChoose),
+		xml.QualifiedName("where-populated", xsltNamespacePrefix): trace(executeWherePopulated),
+		xml.QualifiedName("on-empty", xsltNamespacePrefix):        trace(executeOnEmpty),
+		xml.QualifiedName("on-not-empty", xsltNamespacePrefix):    trace(executeOnNotEmpty),
+		xml.QualifiedName("try", xsltNamespacePrefix):             nest(executeTry),
+		xml.QualifiedName("variable", xsltNamespacePrefix):        trace(executeVariable),
+		xml.QualifiedName("result-document", xsltNamespacePrefix): trace(executeResultDocument),
+		xml.QualifiedName("source-document", xsltNamespacePrefix): nest(executeSourceDocument),
+		xml.QualifiedName("import", xsltNamespacePrefix):          trace(executeImport),
+		xml.QualifiedName("include", xsltNamespacePrefix):         trace(executeInclude),
+		xml.QualifiedName("with-param", xsltNamespacePrefix):      trace(executeWithParam),
+		xml.QualifiedName("copy", xsltNamespacePrefix):            trace(executeCopy),
+		xml.QualifiedName("copy-of", xsltNamespacePrefix):         trace(executeCopyOf),
+		xml.QualifiedName("sequence", xsltNamespacePrefix):        trace(executeSequence),
+		xml.QualifiedName("element", xsltNamespacePrefix):         trace(executeElement),
+		xml.QualifiedName("attribute", xsltNamespacePrefix):       trace(executeAttribute),
+		xml.QualifiedName("text", xsltNamespacePrefix):            trace(executeText),
+		xml.QualifiedName("comment", xsltNamespacePrefix):         trace(executeComment),
+		xml.QualifiedName("message", xsltNamespacePrefix):         trace(executeMessage),
+		xml.QualifiedName("fallback", xsltNamespacePrefix):        trace(executeFallback),
+		xml.QualifiedName("merge", xsltNamespacePrefix):           trace(executeMerge),
+		xml.QualifiedName("for-each-group", xsltNamespacePrefix):  trace(executeForeachGroup),
 	}
 }
 
-func executeImport(ctx *Context, node xml.Node) (xml.Sequence, error) {
-	el := node.(*xml.Element)
-	file, err := getAttribute(el, "href")
+func executeImport(ctx *Context) (xml.Sequence, error) {
+	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
+	}
+	file, err := getAttribute(elem, "href")
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
 	}
 	return nil, ctx.ImportSheet(file)
 }
 
-func executeInclude(ctx *Context, node xml.Node) (xml.Sequence, error) {
-	el := node.(*xml.Element)
-	file, err := getAttribute(el, "href")
+func executeInclude(ctx *Context) (xml.Sequence, error) {
+	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
+	}
+	file, err := getAttribute(elem, "href")
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
 	}
 	return nil, ctx.IncludeSheet(file)
 }
 
-func executeSourceDocument(ctx *Context, node xml.Node) (xml.Sequence, error) {
-	el := node.(*xml.Element)
-	file, err := getAttribute(el, "href")
+func executeSourceDocument(ctx *Context) (xml.Sequence, error) {
+	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
 	}
-	doc, err := loadDocument(filepath.Join(ctx.Context, file))
+	file, err := getAttribute(elem, "href")
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
 	}
-	_ = doc // TODO
+	doc, err := ctx.LoadDocument(file)
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
+	parent, err := getElementFromNode(elem.Parent())
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
+
 	var nodes []xml.Node
-	for _, n := range slices.Clone(el.Nodes) {
+	for _, n := range slices.Clone(elem.Nodes) {
 		c := cloneNode(n)
 		if c == nil {
 			continue
 		}
-		if _, err := transformNode(ctx.Self(), c); err != nil {
-			return nil, err
+		parent.Append(c)
+		if _, err := transformNode(ctx.WithNodes(doc, c)); err != nil {
+			return nil, ctx.errorWithContext(err)
 		}
 		nodes = append(nodes, c)
 	}
-	return nil, insertNodes(el, nodes...)
+	return nil, removeSelf(elem)
 }
 
-func executeResultDocument(ctx *Context, node xml.Node) (xml.Sequence, error) {
-	el := node.(*xml.Element)
+func executeResultDocument(ctx *Context) (xml.Sequence, error) {
+	elem, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
 
 	var doc xml.Document
-	for _, n := range slices.Clone(el.Nodes) {
+	for _, n := range slices.Clone(elem.Nodes) {
 		c := cloneNode(n)
 		if c == nil {
 			continue
 		}
-		if _, err := transformNode(ctx, c); err != nil {
+		if _, err := transformNode(ctx.WithXsl(c)); err != nil {
 			return nil, err
 		}
 		doc.Nodes = append(doc.Nodes, c)
 	}
 
-	file, err := getAttribute(el, "href")
+	file, err := getAttribute(elem, "href")
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
 	}
-	format, _ := getAttribute(el, "format")
+	format, _ := getAttribute(elem, "format")
 	if err := writeDocument(file, format, &doc, ctx.Stylesheet); err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
 	}
-	if err := removeSelf(node); err != nil {
-		return nil, err
+	if err := removeSelf(ctx.XslNode); err != nil {
+		return nil, ctx.errorWithContext(err)
 	}
 	return nil, errSkip
 }
 
-func executeVariable(ctx *Context, node xml.Node) (xml.Sequence, error) {
-	el := node.(*xml.Element)
-	ident, err := getAttribute(el, "name")
+func executeVariable(ctx *Context) (xml.Sequence, error) {
+	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
 	}
-	if value, err := getAttribute(el, "select"); err == nil {
-		query, err := ctx.Compile(value)
-		if err != nil {
-			return nil, err
-		}
-		ctx.Define(ident, query)
+	ident, err := getAttribute(elem, "name")
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
+	var seq xml.Sequence
+	if query, err1 := getAttribute(elem, "select"); err1 == nil {
+		seq, err = ctx.ExecuteQuery(query, ctx.ContextNode)
 	} else {
-		var res xml.Sequence
-		for _, n := range slices.Clone(el.Nodes) {
+		for _, n := range slices.Clone(elem.Nodes) {
 			c := cloneNode(n)
 			if c == nil {
 				continue
 			}
-			seq, err := transformNode(ctx, c)
+			res, err := transformNode(ctx.WithXsl(c))
 			if err != nil {
-				return nil, err
+				return nil, ctx.errorWithContext(err)
 			}
-			res = slices.Concat(res, seq)
+			seq = slices.Concat(res, res)
 		}
-		ctx.Define(ident, xml.NewValueFromSequence(res))
 	}
-	return nil, removeSelf(node)
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
+	ctx.Define(ident, xml.NewValueFromSequence(seq))
+	return nil, removeSelf(ctx.XslNode)
 }
 
-func executeWithParam(ctx *Context, node xml.Node) (xml.Sequence, error) {
-	el := node.(*xml.Element)
-	ident, err := getAttribute(el, "name")
+func executeWithParam(ctx *Context) (xml.Sequence, error) {
+	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
 	}
-	if query, err := getAttribute(el, "select"); err == nil {
-		ctx.EvalParam(ident, query, ctx.CurrentNode)
+	ident, err := getAttribute(elem, "name")
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
+	if query, err := getAttribute(elem, "select"); err == nil {
+		ctx.EvalParam(ident, query, ctx.ContextNode)
 	} else {
 		var res xml.Sequence
-		for _, n := range slices.Clone(el.Nodes) {
+		for _, n := range slices.Clone(elem.Nodes) {
 			c := cloneNode(n)
 			if c == nil {
 				continue
 			}
-			seq, err := transformNode(ctx, c)
+			seq, err := transformNode(ctx.WithXsl(c))
 			if err != nil {
-				return nil, err
+				return nil, ctx.errorWithContext(err)
 			}
 			res = slices.Concat(res, seq)
 		}
 		ctx.DefineExprParam(ident, xml.NewValueFromSequence(res))
 	}
-	return nil, removeSelf(node)
+	return nil, removeSelf(ctx.XslNode)
 }
 
-func executeApplyImport(ctx *Context, node xml.Node) (xml.Sequence, error) {
-	return executeApply(ctx, node, ctx.MatchImport)
+func executeApplyImport(ctx *Context) (xml.Sequence, error) {
+	return executeApply(ctx, ctx.MatchImport)
 }
 
-func executeApplyTemplates(ctx *Context, node xml.Node) (xml.Sequence, error) {
-	return executeApply(ctx, node, ctx.Match)
+func executeApplyTemplates(ctx *Context) (xml.Sequence, error) {
+	return executeApply(ctx, ctx.Match)
 }
 
-func executeCallTemplate(ctx *Context, node xml.Node) (xml.Sequence, error) {
-	el := node.(*xml.Element)
-	name, err := getAttribute(el, "name")
+func executeCallTemplate(ctx *Context) (xml.Sequence, error) {
+	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
 	}
-	mode, _ := getAttribute(el, "mode")
+	name, err := getAttribute(elem, "name")
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
+	mode, _ := getAttribute(elem, "mode")
 	tpl, err := ctx.Find(name, mode)
 	if err != nil {
-		return nil, ctx.NotFound(node, err, mode)
+		return nil, ctx.NotFound(err, mode)
 	}
-	sub := tpl.createContext(ctx, ctx.CurrentNode)
-	if err := applyParams(sub, node); err != nil {
-		return nil, err
+	sub := tpl.mergeContext(ctx)
+	if err := applyParams(sub); err != nil {
+		return nil, ctx.errorWithContext(err)
 	}
-	parent := node.Parent().(*xml.Element)
+	parent, err := getElementFromNode(elem.Parent())
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
 	for _, n := range slices.Clone(tpl.Nodes) {
 		c := cloneNode(n)
 		if c == nil {
 			continue
 		}
 		parent.Append(c)
-		if _, err := transformNode(sub, c); err != nil {
-			return nil, err
+		if _, err := transformNode(sub.WithXsl(c)); err != nil {
+			return nil, ctx.errorWithContext(err)
 		}
 	}
-	return nil, removeSelf(node)
+	return nil, removeSelf(ctx.XslNode)
 }
 
-func executeForeachGroup(ctx *Context, node xml.Node) (xml.Sequence, error) {
-	el := node.(*xml.Element)
-	query, err := getAttribute(el, "select")
+func executeForeachGroup(ctx *Context) (xml.Sequence, error) {
+	elem, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
+	query, err := getAttribute(elem, "select")
 	if err != nil {
 		return nil, err
 	}
-	parent, ok := el.Parent().(*xml.Element)
-	if !ok {
-		return nil, fmt.Errorf("for-each-group: xml element expected as parent")
+	parent, err := getElementFromNode(elem.Parent())
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
 	}
 
-	items, err := ctx.Execute(query, ctx.CurrentNode)
+	items, err := ctx.ExecuteQuery(query, ctx.ContextNode)
 	if err != nil || len(items) == 0 {
 		return nil, err
 	}
 
-	key, err := getAttribute(el, "group-by")
+	key, err := getAttribute(elem, "group-by")
 	if err != nil {
 		return nil, err
 	}
-	grpby, err := ctx.Compile(key)
+	grpby, err := ctx.CompileQuery(key)
 	if err != nil {
 		return nil, err
 	}
-	groups := make(map[string][]xml.Item)
+	groups := make(map[string]xml.Sequence)
 	for i := range items {
 		is, err := grpby.Find(items[i].Node())
 		if err != nil {
@@ -256,42 +304,35 @@ func executeForeachGroup(ctx *Context, node xml.Node) (xml.Sequence, error) {
 	}
 
 	for key, items := range groups {
-		currentGrp := func(_ xml.Context, _ []xml.Expr) (xml.Sequence, error) {
-			return items, nil
-		}
-		currentKey := func(_ xml.Context, _ []xml.Expr) (xml.Sequence, error) {
-			i := xml.NewLiteralItem(key)
-			return []xml.Item{i}, nil
-		}
-		ctx.Builtins.Define("current-group", currentGrp)
-		ctx.Builtins.Define("fn:current-group", currentGrp)
-		ctx.Builtins.Define("current-grouping-key", currentKey)
-		ctx.Builtins.Define("fn:current-grouping-key", currentKey)
-
-		for _, n := range el.Nodes {
+		defineForeachGroupBuiltins(ctx, key, items)
+		for _, n := range elem.Nodes {
 			c := cloneNode(n)
 			if c == nil {
 				continue
 			}
 			parent.Append(c)
-			if _, err := transformNode(ctx, c); err != nil {
+			if _, err := transformNode(ctx.WithXsl(c)); err != nil {
 				return nil, err
 			}
 		}
 	}
-	return nil, removeSelf(node)
+	return nil, removeSelf(ctx.XslNode)
 }
 
-func executeMerge(ctx *Context, node xml.Node) (xml.Sequence, error) {
-	type MergeItem struct {
-		xml.Item
-		Key    string
-		Source string
+type MergedItem struct {
+	xml.Item
+	Key    string
+	Source string
+}
+
+func executeMerge(ctx *Context) (xml.Sequence, error) {
+	elem, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
 	}
 	var (
-		elem   = node.(*xml.Element)
 		action xml.Node
-		groups = make(map[string][]MergeItem)
+		groups = make(map[string][]MergedItem)
 	)
 
 	for _, n := range elem.Nodes {
@@ -306,7 +347,7 @@ func executeMerge(ctx *Context, node xml.Node) (xml.Sequence, error) {
 		}
 		var items xml.Sequence
 		if query, err := getAttribute(el, "select"); err == nil {
-			items, err = ctx.Execute(query, ctx.CurrentNode)
+			items, err = ctx.ExecuteQuery(query, ctx.ContextNode)
 			if err != nil {
 				return nil, err
 			}
@@ -319,7 +360,7 @@ func executeMerge(ctx *Context, node xml.Node) (xml.Sequence, error) {
 		if query, err := getAttribute(el.Nodes[0].(*xml.Element), "select"); err != nil {
 			return nil, err
 		} else {
-			grp, err := ctx.Compile(query)
+			grp, err := ctx.CompileQuery(query)
 			if err != nil {
 				return nil, err
 			}
@@ -328,7 +369,7 @@ func executeMerge(ctx *Context, node xml.Node) (xml.Sequence, error) {
 				if err != nil {
 					return nil, err
 				}
-				mit := MergeItem{
+				mit := MergedItem{
 					Item:   items[i],
 					Source: ident,
 					Key:    fmt.Sprint(is[0].Value()),
@@ -348,132 +389,100 @@ func executeMerge(ctx *Context, node xml.Node) (xml.Sequence, error) {
 	keys := slices.Collect(maps.Keys(groups))
 	slices.Sort(keys)
 	for _, key := range keys {
-		ctx := ctx.Self()
-
-		items := groups[key]
-		currentKey := func(_ xml.Context, _ []xml.Expr) (xml.Sequence, error) {
-			return xml.Singleton(key), nil
-		}
-		currentGrp := func(ctx xml.Context, args []xml.Expr) (xml.Sequence, error) {
-			if len(args) > 1 {
-				return nil, fmt.Errorf("too many arguments")
-			}
-			var (
-				seq xml.Sequence
-				grp string
-			)
-			if len(args) == 1 {
-				names, err := args[0].Find(ctx)
-				if err != nil {
-					return nil, err
-				}
-				if names.Empty() {
-					return nil, fmt.Errorf("no group avaialble")
-				}
-				grp = fmt.Sprint(names[0].Value())
-			}
-			for i := range items {
-				if grp != "" && items[i].Source != grp {
-					continue
-				}
-				seq.Append(items[i].Item)
-			}
-			return seq, nil
-		}
-		ctx.Builtins.Define("current-merge-group", currentGrp)
-		ctx.Builtins.Define("fn:current-merge-group", currentGrp)
-		ctx.Builtins.Define("current-merge-key", currentKey)
-		ctx.Builtins.Define("fn:current-merge-key", currentKey)
-
-		if err := appendNode(ctx, node); err != nil {
+		nested := ctx.Nest()
+		defineMergeBuiltins(nested, key, groups[key])
+		if err := appendNode(nested); err != nil {
 			return nil, err
 		}
 	}
-	return nil, removeSelf(node)
+	return nil, removeSelf(ctx.XslNode)
 }
 
-func executeForeach(ctx *Context, node xml.Node) (xml.Sequence, error) {
-	el := node.(*xml.Element)
-	query, err := getAttribute(el, "select")
+func executeForeach(ctx *Context) (xml.Sequence, error) {
+	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
+	}
+	query, err := getAttribute(elem, "select")
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
 	}
 
-	items, err := ctx.Execute(query, ctx.CurrentNode)
+	items, err := ctx.ExecuteQuery(query, ctx.ContextNode)
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
 	}
 	if len(items) == 0 {
-		return nil, removeSelf(node)
+		return nil, removeSelf(ctx.XslNode)
 	}
-	it, err := applySort(ctx, node, items)
+	it, err := applySort(ctx, items)
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
 	}
 
-	parent, ok := node.Parent().(*xml.Element)
-	if !ok {
-		return nil, fmt.Errorf("for-each: xml element expected as parent")
+	parent, err := getElementFromNode(elem.Parent())
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
 	}
 	for i := range it {
-		value := i.Node()
-		for _, n := range el.Nodes {
+		node := i.Node()
+		for _, n := range elem.Nodes {
 			c := cloneNode(n)
 			if c == nil {
 				continue
 			}
 			parent.Append(c)
-			if _, err := transformNode(ctx.Sub(value), c); err != nil {
+			sub := ctx.WithNodes(node, c)
+			if _, err := transformNode(sub); err != nil {
 				return nil, err
 			}
 		}
 	}
-	return nil, removeSelf(node)
+	return nil, removeSelf(ctx.XslNode)
 }
 
-func executeTry(ctx *Context, node xml.Node) (xml.Sequence, error) {
-	el := node.(*xml.Element)
-	items, err := ctx.Query("./catch[last()]", node)
+func executeTry(ctx *Context) (xml.Sequence, error) {
+	items, err := ctx.queryXSL("./catch[last()]")
 	if err != nil {
 		return nil, err
 	}
 	if len(items) > 1 {
 		return nil, fmt.Errorf("only one catch element is allowed")
 	}
-	if _, err := processNode(ctx, el); err != nil {
+	if _, err := processNode(ctx); err != nil {
 		if len(items) > 0 {
 			catch := items[0].Node()
-			if err := removeNode(node, catch); err != nil {
+			if err := removeNode(ctx.XslNode, catch); err != nil {
 				return nil, err
 			}
-			return processNode(ctx.Self(), catch)
+			return processNode(ctx.WithXsl(catch))
 		}
 		return nil, err
 	}
 	return nil, nil
 }
 
-func executeIf(ctx *Context, node xml.Node) (xml.Sequence, error) {
-	el := node.(*xml.Element)
+func executeIf(ctx *Context) (xml.Sequence, error) {
+	el := ctx.XslNode.(*xml.Element)
 	test, err := getAttribute(el, "test")
 	if err != nil {
 		return nil, err
 	}
-	ok, err := ctx.Test(test, ctx.CurrentNode)
+	ok, err := ctx.TestNode(test, ctx.ContextNode)
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
 		return nil, removeSelf(el)
 	}
-	if _, err = processNode(ctx, node); err != nil {
+	if _, err = processNode(ctx); err != nil {
 		return nil, err
 	}
 	return nil, insertNodes(el, el.Nodes...)
 }
 
-func executeChoose(ctx *Context, node xml.Node) (xml.Sequence, error) {
-	items, err := ctx.Query("/when", ctx.CurrentNode)
+func executeChoose(ctx *Context) (xml.Sequence, error) {
+	items, err := ctx.queryXSL("/when")
 	if err != nil {
 		return nil, err
 	}
@@ -483,12 +492,12 @@ func executeChoose(ctx *Context, node xml.Node) (xml.Sequence, error) {
 		if err != nil {
 			return nil, err
 		}
-		ok, err := ctx.Test(test, ctx.CurrentNode)
+		ok, err := ctx.TestNode(test, ctx.ContextNode)
 		if err != nil {
 			return nil, err
 		}
 		if ok {
-			if _, err := processNode(ctx, n); err != nil {
+			if _, err := processNode(ctx); err != nil {
 				return nil, err
 			}
 			var (
@@ -502,14 +511,14 @@ func executeChoose(ctx *Context, node xml.Node) (xml.Sequence, error) {
 		}
 	}
 
-	if items, err = ctx.Query("otherwise", node); err != nil {
+	if items, err = ctx.queryXSL("otherwise"); err != nil {
 		return nil, err
 	}
 	if len(items) == 0 {
 		return nil, nil
 	}
 	n := items[0].Node().(*xml.Element)
-	if _, err := processNode(ctx, n); err != nil {
+	if _, err := processNode(ctx); err != nil {
 		return nil, err
 	}
 	var (
@@ -522,19 +531,22 @@ func executeChoose(ctx *Context, node xml.Node) (xml.Sequence, error) {
 	return nil, nil
 }
 
-func executeValueOf(ctx *Context, node xml.Node) (xml.Sequence, error) {
-	el := node.(*xml.Element)
-	query, err := getAttribute(el, "select")
+func executeValueOf(ctx *Context) (xml.Sequence, error) {
+	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
 	}
-	sep, err := getAttribute(el, "separator")
+	query, err := getAttribute(elem, "select")
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
+	sep, err := getAttribute(elem, "separator")
 	if err != nil {
 		sep = " "
 	}
-	items, err := ctx.Execute(query, ctx.CurrentNode)
+	items, err := ctx.ExecuteQuery(query, ctx.ContextNode)
 	if err != nil || len(items) == 0 {
-		return nil, removeSelf(node)
+		return nil, removeSelf(ctx.XslNode)
 	}
 
 	var str strings.Builder
@@ -545,22 +557,25 @@ func executeValueOf(ctx *Context, node xml.Node) (xml.Sequence, error) {
 		str.WriteString(toString(items[i]))
 	}
 	text := xml.NewText(str.String())
-	return nil, replaceNode(node, text)
+	return nil, replaceNode(ctx.XslNode, text)
 }
 
-func executeCopy(ctx *Context, node xml.Node) (xml.Sequence, error) {
-	return executeCopyOf(ctx, node)
+func executeCopy(ctx *Context) (xml.Sequence, error) {
+	return executeCopyOf(ctx)
 }
 
-func executeCopyOf(ctx *Context, node xml.Node) (xml.Sequence, error) {
-	el := node.(*xml.Element)
-	query, err := getAttribute(el, "select")
+func executeCopyOf(ctx *Context) (xml.Sequence, error) {
+	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
 	}
-	items, err := ctx.Execute(query, ctx.CurrentNode)
+	query, err := getAttribute(elem, "select")
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
+	}
+	items, err := ctx.ExecuteQuery(query, ctx.ContextNode)
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
 	}
 	var list []xml.Node
 	for i := range items {
@@ -569,18 +584,20 @@ func executeCopyOf(ctx *Context, node xml.Node) (xml.Sequence, error) {
 			list = append(list, c)
 		}
 	}
-	return nil, insertNodes(el, list...)
+	return nil, insertNodes(elem, list...)
 }
 
-func executeMessage(ctx *Context, node xml.Node) (xml.Sequence, error) {
+func executeMessage(ctx *Context) (xml.Sequence, error) {
 	var (
 		parts []string
-		el    = node.(*xml.Element)
+		el    = ctx.XslNode.(*xml.Element)
 	)
 	for _, n := range el.Nodes {
 		parts = append(parts, n.Value())
 	}
-	fmt.Fprintln(os.Stderr, strings.Join(parts, ""))
+	if t, ok := ctx.Tracer.(interface{ Println(string) }); ok {
+		t.Println(strings.Join(parts, ""))
+	}
 
 	if quit, err := getAttribute(el, "terminate"); err == nil && quit == "yes" {
 		return nil, ErrTerminate
@@ -588,42 +605,79 @@ func executeMessage(ctx *Context, node xml.Node) (xml.Sequence, error) {
 	return nil, nil
 }
 
-func executeWherePopulated(ctx *Context, node xml.Node) (xml.Sequence, error) {
+func executeEvaluate(ctx *Context) (xml.Sequence, error) {
 	return nil, errImplemented
 }
 
-func executeOnEmpty(ctx *Context, node xml.Node) (xml.Sequence, error) {
+func executeAnalyzeString(ctx *Context) (xml.Sequence, error) {
 	return nil, errImplemented
 }
 
-func executeOnNotEmpty(ctx *Context, node xml.Node) (xml.Sequence, error) {
+func executeMatchingSubstring(ctx *Context) (xml.Sequence, error) {
 	return nil, errImplemented
 }
 
-func executeSequence(ctx *Context, node xml.Node) (xml.Sequence, error) {
-	elem := node.(*xml.Element)
+func executeNonMatchingSubstring(ctx *Context) (xml.Sequence, error) {
+	return nil, errImplemented
+}
+
+func executeWherePopulated(ctx *Context) (xml.Sequence, error) {
+	nested := ctx.Copy().Nest()
+
+	elem, err := getElementFromNode(nested.XslNode)
+	if err != nil {
+		return nil, nested.errorWithContext(err)
+	}
+	var res xml.Sequence
+	for _, n := range elem.Nodes {
+		c := cloneNode(n)
+		if c == nil {
+			continue
+		}
+		seq, err := transformNode(nested.WithXsl(c))
+		if err != nil {
+			return nil, nested.errorWithContext(err)
+		}
+		res = slices.Concat(res, seq)
+	}
+	return res, removeSelf(elem)
+}
+
+func executeOnEmpty(ctx *Context) (xml.Sequence, error) {
+	return nil, errImplemented
+}
+
+func executeOnNotEmpty(ctx *Context) (xml.Sequence, error) {
+	return nil, errImplemented
+}
+
+func executeSequence(ctx *Context) (xml.Sequence, error) {
+	elem := ctx.XslNode.(*xml.Element)
 	query, err := getAttribute(elem, "select")
 	if err != nil {
 		return nil, err
 	}
-	return ctx.Execute(query, ctx.CurrentNode)
+	return ctx.ExecuteQuery(query, ctx.ContextNode)
 }
 
-func executeElement(ctx *Context, node xml.Node) (xml.Sequence, error) {
-	el := node.(*xml.Element)
-	ident, err := getAttribute(el, "name")
+func executeElement(ctx *Context) (xml.Sequence, error) {
+	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
+	}
+	ident, err := getAttribute(elem, "name")
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
 	}
 	qn, err := xml.ParseName(ident)
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
 	}
 	var (
 		curr  = xml.NewElement(qn)
-		nodes = slices.Clone(el.Nodes)
+		nodes = slices.Clone(elem.Nodes)
 	)
-	if err := replaceNode(el, curr); err != nil {
+	if err := replaceNode(elem, curr); err != nil {
 		return nil, err
 	}
 	for i := range nodes {
@@ -632,29 +686,108 @@ func executeElement(ctx *Context, node xml.Node) (xml.Sequence, error) {
 			continue
 		}
 		curr.Append(c)
-		if _, err := transformNode(ctx, c); err != nil {
+		if _, err := transformNode(ctx.WithXsl(c)); err != nil {
 			return nil, err
 		}
 	}
 	return nil, nil
 }
 
-func executeAttribute(ctx *Context, node xml.Node) (xml.Sequence, error) {
+func executeAttribute(ctx *Context) (xml.Sequence, error) {
 	return nil, errImplemented
 }
 
-func executeText(ctx *Context, node xml.Node) (xml.Sequence, error) {
-	text := xml.NewText(node.Value())
-	return nil, replaceNode(node, text)
+func executeText(ctx *Context) (xml.Sequence, error) {
+	text := xml.NewText(ctx.XslNode.Value())
+	return nil, replaceNode(ctx.XslNode, text)
 }
 
-func executeComment(ctx *Context, node xml.Node) (xml.Sequence, error) {
-	comment := xml.NewComment(node.Value())
-	return nil, replaceNode(node, comment)
+func executeComment(ctx *Context) (xml.Sequence, error) {
+	comment := xml.NewComment(ctx.XslNode.Value())
+	return nil, replaceNode(ctx.XslNode, comment)
 }
 
-func executeFallback(ctx *Context, node xml.Node) (xml.Sequence, error) {
+func executeFallback(ctx *Context) (xml.Sequence, error) {
 	return nil, errImplemented
+}
+
+func applyParams(ctx *Context) error {
+	elem, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return ctx.errorWithContext(err)
+	}
+	for _, n := range slices.Clone(elem.Nodes) {
+		if n.QualifiedName() != ctx.getQualifiedName("with-param") {
+			return fmt.Errorf("%s: invalid child node %s", ctx.XslNode.QualifiedName(), n.QualifiedName())
+		}
+		if _, err := transformNode(ctx.WithXsl(n)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func applySort(ctx *Context, items []xml.Item) (iter.Seq[xml.Item], error) {
+	sorts, err := ctx.queryXSL("./sort[1]")
+	if err != nil {
+		return nil, err
+	}
+	if len(sorts) == 0 {
+		return slices.Values(items), nil
+	}
+	tmp := sorts[0].Node()
+	if err := removeSelf(tmp); err != nil {
+		return nil, err
+	}
+	elem, ok := tmp.(*xml.Element)
+	if !ok {
+		return nil, fmt.Errorf("sort: expected xml element")
+	}
+	query, err := getAttribute(elem, "select")
+	if err != nil {
+		return nil, err
+	}
+	order, _ := getAttribute(elem, "order")
+	return iterItems(items, query, order)
+}
+
+type matchFunc func(xml.Node, string) (*Template, error)
+
+func executeApply(ctx *Context, match matchFunc) (xml.Sequence, error) {
+	nodes, err := getNodesForTemplate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(nodes) == 0 {
+		return nil, removeSelf(ctx.XslNode)
+	}
+	var (
+		el      = ctx.XslNode.(*xml.Element)
+		mode, _ = getAttribute(el, "mode")
+		results []xml.Node
+	)
+	for _, datum := range nodes {
+		tpl, err := match(datum, mode)
+		if err != nil {
+			for i := range nodes {
+				sub := ctx.WithXpath(nodes[i])
+				if err = sub.NotFound(err, mode); err != nil {
+					return nil, err
+				}
+			}
+			return nil, err
+		}
+		sub := tpl.mergeContext(ctx.WithXpath(datum))
+		if err := applyParams(sub); err != nil {
+			return nil, err
+		}
+		res, err := tpl.Execute(sub)
+		if err != nil {
+			return nil, err
+		}
+		results = slices.Concat(results, res)
+	}
+	return nil, insertNodes(ctx.XslNode, results...)
 }
 
 func iterItems(items []xml.Item, orderBy, orderDir string) (iter.Seq[xml.Item], error) {
@@ -698,13 +831,13 @@ func iterItems(items []xml.Item, orderBy, orderDir string) (iter.Seq[xml.Item], 
 	return fn, nil
 }
 
-func getNodesForTemplate(ctx *Context, node xml.Node) ([]xml.Node, error) {
+func getNodesForTemplate(ctx *Context) ([]xml.Node, error) {
 	var (
-		el  = node.(*xml.Element)
-		res []xml.Node
+		elem = ctx.XslNode.(*xml.Element)
+		res  []xml.Node
 	)
-	if query, err := getAttribute(el, "select"); err == nil {
-		items, err := ctx.Execute(query, ctx.CurrentNode)
+	if query, err := getAttribute(elem, "select"); err == nil {
+		items, err := ctx.ExecuteQuery(query, ctx.ContextNode)
 		if err != nil {
 			return nil, err
 		}
@@ -712,83 +845,58 @@ func getNodesForTemplate(ctx *Context, node xml.Node) ([]xml.Node, error) {
 			res = append(res, items[i].Node())
 		}
 	} else {
-		res = []xml.Node{cloneNode(ctx.CurrentNode)}
+		res = []xml.Node{cloneNode(ctx.ContextNode)}
 	}
 	return res, nil
 }
 
-func applyParams(ctx *Context, node xml.Node) error {
-	el := node.(*xml.Element)
-	for _, n := range slices.Clone(el.Nodes) {
-		if n.QualifiedName() != ctx.getQualifiedName("with-param") {
-			return fmt.Errorf("%s: invalid child node %s", node.QualifiedName(), n.QualifiedName())
-		}
-		if _, err := transformNode(ctx, n); err != nil {
-			return err
-		}
+func defineForeachGroupBuiltins(nested *Context, key string, seq xml.Sequence) {
+	currentGrp := func(_ xml.Context, _ []xml.Expr) (xml.Sequence, error) {
+		return seq, nil
 	}
-	return nil
+	currentKey := func(_ xml.Context, _ []xml.Expr) (xml.Sequence, error) {
+		i := xml.NewLiteralItem(key)
+		return []xml.Item{i}, nil
+	}
+
+	nested.Builtins.Define("current-group", currentGrp)
+	nested.Builtins.Define("fn:current-group", currentGrp)
+	nested.Builtins.Define("current-grouping-key", currentKey)
+	nested.Builtins.Define("fn:current-grouping-key", currentKey)
 }
 
-func applySort(ctx *Context, node xml.Node, items []xml.Item) (iter.Seq[xml.Item], error) {
-	sorts, err := ctx.Query("./sort[1]", node)
-	if err != nil {
-		return nil, err
+func defineMergeBuiltins(nested *Context, key string, items []MergedItem) {
+	currentKey := func(_ xml.Context, _ []xml.Expr) (xml.Sequence, error) {
+		return xml.Singleton(key), nil
 	}
-	if len(sorts) == 0 {
-		return slices.Values(items), nil
-	}
-	tmp := sorts[0].Node()
-	if err := removeSelf(tmp); err != nil {
-		return nil, err
-	}
-	elem, ok := tmp.(*xml.Element)
-	if !ok {
-		return nil, fmt.Errorf("sort: expected xml element")
-	}
-	query, err := getAttribute(elem, "select")
-	if err != nil {
-		return nil, err
-	}
-	order, _ := getAttribute(elem, "order")
-	return iterItems(items, query, order)
-}
-
-type matchFunc func(xml.Node, string) (*Template, error)
-
-func executeApply(ctx *Context, node xml.Node, match matchFunc) (xml.Sequence, error) {
-	nodes, err := getNodesForTemplate(ctx, node)
-	if err != nil {
-		return nil, err
-	}
-	if len(nodes) == 0 {
-		return nil, removeNode(node, node)
-	}
-	var (
-		el      = node.(*xml.Element)
-		mode, _ = getAttribute(el, "mode")
-		results []xml.Node
-	)
-	for _, datum := range nodes {
-		tpl, err := match(datum, mode)
-		if err != nil {
-			for i := range nodes {
-				sub := ctx.Sub(nodes[i])
-				if err = sub.NotFound(node, err, mode); err != nil {
-					return nil, err
-				}
+	currentGrp := func(ctx xml.Context, args []xml.Expr) (xml.Sequence, error) {
+		if len(args) > 1 {
+			return nil, fmt.Errorf("too many arguments")
+		}
+		var (
+			seq xml.Sequence
+			grp string
+		)
+		if len(args) == 1 {
+			names, err := args[0].Find(ctx)
+			if err != nil {
+				return nil, err
 			}
-			return nil, err
+			if names.Empty() {
+				return nil, fmt.Errorf("no group available")
+			}
+			grp = fmt.Sprint(names[0].Value())
 		}
-		sub := tpl.createContext(ctx, datum)
-		if err := applyParams(sub, node); err != nil {
-			return nil, err
+		for i := range items {
+			if grp != "" && items[i].Source != grp {
+				continue
+			}
+			seq.Append(items[i].Item)
 		}
-		res, err := tpl.Execute(sub)
-		if err != nil {
-			return nil, err
-		}
-		results = slices.Concat(results, res)
+		return seq, nil
 	}
-	return nil, insertNodes(node, results...)
+	nested.Builtins.Define("current-merge-group", currentGrp)
+	nested.Builtins.Define("fn:current-merge-group", currentGrp)
+	nested.Builtins.Define("current-merge-key", currentKey)
+	nested.Builtins.Define("fn:current-merge-key", currentKey)
 }

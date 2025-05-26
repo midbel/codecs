@@ -76,9 +76,10 @@ type AttributeSet struct {
 }
 
 type Stylesheet struct {
+	DefaultMode string
+
 	namespace   string
 	Mode        string
-	Streamable  bool
 	currentMode *Mode
 	Modes       []*Mode
 	AttrSet     []*AttributeSet
@@ -86,6 +87,7 @@ type Stylesheet struct {
 	output    []*Output
 	Templates []*Template
 	*Env
+	Tracer
 
 	Context string
 	Others  []*Stylesheet
@@ -206,6 +208,11 @@ func (s *Stylesheet) IncludeSheet(file string) error {
 	return nil
 }
 
+func (s *Stylesheet) LoadDocument(file string) (xml.Node, error) {
+	file = filepath.Join(s.Context, file)
+	return loadDocument(file)
+}
+
 func (s *Stylesheet) SetAttributes(node xml.Node) error {
 	elem := node.(*xml.Element)
 	if elem == nil {
@@ -250,7 +257,7 @@ func (s *Stylesheet) createContext(node xml.Node) *Context {
 	env := Enclosed(s)
 	env.Namespace = s.namespace
 	ctx := Context{
-		CurrentNode: node,
+		ContextNode: node,
 		Size:        1,
 		Index:       1,
 		Stylesheet:  s,
@@ -282,13 +289,13 @@ func (s *Stylesheet) init(doc xml.Node) error {
 }
 
 func (s *Stylesheet) includesSheet(doc xml.Node) error {
-	items, err := s.Query("/stylesheet/include | /transform/include", doc)
+	items, err := s.queryXSL("/stylesheet/include | /transform/include", doc)
 	if err != nil {
 		return err
 	}
 	ctx := s.createContext(nil)
 	for _, i := range items {
-		_, err := executeInclude(ctx, i.Node())
+		_, err := executeInclude(ctx.WithXsl(i.Node()))
 		if err != nil {
 			return err
 		}
@@ -297,13 +304,13 @@ func (s *Stylesheet) includesSheet(doc xml.Node) error {
 }
 
 func (s *Stylesheet) importsSheet(doc xml.Node) error {
-	items, err := s.Query("/stylesheet/import | /transform/import", doc)
+	items, err := s.queryXSL("/stylesheet/import | /transform/import", doc)
 	if err != nil {
 		return err
 	}
 	ctx := s.createContext(nil)
 	for _, i := range items {
-		_, err := executeImport(ctx, i.Node())
+		_, err := executeImport(ctx.WithXsl(i.Node()))
 		if err != nil {
 			return err
 		}
@@ -312,7 +319,7 @@ func (s *Stylesheet) importsSheet(doc xml.Node) error {
 }
 
 func (s *Stylesheet) loadAttributeSet(doc xml.Node) error {
-	items, err := s.Query("/stylesheet/attribute-set | /transform/attribute-set", doc)
+	items, err := s.queryXSL("/stylesheet/attribute-set | /transform/attribute-set", doc)
 	if err != nil {
 		return err
 	}
@@ -346,7 +353,7 @@ func (s *Stylesheet) loadAttributeSet(doc xml.Node) error {
 }
 
 func (s *Stylesheet) loadModes(doc xml.Node) error {
-	items, err := s.Query("/stylesheet/mode | /transform/mode", doc)
+	items, err := s.queryXSL("/stylesheet/mode | /transform/mode", doc)
 	if err != nil {
 		return err
 	}
@@ -377,7 +384,7 @@ func (s *Stylesheet) loadModes(doc xml.Node) error {
 }
 
 func (s *Stylesheet) loadParams(doc xml.Node) error {
-	items, err := s.Query("/stylesheet/param | transform/param", doc)
+	items, err := s.queryXSL("/stylesheet/param | transform/param", doc)
 	if err != nil {
 		return err
 	}
@@ -391,7 +398,7 @@ func (s *Stylesheet) loadParams(doc xml.Node) error {
 			return err
 		}
 		if query, err := getAttribute(n, "select"); err == nil {
-			expr, err := s.Compile(query)
+			expr, err := s.CompileQuery(query)
 			if err != nil {
 				return err
 			}
@@ -408,7 +415,7 @@ func (s *Stylesheet) loadParams(doc xml.Node) error {
 }
 
 func (s *Stylesheet) loadOutput(doc xml.Node) error {
-	items, err := s.Query("/stylesheet/output | /transform/output", doc)
+	items, err := s.queryXSL("/stylesheet/output | /transform/output", doc)
 	if err != nil {
 		return err
 	}
@@ -443,7 +450,7 @@ func (s *Stylesheet) loadOutput(doc xml.Node) error {
 }
 
 func (s *Stylesheet) loadTemplates(doc xml.Node) error {
-	items, err := s.Query("/stylesheet/template | /transform/template", doc)
+	items, err := s.queryXSL("/stylesheet/template | /transform/template", doc)
 	if err != nil {
 		return err
 	}
@@ -516,7 +523,7 @@ func (s *Stylesheet) getMatchingTemplates(list []*Template, node xml.Node, mode 
 		if t.isRoot() || t.Mode != mode || t.Name != "" {
 			continue
 		}
-		expr, err := s.Compile(t.Match)
+		expr, err := s.CompileQuery(t.Match)
 		if err != nil {
 			continue
 		}
@@ -611,7 +618,7 @@ func (t *Template) Execute(ctx *Context) ([]xml.Node, error) {
 		if c == nil {
 			continue
 		}
-		if _, err := transformNode(ctx, c); err != nil {
+		if _, err := transformNode(ctx.WithXsl(c)); err != nil {
 			if errors.Is(err, errSkip) {
 				continue
 			}
@@ -622,10 +629,11 @@ func (t *Template) Execute(ctx *Context) ([]xml.Node, error) {
 	return nodes, nil
 }
 
-func (t *Template) createContext(other *Context, node xml.Node) *Context {
-	other = other.Sub(node)
-	other.Env.Merge(t.env)
-	return other
+func (t *Template) mergeContext(other *Context) *Context {
+	child := other.Copy()
+	child.Env = child.Env.Sub()
+	child.Env.Merge(t.env)
+	return child
 }
 
 func (t *Template) isRoot() bool {

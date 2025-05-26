@@ -1090,9 +1090,12 @@ func (t *Template) isRoot() bool {
 	return t.Match == "/"
 }
 
-func processAVT(ctx *Context, node xml.Node) error {
-	el := node.(*xml.Element)
-	for i, a := range el.Attrs {
+func processAVT(ctx *Context) error {
+	elem, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return err
+	}
+	for i, a := range elem.Attrs {
 		var (
 			value = a.Value()
 			str   strings.Builder
@@ -1110,7 +1113,7 @@ func processAVT(ctx *Context, node xml.Node) error {
 				str.WriteString(toString(items[i]))
 			}
 		}
-		el.Attrs[i].Datum = str.String()
+		elem.Attrs[i].Datum = str.String()
 	}
 	return nil
 }
@@ -1208,7 +1211,7 @@ func processNode(ctx *Context) (xml.Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := processAVT(ctx, elem); err != nil {
+	if err := processAVT(ctx); err != nil {
 		return nil, err
 	}
 	if err := ctx.SetAttributes(elem); err != nil {

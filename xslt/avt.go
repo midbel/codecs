@@ -3,13 +3,14 @@ package xslt
 import (
 	"iter"
 	"strings"
-
-	"github.com/midbel/codecs/xml"
 )
 
-func processAVT(ctx *Context, node xml.Node) error {
-	el := node.(*xml.Element)
-	for i, a := range el.Attrs {
+func processAVT(ctx *Context) error {
+	elem, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return err
+	}
+	for i, a := range elem.Attrs {
 		var (
 			value = a.Value()
 			str   strings.Builder
@@ -19,7 +20,7 @@ func processAVT(ctx *Context, node xml.Node) error {
 				str.WriteString(q)
 				continue
 			}
-			items, err := ctx.Execute(q, ctx.CurrentNode)
+			items, err := ctx.ExecuteQuery(q, ctx.ContextNode)
 			if err != nil {
 				return err
 			}
@@ -27,7 +28,7 @@ func processAVT(ctx *Context, node xml.Node) error {
 				str.WriteString(toString(items[i]))
 			}
 		}
-		el.Attrs[i].Datum = str.String()
+		elem.Attrs[i].Datum = str.String()
 	}
 	return nil
 }
