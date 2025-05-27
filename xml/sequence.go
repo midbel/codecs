@@ -2,6 +2,7 @@ package xml
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 )
@@ -45,6 +46,10 @@ func (s *Sequence) Len() int {
 
 func (s *Sequence) Append(item Item) {
 	*s = append(*s, item)
+}
+
+func (s *Sequence) Concat(other Sequence) {
+	*s = slices.Concat(*s, other)
 }
 
 func (s *Sequence) True() bool {

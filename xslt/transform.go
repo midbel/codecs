@@ -23,42 +23,27 @@ func transformNode(ctx *Context) (xml.Sequence, error) {
 	if fn == nil {
 		return nil, fmt.Errorf("%s: %w", elem.QualifiedName(), errImplemented)
 	}
-	seq, err := fn(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if seq.Len() > 0 {
-		parent, err := getElementFromNode(elem.Parent())
-		if err != nil {
-			return nil, err
-		}
-		for _, i := range seq {
-			parent.Append(i.Node())
-		}
-	}
-	return nil, nil
+	return fn(ctx)
 }
 
-func appendNode(ctx *Context) error {
+func appendNode(ctx *Context) (xml.Sequence, error) {
 	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
-		return ctx.errorWithContext(err)
+		return nil, ctx.errorWithContext(err)
 	}
-	parent, err := getElementFromNode(elem.Parent())
-	if err != nil {
-		return ctx.errorWithContext(err)
-	}
-	for _, n := range slices.Clone(elem.Nodes) {
+	seq := xml.NewSequence()
+	for _, n := range elem.Nodes {
 		c := cloneNode(n)
 		if c == nil {
 			continue
 		}
-		parent.Append(c)
-		if _, err := transformNode(ctx.WithXsl(c)); err != nil {
-			return err
+		res, err := transformNode(ctx.WithXsl(c))
+		if err != nil {
+			return nil, err
 		}
+		seq.Concat(res)
 	}
-	return nil
+	return seq, nil
 }
 
 func processParam(node xml.Node, env *Env) error {
@@ -95,20 +80,20 @@ func processNode(ctx *Context) (xml.Sequence, error) {
 	}
 	var (
 		nodes = slices.Clone(elem.Nodes)
-		res   = xml.NewSequence()
+		seq   = xml.NewSequence()
 	)
 	for i := range nodes {
 		if nodes[i].Type() != xml.TypeElement {
-			res.Append(xml.NewNodeItem(nodes[i]))
+			seq.Append(xml.NewNodeItem(nodes[i]))
 			continue
 		}
-		seq, err := transformNode(ctx.WithXsl(nodes[i]))
+		res, err := transformNode(ctx.WithXsl(nodes[i]))
 		if err != nil {
 			return nil, err
 		}
-		res = slices.Concat(res, seq)
+		seq.Concat(res)
 	}
-	return res, nil
+	return seq, nil
 }
 
 func cloneNode(n xml.Node) xml.Node {

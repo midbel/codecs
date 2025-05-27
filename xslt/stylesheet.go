@@ -618,13 +618,16 @@ func (t *Template) Execute(ctx *Context) ([]xml.Node, error) {
 		if c == nil {
 			continue
 		}
-		if _, err := transformNode(ctx.WithXsl(c)); err != nil {
+		res, err := transformNode(ctx.WithXsl(c))
+		if err != nil {
 			if errors.Is(err, errSkip) {
 				continue
 			}
 			return nil, err
 		}
-		nodes = append(nodes, c)
+		for i := range res {
+			nodes = append(nodes, res[i].Node())
+		}
 	}
 	return nodes, nil
 }
