@@ -519,8 +519,11 @@ func executeValueOf(ctx *Context) (xml.Sequence, error) {
 		sep = " "
 	}
 	items, err := ctx.ExecuteQuery(query, ctx.ContextNode)
-	if err != nil || len(items) == 0 {
+	if err != nil {
 		return nil, err
+	}
+	if len(items) == 0 {
+		return nil, nil
 	}
 
 	var str strings.Builder
@@ -596,7 +599,26 @@ func executeNonMatchingSubstring(ctx *Context) (xml.Sequence, error) {
 }
 
 func executeWherePopulated(ctx *Context) (xml.Sequence, error) {
-	return nil, errImplemented
+	elem, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
+	var (
+		nodes = slices.Clone(elem.Nodes)
+		seq   xml.Sequence
+	)
+
+	for _, n := range nodes {
+		res, err := transformNode(ctx.WithXsl(n))
+		if err != nil {
+			return nil, err
+		}
+		seq.Concat(res)
+	}
+	if seq.Empty() {
+		return nil, errEmpty
+	}
+	return seq, nil
 }
 
 func executeOnEmpty(ctx *Context) (xml.Sequence, error) {

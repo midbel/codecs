@@ -20,6 +20,7 @@ var (
 	errImplemented = errors.New("not implemented")
 	errUndefined   = errors.New("undefined")
 	errSkip        = errors.New("skip")
+	errEmpty       = errors.New("empty")
 	ErrTerminate   = errors.New("terminate")
 )
 
@@ -182,11 +183,17 @@ func (s *Stylesheet) Execute(doc xml.Node) (xml.Node, error) {
 	}
 	nodes, err := tpl.Execute(s.createContext(doc))
 	if err == nil {
-		var doc xml.Document
-		for i := range nodes {
-			doc.Append(nodes[i])
+		var root xml.Node
+		if len(nodes) != 1 {
+			elem := xml.NewElement(xml.LocalName("angle"))
+			for i := range nodes {
+				elem.Append(nodes[i])
+			}
+			root = elem
+		} else {
+			root = nodes[0]
 		}
-		return &doc, nil
+		return xml.NewDocument(root), nil
 	}
 	return nil, err
 }
