@@ -66,32 +66,29 @@ func (c *Context) clone(xslNode, ctxNode xml.Node) *Context {
 	return &child
 }
 
-func (c *Context) NotFound(err error, mode string) error {
+func (c *Context) NotFound(err error, mode string) (xml.Sequence, error) {
 	var tmp xml.Node
 	switch mode := c.getMode(mode); mode.NoMatch {
 	case MatchDeepCopy:
 		tmp = cloneNode(c.ContextNode)
 	case MatchShallowCopy:
-		qn, err := xml.ParseName(c.ContextNode.QualifiedName())
+		elem, err := getElementFromNode(c.ContextNode)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		tmp = xml.NewElement(qn)
-		if el, ok := c.ContextNode.(*xml.Element); ok {
-			a := tmp.(*xml.Element)
-			for i := range el.Attrs {
-				a.SetAttribute(el.Attrs[i])
-			}
-			tmp = a
+		curr := xml.NewElement(elem.QName)
+		for i := range elem.Attrs {
+			curr.SetAttribute(elem.Attrs[i])
 		}
+		tmp = curr
 	case MatchTextOnlyCopy:
 		tmp = xml.NewText(c.ContextNode.Value())
 	case MatchFail:
-		return err
+		return nil, err
 	default:
-		return err
+		return nil, err
 	}
-	return replaceNode(c.XslNode, tmp)
+	return xml.Singleton(tmp), nil
 }
 
 type Resolver interface {

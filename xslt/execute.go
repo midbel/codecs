@@ -239,7 +239,7 @@ func executeCallTemplate(ctx *Context) (xml.Sequence, error) {
 	mode, _ := getAttribute(elem, "mode")
 	tpl, err := ctx.Find(name, mode)
 	if err != nil {
-		return nil, ctx.NotFound(err, mode)
+		return ctx.NotFound(err, mode)
 	}
 	sub := tpl.mergeContext(ctx)
 	if err := applyParams(sub); err != nil {
@@ -410,7 +410,7 @@ func executeForeach(ctx *Context) (xml.Sequence, error) {
 		return nil, ctx.errorWithContext(err)
 	}
 	if len(items) == 0 {
-		return nil, removeSelf(ctx.XslNode)
+		return nil, nil
 	}
 	it, err := applySort(ctx, items)
 	if err != nil {
@@ -726,12 +726,13 @@ func executeApply(ctx *Context, match matchFunc) (xml.Sequence, error) {
 		tpl, err := match(datum, mode)
 		if err != nil {
 			for i := range nodes {
-				sub := ctx.WithXpath(nodes[i])
-				if err = sub.NotFound(err, mode); err != nil {
+				res, err := ctx.WithXpath(nodes[i]).NotFound(err, mode)
+				if err != nil {
 					return nil, err
 				}
+				seq.Concat(res)
 			}
-			return nil, err
+			return seq, nil
 		}
 		sub := tpl.mergeContext(ctx.WithXpath(datum))
 		if err := applyParams(sub); err != nil {

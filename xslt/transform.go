@@ -115,50 +115,6 @@ func cloneNode(n xml.Node) xml.Node {
 	return cloner.Clone()
 }
 
-func removeNode(elem, node xml.Node) error {
-	if node == nil {
-		return nil
-	}
-	return removeAt(elem, node.Position())
-}
-
-func removeAt(elem xml.Node, pos int) error {
-	p := elem.Parent()
-	r, ok := p.(interface{ RemoveNode(int) error })
-	if !ok {
-		return fmt.Errorf("node can not be removed from parent element of %s", elem.QualifiedName())
-	}
-	return r.RemoveNode(pos)
-}
-
-func removeSelf(elem xml.Node) error {
-	return removeNode(elem, elem)
-}
-
-func replaceNode(elem, node xml.Node) error {
-	if node == nil {
-		return nil
-	}
-	p := elem.Parent()
-	r, ok := p.(interface{ ReplaceNode(int, xml.Node) error })
-	if !ok {
-		return fmt.Errorf("node can not be replaced from parent element of %s", elem.QualifiedName())
-	}
-	return r.ReplaceNode(elem.Position(), node)
-}
-
-func insertNodes(elem xml.Node, nodes ...xml.Node) error {
-	if len(nodes) == 0 {
-		return nil
-	}
-	p := elem.Parent()
-	i, ok := p.(interface{ InsertNodes(int, []xml.Node) error })
-	if !ok {
-		return fmt.Errorf("nodes can not be inserted to parent element of %s", elem.QualifiedName())
-	}
-	return i.InsertNodes(elem.Position(), nodes)
-}
-
 func getElementFromNode(node xml.Node) (*xml.Element, error) {
 	el, ok := node.(*xml.Element)
 	if !ok {
