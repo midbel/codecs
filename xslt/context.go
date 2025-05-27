@@ -28,6 +28,7 @@ func (c *Context) errorWithContext(err error) error {
 }
 
 func (c *Context) queryXSL(query string) (xml.Sequence, error) {
+	c.Query(c, query)
 	return c.Env.queryXSL(query, c.XslNode)
 }
 

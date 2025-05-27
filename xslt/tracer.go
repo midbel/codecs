@@ -10,6 +10,7 @@ type Tracer interface {
 	Enter(*Context)
 	Leave(*Context)
 	Error(*Context, error)
+	Query(*Context, string)
 }
 
 func NoopTracer() Tracer {
@@ -23,6 +24,8 @@ func (_ discardTracer) Enter(_ *Context) {}
 func (_ discardTracer) Leave(_ *Context) {}
 
 func (_ discardTracer) Error(_ *Context, _ error) {}
+
+func (_ discardTracer) Query(_ *Context, _ string) {}
 
 type stdioTracer struct {
 	logger *slog.Logger
@@ -77,4 +80,16 @@ func (t stdioTracer) Leave(ctx *Context) {
 
 func (t stdioTracer) Error(ctx *Context, err error) {
 	t.logger.Error("error while processing instruction", "node", ctx.ContextNode.QualifiedName(), "depth", ctx.Depth, "err", err.Error())
+}
+
+func (t stdioTracer) Query(ctx *Context, query string) {
+	args := []any{
+		"instruction",
+		ctx.XslNode.QualifiedName(),
+		"node",
+		ctx.ContextNode.QualifiedName(),
+		"query",
+		query,
+	}
+	t.logger.Debug("run query", args...)
 }
