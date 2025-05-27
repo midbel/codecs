@@ -180,10 +180,12 @@ func (s *Stylesheet) Execute(doc xml.Node) (xml.Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	root, err := tpl.Execute(s.createContext(doc))
+	nodes, err := tpl.Execute(s.createContext(doc))
 	if err == nil {
 		var doc xml.Document
-		doc.Nodes = append(doc.Nodes, root...)
+		for i := range nodes {
+			doc.Append(nodes[i])
+		}
 		return &doc, nil
 	}
 	return nil, err
