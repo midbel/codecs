@@ -20,7 +20,6 @@ var (
 	errImplemented = errors.New("not implemented")
 	errUndefined   = errors.New("undefined")
 	errSkip        = errors.New("skip")
-	errEmpty       = errors.New("empty")
 	ErrTerminate   = errors.New("terminate")
 )
 

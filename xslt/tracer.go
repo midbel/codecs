@@ -79,7 +79,17 @@ func (t stdioTracer) Leave(ctx *Context) {
 }
 
 func (t stdioTracer) Error(ctx *Context, err error) {
-	t.logger.Error("error while processing instruction", "node", ctx.ContextNode.QualifiedName(), "depth", ctx.Depth, "err", err.Error())
+	args := []any{
+		"instruction",
+		ctx.XslNode.QualifiedName(),
+		"node",
+		ctx.ContextNode.QualifiedName(),
+		"depth",
+		ctx.Depth,
+		"err",
+		err.Error(),
+	}
+	t.logger.Error("error while processing instruction", args...)
 }
 
 func (t stdioTracer) Query(ctx *Context, query string) {

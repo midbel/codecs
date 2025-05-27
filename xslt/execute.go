@@ -1,7 +1,6 @@
 package xslt
 
 import (
-	"errors"
 	"fmt"
 	"iter"
 	"maps"
@@ -524,7 +523,6 @@ func executeValueOf(ctx *Context) (xml.Sequence, error) {
 		return nil, err
 	}
 	if len(items) == 0 {
-		// return nil, errEmpty
 		return nil, nil
 	}
 
@@ -535,9 +533,6 @@ func executeValueOf(ctx *Context) (xml.Sequence, error) {
 		}
 		str.WriteString(toString(items[i]))
 	}
-	// if str.Len() == 0 {
-	// 	return nil, errEmpty
-	// }
 	return xml.Singleton(xml.NewText(str.String())), nil
 }
 
@@ -613,15 +608,27 @@ func executeWherePopulated(ctx *Context) (xml.Sequence, error) {
 		seq   xml.Sequence
 	)
 
+	keep := func(seq xml.Sequence) bool {
+		for i := range seq {
+			n := seq[i].Node()
+			switch n.Type() {
+			case xml.TypeText:
+				if strings.TrimSpace(n.Value()) == "" {
+					return false
+				}
+			default:
+				return true
+			}
+		}
+		return false
+	}
+
 	for _, n := range nodes {
 		res, err := transformNode(ctx.WithXsl(n))
 		if err != nil {
-			if errors.Is(err, errEmpty) {
-				return nil, nil
-			}
 			return nil, err
 		}
-		if res.Empty() {
+		if !keep(res) {
 			return nil, nil
 		}
 		seq.Concat(res)
