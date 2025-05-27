@@ -613,8 +613,8 @@ func executeWherePopulated(ctx *Context) (xml.Sequence, error) {
 			n := seq[i].Node()
 			switch n.Type() {
 			case xml.TypeText:
-				if strings.TrimSpace(n.Value()) == "" {
-					return false
+				if strings.TrimSpace(n.Value()) != "" {
+					return true
 				}
 			default:
 				return true
