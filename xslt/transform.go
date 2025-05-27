@@ -18,12 +18,52 @@ func transformNode(ctx *Context) (xml.Sequence, error) {
 	}
 	fn, ok := executers[elem.QName]
 	if !ok {
-		return processNode(ctx)
+		seq, err := processNode(ctx)
+		return seq, err
 	}
 	if fn == nil {
 		return nil, fmt.Errorf("%s: %w", elem.QualifiedName(), errImplemented)
 	}
 	return fn(ctx)
+}
+
+func processNode(ctx *Context) (xml.Sequence, error) {
+	ctx.Enter(ctx)
+	defer ctx.Leave(ctx)
+
+	elem, err := getElementFromNode(cloneNode(ctx.XslNode))
+	if err != nil {
+		return nil, err
+	}
+	var (
+		nested = ctx.WithXsl(elem)
+		nodes  = slices.Clone(elem.Nodes)
+	)
+	elem.Nodes = elem.Nodes[:0]
+	if err := processAVT(nested); err != nil {
+		return nil, err
+	}
+	if err := nested.SetAttributes(elem); err != nil {
+		return nil, err
+	}
+	for _, n := range nodes {
+		if n.Type() != xml.TypeElement {
+			c := cloneNode(n)
+			if c != nil {
+				elem.Nodes = append(elem.Nodes, c)
+
+			}
+			continue
+		}
+		res, err := transformNode(nested.WithXsl(n))
+		if err != nil {
+			return nil, err
+		}
+		for i := range res {
+			elem.Append(res[i].Node())
+		}
+	}
+	return xml.Singleton(elem), nil
 }
 
 func appendNode(ctx *Context) (xml.Sequence, error) {
@@ -65,35 +105,6 @@ func processParam(node xml.Node, env *Env) error {
 		env.DefineExprParam(ident, xml.NewValueFromSequence(seq))
 	}
 	return err
-}
-
-func processNode(ctx *Context) (xml.Sequence, error) {
-	elem, err := getElementFromNode(ctx.XslNode)
-	if err != nil {
-		return nil, err
-	}
-	if err := processAVT(ctx); err != nil {
-		return nil, err
-	}
-	if err := ctx.SetAttributes(elem); err != nil {
-		return nil, err
-	}
-	var (
-		nodes = slices.Clone(elem.Nodes)
-		seq   = xml.NewSequence()
-	)
-	for i := range nodes {
-		if nodes[i].Type() != xml.TypeElement {
-			seq.Append(xml.NewNodeItem(nodes[i]))
-			continue
-		}
-		res, err := transformNode(ctx.WithXsl(nodes[i]))
-		if err != nil {
-			return nil, err
-		}
-		seq.Concat(res)
-	}
-	return seq, nil
 }
 
 func cloneNode(n xml.Node) xml.Node {

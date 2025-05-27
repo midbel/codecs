@@ -380,7 +380,7 @@ func executeMerge(ctx *Context) (xml.Sequence, error) {
 
 	var (
 		keys = slices.Collect(maps.Keys(groups))
-		seq = xml.NewSequence()
+		seq  = xml.NewSequence()
 	)
 	slices.Sort(keys)
 	for _, key := range keys {
@@ -714,9 +714,12 @@ func executeApply(ctx *Context, match matchFunc) (xml.Sequence, error) {
 	if len(nodes) == 0 {
 		return nil, nil
 	}
+	elem, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return nil, err
+	}
 	var (
-		el      = ctx.XslNode.(*xml.Element)
-		mode, _ = getAttribute(el, "mode")
+		mode, _ = getAttribute(elem, "mode")
 		seq     = xml.NewSequence()
 	)
 	for _, datum := range nodes {
