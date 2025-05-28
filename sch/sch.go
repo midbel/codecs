@@ -11,10 +11,11 @@ import (
 	"time"
 
 	"github.com/midbel/codecs/xml"
+	"github.com/midbel/codecs/environ"
 )
 
 type Asserter interface {
-	Assert(xml.Expr, xml.Environ[xml.Expr]) ([]xml.Item, error)
+	Assert(xml.Expr, environ.Environ[xml.Expr]) ([]xml.Item, error)
 }
 
 var ErrAssert = errors.New("assertion error")
@@ -59,7 +60,7 @@ func (f Function) Call(ctx xml.Context, args []xml.Expr) (xml.Sequence, error) {
 	defer func() {
 		ctx.Environ = env
 	}()
-	ctx.Environ = xml.Enclosed[xml.Expr](ctx.Environ)
+	ctx.Environ = environ.Enclosed[xml.Expr](ctx.Environ)
 	for i := range f.args {
 		e := xml.As(args[i], f.args[i].as)
 		ctx.Environ.Define(f.args[i].name, e)
@@ -102,8 +103,8 @@ func (r Result) Failed() bool {
 type Schema struct {
 	Title string
 	Mode  xml.StepMode
-	xml.Environ[xml.Expr]
-	Funcs xml.Environ[xml.Callable]
+	environ.Environ[xml.Expr]
+	Funcs environ.Environ[xml.Callable]
 
 	Phases    []*Phase
 	Patterns  []*Pattern
@@ -113,8 +114,8 @@ type Schema struct {
 
 func Default() *Schema {
 	s := Schema{
-		Environ: xml.Empty[xml.Expr](),
-		Funcs:   xml.Empty[xml.Callable](),
+		Environ: environ.Empty[xml.Expr](),
+		Funcs:   environ.Empty[xml.Callable](),
 	}
 	return &s
 }
@@ -172,8 +173,8 @@ func (s *Schema) Asserts() iter.Seq[*Assert] {
 type Pattern struct {
 	Title string
 	Ident string
-	xml.Environ[xml.Expr]
-	Funcs xml.Environ[xml.Callable]
+	environ.Environ[xml.Expr]
+	Funcs environ.Environ[xml.Callable]
 
 	Rules []*Rule
 }
@@ -215,8 +216,8 @@ func (p *Pattern) Asserts() iter.Seq[*Assert] {
 }
 
 type Rule struct {
-	xml.Environ[xml.Expr]
-	Funcs xml.Environ[xml.Callable]
+	environ.Environ[xml.Expr]
+	Funcs environ.Environ[xml.Callable]
 
 	Title   string
 	Context string
@@ -234,9 +235,9 @@ func (r *Rule) Count(doc *xml.Document) (int, error) {
 	}
 	var items []xml.Item
 	if f, ok := expr.(interface {
-		FindWithEnv(xml.Node, xml.Environ[xml.Expr]) ([]xml.Item, error)
+		FindWithEnv(xml.Node, environ.Environ[xml.Expr]) ([]xml.Item, error)
 	}); ok {
-		items, err = f.FindWithEnv(doc, xml.Enclosed(r))
+		items, err = f.FindWithEnv(doc, environ.Enclosed(r))
 	} else {
 		items, err = expr.Find(doc)
 	}
@@ -303,7 +304,7 @@ func (r *Rule) getItems(doc *xml.Document) ([]xml.Item, error) {
 	}
 	var items []xml.Item
 	if f, ok := expr.(interface {
-		FindWithEnv(xml.Node, xml.Environ[xml.Expr]) ([]xml.Item, error)
+		FindWithEnv(xml.Node, environ.Environ[xml.Expr]) ([]xml.Item, error)
 	}); ok {
 		items, err = f.FindWithEnv(doc, r)
 	} else {
@@ -319,7 +320,7 @@ type Assert struct {
 	Message string
 }
 
-func (a *Assert) Eval(ctx context.Context, items []xml.Item, env xml.Environ[xml.Expr]) (int, []*ResultItem, error) {
+func (a *Assert) Eval(ctx context.Context, items []xml.Item, env environ.Environ[xml.Expr]) (int, []*ResultItem, error) {
 	if len(items) == 0 {
 		return 0, nil, nil
 	}

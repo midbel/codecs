@@ -9,11 +9,11 @@ import (
 )
 
 type TransformCmd struct {
-	Context string
-	Trace   bool
-	Quiet   bool
+	Context  string
+	Trace    bool
+	Quiet    bool
 	WrapRoot bool
-	File    string
+	File     string
 	ParserOptions
 }
 

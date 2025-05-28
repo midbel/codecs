@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strconv"
 	"time"
+
+	"github.com/midbel/codecs/environ"
 )
 
 var (
@@ -198,13 +200,13 @@ type Context struct {
 	Size          int
 	PrincipalType NodeType
 
-	Environ[Expr]
-	Builtins Environ[BuiltinFunc]
+	environ.Environ[Expr]
+	Builtins environ.Environ[BuiltinFunc]
 }
 
 func DefaultContext(n Node) Context {
 	ctx := createContext(n, 1, 1)
-	ctx.Environ = Empty[Expr]()
+	ctx.Environ = environ.Empty[Expr]()
 	return ctx
 }
 
@@ -219,7 +221,7 @@ func createContext(n Node, pos, size int) Context {
 
 func (c Context) Sub(n Node, pos int, size int) Context {
 	ctx := createContext(n, pos, size)
-	ctx.Environ = Enclosed(c)
+	ctx.Environ = environ.Enclosed(c)
 	ctx.PrincipalType = c.PrincipalType
 	return ctx
 }
@@ -278,8 +280,8 @@ func isSelf(axis string) bool {
 
 type Query struct {
 	expr Expr
-	Environ[Expr]
-	Builtins Environ[BuiltinFunc]
+	environ.Environ[Expr]
+	Builtins environ.Environ[BuiltinFunc]
 }
 
 func Build(query string) (*Query, error) {
@@ -305,7 +307,7 @@ func (q *Query) Find(node Node) (Sequence, error) {
 		ctx.Builtins = DefaultBuiltin()
 	}
 	if ctx.Environ == nil {
-		ctx.Environ = Empty[Expr]()
+		ctx.Environ = environ.Empty[Expr]()
 	}
 	return q.find(ctx)
 }
@@ -335,7 +337,7 @@ type query struct {
 	expr Expr
 }
 
-func (q query) FindWithEnv(node Node, env Environ[Expr]) (Sequence, error) {
+func (q query) FindWithEnv(node Node, env environ.Environ[Expr]) (Sequence, error) {
 	ctx := createContext(node, 1, 1)
 	ctx.Environ = env
 	return q.find(ctx)
@@ -1296,7 +1298,7 @@ func (q quantified) MatchPriority() int {
 
 func (q quantified) find(ctx Context) (Sequence, error) {
 	env := ctx.Environ
-	ctx.Environ = Enclosed(ctx)
+	ctx.Environ = environ.Enclosed(ctx)
 	defer func() {
 		ctx.Environ = env
 	}()

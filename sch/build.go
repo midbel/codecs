@@ -9,6 +9,7 @@ import (
 	"unicode"
 
 	"github.com/midbel/codecs/xml"
+	"github.com/midbel/codecs/environ"
 )
 
 type buildContext int32
@@ -49,37 +50,37 @@ func (b *Builder) Build(r io.Reader) (*Schema, error) {
 	return b.schema, rs.Start()
 }
 
-func (b *Builder) createEnv() xml.Environ[xml.Expr] {
+func (b *Builder) createEnv() environ.Environ[xml.Expr] {
 	switch b.context {
 	case ctxSchema:
-		return xml.Empty[xml.Expr]()
+		return environ.Empty[xml.Expr]()
 	case ctxSchema | ctxPattern:
-		return xml.Enclosed[xml.Expr](b.schema)
+		return environ.Enclosed[xml.Expr](b.schema)
 	case ctxSchema | ctxPattern | ctxRule:
 		x := len(b.schema.Patterns) - 1
 		if x < 0 {
-			return xml.Empty[xml.Expr]()
+			return environ.Empty[xml.Expr]()
 		}
-		return xml.Enclosed[xml.Expr](b.schema.Patterns[x])
+		return environ.Enclosed[xml.Expr](b.schema.Patterns[x])
 	default:
-		return xml.Empty[xml.Expr]()
+		return environ.Empty[xml.Expr]()
 	}
 }
 
-func (b *Builder) createFuncEnv() xml.Environ[xml.Callable] {
+func (b *Builder) createFuncEnv() environ.Environ[xml.Callable] {
 	switch b.context {
 	case ctxSchema:
-		return xml.Empty[xml.Callable]()
+		return environ.Empty[xml.Callable]()
 	case ctxSchema | ctxPattern:
-		return xml.Enclosed[xml.Callable](b.schema.Funcs)
+		return environ.Enclosed[xml.Callable](b.schema.Funcs)
 	case ctxSchema | ctxPattern | ctxRule:
 		x := len(b.schema.Patterns) - 1
 		if x < 0 {
-			return xml.Empty[xml.Callable]()
+			return environ.Empty[xml.Callable]()
 		}
-		return xml.Enclosed[xml.Callable](b.schema.Patterns[x].Funcs)
+		return environ.Enclosed[xml.Callable](b.schema.Patterns[x].Funcs)
 	default:
-		return xml.Empty[xml.Callable]()
+		return environ.Empty[xml.Callable]()
 	}
 }
 

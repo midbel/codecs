@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/midbel/codecs/xml"
+	"github.com/midbel/codecs/environ"
 )
 
 type Context struct {
@@ -99,9 +100,9 @@ type Resolver interface {
 type Env struct {
 	other     Resolver
 	Namespace string
-	Vars      xml.Environ[xml.Expr]
-	Params    xml.Environ[xml.Expr]
-	Builtins  xml.Environ[xml.BuiltinFunc]
+	Vars      environ.Environ[xml.Expr]
+	Params    environ.Environ[xml.Expr]
+	Builtins  environ.Environ[xml.BuiltinFunc]
 	Depth     int
 }
 
@@ -112,8 +113,8 @@ func Empty() *Env {
 func Enclosed(other Resolver) *Env {
 	return &Env{
 		other:    other,
-		Vars:     xml.Empty[xml.Expr](),
-		Params:   xml.Empty[xml.Expr](),
+		Vars:     environ.Empty[xml.Expr](),
+		Params:   environ.Empty[xml.Expr](),
 		Builtins: xml.DefaultBuiltin(),
 	}
 }
@@ -122,8 +123,8 @@ func (e *Env) Sub() *Env {
 	return &Env{
 		other:     e.other,
 		Namespace: e.Namespace,
-		Vars:      xml.Enclosed[xml.Expr](e.Vars),
-		Params:    xml.Enclosed[xml.Expr](e.Params),
+		Vars:      environ.Enclosed[xml.Expr](e.Vars),
+		Params:    environ.Enclosed[xml.Expr](e.Params),
 		Builtins:  e.Builtins,
 		Depth:     e.Depth + 1,
 	}
@@ -175,10 +176,10 @@ func (e *Env) TestNode(query string, datum xml.Node) (bool, error) {
 }
 
 func (e *Env) Merge(other *Env) {
-	if m, ok := e.Vars.(interface{ Merge(xml.Environ[xml.Expr]) }); ok {
+	if m, ok := e.Vars.(interface{ Merge(environ.Environ[xml.Expr]) }); ok {
 		m.Merge(other.Vars)
 	}
-	if m, ok := e.Params.(interface{ Merge(xml.Environ[xml.Expr]) }); ok {
+	if m, ok := e.Params.(interface{ Merge(environ.Environ[xml.Expr]) }); ok {
 		m.Merge(other.Params)
 	}
 }

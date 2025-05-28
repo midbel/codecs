@@ -1,12 +1,12 @@
 package xpath
 
 import (
-	"bytes"
-	"io"
 	"bufio"
+	"bytes"
+	"fmt"
+	"io"
 	"unicode"
 	"unicode/utf8"
-	"fmt"
 )
 
 type Position struct {
@@ -539,4 +539,3 @@ func isOperator(c rune) bool {
 		c == equal || c == bang || c == langle || c == rangle ||
 		c == lparen || c == rparen
 }
-

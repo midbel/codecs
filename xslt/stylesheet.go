@@ -77,7 +77,7 @@ type AttributeSet struct {
 
 type Stylesheet struct {
 	DefaultMode string
-	WrapRoot bool
+	WrapRoot    bool
 
 	namespace   string
 	Mode        string

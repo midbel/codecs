@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/midbel/codecs/environ"
 )
 
 type Item interface {
@@ -117,7 +119,7 @@ func createLiteral(value any) Item {
 	}
 }
 
-func (i literalItem) Assert(_ Expr, _ Environ[Expr]) ([]Item, error) {
+func (i literalItem) Assert(_ Expr, _ environ.Environ[Expr]) ([]Item, error) {
 	return nil, fmt.Errorf("can not assert on literal item")
 }
 
@@ -172,7 +174,7 @@ func createNode(node Node) Item {
 	}
 }
 
-func (i nodeItem) Assert(expr Expr, env Environ[Expr]) ([]Item, error) {
+func (i nodeItem) Assert(expr Expr, env environ.Environ[Expr]) ([]Item, error) {
 	ctx := createContext(i.node, 1, 1)
 	ctx.Environ = env
 	if ctx.Builtins == nil {

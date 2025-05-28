@@ -20,6 +20,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/midbel/codecs/environ"
 )
 
 type registeredBuiltin struct {
@@ -200,26 +202,26 @@ var processFuncs = []registeredBuiltin{
 	registerFunc("exit-code", "process", callXYZ),
 }
 
-var builtinEnv Environ[BuiltinFunc]
+var builtinEnv environ.Environ[BuiltinFunc]
 
 func init() {
 	builtinEnv = defaultFuncset()
 }
 
 type funcset struct {
-	Environ[BuiltinFunc]
+	environ.Environ[BuiltinFunc]
 }
 
-func defaultFuncset() Environ[BuiltinFunc] {
+func defaultFuncset() environ.Environ[BuiltinFunc] {
 	set := funcset{
-		Environ: Empty[BuiltinFunc](),
+		Environ: environ.Empty[BuiltinFunc](),
 	}
 	set.enableFuncSet(builtins)
 	return &set
 }
 
-func (f *funcset) Clone() Environ[BuiltinFunc] {
-	c, ok := f.Environ.(interface{ Clone() Environ[BuiltinFunc] })
+func (f *funcset) Clone() environ.Environ[BuiltinFunc] {
+	c, ok := f.Environ.(interface{ Clone() environ.Environ[BuiltinFunc] })
 	if !ok {
 		return f
 	}
@@ -254,8 +256,8 @@ func (f *funcset) enableFuncSet(set []registeredBuiltin) {
 	}
 }
 
-func DefaultBuiltin() Environ[BuiltinFunc] {
-	c, ok := builtinEnv.(interface{ Clone() Environ[BuiltinFunc] })
+func DefaultBuiltin() environ.Environ[BuiltinFunc] {
+	c, ok := builtinEnv.(interface{ Clone() environ.Environ[BuiltinFunc] })
 	if ok {
 		return c.Clone()
 	}

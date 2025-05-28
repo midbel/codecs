@@ -1,4 +1,4 @@
-package xml
+package environ
 
 import (
 	"errors"

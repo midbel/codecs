@@ -12,6 +12,8 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/midbel/codecs/environ"
 )
 
 var (
@@ -25,7 +27,7 @@ var (
 
 const (
 	powLowest = iota
-	powAlt // union
+	powAlt    // union
 	powAssign // variable assignment
 	powOr
 	powAnd
@@ -1319,7 +1321,7 @@ type Parser struct {
 	StrictNS   bool
 	MaxDepth   int
 
-	namespaces Environ[string]
+	namespaces environ.Environ[string]
 
 	piFuncs map[string]PiFunc
 }
@@ -1330,7 +1332,7 @@ func NewParser(r io.Reader) *Parser {
 		TrimSpace:  true,
 		MaxDepth:   MaxDepth,
 		piFuncs:    make(map[string]PiFunc),
-		namespaces: Empty[string](),
+		namespaces: environ.Empty[string](),
 	}
 	p.next()
 	p.next()
@@ -1445,9 +1447,9 @@ func (p *Parser) parseNode() (Node, error) {
 }
 
 func (p *Parser) parseElement() (Node, error) {
-	p.namespaces = Enclosed[string](p.namespaces)
+	p.namespaces = environ.Enclosed[string](p.namespaces)
 	defer func() {
-		u, ok := p.namespaces.(interface{ Unwrap() Environ[string] })
+		u, ok := p.namespaces.(interface{ Unwrap() environ.Environ[string] })
 		if !ok {
 			return
 		}
