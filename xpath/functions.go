@@ -1374,13 +1374,13 @@ func getBooleanFromItem(item Item) (bool, error) {
 }
 
 func expandArgs(ctx Context, args []Expr) (Sequence, error) {
-	var list []Item
+	var list Sequence
 	for _, a := range args {
-		i, err := a.find(ctx)
+		is, err := a.find(ctx)
 		if err != nil {
 			return nil, err
 		}
-		list = append(list, i...)
+		list.Concat(is)
 	}
 	return list, nil
 }
