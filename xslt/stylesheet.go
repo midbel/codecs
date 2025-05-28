@@ -176,6 +176,8 @@ func (s *Stylesheet) Generate(w io.Writer, doc *xml.Document) error {
 }
 
 func (s *Stylesheet) Execute(doc xml.Node) (xml.Node, error) {
+	s.Start()
+	defer s.Done()
 	tpl, err := s.getMainTemplate()
 	if err != nil {
 		return nil, err

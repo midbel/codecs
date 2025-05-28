@@ -4,9 +4,12 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"time"
 )
 
 type Tracer interface {
+	Start()
+	Done()
 	Enter(*Context)
 	Leave(*Context)
 	Error(*Context, error)
@@ -19,6 +22,10 @@ func NoopTracer() Tracer {
 
 type discardTracer struct{}
 
+func (_ discardTracer) Start() {}
+
+func (_ discardTracer) Done() {}
+
 func (_ discardTracer) Enter(_ *Context) {}
 
 func (_ discardTracer) Leave(_ *Context) {}
@@ -28,18 +35,24 @@ func (_ discardTracer) Error(_ *Context, _ error) {}
 func (_ discardTracer) Query(_ *Context, _ string) {}
 
 type stdioTracer struct {
-	logger *slog.Logger
+	logger     *slog.Logger
+	when       time.Time
+	errCount   int
+	instrCount int
+	queryCount int
 }
 
 func Stdout() Tracer {
-	return stdioTracer{
+	return &stdioTracer{
 		logger: stdioLogger(os.Stdout),
+		when:   time.Now(),
 	}
 }
 
 func Stderr() Tracer {
-	return stdioTracer{
+	return &stdioTracer{
 		logger: stdioLogger(os.Stderr),
+		when:   time.Now(),
 	}
 }
 
@@ -50,11 +63,29 @@ func stdioLogger(w io.Writer) *slog.Logger {
 	return slog.New(slog.NewTextHandler(w, &opts))
 }
 
-func (t stdioTracer) Println(msg string) {
+func (t *stdioTracer) Start() {
+	t.logger.Info("start")
+}
+
+func (t *stdioTracer) Done() {
+	args := []any{
+		"elapsed",
+		time.Since(t.when),
+		"instructions",
+		t.instrCount,
+		"errors",
+		t.errCount,
+		"query",
+		t.queryCount,
+	}
+	t.logger.Info("done", args...)
+}
+
+func (t *stdioTracer) Println(msg string) {
 	t.logger.Info(msg)
 }
 
-func (t stdioTracer) Enter(ctx *Context) {
+func (t *stdioTracer) Enter(ctx *Context) {
 	args := []any{
 		"instruction",
 		ctx.XslNode.QualifiedName(),
@@ -63,10 +94,11 @@ func (t stdioTracer) Enter(ctx *Context) {
 		"depth",
 		ctx.Depth,
 	}
+	t.instrCount++
 	t.logger.Debug("start instruction", args...)
 }
 
-func (t stdioTracer) Leave(ctx *Context) {
+func (t *stdioTracer) Leave(ctx *Context) {
 	args := []any{
 		"instruction",
 		ctx.XslNode.QualifiedName(),
@@ -78,7 +110,7 @@ func (t stdioTracer) Leave(ctx *Context) {
 	t.logger.Debug("done instruction", args...)
 }
 
-func (t stdioTracer) Error(ctx *Context, err error) {
+func (t *stdioTracer) Error(ctx *Context, err error) {
 	args := []any{
 		"instruction",
 		ctx.XslNode.QualifiedName(),
@@ -89,10 +121,11 @@ func (t stdioTracer) Error(ctx *Context, err error) {
 		"err",
 		err.Error(),
 	}
+	t.errCount++
 	t.logger.Error("error while processing instruction", args...)
 }
 
-func (t stdioTracer) Query(ctx *Context, query string) {
+func (t *stdioTracer) Query(ctx *Context, query string) {
 	args := []any{
 		"instruction",
 		ctx.XslNode.QualifiedName(),
@@ -101,5 +134,6 @@ func (t stdioTracer) Query(ctx *Context, query string) {
 		"query",
 		query,
 	}
+	t.queryCount++
 	t.logger.Debug("run query", args...)
 }

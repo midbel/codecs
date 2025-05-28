@@ -609,20 +609,8 @@ func executeWherePopulated(ctx *Context) (xml.Sequence, error) {
 	)
 
 	discard := func(seq xml.Sequence) bool {
-		// for i := range seq {
-		// 	n := seq[i].Node()
-		// 	switch n.Type() {
-		// 	case xml.TypeText:
-		// 		if strings.TrimSpace(n.Value()) != "" {
-		// 			return true
-		// 		}
-		// 	default:
-		// 		return true
-		// 	}
-		// }
-		// return false
 		ok := slices.ContainsFunc(seq, func(item xml.Item) bool {
-			node := Item.Node()
+			node := item.Node()
 			if node.Type() == xml.TypeText {
 				return strings.TrimSpace(node.Value()) == ""
 			}
