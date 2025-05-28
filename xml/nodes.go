@@ -43,8 +43,38 @@ func (n NodeType) String() string {
 
 const typeNode = TypeDocument | TypeElement | TypeComment | TypeAttribute | TypeInstruction
 
-func isNode(n Node) bool {
+func IsNode(n Node) bool {
 	return n.Type()&typeNode > 0
+}
+
+func Before(left, right Node) bool {
+	var (
+		p1 = left.path()
+		p2 = right.path()
+	)
+	for i := 0; i < len(p1) && i < len(p2); i++ {
+		if p1[i] < p2[i] {
+			return true
+		} else if p1[i] > p2[i] {
+			return false
+		}
+	}
+	return len(p1) < len(p2)
+}
+
+func After(left, right Node) bool {
+	var (
+		p1 = left.path()
+		p2 = right.path()
+	)
+	for i := 0; i < len(p1) && i < len(p2); i++ {
+		if p1[i] > p2[i] {
+			return true
+		} else if p1[i] < p2[i] {
+			return false
+		}
+	}
+	return len(p1) > len(p2)
 }
 
 type Cloner interface {

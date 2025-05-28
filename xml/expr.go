@@ -532,7 +532,7 @@ func (a axis) find(ctx Context) (Sequence, error) {
 }
 
 func (a axis) descendant(ctx Context) (Sequence, error) {
-	if !isNode(ctx.Node) {
+	if !IsNode(ctx.Node) {
 		return nil, nil
 	}
 	var (
