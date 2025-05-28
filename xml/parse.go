@@ -1449,7 +1449,9 @@ func (p *Parser) parseNode() (Node, error) {
 func (p *Parser) parseElement() (Node, error) {
 	p.namespaces = environ.Enclosed[string](p.namespaces)
 	defer func() {
-		u, ok := p.namespaces.(interface{ Unwrap() environ.Environ[string] })
+		u, ok := p.namespaces.(interface {
+			Unwrap() environ.Environ[string]
+		})
 		if !ok {
 			return
 		}

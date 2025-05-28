@@ -3,8 +3,8 @@ package xslt
 import (
 	"fmt"
 
-	"github.com/midbel/codecs/xml"
 	"github.com/midbel/codecs/environ"
+	"github.com/midbel/codecs/xml"
 )
 
 type Context struct {
@@ -176,10 +176,14 @@ func (e *Env) TestNode(query string, datum xml.Node) (bool, error) {
 }
 
 func (e *Env) Merge(other *Env) {
-	if m, ok := e.Vars.(interface{ Merge(environ.Environ[xml.Expr]) }); ok {
+	if m, ok := e.Vars.(interface {
+		Merge(environ.Environ[xml.Expr])
+	}); ok {
 		m.Merge(other.Vars)
 	}
-	if m, ok := e.Params.(interface{ Merge(environ.Environ[xml.Expr]) }); ok {
+	if m, ok := e.Params.(interface {
+		Merge(environ.Environ[xml.Expr])
+	}); ok {
 		m.Merge(other.Params)
 	}
 }

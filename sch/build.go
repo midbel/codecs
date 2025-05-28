@@ -8,8 +8,8 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/midbel/codecs/xml"
 	"github.com/midbel/codecs/environ"
+	"github.com/midbel/codecs/xml"
 )
 
 type buildContext int32

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/midbel/codecs/xml"
 	"github.com/midbel/codecs/environ"
+	"github.com/midbel/codecs/xml"
 )
 
 type Asserter interface {

@@ -221,7 +221,9 @@ func defaultFuncset() environ.Environ[BuiltinFunc] {
 }
 
 func (f *funcset) Clone() environ.Environ[BuiltinFunc] {
-	c, ok := f.Environ.(interface{ Clone() environ.Environ[BuiltinFunc] })
+	c, ok := f.Environ.(interface {
+		Clone() environ.Environ[BuiltinFunc]
+	})
 	if !ok {
 		return f
 	}
@@ -257,7 +259,9 @@ func (f *funcset) enableFuncSet(set []registeredBuiltin) {
 }
 
 func DefaultBuiltin() environ.Environ[BuiltinFunc] {
-	c, ok := builtinEnv.(interface{ Clone() environ.Environ[BuiltinFunc] })
+	c, ok := builtinEnv.(interface {
+		Clone() environ.Environ[BuiltinFunc]
+	})
 	if ok {
 		return c.Clone()
 	}
