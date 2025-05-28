@@ -608,19 +608,27 @@ func executeWherePopulated(ctx *Context) (xml.Sequence, error) {
 		seq   xml.Sequence
 	)
 
-	keep := func(seq xml.Sequence) bool {
-		for i := range seq {
-			n := seq[i].Node()
-			switch n.Type() {
-			case xml.TypeText:
-				if strings.TrimSpace(n.Value()) != "" {
-					return true
-				}
-			default:
-				return true
+	discard := func(seq xml.Sequence) bool {
+		// for i := range seq {
+		// 	n := seq[i].Node()
+		// 	switch n.Type() {
+		// 	case xml.TypeText:
+		// 		if strings.TrimSpace(n.Value()) != "" {
+		// 			return true
+		// 		}
+		// 	default:
+		// 		return true
+		// 	}
+		// }
+		// return false
+		ok := slices.ContainsFunc(seq, func(item xml.Item) bool {
+			node := Item.Node()
+			if node.Type() == xml.TypeText {
+				return strings.TrimSpace(node.Value()) == ""
 			}
-		}
-		return false
+			return false
+		})
+		return ok
 	}
 
 	for _, n := range nodes {
@@ -628,7 +636,7 @@ func executeWherePopulated(ctx *Context) (xml.Sequence, error) {
 		if err != nil {
 			return nil, err
 		}
-		if !keep(res) {
+		if discard(res) {
 			return nil, nil
 		}
 		seq.Concat(res)
