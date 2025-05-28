@@ -1,9 +1,23 @@
 package xpath
 
+type Tracer interface  {
+	Do(string, Token)
+}
+
+type discardTracer struct {}
+
+func (_ discardTracer) Do(_ string, _ Token) {}
+
+type stdioTracer struct {}
+
+func (t stdioTracer) Do(rule string, token Token) {}
+
 type compiler struct {
 	scan *Scanner
 	curr Token
 	peek Token
+
+	tracer Tracer
 
 	mode       StepMode
 	strictMode bool
