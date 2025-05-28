@@ -18,6 +18,7 @@ var (
 	ErrEmpty       = errors.New("sequence is empty")
 	ErrImplemented = errors.New("not implemented")
 	ErrZero        = errors.New("division by zero")
+	ErrArgument    = errors.New("invalid number of argument(s)")
 )
 
 type StepMode int8
