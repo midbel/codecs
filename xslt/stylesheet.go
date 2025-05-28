@@ -77,6 +77,7 @@ type AttributeSet struct {
 
 type Stylesheet struct {
 	DefaultMode string
+	WrapRoot bool
 
 	namespace   string
 	Mode        string
@@ -186,6 +187,9 @@ func (s *Stylesheet) Execute(doc xml.Node) (xml.Node, error) {
 	if err == nil {
 		var root xml.Node
 		if len(nodes) != 1 {
+			if !s.WrapRoot {
+				return nil, fmt.Errorf("main template returns more than one node")
+			}
 			elem := xml.NewElement(xml.LocalName("angle"))
 			for i := range nodes {
 				elem.Append(nodes[i])

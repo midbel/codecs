@@ -25,11 +25,11 @@ var (
 
 const (
 	powLowest = iota
-	powAlt
-	powAssign
+	powAlt // union
+	powAssign // variable assignment
 	powOr
 	powAnd
-	powReserv
+	powReserv // ???
 	powNe
 	powEq
 	powCmp
@@ -37,9 +37,10 @@ const (
 	powAdd
 	powMul
 	powPrefix
-	powPred
-	powLevel
 	powCall
+	powLevel // step
+	powPred
+	powHighest
 )
 
 var bindings = map[rune]int{
