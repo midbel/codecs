@@ -19,6 +19,7 @@ var (
 	ErrImplemented = errors.New("not implemented")
 	ErrZero        = errors.New("division by zero")
 	ErrArgument    = errors.New("invalid number of argument(s)")
+	ErrSyntax      = errors.New("invalid syntax")
 )
 
 type StepMode int8
@@ -332,6 +333,7 @@ func (a axis) find(ctx Context) (Sequence, error) {
 	var list Sequence
 	ctx.PrincipalType = a.principalType()
 	if a.isSelf() && ctx.Type() != xml.TypeDocument {
+		list.Append(NewNodeItem(ctx.Node))
 		others, err := a.next.find(ctx)
 		if err == nil {
 			list.Concat(others)
@@ -354,19 +356,12 @@ func (a axis) find(ctx Context) (Sequence, error) {
 		return nil, nil
 	case ancestorAxis, ancestorSelfAxis:
 		node := ctx.Node.Parent()
-		for {
-			if node == nil {
-				break
-			}
-			p := node.Parent()
-			if p == nil {
-				break
-			}
-			other, err := a.next.find(createContext(p, 1, 1))
+		for node != nil {
+			other, err := a.next.find(createContext(node, 1, 1))
 			if err == nil {
 				list.Concat(other)
 			}
-			node = p
+			node = node.Parent()
 		}
 	case descendantAxis, descendantSelfAxis:
 		others, err := a.descendant(ctx)
@@ -406,12 +401,21 @@ func (a axis) find(ctx Context) (Sequence, error) {
 func (a axis) descendant(ctx Context) (Sequence, error) {
 	var (
 		list  Sequence
-		nodes = ctx.Nodes()
-		size  = len(nodes)
+		nodes = getNodes(ctx.Node)
 	)
 	for i, n := range nodes {
-		res, _ := a.find(ctx.Sub(n, i+1, size))
-		list.Concat(res)
+		sub := ctx.Sub(n, i+1, len(nodes))
+		matches, err := a.next.find(sub)
+		if err != nil {
+			return nil, err
+		}
+		list.Concat(matches)
+
+		matches, err = a.descendant(sub)
+		if err != nil {
+			return nil, err
+		}
+		list.Concat(matches)
 	}
 	return list, nil
 }
@@ -419,7 +423,7 @@ func (a axis) descendant(ctx Context) (Sequence, error) {
 func (a axis) child(ctx Context) (Sequence, error) {
 	var (
 		list  Sequence
-		nodes = ctx.Nodes()
+		nodes = getNodes(ctx.Node)
 	)
 	for i, c := range nodes {
 		others, _ := a.next.find(ctx.Sub(c, i+1, len(nodes)))
@@ -610,6 +614,20 @@ func (n number) MatchPriority() int {
 
 func (n number) find(_ Context) (Sequence, error) {
 	return Singleton(n.expr), nil
+}
+
+func isKind(str string) bool {
+	switch str {
+	case "node":
+	case "element":
+	case "text":
+	case "comment":
+	case "document-node":
+	case "processing-instruction":
+	default:
+		return false
+	}
+	return true
 }
 
 type kind struct {

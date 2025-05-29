@@ -22,6 +22,8 @@ const (
 	typeAll
 )
 
+const TypeNode = TypeDocument | TypeElement | TypeAttribute | TypeInstruction | TypeText
+
 func (n NodeType) String() string {
 	switch n {
 	default:
