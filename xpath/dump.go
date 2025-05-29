@@ -56,7 +56,7 @@ func debugExpr(w io.Writer, expr Expr) {
 		debugExpr(w, v.check)
 		io.WriteString(w, ")")
 	case binary:
-		io.WriteString(w, "axis")
+		io.WriteString(w, "binary")
 		io.WriteString(w, "(")
 		debugExpr(w, v.left)
 		io.WriteString(w, ", ")

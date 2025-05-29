@@ -780,6 +780,7 @@ func (c *Compiler) compileParent() (Expr, error) {
 }
 
 func (c *Compiler) compileStep(left Expr) (Expr, error) {
+	c.next()
 	next, err := c.compileExpr(powStep)
 	if err != nil {
 		return nil, err
@@ -792,6 +793,7 @@ func (c *Compiler) compileStep(left Expr) (Expr, error) {
 }
 
 func (c *Compiler) compileDescendantStep(left Expr) (Expr, error) {
+	c.next()
 	next, err := c.compileExpr(powStep)
 	if err != nil {
 		return nil, err
