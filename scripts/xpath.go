@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/midbel/codecs/xpath"
@@ -18,4 +19,13 @@ func main() {
 			break
 		}
 	}
+	cp := xpath.NewCompiler(strings.NewReader(flag.Arg(0)))
+	cp.Tracer = xpath.TraceStdout()
+	expr, err := cp.Compile()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+	str := xpath.Debug(expr)
+	fmt.Println(str)
 }

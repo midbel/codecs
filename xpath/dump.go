@@ -1,0 +1,138 @@
+package xpath
+
+import (
+	"fmt"
+	"io"
+	"strconv"
+	"strings"
+)
+
+func Debug(expr Expr) string {
+	var str strings.Builder
+	debugExpr(&str, expr)
+	return str.String()
+}
+
+func debugExpr(w io.Writer, expr Expr) {
+	switch v := expr.(type) {
+	case query:
+		debugExpr(w, v.expr)
+	case root:
+		io.WriteString(w, "root")
+	case current:
+		io.WriteString(w, "current")
+	case wildcard:
+		io.WriteString(w, "wildcard")
+	case name:
+		if v.Space != "" {
+			io.WriteString(w, v.Space)
+			io.WriteString(w, ":")
+		}
+		io.WriteString(w, v.Name)
+	case axis:
+		io.WriteString(w, "axis")
+		io.WriteString(w, "(")
+		io.WriteString(w, v.kind)
+		io.WriteString(w, ", ")
+		debugExpr(w, v.next)
+		io.WriteString(w, ")")
+	case step:
+		io.WriteString(w, "step")
+		io.WriteString(w, "(")
+		debugExpr(w, v.curr)
+		io.WriteString(w, ", ")
+		debugExpr(w, v.next)
+		io.WriteString(w, ")")
+	case attr:
+		io.WriteString(w, "attribute")
+		io.WriteString(w, "(")
+		io.WriteString(w, v.ident)
+		io.WriteString(w, ")")
+	case filter:
+		io.WriteString(w, "filter")
+		io.WriteString(w, "(")
+		debugExpr(w, v.expr)
+		io.WriteString(w, ", ")
+		debugExpr(w, v.check)
+		io.WriteString(w, ")")
+	case binary:
+		io.WriteString(w, "axis")
+		io.WriteString(w, "(")
+		debugExpr(w, v.left)
+		io.WriteString(w, ", ")
+		debugExpr(w, v.right)
+		io.WriteString(w, ", ")
+		io.WriteString(w, debugOp(v.op))
+		io.WriteString(w, ")")
+	case reverse:
+		io.WriteString(w, "reverse")
+		io.WriteString(w, "(")
+		debugExpr(w, v.expr)
+		io.WriteString(w, ")")
+	case identifier:
+		io.WriteString(w, "identifier")
+		io.WriteString(w, "(")
+		io.WriteString(w, v.ident)
+		io.WriteString(w, ")")
+	case literal:
+		io.WriteString(w, "literal")
+		io.WriteString(w, "(")
+		io.WriteString(w, v.expr)
+		io.WriteString(w, ")")
+	case number:
+		io.WriteString(w, "number")
+		io.WriteString(w, "(")
+		io.WriteString(w, strconv.FormatFloat(v.expr, 'f', -1, 64))
+		io.WriteString(w, ")")
+	default:
+		io.WriteString(w, "unknown")
+		io.WriteString(w, "(")
+		io.WriteString(w, fmt.Sprintf("%T", v))
+		io.WriteString(w, ")")
+	}
+}
+
+func debugOp(op rune) string {
+	switch op {
+	case opAssign:
+		return "assign"
+	case opArrow:
+		return "arrow"
+	case opRange:
+		return "range"
+	case opConcat:
+		return "concat"
+	case opBefore:
+		return "before"
+	case opAfter:
+		return "after"
+	case opAdd:
+		return "add"
+	case opSub:
+		return "subtract"
+	case opMul:
+		return "multiply"
+	case opDiv:
+		return "divide"
+	case opMod:
+		return "modulo"
+	case opEq:
+		return "eq"
+	case opNe:
+		return "ne"
+	case opGt:
+		return "gt"
+	case opGe:
+		return "ge"
+	case opLt:
+		return "lt"
+	case opLe:
+		return "le"
+	case opAnd:
+		return "and"
+	case opOr:
+		return "or"
+	default:
+		return ""
+	}
+}

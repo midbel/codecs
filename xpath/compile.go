@@ -3,6 +3,8 @@ package xpath
 import (
 	"fmt"
 	"io"
+	"log/slog"
+	"os"
 	"strconv"
 	"strings"
 
@@ -21,11 +23,44 @@ func (_ discardTracer) Enter(_ string, _ Token) {}
 func (_ discardTracer) Leave(_ string)          {}
 func (_ discardTracer) Error(_ string, _ error) {}
 
-type stdioTracer struct{}
+type stdioTracer struct {
+	logger *slog.Logger
+	depth  int
+	count  int
+}
 
-func (t stdioTracer) Enter(rule string, token Token) {}
-func (t stdioTracer) Leave(rule string)              {}
-func (t stdioTracer) Error(rule string, err error)   {}
+func TraceStdout() Tracer {
+	tracer := stdioTracer{
+		logger: stdioLogger(os.Stdout),
+	}
+	return &tracer
+}
+
+func TraceStderr() Tracer {
+	tracer := stdioTracer{
+		logger: stdioLogger(os.Stderr),
+	}
+	return &tracer
+}
+
+func stdioLogger(w io.Writer) *slog.Logger {
+	opts := slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}
+	return slog.New(slog.NewTextHandler(w, &opts))
+}
+
+func (t *stdioTracer) Enter(rule string, token Token) {
+	t.logger.Debug("start compile expr", "rule", rule)
+}
+
+func (t *stdioTracer) Leave(rule string) {
+	t.logger.Debug("done compile expr", "rule", rule)
+}
+
+func (t *stdioTracer) Error(rule string, err error) {
+
+}
 
 type Compiler struct {
 	scan *Scanner
@@ -39,18 +74,10 @@ type Compiler struct {
 	prefix map[rune]func() (Expr, error)
 }
 
-func CompileString(q string) (Expr, error) {
-	return Compile(strings.NewReader(q))
-}
-
-func Compile(r io.Reader) (Expr, error) {
-	return CompileMode(r, ModeDefault)
-}
-
-func CompileMode(r io.Reader, mode StepMode) (Expr, error) {
+func NewCompiler(r io.Reader) *Compiler {
 	cp := Compiler{
-		scan: Scan(r),
-		mode: mode,
+		scan:   Scan(r),
+		Tracer: discardTracer{},
 	}
 
 	cp.infix = map[rune]func(Expr) (Expr, error){
@@ -96,6 +123,20 @@ func CompileMode(r io.Reader, mode StepMode) (Expr, error) {
 
 	cp.next()
 	cp.next()
+	return &cp
+}
+
+func CompileString(q string) (Expr, error) {
+	return Compile(strings.NewReader(q))
+}
+
+func Compile(r io.Reader) (Expr, error) {
+	return CompileMode(r, ModeDefault)
+}
+
+func CompileMode(r io.Reader, mode StepMode) (Expr, error) {
+	cp := NewCompiler(r)
+	cp.mode = mode
 	return cp.Compile()
 }
 
@@ -783,6 +824,7 @@ func (c *Compiler) compileRoot() (Expr, error) {
 }
 
 func (c *Compiler) compileDescendantRoot() (Expr, error) {
+	c.next()
 	next, err := c.compileExpr(powStep)
 	if err != nil {
 		return nil, err
