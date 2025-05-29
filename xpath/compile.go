@@ -12,21 +12,21 @@ import (
 )
 
 type Tracer interface {
-	Enter(string, Token)
+	Enter(string)
 	Leave(string)
 	Error(string, error)
 }
 
 type discardTracer struct{}
 
-func (_ discardTracer) Enter(_ string, _ Token) {}
+func (_ discardTracer) Enter(_ string) {}
 func (_ discardTracer) Leave(_ string)          {}
 func (_ discardTracer) Error(_ string, _ error) {}
 
 type stdioTracer struct {
 	logger *slog.Logger
 	depth  int
-	count  int
+	errcount  int
 }
 
 func TraceStdout() Tracer {
@@ -50,12 +50,26 @@ func stdioLogger(w io.Writer) *slog.Logger {
 	return slog.New(slog.NewTextHandler(w, &opts))
 }
 
-func (t *stdioTracer) Enter(rule string, token Token) {
-	t.logger.Debug("start compile expr", "rule", rule)
+func (t *stdioTracer) Enter(rule string) {
+	t.depth++
+	args := []any{
+		"expression",
+		rule,
+		"depth",
+		t.depth,
+	}
+	t.logger.Debug("start compile expr", args...)
 }
 
 func (t *stdioTracer) Leave(rule string) {
-	t.logger.Debug("done compile expr", "rule", rule)
+	t.depth--
+	args := []any{
+		"expression",
+		rule,
+		"depth",
+		t.depth,
+	}
+	t.logger.Debug("done compile expr", args...)
 }
 
 func (t *stdioTracer) Error(rule string, err error) {
@@ -191,6 +205,8 @@ func (c *Compiler) compileCdt() (Expr, error) {
 }
 
 func (c *Compiler) compileIf() (Expr, error) {
+	c.Enter("if")
+	defer c.Leave("if")
 	c.next()
 	var (
 		cdt conditional
@@ -217,6 +233,8 @@ func (c *Compiler) compileIf() (Expr, error) {
 }
 
 func (c *Compiler) compileFor() (Expr, error) {
+	c.Enter("for")
+	defer c.Leave("for")
 	c.next()
 	var q loop
 	for !c.done() && !c.is(reserved) {
@@ -249,6 +267,8 @@ func (c *Compiler) compileFor() (Expr, error) {
 }
 
 func (c *Compiler) compileInClause() (binding, error) {
+	c.Enter("in")
+	defer c.Leave("in")
 	var b binding
 	if !c.is(variable) {
 		return b, fmt.Errorf("identifier expected")
@@ -268,6 +288,8 @@ func (c *Compiler) compileInClause() (binding, error) {
 }
 
 func (c *Compiler) compileLet() (Expr, error) {
+	c.Enter("let")
+	defer c.Leave("let")
 	var q let
 	for !c.done() {
 		var b binding
@@ -310,6 +332,8 @@ func (c *Compiler) compileLet() (Expr, error) {
 }
 
 func (c *Compiler) compileQuantified(every bool) (Expr, error) {
+	c.Enter("some/every")
+	defer c.Leave("some/every")
 	c.next()
 	var q quantified
 	q.every = every
@@ -392,6 +416,8 @@ func (c *Compiler) compileReservedInfix(left Expr) (Expr, error) {
 }
 
 func (c *Compiler) compileIdentity(left Expr) (Expr, error) {
+	c.Enter("identity")
+	defer c.Leave("identity")
 	right, err := c.compile()
 	if err != nil {
 		return nil, err
@@ -404,6 +430,8 @@ func (c *Compiler) compileIdentity(left Expr) (Expr, error) {
 }
 
 func (c *Compiler) compileRange(left Expr) (Expr, error) {
+	c.Enter("range")
+	defer c.Leave("range")
 	right, err := c.compile()
 	if err != nil {
 		return nil, err
@@ -416,6 +444,8 @@ func (c *Compiler) compileRange(left Expr) (Expr, error) {
 }
 
 func (c *Compiler) compileCast(left Expr) (Expr, error) {
+	c.Enter("cast")
+	defer c.Leave("cast")
 	t, err := c.compileType()
 	if err != nil {
 		return nil, err
@@ -428,6 +458,8 @@ func (c *Compiler) compileCast(left Expr) (Expr, error) {
 }
 
 func (c *Compiler) compileCastable(left Expr) (Expr, error) {
+	c.Enter("castable")
+	defer c.Leave("castable")
 	t, err := c.compileType()
 	if err != nil {
 		return nil, err
@@ -458,6 +490,8 @@ func (c *Compiler) compileType() (Type, error) {
 }
 
 func (c *Compiler) compileFilter(left Expr) (Expr, error) {
+	c.Enter("filter")
+	defer c.Leave("filter")
 	c.next()
 	expr, err := c.compile()
 	if err != nil {
@@ -476,6 +510,8 @@ func (c *Compiler) compileFilter(left Expr) (Expr, error) {
 }
 
 func (c *Compiler) compileSequence() (Expr, error) {
+	c.Enter("sequence")
+	defer c.Leave("sequence")
 	c.next()
 	var seq sequence
 	for !c.done() && !c.is(endGrp) {
@@ -503,6 +539,8 @@ func (c *Compiler) compileSequence() (Expr, error) {
 }
 
 func (c *Compiler) compileAlt(left Expr) (Expr, error) {
+	c.Enter("union")
+	defer c.Leave("union")
 	c.next()
 	expr, err := c.compile()
 	if err != nil {
@@ -514,10 +552,14 @@ func (c *Compiler) compileAlt(left Expr) (Expr, error) {
 }
 
 func (c *Compiler) compileArrow(left Expr) (Expr, error) {
+	c.Enter("arrow")
+	defer c.Leave("arrow")
 	return nil, ErrImplemented
 }
 
 func (c *Compiler) compileBinary(left Expr) (Expr, error) {
+	c.Enter("binary")
+	defer c.Leave("binary")
 	var (
 		op  = c.curr.Type
 		pow = bindings[op]
@@ -536,6 +578,8 @@ func (c *Compiler) compileBinary(left Expr) (Expr, error) {
 }
 
 func (c *Compiler) compileLiteral() (Expr, error) {
+	c.Enter("literal")
+	defer c.Leave("literal")
 	defer c.next()
 	i := literal{
 		expr: c.getCurrentLiteral(),
@@ -544,6 +588,8 @@ func (c *Compiler) compileLiteral() (Expr, error) {
 }
 
 func (c *Compiler) compileNumber() (Expr, error) {
+	c.Enter("number")
+	defer c.Leave("number")
 	defer c.next()
 	f, err := strconv.ParseFloat(c.getCurrentLiteral(), 64)
 	if err != nil {
@@ -556,6 +602,8 @@ func (c *Compiler) compileNumber() (Expr, error) {
 }
 
 func (c *Compiler) compileReverse() (Expr, error) {
+	c.Enter("reverse")
+	defer c.Leave("reverse")
 	c.next()
 	expr, err := c.compileExpr(powPrefix)
 	if err != nil {
@@ -568,6 +616,8 @@ func (c *Compiler) compileReverse() (Expr, error) {
 }
 
 func (c *Compiler) compileAttr() (Expr, error) {
+	c.Enter("attribute")
+	defer c.Leave("attribute")
 	defer c.next()
 	a := attr{
 		ident: c.getCurrentLiteral(),
@@ -576,6 +626,8 @@ func (c *Compiler) compileAttr() (Expr, error) {
 }
 
 func (c *Compiler) compileCall(left Expr) (Expr, error) {
+	c.Enter("call")
+	defer c.Leave("call")
 	compile := func(left Expr) (call, error) {
 		n, ok := left.(name)
 		if !ok {
@@ -621,6 +673,8 @@ func (c *Compiler) compileCall(left Expr) (Expr, error) {
 }
 
 func (c *Compiler) compileExpr(pow int) (Expr, error) {
+	c.Enter("expr")
+	defer c.Leave("expr")
 	fn, ok := c.prefix[c.curr.Type]
 	if !ok {
 		return nil, fmt.Errorf("unexpected prefix expression")
@@ -643,6 +697,8 @@ func (c *Compiler) compileExpr(pow int) (Expr, error) {
 }
 
 func (c *Compiler) compileVariable() (Expr, error) {
+	c.Enter("variable")
+	defer c.Leave("variable")
 	defer c.next()
 	v := identifier{
 		ident: c.getCurrentLiteral(),
@@ -651,6 +707,8 @@ func (c *Compiler) compileVariable() (Expr, error) {
 }
 
 func (c *Compiler) compileKind() (Expr, error) {
+	c.Enter("kind")
+	defer c.Leave("kind")
 	var (
 		kindTest kind
 		withArg  bool
@@ -702,6 +760,9 @@ func (c *Compiler) compileKind() (Expr, error) {
 }
 
 func (c *Compiler) compileAxis() (Expr, error) {
+	c.Enter("axis")
+	defer c.Leave("axis")
+
 	a := axis{
 		kind: c.getCurrentLiteral(),
 	}
@@ -716,6 +777,9 @@ func (c *Compiler) compileAxis() (Expr, error) {
 }
 
 func (c *Compiler) compileName() (Expr, error) {
+	c.Enter("name")
+	defer c.Leave("name")
+
 	if c.peek.Type == opAxis {
 		return c.compileAxis()
 	}
@@ -763,11 +827,15 @@ func (c *Compiler) compileQName() (Expr, error) {
 }
 
 func (c *Compiler) compileCurrent() (Expr, error) {
+	c.Enter("current")
+	defer c.Leave("current")
 	c.next()
 	return current{}, nil
 }
 
 func (c *Compiler) compileParent() (Expr, error) {
+	c.Enter("parent")
+	defer c.Leave("parent")
 	c.next()
 	next := kind{
 		kind: xml.TypeElement,
@@ -780,6 +848,9 @@ func (c *Compiler) compileParent() (Expr, error) {
 }
 
 func (c *Compiler) compileStep(left Expr) (Expr, error) {
+	c.Enter("step")
+	defer c.Leave("step")
+
 	c.next()
 	next, err := c.compileExpr(powStep)
 	if err != nil {
@@ -793,6 +864,9 @@ func (c *Compiler) compileStep(left Expr) (Expr, error) {
 }
 
 func (c *Compiler) compileDescendantStep(left Expr) (Expr, error) {
+	c.Enter("descendant-step")
+	defer c.Leave("descendant-step")
+
 	c.next()
 	next, err := c.compileExpr(powStep)
 	if err != nil {
@@ -810,6 +884,9 @@ func (c *Compiler) compileDescendantStep(left Expr) (Expr, error) {
 }
 
 func (c *Compiler) compileRoot() (Expr, error) {
+	c.Enter("root")
+	defer c.Leave("root")
+
 	c.next()
 	if c.done() {
 		return root{}, nil
@@ -826,6 +903,9 @@ func (c *Compiler) compileRoot() (Expr, error) {
 }
 
 func (c *Compiler) compileDescendantRoot() (Expr, error) {
+	c.Enter("descendant-root")
+	defer c.Leave("descendant-root")
+
 	c.next()
 	next, err := c.compileExpr(powStep)
 	if err != nil {
