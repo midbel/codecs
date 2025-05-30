@@ -371,11 +371,8 @@ func (a axis) find(ctx Context) (Sequence, error) {
 	case prevAxis:
 	case prevSiblingAxis:
 		nodes := getNodes(ctx.Parent())
-		for i, x := range nodes {
-			if x.Position() >= ctx.Node.Position() {
-				break
-			}
-			others, err := a.next.find(ctx.Sub(x, i+1, len(nodes)))
+		for i := ctx.Node.Position() - 1; i >= 0; i-- {
+			others, err := a.next.find(ctx.Sub(nodes[i], i, len(nodes)))
 			if err == nil {
 				list.Concat(others)
 			}
@@ -383,11 +380,8 @@ func (a axis) find(ctx Context) (Sequence, error) {
 	case nextAxis:
 	case nextSiblingAxis:
 		nodes := getNodes(ctx.Parent())
-		for i, x := range slices.Backward(nodes) {
-			if x.Position() <= ctx.Node.Position() {
-				break
-			}
-			others, err := a.next.find(ctx.Sub(x, i+1, len(nodes)))
+		for i := ctx.Node.Position() + 1; i < len(nodes); i++ {
+			others, err := a.next.find(ctx.Sub(nodes[i], i, len(nodes)))
 			if err == nil {
 				list.Concat(others)
 			}

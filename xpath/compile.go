@@ -767,7 +767,7 @@ func (c *Compiler) compileAxis() (Expr, error) {
 	}
 	c.next()
 	c.next()
-	expr, err := c.compileName()
+	expr, err := c.compileNameTest()
 	if err != nil {
 		return nil, err
 	}
