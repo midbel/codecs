@@ -99,6 +99,7 @@ func NewCompiler(r io.Reader) *Compiler {
 		anyLevel:  cp.compileDescendantStep,
 		begPred:   cp.compileFilter,
 		opArrow:   cp.compileArrow,
+		opRange:   cp.compileRange,
 		opConcat:  cp.compileBinary,
 		opAdd:     cp.compileBinary,
 		opSub:     cp.compileBinary,
@@ -377,8 +378,6 @@ func (c *Compiler) compileReservedInfix(left Expr) (Expr, error) {
 	switch keyword {
 	case kwIs:
 		return c.compileIdentity(left)
-	case kwTo:
-		return c.compileRange(left)
 	case kwCast:
 		return c.compileCast(left)
 	case kwCastable:

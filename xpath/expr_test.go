@@ -47,8 +47,12 @@ func TestEval(t *testing.T) {
 			Expected: []string{"element-1", "element-2"},
 		},
 		{
+			Expr: "//item[text()=\"element-1\"]",
+			Expected: []string{"element-1"},
+		},
+		{
 			Expr: "//@ignore",
-			Expected: []string{""},
+			Expected: []string{"true"},
 		},
 	}
 
