@@ -5,6 +5,8 @@ import (
 	"io"
 	"strconv"
 	"strings"
+
+	"github.com/midbel/codecs/xml"
 )
 
 func Debug(expr Expr) string {
@@ -42,6 +44,36 @@ func debugExpr(w io.Writer, expr Expr) {
 		debugExpr(w, v.curr)
 		io.WriteString(w, ", ")
 		debugExpr(w, v.next)
+		io.WriteString(w, ")")
+	case union:
+		io.WriteString(w, "union")
+		io.WriteString(w, "(")
+		for i := range v.all {
+			if i > 0 {
+				io.WriteString(w, ", ")
+			}
+			debugExpr(w, v.all[i])
+		}
+		io.WriteString(w, ")")
+	case except:
+		io.WriteString(w, "except")
+		io.WriteString(w, "(")
+		for i := range v.all {
+			if i > 0 {
+				io.WriteString(w, ", ")
+			}
+			debugExpr(w, v.all[i])
+		}
+		io.WriteString(w, ")")
+	case intersect:
+		io.WriteString(w, "intersect")
+		io.WriteString(w, "(")
+		for i := range v.all {
+			if i > 0 {
+				io.WriteString(w, ", ")
+			}
+			debugExpr(w, v.all[i])
+		}
 		io.WriteString(w, ")")
 	case attr:
 		io.WriteString(w, "attribute")
@@ -84,12 +116,29 @@ func debugExpr(w io.Writer, expr Expr) {
 		io.WriteString(w, "(")
 		io.WriteString(w, strconv.FormatFloat(v.expr, 'f', -1, 64))
 		io.WriteString(w, ")")
+	case call:
+		io.WriteString(w, "call")
+		io.WriteString(w, "(")
+		debugName(w, v.QName)
+		for i := range v.args {
+			io.WriteString(w, ", ")
+			debugExpr(w, v.args[i])
+		}
+		io.WriteString(w, ")")
 	default:
 		io.WriteString(w, "unknown")
 		io.WriteString(w, "(")
 		io.WriteString(w, fmt.Sprintf("%T", v))
 		io.WriteString(w, ")")
 	}
+}
+
+func debugName(w io.Writer, qn xml.QName) {
+	if qn.Space != "" {
+		io.WriteString(w, qn.Space)
+		io.WriteString(w, ":")
+	}
+	io.WriteString(w, qn.Name)
 }
 
 func debugOp(op rune) string {
