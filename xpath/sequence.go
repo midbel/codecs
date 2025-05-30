@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/midbel/codecs/environ"
 	"github.com/midbel/codecs/xml"
 )
 
@@ -149,6 +150,10 @@ func (i literalItem) Value() any {
 	return i.value
 }
 
+func (i literalItem) Assert(_ Expr, _ environ.Environ[Expr]) (Sequence, error) {
+	return nil, fmt.Errorf("can not assert on literal item")
+}
+
 type nodeItem struct {
 	node xml.Node
 }
@@ -197,6 +202,15 @@ func (i nodeItem) Value() any {
 	}
 	str := traverse(i.node)
 	return strings.Join(str, "")
+}
+
+func (i nodeItem) Assert(expr Expr, env environ.Environ[Expr]) (Sequence, error) {
+	ctx := createContext(i.node, 1, 1)
+	ctx.Environ = env
+	if ctx.Builtins == nil {
+		ctx.Builtins = DefaultBuiltin()
+	}
+	return expr.find(ctx)
 }
 
 func isFloat(i Item) bool {

@@ -6,7 +6,6 @@ import (
 
 type FormatCmd struct {
 	OutFile string
-	Query   string
 	WriterOptions
 	ParserOptions
 }
@@ -23,17 +22,12 @@ func (f FormatCmd) Run(args []string) error {
 	set.BoolVar(&f.OmitProlog, "omit-prolog", false, "omit xml prolog")
 	set.StringVar(&f.CaseType, "case-type", "", "rewrite element/attribute name to given case family")
 	set.StringVar(&f.OutFile, "f", "", "specify the path to the file where the document will be written")
-	set.StringVar(&f.Query, "q", "", "")
 
 	if err := set.Parse(args); err != nil {
 		return err
 	}
 
 	doc, err := parseDocument(set.Arg(0), f.ParserOptions)
-	if err != nil {
-		return err
-	}
-	doc, err = doc.Query(f.Query)
 	if err != nil {
 		return err
 	}

@@ -777,7 +777,7 @@ func executeApply(ctx *Context, match matchFunc) (xpath.Sequence, error) {
 			return nil, err
 		}
 		for i := range res {
-			seq.Append(xml.NewNodeItem(res[i]))
+			seq.Append(xpath.NewNodeItem(res[i]))
 		}
 	}
 	return seq, nil

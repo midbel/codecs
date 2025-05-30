@@ -12,13 +12,14 @@ import (
 
 	"github.com/midbel/codecs/environ"
 	"github.com/midbel/codecs/xml"
+	"github.com/midbel/codecs/xpath"
 )
 
-type Asserter interface {
-	Assert(xml.Expr, environ.Environ[xml.Expr]) ([]xml.Item, error)
-}
-
 var ErrAssert = errors.New("assertion error")
+
+type Asserter interface {
+	Assert(xpath.Expr, environ.Environ[xpath.Expr]) (xpath.Sequence, error)
+}
 
 const (
 	LevelFatal = "fatal"
@@ -49,10 +50,10 @@ type Function struct {
 	xml.QName
 	as   xml.QName
 	args []Parameter
-	body []xml.Expr
+	body []xpath.Expr
 }
 
-func (f Function) Call(ctx xml.Context, args []xml.Expr) (xml.Sequence, error) {
+func (f Function) Call(ctx xpath.Context, args []xpath.Expr) (xpath.Sequence, error) {
 	if len(args) != len(f.args) {
 		return nil, fmt.Errorf("invalid number of arguments given")
 	}
@@ -60,12 +61,12 @@ func (f Function) Call(ctx xml.Context, args []xml.Expr) (xml.Sequence, error) {
 	defer func() {
 		ctx.Environ = env
 	}()
-	ctx.Environ = environ.Enclosed[xml.Expr](ctx.Environ)
+	ctx.Environ = environ.Enclosed[xpath.Expr](ctx.Environ)
 	for i := range f.args {
-		e := xml.As(args[i], f.args[i].as)
+		e := xpath.As(args[i], f.args[i].as)
 		ctx.Environ.Define(f.args[i].name, e)
 	}
-	is, err := xml.Call(ctx, f.body)
+	is, err := xpath.Call(ctx, f.body)
 	if err != nil {
 		return nil, err
 	}
@@ -76,8 +77,8 @@ func (f Function) Call(ctx xml.Context, args []xml.Expr) (xml.Sequence, error) {
 }
 
 type ResultItem struct {
-	xml.Item
-	Returns []xml.Item
+	xpath.Item
+	Returns []xpath.Item
 	Pass    bool
 }
 
@@ -102,9 +103,9 @@ func (r Result) Failed() bool {
 
 type Schema struct {
 	Title string
-	Mode  xml.StepMode
-	environ.Environ[xml.Expr]
-	Funcs environ.Environ[xml.Callable]
+	Mode  xpath.StepMode
+	environ.Environ[xpath.Expr]
+	Funcs environ.Environ[xpath.Callable]
 
 	Phases    []*Phase
 	Patterns  []*Pattern
@@ -114,8 +115,8 @@ type Schema struct {
 
 func Default() *Schema {
 	s := Schema{
-		Environ: environ.Empty[xml.Expr](),
-		Funcs:   environ.Empty[xml.Callable](),
+		Environ: environ.Empty[xpath.Expr](),
+		Funcs:   environ.Empty[xpath.Callable](),
 	}
 	return &s
 }
@@ -134,7 +135,7 @@ func Parse(r io.Reader) (*Schema, error) {
 	return b.Build(r)
 }
 
-func (s *Schema) ResolveFunc(name string) (xml.Callable, error) {
+func (s *Schema) ResolveFunc(name string) (xpath.Callable, error) {
 	return s.Funcs.Resolve(name)
 }
 
@@ -173,13 +174,13 @@ func (s *Schema) Asserts() iter.Seq[*Assert] {
 type Pattern struct {
 	Title string
 	Ident string
-	environ.Environ[xml.Expr]
-	Funcs environ.Environ[xml.Callable]
+	environ.Environ[xpath.Expr]
+	Funcs environ.Environ[xpath.Callable]
 
 	Rules []*Rule
 }
 
-func (p *Pattern) ResolveFunc(name string) (xml.Callable, error) {
+func (p *Pattern) ResolveFunc(name string) (xpath.Callable, error) {
 	return p.Funcs.Resolve(name)
 }
 
@@ -216,15 +217,15 @@ func (p *Pattern) Asserts() iter.Seq[*Assert] {
 }
 
 type Rule struct {
-	environ.Environ[xml.Expr]
-	Funcs environ.Environ[xml.Callable]
+	environ.Environ[xpath.Expr]
+	Funcs environ.Environ[xpath.Callable]
 
 	Title   string
 	Context string
 	Asserts []*Assert
 }
 
-func (r *Rule) ResolveFunc(name string) (xml.Callable, error) {
+func (r *Rule) ResolveFunc(name string) (xpath.Callable, error) {
 	return r.Funcs.Resolve(name)
 }
 
@@ -233,9 +234,9 @@ func (r *Rule) Count(doc *xml.Document) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	var items []xml.Item
+	var items []xpath.Item
 	if f, ok := expr.(interface {
-		FindWithEnv(xml.Node, environ.Environ[xml.Expr]) ([]xml.Item, error)
+		FindWithEnv(xml.Node, environ.Environ[xpath.Expr]) (xpath.Sequence, error)
 	}); ok {
 		items, err = f.FindWithEnv(doc, environ.Enclosed(r))
 	} else {
@@ -297,14 +298,14 @@ func (r *Rule) ExecContext(ctx context.Context, doc *xml.Document) iter.Seq[Resu
 	return fn
 }
 
-func (r *Rule) getItems(doc *xml.Document) ([]xml.Item, error) {
+func (r *Rule) getItems(doc *xml.Document) ([]xpath.Item, error) {
 	expr, err := compileContext(r.Context)
 	if err != nil {
 		return nil, err
 	}
-	var items []xml.Item
+	var items []xpath.Item
 	if f, ok := expr.(interface {
-		FindWithEnv(xml.Node, environ.Environ[xml.Expr]) ([]xml.Item, error)
+		FindWithEnv(xml.Node, environ.Environ[xpath.Expr]) (xpath.Sequence, error)
 	}); ok {
 		items, err = f.FindWithEnv(doc, r)
 	} else {
@@ -320,7 +321,7 @@ type Assert struct {
 	Message string
 }
 
-func (a *Assert) Eval(ctx context.Context, items []xml.Item, env environ.Environ[xml.Expr]) (int, []*ResultItem, error) {
+func (a *Assert) Eval(ctx context.Context, items []xpath.Item, env environ.Environ[xpath.Expr]) (int, []*ResultItem, error) {
 	if len(items) == 0 {
 		return 0, nil, nil
 	}
@@ -359,7 +360,7 @@ func (a *Assert) Eval(ctx context.Context, items []xml.Item, env environ.Environ
 	return pass, all, nil
 }
 
-func isTrue(res []xml.Item) bool {
+func isTrue(res []xpath.Item) bool {
 	if len(res) == 0 {
 		return false
 	}
@@ -379,10 +380,10 @@ func isTrue(res []xml.Item) bool {
 	return ok
 }
 
-func compileContext(expr string) (xml.Expr, error) {
-	return xml.CompileMode(strings.NewReader(expr), xml.ModeXsl)
+func compileContext(expr string) (xpath.Expr, error) {
+	return xpath.CompileMode(strings.NewReader(expr), xpath.ModeXsl)
 }
 
-func compileExpr(expr string) (xml.Expr, error) {
-	return xml.Compile(strings.NewReader(expr))
+func compileExpr(expr string) (xpath.Expr, error) {
+	return xpath.Compile(strings.NewReader(expr))
 }

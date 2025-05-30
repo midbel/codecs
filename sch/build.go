@@ -10,6 +10,7 @@ import (
 
 	"github.com/midbel/codecs/environ"
 	"github.com/midbel/codecs/xml"
+	"github.com/midbel/codecs/xpath"
 )
 
 type buildContext int32
@@ -50,37 +51,37 @@ func (b *Builder) Build(r io.Reader) (*Schema, error) {
 	return b.schema, rs.Start()
 }
 
-func (b *Builder) createEnv() environ.Environ[xml.Expr] {
+func (b *Builder) createEnv() environ.Environ[xpath.Expr] {
 	switch b.context {
 	case ctxSchema:
-		return environ.Empty[xml.Expr]()
+		return environ.Empty[xpath.Expr]()
 	case ctxSchema | ctxPattern:
-		return environ.Enclosed[xml.Expr](b.schema)
+		return environ.Enclosed[xpath.Expr](b.schema)
 	case ctxSchema | ctxPattern | ctxRule:
 		x := len(b.schema.Patterns) - 1
 		if x < 0 {
-			return environ.Empty[xml.Expr]()
+			return environ.Empty[xpath.Expr]()
 		}
-		return environ.Enclosed[xml.Expr](b.schema.Patterns[x])
+		return environ.Enclosed[xpath.Expr](b.schema.Patterns[x])
 	default:
-		return environ.Empty[xml.Expr]()
+		return environ.Empty[xpath.Expr]()
 	}
 }
 
-func (b *Builder) createFuncEnv() environ.Environ[xml.Callable] {
+func (b *Builder) createFuncEnv() environ.Environ[xpath.Callable] {
 	switch b.context {
 	case ctxSchema:
-		return environ.Empty[xml.Callable]()
+		return environ.Empty[xpath.Callable]()
 	case ctxSchema | ctxPattern:
-		return environ.Enclosed[xml.Callable](b.schema.Funcs)
+		return environ.Enclosed[xpath.Callable](b.schema.Funcs)
 	case ctxSchema | ctxPattern | ctxRule:
 		x := len(b.schema.Patterns) - 1
 		if x < 0 {
-			return environ.Empty[xml.Callable]()
+			return environ.Empty[xpath.Callable]()
 		}
-		return environ.Enclosed[xml.Callable](b.schema.Patterns[x].Funcs)
+		return environ.Enclosed[xpath.Callable](b.schema.Patterns[x].Funcs)
 	default:
-		return environ.Empty[xml.Callable]()
+		return environ.Empty[xpath.Callable]()
 	}
 }
 
@@ -143,7 +144,7 @@ func (b *Builder) setFunction(fn Function) error {
 	return err
 }
 
-func (b *Builder) setLetToPattern(ident string, value xml.Expr) error {
+func (b *Builder) setLetToPattern(ident string, value xpath.Expr) error {
 	x := len(b.schema.Patterns) - 1
 	if x < 0 {
 		return fmt.Errorf("no pattern element found")
@@ -161,7 +162,7 @@ func (b *Builder) setFuncToPattern(fn Function) error {
 	return nil
 }
 
-func (b *Builder) setLetToRule(ident string, value xml.Expr) error {
+func (b *Builder) setLetToRule(ident string, value xpath.Expr) error {
 	x := len(b.schema.Patterns) - 1
 	if x < 0 {
 		return fmt.Errorf("no pattern element found")
@@ -198,9 +199,9 @@ func (b *Builder) onSchema(rs *xml.Reader, el *xml.Element, closed bool) error {
 	}
 	switch bind {
 	case "xslt2", "xslt3":
-		b.schema.Mode = xml.ModeXsl
+		b.schema.Mode = xpath.ModeXsl
 	case "xpath2", "xpath3":
-		b.schema.Mode = xml.ModeXpath
+		b.schema.Mode = xpath.ModeXpath
 	default:
 		return fmt.Errorf("%s: unsupported query binding value", bind)
 	}
@@ -327,7 +328,7 @@ func (b *Builder) onFunction(rs *xml.Reader, el *xml.Element, closed bool) error
 			if err != nil {
 				return err
 			}
-			fn.body = append(fn.body, xml.Assign(name, expr))
+			fn.body = append(fn.body, xpath.Assign(name, expr))
 		}
 		return err
 	})

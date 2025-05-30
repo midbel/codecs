@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"os"
 	"time"
+
+	"github.com/midbel/codecs/xml"
+	"github.com/midbel/codecs/xpath"
 )
 
 type QueryCmd struct {
@@ -16,10 +19,7 @@ type QueryCmd struct {
 const queryInfo = "query took %s - %d nodes matching %q"
 
 func (q QueryCmd) Run(args []string) error {
-	var (
-		set     = flag.NewFlagSet("query", flag.ContinueOnError)
-		options WriterOptions
-	)
+	set := flag.NewFlagSet("query", flag.ContinueOnError)
 	set.StringVar(&q.Root, "root", "", "rename root element")
 	set.BoolVar(&q.Noout, "noout", false, "suppress output - default is to print the result nodes")
 	if err := set.Parse(args); err != nil {
@@ -30,15 +30,18 @@ func (q QueryCmd) Run(args []string) error {
 		return err
 	}
 	now := time.Now()
-	doc, err = doc.Query(set.Arg(0))
+	query, err := xpath.Build(set.Arg(0))
+	if err != nil {
+		return err
+	}
+	results, err := query.Find(doc)
 	if err != nil {
 		return err
 	}
 	elapsed := time.Since(now)
 	if !q.Noout {
-		doc.SetRootName(q.Root)
-		if err := writeDocument(doc, "", options); err != nil {
-			return err
+		for i := range results {
+			fmt.Fprint(os.Stdout, xml.WriteNode(results[i].Node()))
 		}
 		fmt.Fprintln(os.Stdout)
 	}

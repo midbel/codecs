@@ -205,25 +205,6 @@ func (d *Document) GetElementsByTagName(tag string) ([]Node, error) {
 	return nil, nil
 }
 
-func (d *Document) Query(expr string) (*Document, error) {
-	if expr == "" {
-		return d, nil
-	}
-	q, err := CompileString(expr)
-	if err != nil {
-		return nil, err
-	}
-	items, err := q.Find(d)
-	if err != nil {
-		return nil, err
-	}
-	root := NewElement(LocalName(d.Root().LocalName()))
-	for i := range items {
-		root.Append(items[i].Node())
-	}
-	return NewDocument(root), nil
-}
-
 func (d *Document) Find(name string) (Node, error) {
 	root := d.Root()
 	if el, ok := root.(*Element); ok {

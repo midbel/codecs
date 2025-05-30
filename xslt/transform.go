@@ -160,7 +160,7 @@ func writeDoctypeHTML(w io.Writer) error {
 	return err
 }
 
-func toString(item xml.Item) string {
+func toString(item xpath.Item) string {
 	var v string
 	switch x := item.Value().(type) {
 	case time.Time:
