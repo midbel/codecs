@@ -1,8 +1,10 @@
 package xpath
 
 import (
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/midbel/codecs/xml"
 )
@@ -33,6 +35,22 @@ func TestEval(t *testing.T) {
 		{
 			Expr: "/root/item[1]",
 			Expected: []string{"element-1"},
+		},
+		{
+			Expr: "/root/item[last()]",
+			Expected: []string{"element-2"},
+		},
+		{
+			Expr: "/root/item[position()>=1]",
+			Expected: []string{"element-1", "element-2"},
+		},
+		{
+			Expr: "/root/item[position()>1]",
+			Expected: []string{"element-2"},
+		},
+		{
+			Expr: "count(//item))",
+			Expected: []string{"4"},
 		},
 		{
 			Expr: "//item",
@@ -84,7 +102,22 @@ func TestEval(t *testing.T) {
 
 func compareValues(seq Sequence, values []string) bool {
 	for i := range seq {
-		if seq[i].Value() != values[i] {
+		var (
+			val = seq[i].Value()
+			str string
+		)
+		switch v := val.(type) {
+		case time.Time:
+			str = v.Format("2006-01-02")
+		case float64:
+			str = strconv.FormatFloat(v, 'f', -1, 64)
+		case bool:
+			str = strconv.FormatBool(v)
+		case string:
+			str = v
+		}
+
+		if str != values[i] {
 			return false
 		}
 	}
