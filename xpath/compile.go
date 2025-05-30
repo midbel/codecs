@@ -19,14 +19,14 @@ type Tracer interface {
 
 type discardTracer struct{}
 
-func (_ discardTracer) Enter(_ string) {}
+func (_ discardTracer) Enter(_ string)          {}
 func (_ discardTracer) Leave(_ string)          {}
 func (_ discardTracer) Error(_ string, _ error) {}
 
 type stdioTracer struct {
-	logger *slog.Logger
-	depth  int
-	errcount  int
+	logger   *slog.Logger
+	depth    int
+	errcount int
 }
 
 func TraceStdout() Tracer {

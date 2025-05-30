@@ -9,15 +9,16 @@ import (
 	"strings"
 
 	"github.com/midbel/codecs/xml"
+	"github.com/midbel/codecs/xpath"
 )
 
-type ExecuteFunc func(*Context) (xml.Sequence, error)
+type ExecuteFunc func(*Context) (xpath.Sequence, error)
 
 var executers map[xml.QName]ExecuteFunc
 
 func init() {
 	nest := func(exec ExecuteFunc) ExecuteFunc {
-		fn := func(ctx *Context) (xml.Sequence, error) {
+		fn := func(ctx *Context) (xpath.Sequence, error) {
 			ctx.Enter(ctx)
 			defer ctx.Leave(ctx)
 			seq, err := exec(ctx.Nest())
@@ -29,7 +30,7 @@ func init() {
 		return fn
 	}
 	trace := func(exec ExecuteFunc) ExecuteFunc {
-		fn := func(ctx *Context) (xml.Sequence, error) {
+		fn := func(ctx *Context) (xpath.Sequence, error) {
 			ctx.Enter(ctx)
 			defer ctx.Leave(ctx)
 
@@ -73,7 +74,7 @@ func init() {
 	}
 }
 
-func executeImport(ctx *Context) (xml.Sequence, error) {
+func executeImport(ctx *Context) (xpath.Sequence, error) {
 	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
@@ -85,7 +86,7 @@ func executeImport(ctx *Context) (xml.Sequence, error) {
 	return nil, ctx.ImportSheet(file)
 }
 
-func executeInclude(ctx *Context) (xml.Sequence, error) {
+func executeInclude(ctx *Context) (xpath.Sequence, error) {
 	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
@@ -97,7 +98,7 @@ func executeInclude(ctx *Context) (xml.Sequence, error) {
 	return nil, ctx.IncludeSheet(file)
 }
 
-func executeSourceDocument(ctx *Context) (xml.Sequence, error) {
+func executeSourceDocument(ctx *Context) (xpath.Sequence, error) {
 	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
@@ -111,7 +112,7 @@ func executeSourceDocument(ctx *Context) (xml.Sequence, error) {
 		return nil, ctx.errorWithContext(err)
 	}
 
-	seq := xml.NewSequence()
+	seq := xpath.NewSequence()
 	for _, n := range slices.Clone(elem.Nodes) {
 		c := cloneNode(n)
 		if c == nil {
@@ -126,7 +127,7 @@ func executeSourceDocument(ctx *Context) (xml.Sequence, error) {
 	return seq, nil
 }
 
-func executeResultDocument(ctx *Context) (xml.Sequence, error) {
+func executeResultDocument(ctx *Context) (xpath.Sequence, error) {
 	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
@@ -158,7 +159,7 @@ func executeResultDocument(ctx *Context) (xml.Sequence, error) {
 	return nil, nil
 }
 
-func executeVariable(ctx *Context) (xml.Sequence, error) {
+func executeVariable(ctx *Context) (xpath.Sequence, error) {
 	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
@@ -167,7 +168,7 @@ func executeVariable(ctx *Context) (xml.Sequence, error) {
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
 	}
-	var seq xml.Sequence
+	var seq xpath.Sequence
 	if query, err1 := getAttribute(elem, "select"); err1 == nil {
 		seq, err = ctx.ExecuteQuery(query, ctx.ContextNode)
 	} else {
@@ -186,11 +187,11 @@ func executeVariable(ctx *Context) (xml.Sequence, error) {
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
 	}
-	ctx.Define(ident, xml.NewValueFromSequence(seq))
+	ctx.Define(ident, xpath.NewValueFromSequence(seq))
 	return nil, nil
 }
 
-func executeWithParam(ctx *Context) (xml.Sequence, error) {
+func executeWithParam(ctx *Context) (xpath.Sequence, error) {
 	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
@@ -202,7 +203,7 @@ func executeWithParam(ctx *Context) (xml.Sequence, error) {
 	if query, err := getAttribute(elem, "select"); err == nil {
 		ctx.EvalParam(ident, query, ctx.ContextNode)
 	} else {
-		var seq xml.Sequence
+		var seq xpath.Sequence
 		for _, n := range slices.Clone(elem.Nodes) {
 			c := cloneNode(n)
 			if c == nil {
@@ -214,20 +215,20 @@ func executeWithParam(ctx *Context) (xml.Sequence, error) {
 			}
 			seq.Concat(res)
 		}
-		ctx.DefineExprParam(ident, xml.NewValueFromSequence(seq))
+		ctx.DefineExprParam(ident, xpath.NewValueFromSequence(seq))
 	}
 	return nil, nil
 }
 
-func executeApplyImport(ctx *Context) (xml.Sequence, error) {
+func executeApplyImport(ctx *Context) (xpath.Sequence, error) {
 	return executeApply(ctx, ctx.MatchImport)
 }
 
-func executeApplyTemplates(ctx *Context) (xml.Sequence, error) {
+func executeApplyTemplates(ctx *Context) (xpath.Sequence, error) {
 	return executeApply(ctx, ctx.Match)
 }
 
-func executeCallTemplate(ctx *Context) (xml.Sequence, error) {
+func executeCallTemplate(ctx *Context) (xpath.Sequence, error) {
 	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
@@ -245,7 +246,7 @@ func executeCallTemplate(ctx *Context) (xml.Sequence, error) {
 	if err := applyParams(sub); err != nil {
 		return nil, ctx.errorWithContext(err)
 	}
-	seq := xml.NewSequence()
+	seq := xpath.NewSequence()
 	for _, n := range slices.Clone(tpl.Nodes) {
 		c := cloneNode(n)
 		if c == nil {
@@ -260,7 +261,7 @@ func executeCallTemplate(ctx *Context) (xml.Sequence, error) {
 	return seq, nil
 }
 
-func executeForeachGroup(ctx *Context) (xml.Sequence, error) {
+func executeForeachGroup(ctx *Context) (xpath.Sequence, error) {
 	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
@@ -283,7 +284,7 @@ func executeForeachGroup(ctx *Context) (xml.Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	groups := make(map[string]xml.Sequence)
+	groups := make(map[string]xpath.Sequence)
 	for i := range items {
 		is, err := grpby.Find(items[i].Node())
 		if err != nil {
@@ -293,7 +294,7 @@ func executeForeachGroup(ctx *Context) (xml.Sequence, error) {
 		groups[key] = append(groups[key], items[i])
 	}
 
-	seq := xml.NewSequence()
+	seq := xpath.NewSequence()
 	for key, items := range groups {
 		defineForeachGroupBuiltins(ctx, key, items)
 		for _, n := range elem.Nodes {
@@ -312,12 +313,12 @@ func executeForeachGroup(ctx *Context) (xml.Sequence, error) {
 }
 
 type MergedItem struct {
-	xml.Item
+	xpath.Item
 	Key    string
 	Source string
 }
 
-func executeMerge(ctx *Context) (xml.Sequence, error) {
+func executeMerge(ctx *Context) (xpath.Sequence, error) {
 	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
@@ -337,7 +338,7 @@ func executeMerge(ctx *Context) (xml.Sequence, error) {
 		if err != nil {
 			return nil, err
 		}
-		var items xml.Sequence
+		var items xpath.Sequence
 		if query, err := getAttribute(el, "select"); err == nil {
 			items, err = ctx.ExecuteQuery(query, ctx.ContextNode)
 			if err != nil {
@@ -380,7 +381,7 @@ func executeMerge(ctx *Context) (xml.Sequence, error) {
 
 	var (
 		keys = slices.Collect(maps.Keys(groups))
-		seq  = xml.NewSequence()
+		seq  = xpath.NewSequence()
 	)
 	slices.Sort(keys)
 	for _, key := range keys {
@@ -395,7 +396,7 @@ func executeMerge(ctx *Context) (xml.Sequence, error) {
 	return seq, nil
 }
 
-func executeForeach(ctx *Context) (xml.Sequence, error) {
+func executeForeach(ctx *Context) (xpath.Sequence, error) {
 	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
@@ -417,7 +418,7 @@ func executeForeach(ctx *Context) (xml.Sequence, error) {
 		return nil, ctx.errorWithContext(err)
 	}
 
-	seq := xml.NewSequence()
+	seq := xpath.NewSequence()
 	for i := range it {
 		node := i.Node()
 		for _, n := range elem.Nodes {
@@ -435,7 +436,7 @@ func executeForeach(ctx *Context) (xml.Sequence, error) {
 	return seq, nil
 }
 
-func executeTry(ctx *Context) (xml.Sequence, error) {
+func executeTry(ctx *Context) (xpath.Sequence, error) {
 	items, err := ctx.queryXSL("./catch[last()]")
 	if err != nil {
 		return nil, err
@@ -454,7 +455,7 @@ func executeTry(ctx *Context) (xml.Sequence, error) {
 	return seq, nil
 }
 
-func executeIf(ctx *Context) (xml.Sequence, error) {
+func executeIf(ctx *Context) (xpath.Sequence, error) {
 	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
 		return nil, err
@@ -473,7 +474,7 @@ func executeIf(ctx *Context) (xml.Sequence, error) {
 	return processNode(ctx)
 }
 
-func executeChoose(ctx *Context) (xml.Sequence, error) {
+func executeChoose(ctx *Context) (xpath.Sequence, error) {
 	items, err := ctx.queryXSL("/when")
 	if err != nil {
 		return nil, err
@@ -505,7 +506,7 @@ func executeChoose(ctx *Context) (xml.Sequence, error) {
 	return processNode(ctx.WithXsl(items[0].Node()))
 }
 
-func executeValueOf(ctx *Context) (xml.Sequence, error) {
+func executeValueOf(ctx *Context) (xpath.Sequence, error) {
 	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
@@ -533,14 +534,14 @@ func executeValueOf(ctx *Context) (xml.Sequence, error) {
 		}
 		str.WriteString(toString(items[i]))
 	}
-	return xml.Singleton(xml.NewText(str.String())), nil
+	return xpath.Singleton(xml.NewText(str.String())), nil
 }
 
-func executeCopy(ctx *Context) (xml.Sequence, error) {
+func executeCopy(ctx *Context) (xpath.Sequence, error) {
 	return executeCopyOf(ctx)
 }
 
-func executeCopyOf(ctx *Context) (xml.Sequence, error) {
+func executeCopyOf(ctx *Context) (xpath.Sequence, error) {
 	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
@@ -553,17 +554,17 @@ func executeCopyOf(ctx *Context) (xml.Sequence, error) {
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
 	}
-	seq := xml.NewSequence()
+	seq := xpath.NewSequence()
 	for i := range items {
 		c := cloneNode(items[i].Node())
 		if c != nil {
-			seq.Append(xml.NewNodeItem(c))
+			seq.Append(xpath.NewNodeItem(c))
 		}
 	}
 	return seq, nil
 }
 
-func executeMessage(ctx *Context) (xml.Sequence, error) {
+func executeMessage(ctx *Context) (xpath.Sequence, error) {
 	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
@@ -582,34 +583,34 @@ func executeMessage(ctx *Context) (xml.Sequence, error) {
 	return nil, nil
 }
 
-func executeEvaluate(ctx *Context) (xml.Sequence, error) {
+func executeEvaluate(ctx *Context) (xpath.Sequence, error) {
 	return nil, errImplemented
 }
 
-func executeAnalyzeString(ctx *Context) (xml.Sequence, error) {
+func executeAnalyzeString(ctx *Context) (xpath.Sequence, error) {
 	return nil, errImplemented
 }
 
-func executeMatchingSubstring(ctx *Context) (xml.Sequence, error) {
+func executeMatchingSubstring(ctx *Context) (xpath.Sequence, error) {
 	return nil, errImplemented
 }
 
-func executeNonMatchingSubstring(ctx *Context) (xml.Sequence, error) {
+func executeNonMatchingSubstring(ctx *Context) (xpath.Sequence, error) {
 	return nil, errImplemented
 }
 
-func executeWherePopulated(ctx *Context) (xml.Sequence, error) {
+func executeWherePopulated(ctx *Context) (xpath.Sequence, error) {
 	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
 	}
 	var (
 		nodes = slices.Clone(elem.Nodes)
-		seq   xml.Sequence
+		seq   xpath.Sequence
 	)
 
-	discard := func(seq xml.Sequence) bool {
-		ok := slices.ContainsFunc(seq, func(item xml.Item) bool {
+	discard := func(seq xpath.Sequence) bool {
+		ok := slices.ContainsFunc(seq, func(item xpath.Item) bool {
 			node := item.Node()
 			if node.Type() == xml.TypeText {
 				return strings.TrimSpace(node.Value()) == ""
@@ -632,15 +633,15 @@ func executeWherePopulated(ctx *Context) (xml.Sequence, error) {
 	return seq, nil
 }
 
-func executeOnEmpty(ctx *Context) (xml.Sequence, error) {
+func executeOnEmpty(ctx *Context) (xpath.Sequence, error) {
 	return nil, errImplemented
 }
 
-func executeOnNotEmpty(ctx *Context) (xml.Sequence, error) {
+func executeOnNotEmpty(ctx *Context) (xpath.Sequence, error) {
 	return nil, errImplemented
 }
 
-func executeSequence(ctx *Context) (xml.Sequence, error) {
+func executeSequence(ctx *Context) (xpath.Sequence, error) {
 	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
@@ -652,7 +653,7 @@ func executeSequence(ctx *Context) (xml.Sequence, error) {
 	return ctx.ExecuteQuery(query, ctx.ContextNode)
 }
 
-func executeElement(ctx *Context) (xml.Sequence, error) {
+func executeElement(ctx *Context) (xpath.Sequence, error) {
 	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
@@ -679,24 +680,24 @@ func executeElement(ctx *Context) (xml.Sequence, error) {
 			curr.Nodes = append(curr.Nodes, seq[i].Node())
 		}
 	}
-	return xml.Singleton(curr), nil
+	return xpath.Singleton(curr), nil
 }
 
-func executeAttribute(ctx *Context) (xml.Sequence, error) {
+func executeAttribute(ctx *Context) (xpath.Sequence, error) {
 	return nil, errImplemented
 }
 
-func executeText(ctx *Context) (xml.Sequence, error) {
+func executeText(ctx *Context) (xpath.Sequence, error) {
 	elem := xml.NewText(ctx.XslNode.Value())
-	return xml.Singleton(xml.NewNodeItem(elem)), nil
+	return xpath.Singleton(xpath.NewNodeItem(elem)), nil
 }
 
-func executeComment(ctx *Context) (xml.Sequence, error) {
+func executeComment(ctx *Context) (xpath.Sequence, error) {
 	elem := xml.NewComment(ctx.XslNode.Value())
-	return xml.Singleton(xml.NewNodeItem(elem)), nil
+	return xpath.Singleton(xpath.NewNodeItem(elem)), nil
 }
 
-func executeFallback(ctx *Context) (xml.Sequence, error) {
+func executeFallback(ctx *Context) (xpath.Sequence, error) {
 	return nil, errImplemented
 }
 
@@ -717,7 +718,7 @@ func applyParams(ctx *Context) error {
 	return nil
 }
 
-func applySort(ctx *Context, items []xml.Item) (iter.Seq[xml.Item], error) {
+func applySort(ctx *Context, items []xpath.Item) (iter.Seq[xpath.Item], error) {
 	sorts, err := ctx.queryXSL("./sort[1]")
 	if err != nil {
 		return nil, err
@@ -739,7 +740,7 @@ func applySort(ctx *Context, items []xml.Item) (iter.Seq[xml.Item], error) {
 
 type matchFunc func(xml.Node, string) (*Template, error)
 
-func executeApply(ctx *Context, match matchFunc) (xml.Sequence, error) {
+func executeApply(ctx *Context, match matchFunc) (xpath.Sequence, error) {
 	nodes, err := getNodesForTemplate(ctx)
 	if err != nil {
 		return nil, err
@@ -753,7 +754,7 @@ func executeApply(ctx *Context, match matchFunc) (xml.Sequence, error) {
 	}
 	var (
 		mode, _ = getAttribute(elem, "mode")
-		seq     = xml.NewSequence()
+		seq     = xpath.NewSequence()
 	)
 	for _, datum := range nodes {
 		tpl, err := match(datum, mode)
@@ -782,12 +783,12 @@ func executeApply(ctx *Context, match matchFunc) (xml.Sequence, error) {
 	return seq, nil
 }
 
-func iterItems(items []xml.Item, orderBy, orderDir string) (iter.Seq[xml.Item], error) {
-	expr, err := xml.CompileString(orderBy)
+func iterItems(items []xpath.Item, orderBy, orderDir string) (iter.Seq[xpath.Item], error) {
+	expr, err := xpath.CompileString(orderBy)
 	if err != nil {
 		return nil, err
 	}
-	getString := func(is []xml.Item) string {
+	getString := func(is []xpath.Item) string {
 		if len(is) == 0 {
 			return ""
 		}
@@ -804,7 +805,7 @@ func iterItems(items []xml.Item, orderBy, orderDir string) (iter.Seq[xml.Item], 
 			return strings.Compare(str1, str2) < 0
 		}
 	}
-	fn := func(yield func(xml.Item) bool) {
+	fn := func(yield func(xpath.Item) bool) {
 		is := slices.Clone(items)
 		sort.Slice(is, func(i, j int) bool {
 			x1, err1 := expr.Find(is[i].Node())
@@ -843,13 +844,13 @@ func getNodesForTemplate(ctx *Context) ([]xml.Node, error) {
 	return res, nil
 }
 
-func defineForeachGroupBuiltins(nested *Context, key string, seq xml.Sequence) {
-	currentGrp := func(_ xml.Context, _ []xml.Expr) (xml.Sequence, error) {
+func defineForeachGroupBuiltins(nested *Context, key string, seq xpath.Sequence) {
+	currentGrp := func(_ xpath.Context, _ []xpath.Expr) (xpath.Sequence, error) {
 		return seq, nil
 	}
-	currentKey := func(_ xml.Context, _ []xml.Expr) (xml.Sequence, error) {
-		i := xml.NewLiteralItem(key)
-		return []xml.Item{i}, nil
+	currentKey := func(_ xpath.Context, _ []xpath.Expr) (xpath.Sequence, error) {
+		i := xpath.NewLiteralItem(key)
+		return xpath.Singleton(i), nil
 	}
 
 	nested.Builtins.Define("current-group", currentGrp)
@@ -859,15 +860,15 @@ func defineForeachGroupBuiltins(nested *Context, key string, seq xml.Sequence) {
 }
 
 func defineMergeBuiltins(nested *Context, key string, items []MergedItem) {
-	currentKey := func(_ xml.Context, _ []xml.Expr) (xml.Sequence, error) {
-		return xml.Singleton(key), nil
+	currentKey := func(_ xpath.Context, _ []xpath.Expr) (xpath.Sequence, error) {
+		return xpath.Singleton(key), nil
 	}
-	currentGrp := func(ctx xml.Context, args []xml.Expr) (xml.Sequence, error) {
+	currentGrp := func(ctx xpath.Context, args []xpath.Expr) (xpath.Sequence, error) {
 		if len(args) > 1 {
 			return nil, fmt.Errorf("too many arguments")
 		}
 		var (
-			seq xml.Sequence
+			seq xpath.Sequence
 			grp string
 		)
 		if len(args) == 1 {

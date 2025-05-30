@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/midbel/codecs/xml"
+	"github.com/midbel/codecs/xpath"
 )
 
 const (
@@ -249,7 +250,7 @@ func (s *Stylesheet) SetAttributes(node xml.Node) error {
 	return nil
 }
 
-func (s *Stylesheet) SetParam(ident string, expr xml.Expr) {
+func (s *Stylesheet) SetParam(ident string, expr xpath.Expr) {
 	s.Env.DefineExprParam(ident, expr)
 }
 
@@ -422,7 +423,7 @@ func (s *Stylesheet) loadParams(doc xml.Node) error {
 				return fmt.Errorf("only one node expected")
 			}
 			n := cloneNode(n.Nodes[0])
-			s.Define(ident, xml.NewValueFromNode(n))
+			s.Define(ident, xpath.NewValueFromNode(n))
 		}
 	}
 	return nil
@@ -495,7 +496,7 @@ func (s *Stylesheet) writeDocument(w io.Writer, format string, doc *xml.Document
 	return writer.Write(doc)
 }
 
-func (s *Stylesheet) resolve(ident string) (xml.Expr, error) {
+func (s *Stylesheet) resolve(ident string) (xpath.Expr, error) {
 	expr, err := s.Env.Resolve(ident)
 	if err == nil {
 		return expr, nil
@@ -657,7 +658,7 @@ func (t *Template) isRoot() bool {
 	return t.Match == "/"
 }
 
-func templateMatch(expr xml.Expr, node xml.Node) (bool, int) {
+func templateMatch(expr xpath.Expr, node xml.Node) (bool, int) {
 	var (
 		depth int
 		curr  = node
@@ -668,7 +669,7 @@ func templateMatch(expr xml.Expr, node xml.Node) (bool, int) {
 			break
 		}
 		if len(items) > 0 {
-			ok := slices.ContainsFunc(items, func(i xml.Item) bool {
+			ok := slices.ContainsFunc(items, func(i xpath.Item) bool {
 				n := i.Node()
 				return n.Identity() == node.Identity()
 			})

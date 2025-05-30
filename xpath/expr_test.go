@@ -23,53 +23,53 @@ const document = `<?xml version="1.0" encoding="UTF-8"?>
 `
 
 func TestEval(t *testing.T) {
-	tests := []struct{
-		Expr string
-		Count int
+	tests := []struct {
+		Expr     string
+		Count    int
 		Expected []string
 	}{
 		{
-			Expr: "/root/item",
+			Expr:     "/root/item",
 			Expected: []string{"element-1", "element-2"},
 		},
 		{
-			Expr: "/root/item[1]",
+			Expr:     "/root/item[1]",
 			Expected: []string{"element-1"},
 		},
 		{
-			Expr: "/root/item[last()]",
+			Expr:     "/root/item[last()]",
 			Expected: []string{"element-2"},
 		},
 		{
-			Expr: "/root/item[position()>=1]",
+			Expr:     "/root/item[position()>=1]",
 			Expected: []string{"element-1", "element-2"},
 		},
 		{
-			Expr: "/root/item[position()>1]",
+			Expr:     "/root/item[position()>1]",
 			Expected: []string{"element-2"},
 		},
 		{
-			Expr: "count(//item))",
+			Expr:     "count(//item))",
 			Expected: []string{"4"},
 		},
 		{
-			Expr: "//item",
+			Expr:     "//item",
 			Expected: []string{"element-1", "element-2", "sub-element-1", "sub-element-2"},
 		},
 		{
-			Expr: "//group/item[1]",
+			Expr:     "//group/item[1]",
 			Expected: []string{"sub-element-1"},
 		},
 		{
-			Expr: "/root/item[1] | /root/item[2]",
+			Expr:     "/root/item[1] | /root/item[2]",
 			Expected: []string{"element-1", "element-2"},
 		},
 		{
-			Expr: "//item[text()=\"element-1\"]",
+			Expr:     "//item[text()=\"element-1\"]",
 			Expected: []string{"element-1"},
 		},
 		{
-			Expr: "//@ignore",
+			Expr:     "//@ignore",
 			Expected: []string{"true"},
 		},
 	}

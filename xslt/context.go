@@ -5,6 +5,7 @@ import (
 
 	"github.com/midbel/codecs/environ"
 	"github.com/midbel/codecs/xml"
+	"github.com/midbel/codecs/xpath"
 )
 
 type Context struct {
@@ -28,7 +29,7 @@ func (c *Context) errorWithContext(err error) error {
 	return errorWithContext(c.XslNode.QualifiedName(), err)
 }
 
-func (c *Context) queryXSL(query string) (xml.Sequence, error) {
+func (c *Context) queryXSL(query string) (xpath.Sequence, error) {
 	c.Query(c, query)
 	return c.Env.queryXSL(query, c.XslNode)
 }
@@ -68,7 +69,7 @@ func (c *Context) clone(xslNode, ctxNode xml.Node) *Context {
 	return &child
 }
 
-func (c *Context) NotFound(err error, mode string) (xml.Sequence, error) {
+func (c *Context) NotFound(err error, mode string) (xpath.Sequence, error) {
 	var tmp xml.Node
 	switch mode := c.getMode(mode); mode.NoMatch {
 	case MatchDeepCopy:
@@ -90,19 +91,19 @@ func (c *Context) NotFound(err error, mode string) (xml.Sequence, error) {
 	default:
 		return nil, err
 	}
-	return xml.Singleton(tmp), nil
+	return xpath.Singleton(tmp), nil
 }
 
 type Resolver interface {
-	Resolve(string) (xml.Expr, error)
+	Resolve(string) (xpath.Expr, error)
 }
 
 type Env struct {
 	other     Resolver
 	Namespace string
-	Vars      environ.Environ[xml.Expr]
-	Params    environ.Environ[xml.Expr]
-	Builtins  environ.Environ[xml.BuiltinFunc]
+	Vars      environ.Environ[xpath.Expr]
+	Params    environ.Environ[xpath.Expr]
+	Builtins  environ.Environ[xpath.BuiltinFunc]
 	Depth     int
 }
 
@@ -113,9 +114,9 @@ func Empty() *Env {
 func Enclosed(other Resolver) *Env {
 	return &Env{
 		other:    other,
-		Vars:     environ.Empty[xml.Expr](),
-		Params:   environ.Empty[xml.Expr](),
-		Builtins: xml.DefaultBuiltin(),
+		Vars:     environ.Empty[xpath.Expr](),
+		Params:   environ.Empty[xpath.Expr](),
+		Builtins: xpath.DefaultBuiltin(),
 	}
 }
 
@@ -123,21 +124,21 @@ func (e *Env) Sub() *Env {
 	return &Env{
 		other:     e.other,
 		Namespace: e.Namespace,
-		Vars:      environ.Enclosed[xml.Expr](e.Vars),
-		Params:    environ.Enclosed[xml.Expr](e.Params),
+		Vars:      environ.Enclosed[xpath.Expr](e.Vars),
+		Params:    environ.Enclosed[xpath.Expr](e.Params),
 		Builtins:  e.Builtins,
 		Depth:     e.Depth + 1,
 	}
 }
 
-func (e *Env) ExecuteQuery(query string, datum xml.Node) (xml.Sequence, error) {
+func (e *Env) ExecuteQuery(query string, datum xml.Node) (xpath.Sequence, error) {
 	return e.ExecuteQueryWithNS(query, "", datum)
 }
 
-func (e *Env) ExecuteQueryWithNS(query, namespace string, datum xml.Node) (xml.Sequence, error) {
+func (e *Env) ExecuteQueryWithNS(query, namespace string, datum xml.Node) (xpath.Sequence, error) {
 	if query == "" {
-		i := xml.NewNodeItem(datum)
-		return xml.Singleton(i), nil
+		i := xpath.NewNodeItem(datum)
+		return xpath.Singleton(i), nil
 	}
 	q, err := e.CompileQueryWithNS(query, namespace)
 	if err != nil {
@@ -146,16 +147,16 @@ func (e *Env) ExecuteQueryWithNS(query, namespace string, datum xml.Node) (xml.S
 	return q.Find(datum)
 }
 
-func (e *Env) queryXSL(query string, datum xml.Node) (xml.Sequence, error) {
+func (e *Env) queryXSL(query string, datum xml.Node) (xpath.Sequence, error) {
 	return e.ExecuteQueryWithNS(query, e.Namespace, datum)
 }
 
-func (e *Env) CompileQuery(query string) (xml.Expr, error) {
+func (e *Env) CompileQuery(query string) (xpath.Expr, error) {
 	return e.CompileQueryWithNS(query, "")
 }
 
-func (e *Env) CompileQueryWithNS(query, namespace string) (xml.Expr, error) {
-	q, err := xml.Build(query)
+func (e *Env) CompileQueryWithNS(query, namespace string) (xpath.Expr, error) {
+	q, err := xpath.Build(query)
 	if err != nil {
 		return nil, err
 	}
@@ -177,18 +178,18 @@ func (e *Env) TestNode(query string, datum xml.Node) (bool, error) {
 
 func (e *Env) Merge(other *Env) {
 	if m, ok := e.Vars.(interface {
-		Merge(environ.Environ[xml.Expr])
+		Merge(environ.Environ[xpath.Expr])
 	}); ok {
 		m.Merge(other.Vars)
 	}
 	if m, ok := e.Params.(interface {
-		Merge(environ.Environ[xml.Expr])
+		Merge(environ.Environ[xpath.Expr])
 	}); ok {
 		m.Merge(other.Params)
 	}
 }
 
-func (e *Env) Resolve(ident string) (xml.Expr, error) {
+func (e *Env) Resolve(ident string) (xpath.Expr, error) {
 	expr, err := e.Vars.Resolve(ident)
 	if err == nil {
 		return expr, nil
@@ -203,7 +204,7 @@ func (e *Env) Resolve(ident string) (xml.Expr, error) {
 	return nil, err
 }
 
-func (e *Env) Define(ident string, expr xml.Expr) {
+func (e *Env) Define(ident string, expr xpath.Expr) {
 	e.Vars.Define(ident, expr)
 }
 
@@ -218,16 +219,16 @@ func (e *Env) DefineParam(param, value string) error {
 func (e *Env) EvalParam(param, query string, datum xml.Node) error {
 	items, err := e.ExecuteQuery(query, datum)
 	if err == nil {
-		e.DefineExprParam(param, xml.NewValueFromSequence(items))
+		e.DefineExprParam(param, xpath.NewValueFromSequence(items))
 	}
 	return err
 }
 
-func (e *Env) DefineExprParam(param string, expr xml.Expr) {
+func (e *Env) DefineExprParam(param string, expr xpath.Expr) {
 	e.Params.Define(param, expr)
 }
 
-func isTrue(seq xml.Sequence) bool {
+func isTrue(seq xpath.Sequence) bool {
 	if seq.Empty() {
 		return false
 	}

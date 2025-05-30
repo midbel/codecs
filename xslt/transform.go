@@ -9,9 +9,10 @@ import (
 	"time"
 
 	"github.com/midbel/codecs/xml"
+	"github.com/midbel/codecs/xpath"
 )
 
-func transformNode(ctx *Context) (xml.Sequence, error) {
+func transformNode(ctx *Context) (xpath.Sequence, error) {
 	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
@@ -27,7 +28,7 @@ func transformNode(ctx *Context) (xml.Sequence, error) {
 	return fn(ctx)
 }
 
-func processNode(ctx *Context) (xml.Sequence, error) {
+func processNode(ctx *Context) (xpath.Sequence, error) {
 	ctx.Enter(ctx)
 	defer ctx.Leave(ctx)
 
@@ -63,15 +64,15 @@ func processNode(ctx *Context) (xml.Sequence, error) {
 			elem.Append(res[i].Node())
 		}
 	}
-	return xml.Singleton(elem), nil
+	return xpath.Singleton(elem), nil
 }
 
-func appendNode(ctx *Context) (xml.Sequence, error) {
+func appendNode(ctx *Context) (xpath.Sequence, error) {
 	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
 	}
-	seq := xml.NewSequence()
+	seq := xpath.NewSequence()
 	for _, n := range elem.Nodes {
 		c := cloneNode(n)
 		if c == nil {
@@ -98,11 +99,11 @@ func processParam(node xml.Node, env *Env) error {
 	if query, err := getAttribute(elem, "select"); err == nil {
 		err = env.DefineParam(ident, query)
 	} else {
-		var seq xml.Sequence
+		var seq xpath.Sequence
 		for i := range elem.Nodes {
-			seq.Append(xml.NewNodeItem(elem.Nodes[i]))
+			seq.Append(xpath.NewNodeItem(elem.Nodes[i]))
 		}
-		env.DefineExprParam(ident, xml.NewValueFromSequence(seq))
+		env.DefineExprParam(ident, xpath.NewValueFromSequence(seq))
 	}
 	return err
 }
