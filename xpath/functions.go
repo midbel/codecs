@@ -302,7 +302,7 @@ func callHash(ctx Context, args []Expr) (Sequence, error) {
 		tmp := sha512.Sum512(in)
 		res = tmp[:]
 	default:
-		return nil, fmt.Errorf("%s unsupported algorithm")
+		return nil, fmt.Errorf("%s unsupported algorithm", alg)
 	}
 	var str string
 	if len(args) >= 3 {
