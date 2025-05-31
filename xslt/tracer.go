@@ -91,6 +91,8 @@ func (t *stdioTracer) Enter(ctx *Context) {
 		ctx.XslNode.QualifiedName(),
 		"node",
 		ctx.ContextNode.QualifiedName(),
+		"mode",
+		ctx.Mode,
 		"depth",
 		ctx.Depth,
 	}
@@ -104,6 +106,8 @@ func (t *stdioTracer) Leave(ctx *Context) {
 		ctx.XslNode.QualifiedName(),
 		"node",
 		ctx.ContextNode.QualifiedName(),
+		"mode",
+		ctx.Mode,
 		"depth",
 		ctx.Depth,
 	}
@@ -116,6 +120,8 @@ func (t *stdioTracer) Error(ctx *Context, err error) {
 		ctx.XslNode.QualifiedName(),
 		"node",
 		ctx.ContextNode.QualifiedName(),
+		"mode",
+		ctx.Mode,
 		"depth",
 		ctx.Depth,
 		"err",
@@ -131,6 +137,8 @@ func (t *stdioTracer) Query(ctx *Context, query string) {
 		ctx.XslNode.QualifiedName(),
 		"node",
 		ctx.ContextNode.QualifiedName(),
+		"mode",
+		ctx.Mode,
 		"query",
 		query,
 	}

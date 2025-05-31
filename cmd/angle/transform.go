@@ -10,6 +10,7 @@ import (
 
 type TransformCmd struct {
 	Context  string
+	Mode     string
 	Trace    bool
 	Quiet    bool
 	WrapRoot bool
@@ -21,6 +22,7 @@ func (c TransformCmd) Run(args []string) error {
 	set := flag.NewFlagSet("transform", flag.ContinueOnError)
 	set.BoolVar(&c.Trace, "t", false, "trace")
 	set.BoolVar(&c.Quiet, "q", false, "quiet")
+	set.StringVar(&c.Mode, "m", "", "default mode")
 	set.BoolVar(&c.WrapRoot, "w", false, "wrap nodes under a single root element")
 	set.StringVar(&c.Context, "d", "", "context directory")
 	set.StringVar(&c.File, "f", "", "output file")
@@ -41,6 +43,7 @@ func (c TransformCmd) Run(args []string) error {
 	if err != nil {
 		return err
 	}
+	sheet.Mode = c.Mode
 	sheet.WrapRoot = c.WrapRoot
 	if c.Trace {
 		sheet.Tracer = xslt.Stdout()

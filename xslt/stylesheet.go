@@ -80,11 +80,10 @@ type Stylesheet struct {
 	DefaultMode string
 	WrapRoot    bool
 
-	namespace   string
-	Mode        string
-	currentMode *Mode
-	Modes       []*Mode
-	AttrSet     []*AttributeSet
+	namespace string
+	Mode      string
+	Modes     []*Mode
+	AttrSet   []*AttributeSet
 
 	output    []*Output
 	Templates []*Template
@@ -101,10 +100,9 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 		return nil, err
 	}
 	sheet := Stylesheet{
-		Context:     contextDir,
-		currentMode: unnamedMode(),
-		namespace:   xsltNamespacePrefix,
-		Env:         Empty(),
+		Context:   contextDir,
+		namespace: xsltNamespacePrefix,
+		Env:       Empty(),
 	}
 	if sheet.Context == "" {
 		sheet.Context = filepath.Dir(file)
@@ -273,6 +271,7 @@ func (s *Stylesheet) createContext(node xml.Node) *Context {
 	env.Namespace = s.namespace
 	ctx := Context{
 		ContextNode: node,
+		Mode:        s.Mode,
 		Size:        1,
 		Index:       1,
 		Stylesheet:  s,
@@ -473,6 +472,12 @@ func (s *Stylesheet) loadTemplates(doc xml.Node) error {
 		t, err := NewTemplate(el.Node())
 		if err != nil {
 			return err
+		}
+		found := slices.ContainsFunc(s.Templates, func(other *Template) bool {
+			return other.Name == t.Name && other.Match == t.Match && other.Mode == t.Mode
+		})
+		if found {
+			return fmt.Errorf("duplicate match/name/mode template")
 		}
 		s.Templates = append(s.Templates, t)
 	}

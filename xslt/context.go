@@ -11,11 +11,10 @@ import (
 type Context struct {
 	XslNode     xml.Node
 	ContextNode xml.Node
+	Mode        string
 
 	Index int
 	Size  int
-	Mode  string
-
 	Depth int
 
 	*Stylesheet
@@ -46,6 +45,12 @@ func (c *Context) WithXpath(ctxNode xml.Node) *Context {
 	return c.clone(c.XslNode, ctxNode)
 }
 
+func (c *Context) WithMode(mode string) *Context {
+	child := c.clone(c.XslNode, c.ContextNode)
+	child.Mode = mode
+	return child
+}
+
 func (c *Context) Nest() *Context {
 	child := c.clone(c.XslNode, c.ContextNode)
 	child.Env = child.Env.Sub()
@@ -60,6 +65,7 @@ func (c *Context) clone(xslNode, ctxNode xml.Node) *Context {
 	child := Context{
 		XslNode:     xslNode,
 		ContextNode: ctxNode,
+		Mode:        c.Mode,
 		Index:       1,
 		Size:        1,
 		Stylesheet:  c.Stylesheet,
