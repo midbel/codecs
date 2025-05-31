@@ -1,16 +1,20 @@
 package xslt
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/midbel/codecs/xml"
 	"github.com/midbel/codecs/xpath"
 )
+
+var errMissed = errors.New("missing attribute")
 
 func transformNode(ctx *Context) (xpath.Sequence, error) {
 	elem, err := getElementFromNode(ctx.XslNode)
@@ -108,6 +112,28 @@ func processParam(node xml.Node, env *Env) error {
 	return err
 }
 
+func isEmpty(seq xpath.Sequence) bool {
+	if seq.Empty() {
+		return true
+	}
+	return !slices.ContainsFunc(seq, func(item xpath.Item) bool {
+		node := item.Node()
+		switch node.Type() {
+		case xml.TypeText:
+			return strings.TrimSpace(node.Value()) == ""
+		case xml.TypeDocument:
+			d := node.(*xml.Document)
+			r := d.Root()
+			return r == nil
+		case xml.TypeElement:
+			e := node.(*xml.Element)
+			return len(e.Nodes) == 0
+		default:
+			return false
+		}
+	})
+}
+
 func cloneNode(n xml.Node) xml.Node {
 	cloner, ok := n.(xml.Cloner)
 	if !ok {
@@ -129,7 +155,7 @@ func getAttribute(el *xml.Element, ident string) (string, error) {
 		return a.Name == ident
 	})
 	if ix < 0 {
-		return "", fmt.Errorf("%s: missing attribute %q", el.QualifiedName(), ident)
+		return "", fmt.Errorf("%s: %w %q", el.QualifiedName(), errMissed, ident)
 	}
 	return el.Attrs[ix].Value(), nil
 }

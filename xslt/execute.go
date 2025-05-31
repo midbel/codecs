@@ -1,6 +1,7 @@
 package xslt
 
 import (
+	"errors"
 	"fmt"
 	"iter"
 	"maps"
@@ -111,20 +112,7 @@ func executeSourceDocument(ctx *Context) (xpath.Sequence, error) {
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
 	}
-
-	seq := xpath.NewSequence()
-	for _, n := range slices.Clone(elem.Nodes) {
-		c := cloneNode(n)
-		if c == nil {
-			continue
-		}
-		res, err := transformNode(ctx.WithNodes(doc, c))
-		if err != nil {
-			return nil, ctx.errorWithContext(err)
-		}
-		seq.Concat(res)
-	}
-	return seq, nil
+	return executeConstructor(ctx.WithXpath(doc), elem.Nodes, AllowOnEmpty|AllowOnNonEmpty)
 }
 
 func executeResultDocument(ctx *Context) (xpath.Sequence, error) {
@@ -132,20 +120,13 @@ func executeResultDocument(ctx *Context) (xpath.Sequence, error) {
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
 	}
-
+	seq, err := executeConstructor(ctx, elem.Nodes, AllowOnEmpty|AllowOnNonEmpty)
+	if err != nil {
+		return nil, err
+	}
 	var doc xml.Document
-	for _, n := range slices.Clone(elem.Nodes) {
-		c := cloneNode(n)
-		if c == nil {
-			continue
-		}
-		seq, err := transformNode(ctx.WithXsl(c))
-		if err != nil {
-			return nil, err
-		}
-		for i := range seq {
-			doc.Nodes = append(doc.Nodes, seq[i].Node())
-		}
+	for i := range seq {
+		doc.Nodes = append(doc.Nodes, seq[i].Node())
 	}
 
 	file, err := getAttribute(elem, "href")
@@ -201,22 +182,19 @@ func executeWithParam(ctx *Context) (xpath.Sequence, error) {
 		return nil, ctx.errorWithContext(err)
 	}
 	if query, err := getAttribute(elem, "select"); err == nil {
-		ctx.EvalParam(ident, query, ctx.ContextNode)
-	} else {
-		var seq xpath.Sequence
-		for _, n := range slices.Clone(elem.Nodes) {
-			c := cloneNode(n)
-			if c == nil {
-				continue
-			}
-			res, err := transformNode(ctx.WithXsl(c))
-			if err != nil {
-				return nil, ctx.errorWithContext(err)
-			}
-			seq.Concat(res)
+		if len(elem.Nodes) != 0 {
+			return nil, fmt.Errorf("select attribute can not be used with children")
 		}
-		ctx.DefineExprParam(ident, xpath.NewValueFromSequence(seq))
+		ctx.EvalParam(ident, query, ctx.ContextNode)
 	}
+	if len(elem.Nodes) == 0 {
+		return nil, nil
+	}
+	seq, err := executeConstructor(ctx, elem.Nodes, 0)
+	if err != nil {
+		return nil, err
+	}
+	ctx.DefineExprParam(ident, xpath.NewValueFromSequence(seq))
 	return nil, nil
 }
 
@@ -246,19 +224,7 @@ func executeCallTemplate(ctx *Context) (xpath.Sequence, error) {
 	if err := applyParams(sub); err != nil {
 		return nil, ctx.errorWithContext(err)
 	}
-	seq := xpath.NewSequence()
-	for _, n := range slices.Clone(tpl.Nodes) {
-		c := cloneNode(n)
-		if c == nil {
-			continue
-		}
-		res, err := transformNode(sub.WithXsl(c))
-		if err != nil {
-			return nil, ctx.errorWithContext(err)
-		}
-		seq.Concat(res)
-	}
-	return seq, nil
+	return executeConstructor(sub, tpl.Nodes, AllowOnEmpty|AllowOnNonEmpty)
 }
 
 func executeForeachGroup(ctx *Context) (xpath.Sequence, error) {
@@ -272,8 +238,12 @@ func executeForeachGroup(ctx *Context) (xpath.Sequence, error) {
 	}
 
 	items, err := ctx.ExecuteQuery(query, ctx.ContextNode)
-	if err != nil || len(items) == 0 {
+	if err != nil {
 		return nil, err
+	}
+
+	if len(items) == 0 {
+		return executeConstructor(ctx, elem.Nodes, AllowOnEmpty|AllowOnNonEmpty)
 	}
 
 	key, err := getAttribute(elem, "group-by")
@@ -297,17 +267,11 @@ func executeForeachGroup(ctx *Context) (xpath.Sequence, error) {
 	seq := xpath.NewSequence()
 	for key, items := range groups {
 		defineForeachGroupBuiltins(ctx, key, items)
-		for _, n := range elem.Nodes {
-			c := cloneNode(n)
-			if c == nil {
-				continue
-			}
-			res, err := transformNode(ctx.WithXsl(c))
-			if err != nil {
-				return nil, err
-			}
-			seq.Concat(res)
+		others, err := executeConstructor(ctx, elem.Nodes, AllowOnEmpty|AllowOnNonEmpty)
+		if err != nil {
+			return nil, err
 		}
+		seq.Concat(others)
 	}
 	return seq, nil
 }
@@ -411,7 +375,7 @@ func executeForeach(ctx *Context) (xpath.Sequence, error) {
 		return nil, ctx.errorWithContext(err)
 	}
 	if len(items) == 0 {
-		return nil, nil
+		return executeConstructor(ctx, elem.Nodes, AllowOnEmpty|AllowOnNonEmpty)
 	}
 	it, err := applySort(ctx, items)
 	if err != nil {
@@ -421,17 +385,11 @@ func executeForeach(ctx *Context) (xpath.Sequence, error) {
 	seq := xpath.NewSequence()
 	for i := range it {
 		node := i.Node()
-		for _, n := range elem.Nodes {
-			c := cloneNode(n)
-			if c == nil {
-				continue
-			}
-			res, err := transformNode(ctx.WithNodes(node, c))
-			if err != nil {
-				return nil, err
-			}
-			seq.Concat(res)
+		others, err := executeConstructor(ctx.WithXpath(node), elem.Nodes, AllowOnEmpty|AllowOnNonEmpty)
+		if err != nil {
+			return nil, err
 		}
+		seq.Concat(others)
 	}
 	return seq, nil
 }
@@ -604,48 +562,31 @@ func executeWherePopulated(ctx *Context) (xpath.Sequence, error) {
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
 	}
-	var (
-		nodes = slices.Clone(elem.Nodes)
-		seq   xpath.Sequence
-	)
-
-	discard := func(seq xpath.Sequence) bool {
-		ok := slices.ContainsFunc(seq, func(item xpath.Item) bool {
-			node := item.Node()
-			if kind := node.Type(); kind == xml.TypeText {
-				return strings.TrimSpace(node.Value()) == ""
-			} else if kind == xml.TypeDocument {
-				d := node.(*xml.Document)
-				r := d.Root()
-				return r == nil
-			} else if kind == xml.TypeElement {
-				e := node.(*xml.Element)
-				return len(e.Nodes) == 0
-			}
-			return false
-		})
-		return ok
-	}
-
-	for _, n := range nodes {
-		res, err := transformNode(ctx.WithXsl(n))
-		if err != nil {
-			return nil, err
-		}
-		if discard(res) {
-			return nil, nil
-		}
-		seq.Concat(res)
-	}
-	return seq, nil
+	return executeConstructor(ctx, elem.Nodes, AllowOnEmpty|AllowOnNonEmpty)
 }
 
 func executeOnEmpty(ctx *Context) (xpath.Sequence, error) {
-	return nil, errImplemented
+	elem, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
+	seq, err := executeSelect(ctx, elem)
+	if !errors.Is(err, errMissed) {
+		return seq, err
+	}
+	return executeConstructor(ctx, elem.Nodes, 0)
 }
 
 func executeOnNotEmpty(ctx *Context) (xpath.Sequence, error) {
-	return nil, errImplemented
+	elem, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
+	seq, err := executeSelect(ctx, elem)
+	if !errors.Is(err, errMissed) {
+		return seq, err
+	}
+	return executeConstructor(ctx, elem.Nodes, 0)
 }
 
 func executeSequence(ctx *Context) (xpath.Sequence, error) {
@@ -653,11 +594,105 @@ func executeSequence(ctx *Context) (xpath.Sequence, error) {
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
 	}
-	query, err := getAttribute(elem, "select")
-	if err != nil {
-		return nil, err
+	seq, err := executeSelect(ctx, elem)
+	if !errors.Is(err, errMissed) {
+		return seq, err
 	}
-	return ctx.ExecuteQuery(query, ctx.ContextNode)
+	return executeConstructor(ctx, elem.Nodes, AllowOnEmpty|AllowOnNonEmpty)
+}
+
+type constructorFlags int8
+
+func (c constructorFlags) AllowEmpty() bool {
+	return c&AllowOnEmpty != 0
+}
+
+func (c constructorFlags) AllowNotEmpty() bool {
+	return c&AllowOnNonEmpty != 0
+}
+
+const (
+	AllowOnEmpty constructorFlags = 1 << iota
+	AllowOnNonEmpty
+)
+
+func executeConstructor(ctx *Context, nodes []xml.Node, options constructorFlags) (xpath.Sequence, error) {
+	var (
+		seq     xpath.Sequence
+		pending []xml.Node
+	)
+	for i, n := range nodes {
+		c := cloneNode(n)
+		if c == nil {
+			continue
+		}
+		switch {
+		case c.QualifiedName() == ctx.getQualifiedName("on-empty"):
+			if !options.AllowEmpty() {
+				err := fmt.Errorf("%s is not allowed", c.QualifiedName())
+				return nil, ctx.errorWithContext(err)
+			}
+			if i < len(nodes)-1 {
+				err := fmt.Errorf("%s can only be the last child of node", c.QualifiedName())
+				return nil, ctx.errorWithContext(err)
+			}
+			if !isEmpty(seq) {
+				break
+			}
+			return transformNode(ctx.WithXsl(c))
+		case c.QualifiedName() == ctx.getQualifiedName("on-non-empty"):
+			if !options.AllowNotEmpty() {
+				err := fmt.Errorf("%s is not allowed", c.QualifiedName())
+				return nil, ctx.errorWithContext(err)
+			}
+			pending = append(pending, c)
+		default:
+			others, err := transformNode(ctx.WithXsl(c))
+			if err != nil {
+				return nil, err
+			}
+			if !others.Empty() && len(pending) > 0 && options.AllowNotEmpty() {
+				tmp, err := executeNodes(ctx, pending)
+				if err != nil {
+					return nil, err
+				}
+				seq.Concat(tmp)
+				pending = nil
+			}
+			seq.Concat(others)
+		}
+	}
+	if !seq.Empty() && options.AllowNotEmpty() {
+		others, err := executeNodes(ctx, pending)
+		if err != nil {
+			return nil, err
+		}
+		seq.Concat(others)
+	}
+	return seq, nil
+}
+
+func executeNodes(ctx *Context, nodes []xml.Node) (xpath.Sequence, error) {
+	var seq xpath.Sequence
+	for i := range nodes {
+		tmp, err := transformNode(ctx.WithXsl(nodes[i]))
+		if err != nil {
+			return nil, err
+		}
+		seq.Concat(tmp)
+	}
+	return seq, nil
+}
+
+func executeSelect(ctx *Context, elem *xml.Element) (xpath.Sequence, error) {
+	query, err := getAttribute(elem, "select")
+	if err == nil {
+		if len(elem.Nodes) != 0 {
+			return nil, fmt.Errorf("select attribute can not be used with children")
+		}
+		return ctx.ExecuteQuery(query, ctx.ContextNode)
+	}
+	return nil, err
 }
 
 func executeElement(ctx *Context) (xpath.Sequence, error) {
@@ -673,19 +708,13 @@ func executeElement(ctx *Context) (xpath.Sequence, error) {
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
 	}
+	seq, err := executeConstructor(ctx, elem.Nodes, AllowOnEmpty|AllowOnNonEmpty)
+	if err != nil {
+		return nil, err
+	}
 	curr := xml.NewElement(qn)
-	for i := range elem.Nodes {
-		c := cloneNode(elem.Nodes[i])
-		if c == nil {
-			continue
-		}
-		seq, err := transformNode(ctx.WithXsl(c))
-		if err != nil {
-			return nil, err
-		}
-		for i := range seq {
-			curr.Nodes = append(curr.Nodes, seq[i].Node())
-		}
+	for i := range seq {
+		curr.Append(seq[i].Node())
 	}
 	return xpath.Singleton(curr), nil
 }
