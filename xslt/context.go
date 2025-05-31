@@ -75,9 +75,9 @@ func (c *Context) clone(xslNode, ctxNode xml.Node) *Context {
 	return &child
 }
 
-func (c *Context) NotFound(err error, mode string) (xpath.Sequence, error) {
+func (c *Context) NotFound(err error) (xpath.Sequence, error) {
 	var tmp xml.Node
-	switch mode := c.getMode(mode); mode.NoMatch {
+	switch mode := c.getMode(c.Mode); mode.NoMatch {
 	case MatchDeepCopy:
 		tmp = cloneNode(c.ContextNode)
 	case MatchShallowCopy:

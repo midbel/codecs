@@ -215,10 +215,13 @@ func executeCallTemplate(ctx *Context) (xpath.Sequence, error) {
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
 	}
-	mode, _ := getAttribute(elem, "mode")
+	mode, err := getAttribute(elem, "mode")
+	if err == nil {
+		ctx = ctx.WithMode(mode)
+	}
 	tpl, err := ctx.Find(name, mode)
 	if err != nil {
-		return ctx.NotFound(err, mode)
+		return ctx.NotFound(err)
 	}
 	sub := tpl.mergeContext(ctx)
 	if err := applyParams(sub); err != nil {
@@ -788,15 +791,16 @@ func executeApply(ctx *Context, match matchFunc) (xpath.Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	var (
-		mode, _ = getAttribute(elem, "mode")
-		seq     = xpath.NewSequence()
-	)
+	mode, err := getAttribute(elem, "mode")
+	if err == nil {
+		ctx = ctx.WithMode(mode)
+	}
+	seq := xpath.NewSequence()
 	for _, datum := range nodes {
 		tpl, err := match(datum, mode)
 		if err != nil {
 			for i := range nodes {
-				res, err := ctx.WithXpath(nodes[i]).NotFound(err, mode)
+				res, err := ctx.WithXpath(nodes[i]).NotFound(err)
 				if err != nil {
 					return nil, err
 				}
