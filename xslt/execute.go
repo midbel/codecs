@@ -612,8 +612,15 @@ func executeWherePopulated(ctx *Context) (xpath.Sequence, error) {
 	discard := func(seq xpath.Sequence) bool {
 		ok := slices.ContainsFunc(seq, func(item xpath.Item) bool {
 			node := item.Node()
-			if node.Type() == xml.TypeText {
+			if kind := node.Type(); kind == xml.TypeText {
 				return strings.TrimSpace(node.Value()) == ""
+			} else if kind == xml.TypeDocument {
+				d := node.(*xml.Document)
+				r := d.Root()
+				return r == nil
+			} else if kind == xml.TypeElement {
+				e := node.(*xml.Element)
+				return len(e.Nodes) == 0
 			}
 			return false
 		})
