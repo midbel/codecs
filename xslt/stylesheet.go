@@ -163,16 +163,29 @@ func (m *Mode) matchTemplate(node xml.Node, env *Env) (*Template, error) {
 		if len(results) > 1 && m.MultiMatch == MultiMatchFail {
 			return nil, fmt.Errorf("%s: more than one template match", node.QualifiedName())
 		}
+		if m.MultiMatch == MultiMatchLast {
+			return results[len(results)-1].Template.Clone(), nil
+		}
 		slices.SortFunc(results, func(m1, m2 *TemplateMatch) int {
 			return m2.Priority - m1.Priority
 		})
-		tpl := results[0].Template.Clone()
-		return tpl, nil
+		return results[0].Template.Clone(), nil
 	}
-	if m.NoMatch == NoMatchFail {
+	return nm.noMatch()
+}
+
+func (m *Mode) noMatch() (*Template, error) {
+	switch m.NoMatch {
+	case NoMatchDeepCopy:
+	case NoMatchShallowCopy:
+	case NoMatchDeepSkip:
+	case NoMatchShallowSkip:
+	case NoMatchTextOnlyCopy:
+	case NoMatchFail:
+		return nil, fmt.Errorf("%s: no template match", node.QualifiedName())
+	default:
 		return nil, fmt.Errorf("%s: no template match", node.QualifiedName())
 	}
-	return nil, fmt.Errorf("no template found matching given node (%s)", node.QualifiedName())
 }
 
 type Stylesheet struct {
