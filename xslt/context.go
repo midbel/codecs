@@ -75,31 +75,6 @@ func (c *Context) clone(xslNode, ctxNode xml.Node) *Context {
 	return &child
 }
 
-func (c *Context) NotFound(err error) (xpath.Sequence, error) {
-	var tmp xml.Node
-	switch mode := c.getMode(c.Mode); mode.NoMatch {
-	case MatchDeepCopy:
-		tmp = cloneNode(c.ContextNode)
-	case MatchShallowCopy:
-		elem, err := getElementFromNode(c.ContextNode)
-		if err != nil {
-			return nil, err
-		}
-		curr := xml.NewElement(elem.QName)
-		for i := range elem.Attrs {
-			curr.SetAttribute(elem.Attrs[i])
-		}
-		tmp = curr
-	case MatchTextOnlyCopy:
-		tmp = xml.NewText(c.ContextNode.Value())
-	case MatchFail:
-		return nil, err
-	default:
-		return nil, err
-	}
-	return xpath.Singleton(tmp), nil
-}
-
 type Resolver interface {
 	Resolve(string) (xpath.Expr, error)
 }

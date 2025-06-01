@@ -51,7 +51,7 @@ func defaultOutput() *Output {
 type NoMatchMode int8
 
 const (
-	NoMatchDeepCopy MatchMode = 1 << iota
+	NoMatchDeepCopy NoMatchMode = 1 << iota
 	NoMatchShallowCopy
 	NoMatchDeepSkip
 	NoMatchShallowSkip
@@ -59,52 +59,133 @@ const (
 	NoMatchFail
 )
 
-type MultipleMatchMode int8
+type MultiMatchMode int8
 
 const (
-	MultiMatchFail MultipleMatchMode = 1 << iota
+	MultiMatchFail MultiMatchMode = 1 << iota
 	MultiMatchLast
 )
 
 type Mode struct {
 	Name       string
 	NoMatch    NoMatchMode
-	MultiMatch MatchMode
+	MultiMatch MultiMatchMode
 
 	Templates []*Template
 	Builtins  []*Template
 }
 
-func unnamedMode() *Mode {
+func namedMode(name string) *Mode {
 	return &Mode{
-		NoMatch:    MatchFail,
-		MultiMatch: MatchFail,
+		Name:       name,
+		NoMatch:    NoMatchFail,
+		MultiMatch: MultiMatchFail,
 	}
+}
+
+func unnamedMode() *Mode {
+	return namedMode("")
 }
 
 func (m *Mode) Unnamed() bool {
 	return m.Name == ""
 }
 
-func (m *Mode) Find(name string) (*Template, error) {
-	return nil, nil
+func (m *Mode) Merge(other *Mode) error {
+	for _, t := range other.Templates {
+		ix := slices.IndexFunc(m.Templates, func(c *Template) bool {
+			return c.Name == t.Name && c.Match == t.Match
+		})
+		if ix >= 0 {
+			return fmt.Errorf("template already defined")
+		}
+		m.Templates = append(m.Templates, t)
+	}
+	return nil
 }
 
-func (m *Mode) Match(node xml.Node) (*Template, error) {
-	return nil, nil
+func (m *Mode) Append(t *Template) error {
+	found := slices.ContainsFunc(m.Templates, func(other *Template) bool {
+		return other.Name == t.Name && other.Match == t.Match
+	})
+	if found {
+		return fmt.Errorf("duplicate match/name/mode template")
+	}
+	m.Templates = append(m.Templates, t)
+	return nil
+}
+
+func (m *Mode) callTemplate(name string) (*Template, error) {
+	ix := slices.IndexFunc(m.Templates, func(t *Template) bool {
+		return t.Name == name
+	})
+	if ix < 0 {
+		return nil, fmt.Errorf("%s: template not found", name)
+	}
+	return m.Templates[ix].Clone(), nil
+}
+
+func (m *Mode) mainTemplate() (*Template, error) {
+	ix := slices.IndexFunc(m.Templates, func(t *Template) bool {
+		return t.isRoot()
+	})
+	if ix >= 0 {
+		return m.Templates[0], nil
+	}
+	return nil, fmt.Errorf("main template not found")
+}
+
+func (m *Mode) matchTemplate(node xml.Node, env *Env) (*Template, error) {
+	type TemplateMatch struct {
+		*Template
+		Priority int
+	}
+	var results []*TemplateMatch
+	for _, t := range m.Templates {
+		if t.isRoot() || t.Name != "" {
+			continue
+		}
+		expr, err := env.CompileQuery(t.Match)
+		if err != nil {
+			continue
+		}
+		ok, prio := templateMatch(expr, node)
+		if !ok {
+			continue
+		}
+		match := TemplateMatch{
+			Template: t,
+			Priority: prio + t.Priority,
+		}
+		results = append(results, &match)
+	}
+	if len(results) > 0 {
+		if len(results) > 1 && m.MultiMatch == MultiMatchFail {
+			return nil, fmt.Errorf("%s: more than one template match", node.QualifiedName())
+		}
+		slices.SortFunc(results, func(m1, m2 *TemplateMatch) int {
+			return m2.Priority - m1.Priority
+		})
+		tpl := results[0].Template.Clone()
+		return tpl, nil
+	}
+	if m.NoMatch == NoMatchFail {
+		return nil, fmt.Errorf("%s: no template match", node.QualifiedName())
+	}
+	return nil, fmt.Errorf("no template found matching given node (%s)", node.QualifiedName())
 }
 
 type Stylesheet struct {
-	DefaultMode string
-	WrapRoot    bool
+	DefaultMode           string
+	WrapRoot              bool
+	StrictModeDeclaration bool
 
 	namespace string
 	Mode      string
 	Modes     []*Mode
 	AttrSet   []*AttributeSet
 
-	output    []*Output
-	Templates []*Template
+	output []*Output
 	*Env
 	Tracer
 
@@ -153,19 +234,22 @@ func (s *Stylesheet) Find(name, mode string) (*Template, error) {
 	if mode == "" {
 		mode = s.CurrentMode()
 	}
-	ix := slices.IndexFunc(s.Templates, func(t *Template) bool {
-		return t.Name == name && t.Mode == mode
+	ix := slices.IndexFunc(s.Modes, func(m *Mode) bool {
+		return m.Name == mode
 	})
-	if ix < 0 {
-		for _, s := range s.Others {
-			if tpl, err := s.Find(name, mode); err == nil {
-				return tpl, nil
-			}
+	if ix >= 0 {
+		tpl, err := s.Modes[ix].callTemplate(name)
+		if err != nil {
+			return nil, err
 		}
-		return nil, fmt.Errorf("template %s not found", name)
+		return tpl, nil
 	}
-	tpl := s.Templates[ix].Clone()
-	return tpl, nil
+	for _, s := range s.Others {
+		if tpl, err := s.Find(name, mode); err == nil {
+			return tpl, nil
+		}
+	}
+	return nil, fmt.Errorf("template %s not found", name)
 }
 
 func (s *Stylesheet) MatchImport(node xml.Node, mode string) (*Template, error) {
@@ -178,9 +262,12 @@ func (s *Stylesheet) MatchImport(node xml.Node, mode string) (*Template, error) 
 }
 
 func (s *Stylesheet) Match(node xml.Node, mode string) (*Template, error) {
-	tpl, err := s.getMatchingTemplates(s.Templates, node, mode)
-	if err == nil {
-		return tpl, nil
+	ix := slices.IndexFunc(s.Modes, func(m *Mode) bool {
+		return m.Name == mode
+	})
+	if ix >= 0 {
+		tpl, err := s.Modes[ix].matchTemplate(node, s.Env)
+		return tpl, err
 	}
 	return s.MatchImport(node, mode)
 }
@@ -234,7 +321,18 @@ func (s *Stylesheet) IncludeSheet(file string) error {
 	if err != nil {
 		return err
 	}
-	s.Templates = append(s.Templates, other.Templates...)
+	for _, m := range other.Modes {
+		ix := slices.IndexFunc(s.Modes, func(c *Mode) bool {
+			return c.Name == m.Name
+		})
+		if ix < 0 {
+			s.Modes = append(s.Modes, m)
+		} else {
+			if err := s.Modes[ix].Merge(m); err != nil {
+				return err
+			}
+		}
+	}
 	s.Env.Merge(other.Env)
 	return nil
 }
@@ -400,13 +498,11 @@ func (s *Stylesheet) loadModes(doc xml.Node) error {
 			case "name":
 				m.Name = attr
 			case "on-no-match":
-				m.NoMatch = MatchFail
+				m.NoMatch = NoMatchFail
 			case "on-multiple-match":
-				m.MultiMatch = MatchFail
+				m.MultiMatch = MultiMatchFail
 			case "warning-on-no-match":
-				// TODO
 			case "warning-on-multiple-match":
-				// TODO
 			default:
 			}
 		}
@@ -491,13 +587,21 @@ func (s *Stylesheet) loadTemplates(doc xml.Node) error {
 		if err != nil {
 			return err
 		}
-		found := slices.ContainsFunc(s.Templates, func(other *Template) bool {
-			return other.Name == t.Name && other.Match == t.Match && other.Mode == t.Mode
+		ix := slices.IndexFunc(s.Modes, func(m *Mode) bool {
+			return m.Name == t.Mode
 		})
-		if found {
-			return fmt.Errorf("duplicate match/name/mode template")
+		if ix < 0 {
+			mode := namedMode(t.Mode)
+			err = mode.Append(t)
+			if err == nil {
+				s.Modes = append(s.Modes, mode)
+			}
+		} else {
+			err = s.Modes[ix].Append(t)
 		}
-		s.Templates = append(s.Templates, t)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -539,60 +643,13 @@ func (s *Stylesheet) getQualifiedName(name string) string {
 }
 
 func (s *Stylesheet) getMainTemplate() (*Template, error) {
-	if len(s.Templates) == 1 {
-		return s.Templates[0], nil
-	}
-	ix := slices.IndexFunc(s.Templates, func(t *Template) bool {
-		return t.isRoot() && t.Mode == s.CurrentMode()
-	})
-	if ix < 0 {
-		return nil, fmt.Errorf("main template not found")
-	}
-	return s.Templates[ix], nil
-}
-
-func (s *Stylesheet) getMatchingTemplates(list []*Template, node xml.Node, mode string) (*Template, error) {
-	type TemplateMatch struct {
-		*Template
-		Priority int
-	}
-	var results []*TemplateMatch
-	for _, t := range list {
-		if t.isRoot() || t.Mode != mode || t.Name != "" {
-			continue
-		}
-		expr, err := s.CompileQuery(t.Match)
-		if err != nil {
-			continue
-		}
-		ok, prio := templateMatch(expr, node)
-		if !ok {
-			continue
-		}
-		m := TemplateMatch{
-			Template: t,
-			Priority: prio + t.Priority,
-		}
-		results = append(results, &m)
-	}
-	if len(results) > 0 {
-		slices.SortFunc(results, func(m1, m2 *TemplateMatch) int {
-			return m2.Priority - m1.Priority
-		})
-		tpl := results[0].Template.Clone()
-		return tpl, nil
-	}
-	return nil, fmt.Errorf("no template found matching given node (%s)", node.QualifiedName())
-}
-
-func (s *Stylesheet) getMode(mode string) *Mode {
 	ix := slices.IndexFunc(s.Modes, func(m *Mode) bool {
-		return m.Name == mode
+		return m.Name == s.Mode
 	})
-	if ix < 0 {
-		return unnamedMode()
+	if ix >= 0 {
+		return s.Modes[ix].mainTemplate()
 	}
-	return s.Modes[ix]
+	return nil, fmt.Errorf("main template not found")
 }
 
 type Template struct {
@@ -641,6 +698,10 @@ func NewTemplate(node xml.Node) (*Template, error) {
 		}
 	}
 	return &tpl, nil
+}
+
+func (t *Template) BuiltinRule() bool {
+	return false
 }
 
 func (t *Template) Clone() *Template {
