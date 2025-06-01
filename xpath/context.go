@@ -1,6 +1,8 @@
 package xpath
 
 import (
+	"slices"
+
 	"github.com/midbel/codecs/environ"
 	"github.com/midbel/codecs/xml"
 )

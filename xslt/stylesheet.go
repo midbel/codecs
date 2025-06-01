@@ -24,6 +24,11 @@ var (
 	ErrTerminate   = errors.New("terminate")
 )
 
+type AttributeSet struct {
+	Name  string
+	Attrs []xml.Attribute
+}
+
 type Output struct {
 	Name       string
 	Method     string
@@ -43,21 +48,31 @@ func defaultOutput() *Output {
 	return out
 }
 
-type MatchMode int8
+type NoMatchMode int8
 
 const (
-	MatchDeepCopy MatchMode = 1 << iota
-	MatchShallowCopy
-	MatchDeepSkip
-	MatchShallowSkip
-	MatchTextOnlyCopy
-	MatchFail
+	NoMatchDeepCopy MatchMode = 1 << iota
+	NoMatchShallowCopy
+	NoMatchDeepSkip
+	NoMatchShallowSkip
+	NoMatchTextOnlyCopy
+	NoMatchFail
+)
+
+type MultipleMatchMode int8
+
+const (
+	MultiMatchFail MultipleMatchMode = 1 << iota
+	MultiMatchLast
 )
 
 type Mode struct {
 	Name       string
-	NoMatch    MatchMode
+	NoMatch    NoMatchMode
 	MultiMatch MatchMode
+
+	Templates []*Template
+	Builtins  []*Template
 }
 
 func unnamedMode() *Mode {
@@ -67,13 +82,16 @@ func unnamedMode() *Mode {
 	}
 }
 
-func (m Mode) Unnamed() bool {
+func (m *Mode) Unnamed() bool {
 	return m.Name == ""
 }
 
-type AttributeSet struct {
-	Name  string
-	Attrs []xml.Attribute
+func (m *Mode) Find(name string) (*Template, error) {
+	return nil, nil
+}
+
+func (m *Mode) Match(node xml.Node) (*Template, error) {
+	return nil, nil
 }
 
 type Stylesheet struct {

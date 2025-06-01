@@ -1,6 +1,8 @@
 package xpath
 
 import (
+	"fmt"
+
 	"github.com/midbel/codecs/xml"
 )
 
@@ -59,7 +61,7 @@ func eval(expr Expr, ctx *Context) (Sequence, error) {
 	case let:
 		return evalLet(e, ctx)
 	case rng:
-		return evalRng(e, ctx)
+		return evalRange(e, ctx)
 	case loop:
 		return evalLoop(e, ctx)
 	case conditional:
