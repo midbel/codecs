@@ -138,11 +138,12 @@ func (m *Mode) mainTemplate() (*Template, error) {
 func (m *Mode) matchTemplate(node xml.Node, env *Env) (*Template, error) {
 	type TemplateMatch struct {
 		*Template
-		Priority int
+		Position int
+		Priority float64
 	}
 	var results []*TemplateMatch
-	for _, t := range m.Templates {
-		if t.isRoot() || t.Name != "" {
+	for i, t := range m.Templates {
+		if t.isRoot() || t.Name != "" || t.Match == "" {
 			continue
 		}
 		expr, err := env.CompileQuery(t.Match)
@@ -155,7 +156,8 @@ func (m *Mode) matchTemplate(node xml.Node, env *Env) (*Template, error) {
 		}
 		match := TemplateMatch{
 			Template: t,
-			Priority: prio + t.Priority,
+			Position: i,
+			Priority: float64(prio) + t.Priority,
 		}
 		results = append(results, &match)
 	}
@@ -167,14 +169,20 @@ func (m *Mode) matchTemplate(node xml.Node, env *Env) (*Template, error) {
 			return results[len(results)-1].Template.Clone(), nil
 		}
 		slices.SortFunc(results, func(m1, m2 *TemplateMatch) int {
-			return m2.Priority - m1.Priority
+			if m1.Priority == m2.Priority {
+				return m1.Position - m2.Position
+			}
+			if m1.Priority > m2.Priority {
+				return -1
+			}
+			return 1
 		})
 		return results[0].Template.Clone(), nil
 	}
-	return nm.noMatch()
+	return m.noMatch(node)
 }
 
-func (m *Mode) noMatch() (*Template, error) {
+func (m *Mode) noMatch(node xml.Node) (*Template, error) {
 	switch m.NoMatch {
 	case NoMatchDeepCopy:
 	case NoMatchShallowCopy:
@@ -186,6 +194,7 @@ func (m *Mode) noMatch() (*Template, error) {
 	default:
 		return nil, fmt.Errorf("%s: no template match", node.QualifiedName())
 	}
+	return nil, errImplemented
 }
 
 type Stylesheet struct {
@@ -669,7 +678,7 @@ type Template struct {
 	Name     string
 	Match    string
 	Mode     string
-	Priority int
+	Priority float64
 
 	Nodes []xml.Node
 
@@ -687,7 +696,7 @@ func NewTemplate(node xml.Node) (*Template, error) {
 	for _, a := range elem.Attrs {
 		switch attr := a.Value(); a.Name {
 		case "priority":
-			p, err := strconv.Atoi(attr)
+			p, err := strconv.ParseFloat(attr, 64)
 			if err != nil {
 				return nil, err
 			}
