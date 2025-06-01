@@ -1,272 +1,194 @@
 package xpath
 
 import (
-	"math"
-	"time"
-
 	"github.com/midbel/codecs/xml"
 )
 
-type BinaryFunc func(Sequence, Sequence) (Sequence, error)
-
-var binaryOp = map[rune]BinaryFunc{
-	opAdd:    doAdd,
-	opSub:    doSub,
-	opMul:    doMul,
-	opDiv:    doDiv,
-	opMod:    doMod,
-	opConcat: doConcat,
-	opAnd:    doAnd,
-	opOr:     doOr,
-	opBefore: doBefore,
-	opAfter:  doAfter,
-	opEq:     doEqual,
-	opNe:     doNotEqual,
-	opLt:     doLesser,
-	opLe:     doLessEq,
-	opGt:     doGreater,
-	opGe:     doGreatEq,
+func Eval(expr Expr, node xml.Node) (Sequence, error) {
+	return nil, nil
 }
 
-func doAdd(left, right Sequence) (Sequence, error) {
-	return apply(left, right, func(left, right float64) (float64, error) {
-		return left + right, nil
-	})
+func EvalWithContext(expr Expr, ctx *Context) (Sequence, error) {
+	return eval(expr, ctx)
 }
 
-func doSub(left, right Sequence) (Sequence, error) {
-	return apply(left, right, func(left, right float64) (float64, error) {
-		return left - right, nil
-	})
+func eval(expr Expr, ctx *Context) (Sequence, error) {
+	switch e := expr.(type) {
+	case wildcard:
+		return evalWildcard(e, ctx)
+	case root:
+		return evalRoot(e, ctx)
+	case current:
+		return evalCurrent(e, ctx)
+	case step:
+		return evalStep(e, ctx)
+	case axis:
+		return evalAxis(e, ctx)
+	case identifier:
+		return evalIdentifier(e, ctx)
+	case name:
+		return evalName(e, ctx)
+	case sequence:
+		return evalSequence(e, ctx)
+	case arrow:
+		return evalArrow(e, ctx)
+	case binary:
+		return evalBinary(e, ctx)
+	case identity:
+		return evalIdentity(e, ctx)
+	case reverse:
+		return evalReverse(e, ctx)
+	case literal:
+		return evalLiteral(e, ctx)
+	case number:
+		return evalNumber(e, ctx)
+	case kind:
+		return evalKind(e, ctx)
+	case call:
+		return evalCall(e, ctx)
+	case attr:
+		return evalAttr(e, ctx)
+	case except:
+		return evalExcept(e, ctx)
+	case intersect:
+		return evalIntersect(e, ctx)
+	case union:
+		return evalUnion(e, ctx)
+	case filter:
+		return evalFilter(e, ctx)
+	case let:
+		return evalLet(e, ctx)
+	case rng:
+		return evalRng(e, ctx)
+	case loop:
+		return evalLoop(e, ctx)
+	case conditional:
+		return evalConditional(e, ctx)
+	case quantified:
+		return evalQuantified(e, ctx)
+	case value:
+		return evalValue(e, ctx)
+	case cast:
+		return evalCast(e, ctx)
+	case castable:
+		return evalCastable(e, ctx)
+	default:
+		return nil, fmt.Errorf("unsupported expression type")
+	}
 }
 
-func doMul(left, right Sequence) (Sequence, error) {
-	return apply(left, right, func(left, right float64) (float64, error) {
-		return left * right, nil
-	})
+func evalWildcard(e wildcard, ctx *Context) (Sequence, error) {
+	return nil, nil
 }
 
-func doDiv(left, right Sequence) (Sequence, error) {
-	return apply(left, right, func(left, right float64) (float64, error) {
-		if right == 0 {
-			return 0, ErrZero
-		}
-		return left / right, nil
-	})
+func evalRoot(e root, ctx *Context) (Sequence, error) {
+	return nil, nil
 }
 
-func doMod(left, right Sequence) (Sequence, error) {
-	return apply(left, right, func(left, right float64) (float64, error) {
-		if right == 0 {
-			return 0, ErrZero
-		}
-		return math.Mod(left, right), nil
-	})
+func evalCurrent(e current, ctx *Context) (Sequence, error) {
+	return nil, nil
 }
 
-func doConcat(left, right Sequence) (Sequence, error) {
-	var str1, str2 string
-	if !left.Empty() {
-		str1, _ = toString(left[0].Value())
-	}
-	if !right.Empty() {
-		str2, _ = toString(right[0].Value())
-	}
-	return Singleton(str1 + str2), nil
+func evalStep(e step, ctx *Context) (Sequence, error) {
+	return nil, nil
 }
 
-func doAnd(left, right Sequence) (Sequence, error) {
-	ok := isTrue(left) && isTrue(right)
-	return Singleton(ok), nil
+func evalAxis(e axis, ctx *Context) (Sequence, error) {
+	return nil, nil
 }
 
-func doOr(left, right Sequence) (Sequence, error) {
-	ok := isTrue(left) || isTrue(right)
-	return Singleton(ok), nil
+func evalIdentifier(e identifier, ctx *Context) (Sequence, error) {
+	return nil, nil
 }
 
-func doBefore(left, right Sequence) (Sequence, error) {
-	if left.Empty() || right.Empty() {
-		return Singleton(false), nil
-	}
-	ok := xml.Before(left[0].Node(), right[0].Node())
-	return Singleton(ok), nil
+func evalName(e name, ctx *Context) (Sequence, error) {
+	return nil, nil
 }
 
-func doAfter(left, right Sequence) (Sequence, error) {
-	if left.Empty() || right.Empty() {
-		return Singleton(false), nil
-	}
-	ok := xml.After(left[0].Node(), right[0].Node())
-	return Singleton(ok), nil
+func evalSequence(e sequence, ctx *Context) (Sequence, error) {
+	return nil, nil
 }
 
-func doEqual(left, right Sequence) (Sequence, error) {
-	res, err := isEqual(left, right)
-	return Singleton(res), err
+func evalArrow(e arrow, ctx *Context) (Sequence, error) {
+	return nil, nil
 }
 
-func doNotEqual(left, right Sequence) (Sequence, error) {
-	res, err := isEqual(left, right)
-	if err != nil {
-		return nil, err
-	}
-	return Singleton(!res), nil
+func evalBinary(e binary, ctx *Context) (Sequence, error) {
+	return nil, nil
 }
 
-func doLesser(left, right Sequence) (Sequence, error) {
-	res, err := isLess(left, right)
-	if err != nil {
-		return nil, err
-	}
-	return Singleton(res), nil
+func evalIdentity(e identity, ctx *Context) (Sequence, error) {
+	return nil, nil
 }
 
-func doLessEq(left, right Sequence) (Sequence, error) {
-	ok, err := isEqual(left, right)
-	if err != nil {
-		return nil, err
-	}
-	if ok {
-		return Singleton(ok), nil
-	}
-	ok, err = isLess(left, right)
-	if err != nil {
-		return nil, err
-	}
-	return Singleton(ok), nil
+func evalReverse(e reverse, ctx *Context) (Sequence, error) {
+	return nil, nil
 }
 
-func doGreater(left, right Sequence) (Sequence, error) {
-	ok, err := isEqual(left, right)
-	if err != nil {
-		return nil, err
-	}
-	if ok {
-		return Singleton(false), nil
-	}
-	ok, err = isLess(left, right)
-	if err != nil {
-		return nil, err
-	}
-	return Singleton(!ok), nil
+func evalLiteral(e literal, ctx *Context) (Sequence, error) {
+	return nil, nil
 }
 
-func doGreatEq(left, right Sequence) (Sequence, error) {
-	ok, err := isEqual(left, right)
-	if err != nil {
-		return nil, err
-	}
-	if ok {
-		return Singleton(ok), nil
-	}
-	ok, err = isLess(left, right)
-	if err != nil {
-		return nil, err
-	}
-	return Singleton(!ok), nil
+func evalNumber(e number, ctx *Context) (Sequence, error) {
+	return nil, nil
 }
 
-func apply(left, right Sequence, do func(left, right float64) (float64, error)) (Sequence, error) {
-	if left.Empty() || right.Empty() {
-		return Singleton(math.NaN()), nil
-	}
-	x, err := toFloat(left[0].Value())
-	if err != nil {
-		return nil, err
-	}
-	y, err := toFloat(right[0].Value())
-	if err != nil {
-		return nil, err
-	}
-	res, err := do(x, y)
-	if err != nil {
-		return nil, err
-	}
-	return Singleton(res), nil
+func evalKind(e kind, ctx *Context) (Sequence, error) {
+	return nil, nil
 }
 
-func compareItems(left, right Sequence, cmp func(left, right Item) (bool, error)) (bool, error) {
-	if left.Empty() || right.Empty() {
-		return false, nil
-	}
-	for i := range left {
-		for j := range right {
-			ok, err := cmp(left[i], right[j])
-			if ok || err != nil {
-				return ok, err
-			}
-		}
-	}
-	return false, nil
+func evalCall(e call, ctx *Context) (Sequence, error) {
+	return nil, nil
 }
 
-func isLess(left, right Sequence) (bool, error) {
-	return compareItems(left, right, func(left, right Item) (bool, error) {
-		switch x := left.Value().(type) {
-		case float64:
-			y, err := toFloat(right.Value())
-			return x < y, err
-		case string:
-			y, err := toString(right.Value())
-			return x < y, err
-		case time.Time:
-			y, err := toTime(right.Value())
-			return x.Before(y), err
-		default:
-			return false, ErrType
-		}
-	})
-
+func evalAttr(e attr, ctx *Context) (Sequence, error) {
+	return nil, nil
 }
 
-func isEqual(left, right Sequence) (bool, error) {
-	return compareItems(left, right, func(left, right Item) (bool, error) {
-		switch x := left.Value().(type) {
-		case float64:
-			y, err := toFloat(right.Value())
-			return nearlyEqual(x, y), err
-		case string:
-			y, err := toString(right.Value())
-			return x == y, err
-		case bool:
-			return x == toBool(right.Value()), nil
-		case time.Time:
-			y, err := toTime(right.Value())
-			return x.Equal(y), err
-		default:
-			return false, ErrType
-		}
-	})
+func evalExcept(e except, ctx *Context) (Sequence, error) {
+	return nil, nil
 }
 
-func nearlyEqual(left, right float64) bool {
-	if left == right {
-		return true
-	}
-	return math.Abs(left-right) < 0.000001
+func evalIntersect(e intersect, ctx *Context) (Sequence, error) {
+	return nil, nil
 }
 
-func lowestValue[T string | float64](items []T) T {
-	var res T
-	for i := range items {
-		if i == 0 {
-			res = items[i]
-			continue
-		}
-		res = min(items[i], res)
-	}
-	return res
+func evalUnion(e union, ctx *Context) (Sequence, error) {
+	return nil, nil
 }
 
-func greatestValue[T string | float64](items []T) T {
-	var res T
-	for i := range items {
-		if i == 0 {
-			res = items[i]
-			continue
-		}
-		res = max(items[i], res)
-	}
-	return res
+func evalFilter(e filter, ctx *Context) (Sequence, error) {
+	return nil, nil
+}
+
+func evalLet(e let, ctx *Context) (Sequence, error) {
+	return nil, nil
+}
+
+func evalRange(e rng, ctx *Context) (Sequence, error) {
+	return nil, nil
+}
+
+func evalLoop(e loop, ctx *Context) (Sequence, error) {
+	return nil, nil
+}
+
+func evalConditional(e conditional, ctx *Context) (Sequence, error) {
+	return nil, nil
+}
+
+func evalQuantified(e quantified, ctx *Context) (Sequence, error) {
+	return nil, nil
+}
+
+func evalValue(e value, ctx *Context) (Sequence, error) {
+	return nil, nil
+}
+
+func evalCast(e cast, ctx *Context) (Sequence, error) {
+	return nil, nil
+}
+
+func evalCastable(e castable, ctx *Context) (Sequence, error) {
+	return nil, nil
 }

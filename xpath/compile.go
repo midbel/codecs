@@ -553,7 +553,20 @@ func (c *Compiler) compileAlt(left Expr) (Expr, error) {
 func (c *Compiler) compileArrow(left Expr) (Expr, error) {
 	c.Enter("arrow")
 	defer c.Leave("arrow")
-	return nil, ErrImplemented
+	var (
+		op  = c.curr.Type
+		pow = bindings[op]
+	)
+	c.next()
+	next, err := c.compileExpr(pow)
+	if err != nil {
+		return nil, err
+	}
+	a := arrow{
+		left:  left,
+		right: next,
+	}
+	return a, nil
 }
 
 func (c *Compiler) compileBinary(left Expr) (Expr, error) {
