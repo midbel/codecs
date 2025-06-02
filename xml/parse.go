@@ -144,7 +144,7 @@ func (p *Parser) parseProlog() (Node, error) {
 	ix := slices.IndexFunc(pi.Attrs, func(a Attribute) bool {
 		return a.LocalName() == "encoding"
 	})
-	if ix >= 0 && pi.Attrs[ix].Value() != SupportedEncoding {
+	if ix >= 0 && strings.ToUpper(pi.Attrs[ix].Value()) != SupportedEncoding {
 		return nil, p.createError("document", "xml encoding not supported")
 	}
 	return pi, nil
@@ -528,8 +528,16 @@ type Scanner struct {
 }
 
 func Scan(r io.Reader) *Scanner {
+	var (
+		rs    = bufio.NewReader(r)
+		pk, _ = rs.Peek(3)
+	)
+	if bytes.Equal(pk, []byte{0xEF, 0xBB, 0xBF}) {
+		rs.Discard(3)
+	}
+
 	scan := &Scanner{
-		input: bufio.NewReader(r),
+		input: rs,
 	}
 	scan.Position.Line = 1
 	scan.read()

@@ -466,6 +466,12 @@ func (e *Element) Clone() Node {
 	return c
 }
 
+func (e *Element) Clear() {
+	e.Nodes = slices.DeleteFunc(e.Nodes, func(n Node) bool {
+		return n.Type() == TypeElement
+	})
+}
+
 func (e *Element) RemoveNode(at int) error {
 	if at < 0 || at >= len(e.Nodes) {
 		return fmt.Errorf("%s: removing node with bad index (%d - %d)", e.QualifiedName(), at, len(e.Nodes))
@@ -556,11 +562,16 @@ func (e *Element) Root() bool {
 }
 
 func (e *Element) Leaf() bool {
-	if len(e.Nodes) == 1 {
-		_, ok := e.Nodes[0].(*Text)
-		return ok
+	if e.Empty() {
+		return true
 	}
-	return e.Empty()
+	switch e.Nodes[0].(type) {
+	case *Text:
+	case *CharData:
+	default:
+		return false
+	}
+	return true
 }
 
 func (e *Element) Empty() bool {
@@ -653,13 +664,6 @@ func (e *Element) Insert(node Node, index int) {
 
 func (e *Element) Len() int {
 	return len(e.Nodes)
-}
-
-func (e *Element) Clear() {
-	for i := range e.Nodes {
-		e.Nodes[i].setParent(nil)
-	}
-	e.Nodes = e.Nodes[:0]
 }
 
 func (e *Element) Position() int {
