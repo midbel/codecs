@@ -528,7 +528,17 @@ func (s *Stylesheet) loadModes(doc xml.Node) error {
 			default:
 			}
 		}
-		s.Modes = append(s.Modes, &m)
+		ix := slices.IndexFunc(s.Modes, func(o *Mode) bool {
+			return o.Name == m.Name
+		})
+		if ix < 0 {
+			s.Modes = append(s.Modes, &m)
+		} else if m.Unnamed() {
+			s.Modes[ix].NoMatch = m.NoMatch
+			s.Modes[ix].MultiMatch = m.MultiMatch
+		} else {
+			return fmt.Errorf("%s mode already defined", m.Name)
+		}
 	}
 	return nil
 }
