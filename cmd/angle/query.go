@@ -41,11 +41,12 @@ func (q QueryCmd) Run(args []string) error {
 	elapsed := time.Since(now)
 	if !q.Noout {
 		for i := range results {
-			fmt.Fprint(os.Stdout, xml.WriteNode(results[i].Node()))
+			n := results[i].Node()
+			fmt.Fprint(os.Stdout, xml.WriteNodeDepth(n, 1))
 		}
 		fmt.Fprintln(os.Stdout)
 	}
-	fmt.Fprintf(os.Stdout, queryInfo, elapsed, doc.GetNodesCount(), set.Arg(0))
+	fmt.Fprintf(os.Stdout, queryInfo, elapsed, results.Len(), set.Arg(0))
 	fmt.Fprintln(os.Stdout)
 	return nil
 }

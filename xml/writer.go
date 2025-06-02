@@ -102,16 +102,26 @@ type PrologWriter interface {
 type Writer struct {
 	writer *bufio.Writer
 
-	Indent  string
-	Doctype string
+	Indent   string
+	Doctype  string
+	MaxDepth int
 	WriterOptions
 	PrologWriter
 }
 
 func WriteNode(node Node) string {
+	return writeNode(node, 0)
+}
+
+func WriteNodeDepth(node Node, depth int) string {
+	return writeNode(node, depth)
+}
+
+func writeNode(node Node, maxdepth int) string {
 	var buf bytes.Buffer
 
 	ws := NewWriter(&buf)
+	ws.MaxDepth = maxdepth
 	ws.writeNode(node, 0)
 	return buf.String()
 }
@@ -184,10 +194,18 @@ func (w *Writer) writeElement(node *Element, depth int) error {
 		return w.writer.Flush()
 	}
 	w.writer.WriteRune(rangle)
-	for _, n := range node.Nodes {
-		if err := w.writeNode(n, depth+1); err != nil {
-			return err
+	if w.MaxDepth == 0 || depth < w.MaxDepth {
+		for _, n := range node.Nodes {
+			if err := w.writeNode(n, depth+1); err != nil {
+				return err
+			}
 		}
+	} else if node.Leaf() {
+		w.writeNode(node.Nodes[0], depth+1)
+	} else {
+		w.writer.WriteRune(slash)
+		w.writer.WriteRune(rangle)
+		return w.writer.Flush()
 	}
 	if n := len(node.Nodes); n > 0 {
 		_, ok := node.Nodes[n-1].(*Text)
@@ -289,11 +307,11 @@ func (w *Writer) writeAttributeAsNode(attr *Attribute, depth int) error {
 
 func (w *Writer) writeAttributes(attrs []Attribute, depth int) error {
 	prefix := w.getIndent(depth)
-	for _, a := range attrs {
+	for i, a := range attrs {
 		if w.NoNamespace() && (a.Space == "xmlns" || a.Name == "xmlns") && a.Value() != "" {
 			continue
 		}
-		if depth == 0 || w.Compact() {
+		if i == 0 || depth == 0 || w.Compact() {
 			w.writer.WriteRune(' ')
 		} else {
 			w.writeNL()
