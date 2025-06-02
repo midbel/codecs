@@ -769,7 +769,7 @@ func executeApply(ctx *Context, match matchFunc) (xpath.Sequence, error) {
 	if err == nil {
 		ctx = ctx.WithMode(mode)
 	}
-	seq := xpath.NewSequence()
+	var seq xpath.Sequence
 	for _, datum := range nodes {
 		tpl, err := match(datum, mode)
 		if err != nil {

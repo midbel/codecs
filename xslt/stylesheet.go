@@ -94,13 +94,9 @@ func (m *Mode) Unnamed() bool {
 
 func (m *Mode) Merge(other *Mode) error {
 	for _, t := range other.Templates {
-		ix := slices.IndexFunc(m.Templates, func(c *Template) bool {
-			return c.Name == t.Name && c.Match == t.Match
-		})
-		if ix >= 0 {
-			return fmt.Errorf("template already defined")
+		if err := m.Append(t); err != nil {
+			return err
 		}
-		m.Templates = append(m.Templates, t)
 	}
 	return nil
 }
@@ -131,7 +127,7 @@ func (m *Mode) mainTemplate() (*Template, error) {
 		return t.isRoot()
 	})
 	if ix >= 0 {
-		return m.Templates[0], nil
+		return m.Templates[ix], nil
 	}
 	return nil, fmt.Errorf("main template not found")
 }
@@ -225,6 +221,7 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 		Context:   contextDir,
 		namespace: xsltNamespacePrefix,
 		Env:       Empty(),
+		Tracer:    NoopTracer(),
 	}
 	sheet.Modes = append(sheet.Modes, unnamedMode())
 	if sheet.Context == "" {
@@ -264,9 +261,6 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 }
 
 func (s *Stylesheet) Find(name, mode string) (*Template, error) {
-	if mode == "" {
-		mode = s.CurrentMode()
-	}
 	ix := slices.IndexFunc(s.Modes, func(m *Mode) bool {
 		return m.Name == mode
 	})
@@ -433,26 +427,30 @@ func (s *Stylesheet) init(doc xml.Node) error {
 	if doc.Type() != xml.TypeDocument {
 		return fmt.Errorf("document expected")
 	}
-	root := doc.Root()
-	if root == nil {
-		return fmt.Errorf("missing root node in document")
+	var (
+		top  = doc.(*xml.Document)
+		root = top.Root()
+	)
+	r, err := getElementFromNode(root)
+	if err != nil {
+		return err
 	}
-	for _, n := range root.Nodes {
+	for _, n := range r.Nodes {
 		var err error
 		switch name := n.QualifiedName(); name {
-		case c.getQualifiedName("include"):
-			err = s.includeSheet(doc)
-		case c.getQualifiedName("import"):
-			err = s.includeImport(doc)
-		case c.getQualifiedName("output"):
+		case s.getQualifiedName("include"):
+			err = s.includeSheet(n)
+		case s.getQualifiedName("import"):
+			err = s.importSheet(n)
+		case s.getQualifiedName("output"):
 			err = s.loadOutput(n)
-		case c.getQualifiedName("param"):
+		case s.getQualifiedName("param"):
 			err = s.loadParam(n)
-		case c.getQualifiedName("attribute-set"):
+		case s.getQualifiedName("attribute-set"):
 			err = s.loadAttributeSet(n)
-		case c.getQualifiedName("template"):
+		case s.getQualifiedName("template"):
 			err = s.loadTemplate(n)
-		case c.getQualifiedName("mode"):
+		case s.getQualifiedName("mode"):
 			err = s.loadMode(n)
 		default:
 			err = fmt.Errorf("%s: unexpected element", name)
@@ -509,7 +507,7 @@ func (s *Stylesheet) loadAttributeSet(node xml.Node) error {
 	if err != nil {
 		return err
 	}
-	ident, err := getAttribute(n, "name")
+	ident, err := getAttribute(elem, "name")
 	if err != nil {
 		return err
 	}
@@ -584,7 +582,7 @@ func (s *Stylesheet) loadParam(node xml.Node) error {
 		}
 		s.Define(ident, expr)
 	} else {
-		if len(n.Nodes) != 1 {
+		if len(elem.Nodes) != 1 {
 			return fmt.Errorf("only one node expected")
 		}
 		n := cloneNode(elem.Nodes[0])
@@ -598,6 +596,7 @@ func (s *Stylesheet) loadOutput(node xml.Node) error {
 	if err != nil {
 		return err
 	}
+	var out Output
 	for _, a := range elem.Attrs {
 		switch value := a.Value(); a.Name {
 		case "name":
@@ -639,7 +638,7 @@ func (s *Stylesheet) loadTemplate(node xml.Node) error {
 			s.Modes = append(s.Modes, mode)
 		}
 	} else {
-		err = s.Modes[ix].Append(t)
+		err = s.Modes[ix].Append(tpl)
 	}
 	return err
 }
@@ -803,16 +802,16 @@ func templateMatch(expr xpath.Expr, node xml.Node) (bool, int) {
 	return false, 0
 }
 
-func importSheet(ctx *Context) (xpath.Sequence, error) {
+func importSheet(ctx *Context) error {
 	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
-		return nil, ctx.errorWithContext(err)
+		return ctx.errorWithContext(err)
 	}
 	file, err := getAttribute(elem, "href")
 	if err != nil {
-		return nil, ctx.errorWithContext(err)
+		return ctx.errorWithContext(err)
 	}
-	return nil, ctx.ImportSheet(file)
+	return ctx.ImportSheet(file)
 }
 
 func includeSheet(ctx *Context) error {
