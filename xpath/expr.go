@@ -267,18 +267,14 @@ func (a axis) isSelf() bool {
 }
 
 func (a axis) find(ctx Context) (Sequence, error) {
-	var list Sequence
+	var (
+		list Sequence
+		err  error
+	)
 	ctx.PrincipalType = a.principalType()
-	if a.isSelf() && ctx.Type() != xml.TypeDocument {
-		list.Append(NewNodeItem(ctx.Node))
-		others, err := a.next.find(ctx)
-		if err == nil {
-			list.Concat(others)
-		}
-	}
 	switch a.kind {
 	case selfAxis:
-		return list, nil
+		return a.next.find(ctx)
 	case childAxis:
 		others, err := a.child(ctx)
 		if err != nil {
@@ -292,6 +288,12 @@ func (a axis) find(ctx Context) (Sequence, error) {
 		}
 		return nil, nil
 	case ancestorAxis, ancestorSelfAxis:
+		if a.isSelf() {
+			list, err = a.next.find(ctx)
+			if err != nil {
+				return nil, err
+			}
+		}
 		node := ctx.Node.Parent()
 		for node != nil {
 			other, err := a.next.find(createContext(node, 1, 1))
@@ -301,6 +303,12 @@ func (a axis) find(ctx Context) (Sequence, error) {
 			node = node.Parent()
 		}
 	case descendantAxis, descendantSelfAxis:
+		if a.isSelf() {
+			list, err = a.next.find(ctx)
+			if err != nil {
+				return nil, err
+			}
+		}
 		others, err := a.descendant(ctx)
 		if err == nil {
 			list.Concat(others)
@@ -792,6 +800,8 @@ func (f filter) find(ctx Context) (Sequence, error) {
 			keep = int(x) == j+1
 		case bool:
 			keep = x
+		case string:
+			keep = len(x) > 0
 		default:
 			return nil, ErrType
 		}

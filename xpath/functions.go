@@ -1302,8 +1302,7 @@ func callNot(ctx Context, args []Expr) (Sequence, error) {
 	if !ok {
 		return nil, ErrType
 	}
-	items[0] = createLiteral(!value)
-	return items, nil
+	return Singleton(!value), nil
 }
 
 func callTrue(_ Context, _ []Expr) (Sequence, error) {

@@ -26,11 +26,14 @@ func debugExpr(w io.Writer, expr Expr) {
 	case wildcard:
 		io.WriteString(w, "wildcard")
 	case name:
+		io.WriteString(w, "name")
+		io.WriteString(w, "(")
 		if v.Space != "" {
 			io.WriteString(w, v.Space)
 			io.WriteString(w, ":")
 		}
 		io.WriteString(w, v.Name)
+		io.WriteString(w, ")")
 	case axis:
 		io.WriteString(w, "axis")
 		io.WriteString(w, "(")
