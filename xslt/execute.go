@@ -58,8 +58,6 @@ func init() {
 		xml.QualifiedName("variable", xsltNamespacePrefix):        trace(executeVariable),
 		xml.QualifiedName("result-document", xsltNamespacePrefix): trace(executeResultDocument),
 		xml.QualifiedName("source-document", xsltNamespacePrefix): nest(executeSourceDocument),
-		xml.QualifiedName("import", xsltNamespacePrefix):          trace(executeImport),
-		xml.QualifiedName("include", xsltNamespacePrefix):         trace(executeInclude),
 		xml.QualifiedName("with-param", xsltNamespacePrefix):      trace(executeWithParam),
 		xml.QualifiedName("copy", xsltNamespacePrefix):            trace(executeCopy),
 		xml.QualifiedName("copy-of", xsltNamespacePrefix):         trace(executeCopyOf),
@@ -73,30 +71,6 @@ func init() {
 		xml.QualifiedName("merge", xsltNamespacePrefix):           trace(executeMerge),
 		xml.QualifiedName("for-each-group", xsltNamespacePrefix):  trace(executeForeachGroup),
 	}
-}
-
-func executeImport(ctx *Context) (xpath.Sequence, error) {
-	elem, err := getElementFromNode(ctx.XslNode)
-	if err != nil {
-		return nil, ctx.errorWithContext(err)
-	}
-	file, err := getAttribute(elem, "href")
-	if err != nil {
-		return nil, ctx.errorWithContext(err)
-	}
-	return nil, ctx.ImportSheet(file)
-}
-
-func executeInclude(ctx *Context) (xpath.Sequence, error) {
-	elem, err := getElementFromNode(ctx.XslNode)
-	if err != nil {
-		return nil, ctx.errorWithContext(err)
-	}
-	file, err := getAttribute(elem, "href")
-	if err != nil {
-		return nil, ctx.errorWithContext(err)
-	}
-	return nil, ctx.IncludeSheet(file)
 }
 
 func executeSourceDocument(ctx *Context) (xpath.Sequence, error) {

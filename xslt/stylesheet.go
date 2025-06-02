@@ -68,6 +68,7 @@ const (
 
 type Mode struct {
 	Name       string
+	Default    bool
 	NoMatch    NoMatchMode
 	MultiMatch MultiMatchMode
 
@@ -225,6 +226,7 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 		namespace: xsltNamespacePrefix,
 		Env:       Empty(),
 	}
+	sheet.Modes = append(sheet.Modes, unnamedMode())
 	if sheet.Context == "" {
 		sheet.Context = filepath.Dir(file)
 	}
@@ -243,6 +245,15 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 				e.Space = sheet.namespace
 				executers[e] = fn
 			}
+		}
+		ix = slices.IndexFunc(root.Attrs, func(a xml.Attribute) bool {
+			return a.Name == "default-mode"
+		})
+		if ix >= 0 {
+			mode := namedMode(sheet.DefaultMode)
+			mode.Default = true
+			sheet.Modes = append(sheet.Modes, mode)
+			sheet.DefaultMode = root.Attrs[ix].Value()
 		}
 	}
 
@@ -533,7 +544,7 @@ func (s *Stylesheet) loadModes(doc xml.Node) error {
 		})
 		if ix < 0 {
 			s.Modes = append(s.Modes, &m)
-		} else if m.Unnamed() {
+		} else if s.Modes[ix].Unnamed() || s.Modes[ix].Default {
 			s.Modes[ix].NoMatch = m.NoMatch
 			s.Modes[ix].MultiMatch = m.MultiMatch
 		} else {
