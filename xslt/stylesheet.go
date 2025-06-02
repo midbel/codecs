@@ -430,23 +430,39 @@ func (s *Stylesheet) createContext(node xml.Node) *Context {
 }
 
 func (s *Stylesheet) init(doc xml.Node) error {
-	if err := s.loadTemplates(doc); err != nil {
-		return err
+	if doc.Type() != xml.TypeDocument {
+		return fmt.Errorf("document expected")
 	}
-	if err := s.loadOutput(doc); err != nil {
-		return err
+	root := doc.Root()
+	if root == nil {
+		return fmt.Errorf("missing root node in document")
 	}
-	if err := s.loadParams(doc); err != nil {
-		return err
+	for _, n := range root.Nodes {
+		var err error
+		switch name := n.QualifiedName(); name {
+		case c.getQualifiedName("include"):
+			err = s.includeSheet(doc)
+		case c.getQualifiedName("import"):
+			err = s.includeImport(doc)
+		case c.getQualifiedName("output"):
+			err = s.loadOutput(n)
+		case c.getQualifiedName("param"):
+			err = s.loadParam(n)
+		case c.getQualifiedName("attribute-set"):
+			err = s.loadAttributeSet(n)
+		case c.getQualifiedName("template"):
+			err = s.loadTemplate(n)
+		case c.getQualifiedName("mode"):
+			err = s.loadMode(n)
+		default:
+			err = fmt.Errorf("%s: unexpected element", name)
+		}
+		if err != nil {
+			return err
+		}
 	}
-	if err := s.loadAttributeSet(doc); err != nil {
-		return err
-	}
-	if err := s.includesSheet(doc); err != nil {
-		return err
-	}
-	if err := s.importsSheet(doc); err != nil {
-		return err
+	if len(s.output) == 0 {
+		s.output = append(s.output, defaultOutput())
 	}
 	return nil
 }
@@ -478,202 +494,154 @@ func (s *Stylesheet) simplified(root xml.Node) error {
 	return fmt.Errorf("unnamed mode not found")
 }
 
-func (s *Stylesheet) includesSheet(doc xml.Node) error {
-	items, err := s.queryXSL("/stylesheet/include | /transform/include", doc)
+func (s *Stylesheet) includeSheet(node xml.Node) error {
+	ctx := s.createContext(nil)
+	return includeSheet(ctx.WithXsl(node))
+}
+
+func (s *Stylesheet) importSheet(node xml.Node) error {
+	ctx := s.createContext(nil)
+	return importSheet(ctx.WithXsl(node))
+}
+
+func (s *Stylesheet) loadAttributeSet(node xml.Node) error {
+	elem, err := getElementFromNode(node)
 	if err != nil {
 		return err
 	}
-	ctx := s.createContext(nil)
-	for _, i := range items {
-		_, err := includeSheet(ctx.WithXsl(i.Node()))
+	ident, err := getAttribute(n, "name")
+	if err != nil {
+		return err
+	}
+	as := AttributeSet{
+		Name: ident,
+	}
+	for _, n := range elem.Nodes {
+		n, err := getElementFromNode(n)
 		if err != nil {
 			return err
 		}
-	}
-	return nil
-}
-
-func (s *Stylesheet) importsSheet(doc xml.Node) error {
-	items, err := s.queryXSL("/stylesheet/import | /transform/import", doc)
-	if err != nil {
-		return err
-	}
-	ctx := s.createContext(nil)
-	for _, i := range items {
-		_, err := importSheet(ctx.WithXsl(i.Node()))
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (s *Stylesheet) loadAttributeSet(doc xml.Node) error {
-	items, err := s.queryXSL("/stylesheet/attribute-set | /transform/attribute-set", doc)
-	if err != nil {
-		return err
-	}
-	for i := range items {
-		n := items[i].Node().(*xml.Element)
-		if n == nil {
-			continue
+		if n.QualifiedName() != s.getQualifiedName("attribute") {
+			return fmt.Errorf("xsl:attribute element expected")
 		}
 		ident, err := getAttribute(n, "name")
 		if err != nil {
 			return err
 		}
-		as := AttributeSet{
-			Name: ident,
+		attr := xml.NewAttribute(xml.LocalName(ident), n.Value())
+		as.Attrs = append(as.Attrs, attr)
+	}
+	s.AttrSet = append(s.AttrSet, &as)
+	return nil
+}
+
+func (s *Stylesheet) loadMode(node xml.Node) error {
+	elem, err := getElementFromNode(node)
+	if err != nil {
+		return err
+	}
+	var m Mode
+	for _, a := range elem.Attrs {
+		switch attr := a.Value(); a.Name {
+		case "name":
+			m.Name = attr
+		case "on-no-match":
+			m.NoMatch = NoMatchFail
+		case "on-multiple-match":
+			m.MultiMatch = MultiMatchFail
+		case "warning-on-no-match":
+		case "warning-on-multiple-match":
+		default:
 		}
-		for _, n := range n.Nodes {
-			n := n.(*xml.Element)
-			if n == nil {
-				continue
-			}
-			ident, err := getAttribute(n, "name")
-			if err != nil {
-				return err
-			}
-			attr := xml.NewAttribute(xml.LocalName(ident), n.Value())
-			as.Attrs = append(as.Attrs, attr)
-		}
-		s.AttrSet = append(s.AttrSet, &as)
+	}
+	ix := slices.IndexFunc(s.Modes, func(o *Mode) bool {
+		return o.Name == m.Name
+	})
+	if ix < 0 {
+		s.Modes = append(s.Modes, &m)
+	} else if s.Modes[ix].Unnamed() || s.Modes[ix].Default {
+		s.Modes[ix].NoMatch = m.NoMatch
+		s.Modes[ix].MultiMatch = m.MultiMatch
+	} else {
+		return fmt.Errorf("%s mode already defined", m.Name)
 	}
 	return nil
 }
 
-func (s *Stylesheet) loadModes(doc xml.Node) error {
-	items, err := s.queryXSL("/stylesheet/mode | /transform/mode", doc)
+func (s *Stylesheet) loadParam(node xml.Node) error {
+	elem, err := getElementFromNode(node)
 	if err != nil {
 		return err
 	}
-	for i := range items {
-		n := items[i].Node().(*xml.Element)
-		if n == nil {
-			continue
-		}
-		var m Mode
-		for _, a := range n.Attrs {
-			switch attr := a.Value(); a.Name {
-			case "name":
-				m.Name = attr
-			case "on-no-match":
-				m.NoMatch = NoMatchFail
-			case "on-multiple-match":
-				m.MultiMatch = MultiMatchFail
-			case "warning-on-no-match":
-			case "warning-on-multiple-match":
-			default:
-			}
-		}
-		ix := slices.IndexFunc(s.Modes, func(o *Mode) bool {
-			return o.Name == m.Name
-		})
-		if ix < 0 {
-			s.Modes = append(s.Modes, &m)
-		} else if s.Modes[ix].Unnamed() || s.Modes[ix].Default {
-			s.Modes[ix].NoMatch = m.NoMatch
-			s.Modes[ix].MultiMatch = m.MultiMatch
-		} else {
-			return fmt.Errorf("%s mode already defined", m.Name)
-		}
-	}
-	return nil
-}
-
-func (s *Stylesheet) loadParams(doc xml.Node) error {
-	items, err := s.queryXSL("/stylesheet/param | transform/param", doc)
+	ident, err := getAttribute(elem, "name")
 	if err != nil {
 		return err
 	}
-	for i := range items {
-		n := items[i].Node().(*xml.Element)
-		if n == nil {
-			continue
-		}
-		ident, err := getAttribute(n, "name")
+	if query, err := getAttribute(elem, "select"); err == nil {
+		expr, err := s.CompileQuery(query)
 		if err != nil {
 			return err
 		}
-		if query, err := getAttribute(n, "select"); err == nil {
-			expr, err := s.CompileQuery(query)
-			if err != nil {
-				return err
-			}
-			s.Define(ident, expr)
-		} else {
-			if len(n.Nodes) != 1 {
-				return fmt.Errorf("only one node expected")
-			}
-			n := cloneNode(n.Nodes[0])
-			s.Define(ident, xpath.NewValueFromNode(n))
+		s.Define(ident, expr)
+	} else {
+		if len(n.Nodes) != 1 {
+			return fmt.Errorf("only one node expected")
 		}
+		n := cloneNode(elem.Nodes[0])
+		s.Define(ident, xpath.NewValueFromNode(n))
 	}
 	return nil
 }
 
-func (s *Stylesheet) loadOutput(doc xml.Node) error {
-	items, err := s.queryXSL("/stylesheet/output | /transform/output", doc)
+func (s *Stylesheet) loadOutput(node xml.Node) error {
+	elem, err := getElementFromNode(node)
 	if err != nil {
 		return err
 	}
-	for i := range items {
-		var (
-			node = items[i].Node().(*xml.Element)
-			out  Output
-		)
-		for _, a := range node.Attrs {
-			switch value := a.Value(); a.Name {
-			case "name":
-				out.Name = value
-			case "method":
-				out.Method = value
-			case "version":
-				out.Version = value
-			case "encoding":
-				out.Encoding = value
-			case "indent":
-				out.Indent = value == "yes"
-			case "omit-xml-declaration":
-				out.OmitProlog = value == "yes"
-			default:
-			}
+	for _, a := range elem.Attrs {
+		switch value := a.Value(); a.Name {
+		case "name":
+			out.Name = value
+		case "method":
+			out.Method = value
+		case "version":
+			out.Version = value
+		case "encoding":
+			out.Encoding = value
+		case "indent":
+			out.Indent = value == "yes"
+		case "omit-xml-declaration":
+			out.OmitProlog = value == "yes"
+		default:
 		}
-		s.output = append(s.output, &out)
 	}
-	if len(s.output) == 0 {
-		s.output = append(s.output, defaultOutput())
-	}
+	s.output = append(s.output, &out)
 	return nil
 }
 
-func (s *Stylesheet) loadTemplates(doc xml.Node) error {
-	items, err := s.queryXSL("/stylesheet/template | /transform/template", doc)
+func (s *Stylesheet) loadTemplate(node xml.Node) error {
+	elem, err := getElementFromNode(node)
 	if err != nil {
 		return err
 	}
-	for _, el := range items {
-		t, err := NewTemplate(el.Node())
-		if err != nil {
-			return err
-		}
-		ix := slices.IndexFunc(s.Modes, func(m *Mode) bool {
-			return m.Name == t.Mode
-		})
-		if ix < 0 {
-			mode := namedMode(t.Mode)
-			err = mode.Append(t)
-			if err == nil {
-				s.Modes = append(s.Modes, mode)
-			}
-		} else {
-			err = s.Modes[ix].Append(t)
-		}
-		if err != nil {
-			return err
-		}
+
+	tpl, err := NewTemplate(elem)
+	if err != nil {
+		return err
 	}
-	return nil
+	ix := slices.IndexFunc(s.Modes, func(m *Mode) bool {
+		return m.Name == tpl.Mode
+	})
+	if ix < 0 {
+		mode := namedMode(tpl.Mode)
+		err = mode.Append(tpl)
+		if err == nil {
+			s.Modes = append(s.Modes, mode)
+		}
+	} else {
+		err = s.Modes[ix].Append(t)
+	}
+	return err
 }
 
 func (s *Stylesheet) writeDocument(w io.Writer, format string, doc *xml.Document) error {
@@ -847,14 +815,14 @@ func importSheet(ctx *Context) (xpath.Sequence, error) {
 	return nil, ctx.ImportSheet(file)
 }
 
-func includeSheet(ctx *Context) (xpath.Sequence, error) {
+func includeSheet(ctx *Context) error {
 	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
-		return nil, ctx.errorWithContext(err)
+		return ctx.errorWithContext(err)
 	}
 	file, err := getAttribute(elem, "href")
 	if err != nil {
-		return nil, ctx.errorWithContext(err)
+		return ctx.errorWithContext(err)
 	}
-	return nil, ctx.IncludeSheet(file)
+	return ctx.IncludeSheet(file)
 }
