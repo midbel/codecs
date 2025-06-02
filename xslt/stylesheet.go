@@ -451,6 +451,33 @@ func (s *Stylesheet) init(doc xml.Node) error {
 	return nil
 }
 
+func (s *Stylesheet) simplified(root xml.Node) error {
+	elem, err := getElementFromNode(root)
+	if err != nil {
+		return err
+	}
+	list := elem.Namespaces()
+	ok := slices.ContainsFunc(list, func(ns xml.NS) bool {
+		return ns.Prefix == xsltNamespacePrefix && ns.Uri == xsltNamespaceUri
+	})
+	if !ok {
+		return fmt.Errorf("simplified stylesheet should declared the xsl namespace")
+	}
+	elem.RemoveAttribute(xml.QualifiedName(xsltNamespacePrefix, "xmlns"))
+	tpl, err := NewTemplate(elem)
+	if err != nil {
+		return err
+	}
+	tpl.Match = "/"
+	ix := slices.IndexFunc(s.Modes, func(m *Mode) bool {
+		return m.Unnamed()
+	})
+	if ix >= 0 {
+		return s.Modes[ix].Append(tpl)
+	}
+	return fmt.Errorf("unnamed mode not found")
+}
+
 func (s *Stylesheet) includesSheet(doc xml.Node) error {
 	items, err := s.queryXSL("/stylesheet/include | /transform/include", doc)
 	if err != nil {
@@ -458,7 +485,7 @@ func (s *Stylesheet) includesSheet(doc xml.Node) error {
 	}
 	ctx := s.createContext(nil)
 	for _, i := range items {
-		_, err := executeInclude(ctx.WithXsl(i.Node()))
+		_, err := includeSheet(ctx.WithXsl(i.Node()))
 		if err != nil {
 			return err
 		}
@@ -473,7 +500,7 @@ func (s *Stylesheet) importsSheet(doc xml.Node) error {
 	}
 	ctx := s.createContext(nil)
 	for _, i := range items {
-		_, err := executeImport(ctx.WithXsl(i.Node()))
+		_, err := importSheet(ctx.WithXsl(i.Node()))
 		if err != nil {
 			return err
 		}
@@ -806,4 +833,28 @@ func templateMatch(expr xpath.Expr, node xml.Node) (bool, int) {
 		curr = curr.Parent()
 	}
 	return false, 0
+}
+
+func importSheet(ctx *Context) (xpath.Sequence, error) {
+	elem, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
+	file, err := getAttribute(elem, "href")
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
+	return nil, ctx.ImportSheet(file)
+}
+
+func includeSheet(ctx *Context) (xpath.Sequence, error) {
+	elem, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
+	file, err := getAttribute(elem, "href")
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
+	return nil, ctx.IncludeSheet(file)
 }
