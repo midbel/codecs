@@ -197,11 +197,24 @@ func executeCallTemplate(ctx *Context) (xpath.Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	sub := tpl.mergeContext(ctx)
+	var sub *Context
+	if x, ok := tpl.(interface { mergeContext(*Context) *Context}); ok {
+		sub = x.mergeContext(ctx)
+	} else {
+		sub = ctx.Copy()
+	}
 	if err := applyParams(sub); err != nil {
 		return nil, ctx.errorWithContext(err)
 	}
-	return executeConstructor(sub, tpl.Nodes, AllowOnEmpty|AllowOnNonEmpty)
+	nodes, err := tpl.Execute(sub)
+	if err != nil {
+		return nil, err
+	}
+	var seq xpath.Sequence
+	for i := range nodes {
+		seq.Append(xpath.NewNodeItem(nodes[i]))
+	}
+	return seq, nil
 }
 
 func executeForeachGroup(ctx *Context) (xpath.Sequence, error) {
@@ -751,7 +764,7 @@ func applySort(ctx *Context, items []xpath.Item) (iter.Seq[xpath.Item], error) {
 	return iterItems(items, query, order)
 }
 
-type matchFunc func(xml.Node, string) (*Template, error)
+type matchFunc func(xml.Node, string) (Executer, error)
 
 func executeApply(ctx *Context, match matchFunc) (xpath.Sequence, error) {
 	nodes, err := getNodesForTemplate(ctx)
@@ -775,7 +788,12 @@ func executeApply(ctx *Context, match matchFunc) (xpath.Sequence, error) {
 		if err != nil {
 			return seq, err
 		}
-		sub := tpl.mergeContext(ctx.WithXpath(datum))
+		var sub *Context
+		if x, ok := tpl.(interface { mergeContext(*Context) *Context}); ok {
+			sub = x.mergeContext(ctx.WithXpath(datum))
+		} else {
+			sub = ctx.Copy()
+		}
 		if err := applyParams(sub); err != nil {
 			return nil, err
 		}

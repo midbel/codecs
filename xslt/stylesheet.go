@@ -48,6 +48,10 @@ func defaultOutput() *Output {
 	return out
 }
 
+type Executer interface {
+	Execute(*Context) ([]xml.Node, error)
+}
+
 type NoMatchMode int8
 
 const (
@@ -116,7 +120,7 @@ func (m *Mode) Append(t *Template) error {
 	return nil
 }
 
-func (m *Mode) callTemplate(name string) (*Template, error) {
+func (m *Mode) callTemplate(name string) (Executer, error) {
 	ix := slices.IndexFunc(m.Templates, func(t *Template) bool {
 		return t.Name == name
 	})
@@ -126,7 +130,7 @@ func (m *Mode) callTemplate(name string) (*Template, error) {
 	return m.Templates[ix].Clone(), nil
 }
 
-func (m *Mode) mainTemplate() (*Template, error) {
+func (m *Mode) mainTemplate() (Executer, error) {
 	ix := slices.IndexFunc(m.Templates, func(t *Template) bool {
 		return t.isRoot()
 	})
@@ -136,7 +140,7 @@ func (m *Mode) mainTemplate() (*Template, error) {
 	return nil, fmt.Errorf("main template not found")
 }
 
-func (m *Mode) matchTemplate(node xml.Node, env *Env) (*Template, error) {
+func (m *Mode) matchTemplate(node xml.Node, env *Env) (Executer, error) {
 	type TemplateMatch struct {
 		*Template
 		Position int
@@ -183,7 +187,7 @@ func (m *Mode) matchTemplate(node xml.Node, env *Env) (*Template, error) {
 	return m.noMatch(node)
 }
 
-func (m *Mode) noMatch(node xml.Node) (*Template, error) {
+func (m *Mode) noMatch(node xml.Node) (Executer, error) {
 	switch m.NoMatch {
 	case NoMatchTextOnlyCopy:
 	case NoMatchDeepCopy:
@@ -264,7 +268,7 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 	return &sheet, nil
 }
 
-func (s *Stylesheet) Find(name, mode string) (*Template, error) {
+func (s *Stylesheet) Find(name, mode string) (Executer, error) {
 	ix := slices.IndexFunc(s.Modes, func(m *Mode) bool {
 		return m.Name == mode
 	})
@@ -283,7 +287,7 @@ func (s *Stylesheet) Find(name, mode string) (*Template, error) {
 	return nil, fmt.Errorf("template %s not found", name)
 }
 
-func (s *Stylesheet) MatchImport(node xml.Node, mode string) (*Template, error) {
+func (s *Stylesheet) MatchImport(node xml.Node, mode string) (Executer, error) {
 	for _, s := range s.Others {
 		if tpl, err := s.Match(node, mode); err == nil {
 			return tpl, err
@@ -292,7 +296,7 @@ func (s *Stylesheet) MatchImport(node xml.Node, mode string) (*Template, error) 
 	return nil, fmt.Errorf("no template found matching given node (%s)", node.QualifiedName())
 }
 
-func (s *Stylesheet) Match(node xml.Node, mode string) (*Template, error) {
+func (s *Stylesheet) Match(node xml.Node, mode string) (Executer, error) {
 	ix := slices.IndexFunc(s.Modes, func(m *Mode) bool {
 		return m.Name == mode
 	})
@@ -683,7 +687,7 @@ func (s *Stylesheet) getQualifiedName(name string) string {
 	return qn.QualifiedName()
 }
 
-func (s *Stylesheet) getMainTemplate() (*Template, error) {
+func (s *Stylesheet) getMainTemplate() (Executer, error) {
 	ix := slices.IndexFunc(s.Modes, func(m *Mode) bool {
 		return m.Name == s.Mode
 	})

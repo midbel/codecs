@@ -21,16 +21,16 @@ type Context struct {
 	*Env
 }
 
-func (c *Context) Find(name, mode string) (*Template, error) {
+func (c *Context) Find(name, mode string) (Executer, error) {
 	return c.Stylesheet.Find(name, c.getMode(mode))
 }
 
-func (c *Context) Match(node xml.Node, mode string) (*Template, error) {
-	return c.Stylesheet.Match(name, c.getMode(mode))
+func (c *Context) Match(node xml.Node, mode string) (Executer, error) {
+	return c.Stylesheet.Match(node, c.getMode(mode))
 }
 
-func (c *Context) MatchImport(node xml.Node, mode string) (*Template, error) {
-	return c.Stylesheet.MatchImport(name, c.getMode(mode))
+func (c *Context) MatchImport(node xml.Node, mode string) (Executer, error) {
+	return c.Stylesheet.MatchImport(node, c.getMode(mode))
 }
 
 func (c *Context) getMode(mode string) string {
