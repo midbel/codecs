@@ -21,6 +21,14 @@ type Context struct {
 	*Env
 }
 
+func (c *Context) ApplyTemplate() ([]xml.Node, error) {
+	ex, err := c.Match(c.ContextNode, c.Mode)
+	if err != nil {
+		return nil, err
+	}
+	return ex.Execute(ctx)
+}
+
 func (c *Context) Find(name, mode string) (Executer, error) {
 	return c.Stylesheet.Find(name, c.getMode(mode))
 }

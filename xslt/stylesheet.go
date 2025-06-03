@@ -188,18 +188,55 @@ func (m *Mode) matchTemplate(node xml.Node, env *Env) (Executer, error) {
 }
 
 func (m *Mode) noMatch(node xml.Node) (Executer, error) {
+	var exec Executer
 	switch m.NoMatch {
 	case NoMatchTextOnlyCopy:
+		exec = textOnlyCopy{}
 	case NoMatchDeepCopy:
+		exec = deepCopy{}
 	case NoMatchShallowCopy:
+		exec = shallowCopy{}
 	case NoMatchDeepSkip:
+		exec = deepSkip{}
 	case NoMatchShallowSkip:
+		exec = shallowSkip{}
 	case NoMatchFail:
 		return nil, fmt.Errorf("%s: no template match", node.QualifiedName())
 	default:
 		return nil, fmt.Errorf("%s: no template match", node.QualifiedName())
 	}
-	return nil, errImplemented
+	return exec, nil
+}
+
+type textOnlyCopy struct{}
+
+func (_ textOnlyCopy) Execute(ctx *Context) ([]xml.Node, error) {
+	return nil, nil
+}
+
+type deepCopy struct{}
+
+func (_ deepCopy) Execute(ctx *Context) ([]xml.Node, error) {
+	node := cloneNode(ctx.ContextNode)
+	return []xml.Node{node}, nil
+}
+
+type shallowCopy struct{}
+
+func (_ shallowCopy) Execute(ctx *Context) ([]xml.Node, error) {
+	return nil, nil
+}
+
+type deepSkip struct{}
+
+func (_ deepSkip) Execute(ctx *Context) ([]xml.Node, error) {
+	return nil, nil
+}
+
+type shallowSkip struct{}
+
+func (_ shallowSkip) Execute(ctx *Context) ([]xml.Node, error) {
+	return nil, nil
 }
 
 type Stylesheet struct {
