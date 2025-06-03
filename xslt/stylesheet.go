@@ -210,8 +210,42 @@ func (m *Mode) noMatch(node xml.Node) (Executer, error) {
 
 type textOnlyCopy struct{}
 
-func (_ textOnlyCopy) Execute(ctx *Context) ([]xml.Node, error) {
-	return nil, nil
+func (c textOnlyCopy) Execute(ctx *Context) ([]xml.Node, error) {
+	switch ctx.ContextNode.Type() {
+	case xml.TypeElement:
+		var (
+			list []xml.Node
+			elem = ctx.ContextNode.(*xml.Element)
+		)
+		for i := range elem.Nodes {
+			others, err := ctx.WithXpath(elem.Nodes[i]).ApplyTemplate()
+			if err != nil {
+				return nil, err
+			}
+			list = slices.Concat(list, others)
+		}
+		return list, nil
+	case xml.TypeDocument:
+		var (
+			list []xml.Node
+			doc = ctx.ContextNode.(*xml.Document)
+		)
+		for i := range doc.Nodes {
+			others, err := ctx.WithXpath(doc.Nodes[i]).ApplyTemplate()
+			if err != nil {
+				return nil, err
+			}
+			list = slices.Concat(list, others)
+		}
+		return list, nil
+		doc := ctx.ContextNode.(*xml.Document)
+		return ctx.WithXpath(doc.Root()).ApplyTemplate()
+	case xml.TypeText:
+		node := xml.NewText(ctx.ContextNode.Value())
+		return []xml.Node{node}, nil
+	default:
+		return nil, nil
+	}
 }
 
 type deepCopy struct{}
@@ -224,7 +258,25 @@ func (_ deepCopy) Execute(ctx *Context) ([]xml.Node, error) {
 type shallowCopy struct{}
 
 func (_ shallowCopy) Execute(ctx *Context) ([]xml.Node, error) {
-	return nil, nil
+	if ctx.ContextNode == xml.TypeDocument {
+		doc := ctx.ContextNode.(*xml.Document)
+		return ctx.WithXpath(doc.Root()).ApplyTemplate()
+	}
+	elem, err := getElementFromNode(ctx.ContextNode)
+	if err != nil {
+		return nil, err
+	}
+	clone := elem.Copy()
+	for _, n := range slices.Clone(elem.Nodes) {
+		others, err := ctx.WithXpath(n).ApplyTemplate()
+		if err != nil {
+			return nil, err
+		}
+		for i := range others {
+			clone.Append(others[i])
+		}
+	}
+	return []xml.Node{clone}, nil
 }
 
 type deepSkip struct{}
@@ -236,7 +288,29 @@ func (_ deepSkip) Execute(ctx *Context) ([]xml.Node, error) {
 type shallowSkip struct{}
 
 func (_ shallowSkip) Execute(ctx *Context) ([]xml.Node, error) {
-	return nil, nil
+	var list []xml.Node
+	switch ctx.ContextNode.Type() {
+	case xml.TypeDocument:
+		doc := ctx.ContextNode.(*xml.Document)
+		for _, n := range doc.Nodes {
+			res, err := ctx.WithXpath(n).ApplyTemplate()
+			if err != nil {
+				return nil, err
+			}
+			list = slices.Concat(list, res)
+		}
+	case xml.TypeElement:
+		elem := ctx.ContextNode.(*xml.Element)
+		for _, n := range elem.Nodes {
+			res, err := ctx.WithXpath(n).ApplyTemplate()
+			if err != nil {
+				return nil, err
+			}
+			list = slices.Concat(list, res)
+		}
+	default:
+	}
+	return list, nil
 }
 
 type Stylesheet struct {

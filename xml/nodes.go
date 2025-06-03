@@ -447,6 +447,16 @@ func (e *Element) Namespaces() []NS {
 	return ns
 }
 
+func (e *Element) Copy() Node {
+	c := &Element{
+		QName:    e.QName,
+		Attrs:    slices.Clone(e.Attrs),
+		parent:   e.parent,
+		position: e.position,
+	}
+	return c
+}
+
 func (e *Element) Clone() Node {
 	c := &Element{
 		QName:    e.QName,

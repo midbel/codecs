@@ -26,7 +26,7 @@ func (c *Context) ApplyTemplate() ([]xml.Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ex.Execute(ctx)
+	return ex.Execute(c)
 }
 
 func (c *Context) Find(name, mode string) (Executer, error) {
