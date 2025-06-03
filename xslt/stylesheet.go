@@ -66,6 +66,11 @@ const (
 	MultiMatchLast
 )
 
+const (
+	currentMode = "#current"
+	defaultMode = "#default"
+)
+
 type Mode struct {
 	Name       string
 	Default    bool
@@ -73,7 +78,6 @@ type Mode struct {
 	MultiMatch MultiMatchMode
 
 	Templates []*Template
-	Builtins  []*Template
 }
 
 func namedMode(name string) *Mode {
@@ -181,11 +185,11 @@ func (m *Mode) matchTemplate(node xml.Node, env *Env) (*Template, error) {
 
 func (m *Mode) noMatch(node xml.Node) (*Template, error) {
 	switch m.NoMatch {
+	case NoMatchTextOnlyCopy:
 	case NoMatchDeepCopy:
 	case NoMatchShallowCopy:
 	case NoMatchDeepSkip:
 	case NoMatchShallowSkip:
-	case NoMatchTextOnlyCopy:
 	case NoMatchFail:
 		return nil, fmt.Errorf("%s: no template match", node.QualifiedName())
 	default:

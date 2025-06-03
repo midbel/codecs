@@ -21,16 +21,27 @@ type Context struct {
 	*Env
 }
 
-func (c *Context) errorWithContext(err error) error {
-	if c.XslNode == nil {
-		return err
-	}
-	return errorWithContext(c.XslNode.QualifiedName(), err)
+func (c *Context) Find(name, mode string) (*Template, error) {
+	return c.Stylesheet.Find(name, c.getMode(mode))
 }
 
-func (c *Context) queryXSL(query string) (xpath.Sequence, error) {
-	c.Query(c, query)
-	return c.Env.queryXSL(query, c.XslNode)
+func (c *Context) Match(node xml.Node, mode string) (*Template, error) {
+	return c.Stylesheet.Match(name, c.getMode(mode))
+}
+
+func (c *Context) MatchImport(node xml.Node, mode string) (*Template, error) {
+	return c.Stylesheet.MatchImport(name, c.getMode(mode))
+}
+
+func (c *Context) getMode(mode string) string {
+	switch mode {
+	case currentMode:
+		return c.Mode
+	case defaultMode:
+		return c.Stylesheet.DefaultMode
+	default:
+		return mode
+	}
 }
 
 func (c *Context) WithNodes(ctxNode, xslNode xml.Node) *Context {
@@ -73,6 +84,18 @@ func (c *Context) clone(xslNode, ctxNode xml.Node) *Context {
 		Depth:       c.Depth + 1,
 	}
 	return &child
+}
+
+func (c *Context) errorWithContext(err error) error {
+	if c.XslNode == nil {
+		return err
+	}
+	return errorWithContext(c.XslNode.QualifiedName(), err)
+}
+
+func (c *Context) queryXSL(query string) (xpath.Sequence, error) {
+	c.Query(c, query)
+	return c.Env.queryXSL(query, c.XslNode)
 }
 
 type Resolver interface {
