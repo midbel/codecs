@@ -41,8 +41,8 @@ type Output struct {
 func defaultOutput() *Output {
 	out := &Output{
 		Method:   "xml",
-		Version:  "1.0",
-		Encoding: "UTF-8",
+		Version:  xml.SupportedVersion,
+		Encoding: xml.SupportedEncoding,
 		Indent:   false,
 	}
 	return out
@@ -228,7 +228,7 @@ func (c textOnlyCopy) Execute(ctx *Context) ([]xml.Node, error) {
 	case xml.TypeDocument:
 		var (
 			list []xml.Node
-			doc = ctx.ContextNode.(*xml.Document)
+			doc  = ctx.ContextNode.(*xml.Document)
 		)
 		for i := range doc.Nodes {
 			others, err := ctx.WithXpath(doc.Nodes[i]).ApplyTemplate()
@@ -238,8 +238,6 @@ func (c textOnlyCopy) Execute(ctx *Context) ([]xml.Node, error) {
 			list = slices.Concat(list, others)
 		}
 		return list, nil
-		doc := ctx.ContextNode.(*xml.Document)
-		return ctx.WithXpath(doc.Root()).ApplyTemplate()
 	case xml.TypeText:
 		node := xml.NewText(ctx.ContextNode.Value())
 		return []xml.Node{node}, nil
@@ -258,7 +256,7 @@ func (_ deepCopy) Execute(ctx *Context) ([]xml.Node, error) {
 type shallowCopy struct{}
 
 func (_ shallowCopy) Execute(ctx *Context) ([]xml.Node, error) {
-	if ctx.ContextNode == xml.TypeDocument {
+	if ctx.ContextNode.Type() == xml.TypeDocument {
 		doc := ctx.ContextNode.(*xml.Document)
 		return ctx.WithXpath(doc.Root()).ApplyTemplate()
 	}
@@ -266,7 +264,10 @@ func (_ shallowCopy) Execute(ctx *Context) ([]xml.Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	clone := elem.Copy()
+	clone, ok := elem.Copy().(*xml.Element)
+	if !ok {
+		return nil, nil
+	}
 	for _, n := range slices.Clone(elem.Nodes) {
 		others, err := ctx.WithXpath(n).ApplyTemplate()
 		if err != nil {
