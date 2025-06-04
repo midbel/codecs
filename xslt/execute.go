@@ -45,6 +45,11 @@ func init() {
 	}
 	executers = map[xml.QName]ExecuteFunc{
 		xml.QualifiedName("for-each", xsltNamespacePrefix):        nest(executeForeach),
+		xml.QualifiedName("iterate", xsltNamespacePrefix):         nest(executeIterate),
+		xml.QualifiedName("next-iteration", xsltNamespacePrefix):  nest(executeNextIteration),
+		xml.QualifiedName("on-completion", xsltNamespacePrefix):   nest(executeOnCompletion),
+		xml.QualifiedName("iterate", xsltNamespacePrefix):         nest(executeIterate),
+		xml.QualifiedName("break", xsltNamespacePrefix):           trace(executeBreak),
 		xml.QualifiedName("value-of", xsltNamespacePrefix):        trace(executeValueOf),
 		xml.QualifiedName("call-template", xsltNamespacePrefix):   nest(executeCallTemplate),
 		xml.QualifiedName("apply-templates", xsltNamespacePrefix): nest(executeApplyTemplates),
@@ -346,6 +351,92 @@ func executeMerge(ctx *Context) (xpath.Sequence, error) {
 			return nil, err
 		}
 		seq.Concat(res)
+	}
+	return seq, nil
+}
+
+func executeBreak(ctx *Context) (xpath.Sequence, error) {
+	elem, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return nil, err
+	}
+	query, err := getAttribute(elem, "select")
+	if err == nil {
+		seq, err := ctx.ExecuteQuery(query, ctx.ContextNode)
+		if err != nil {
+			return nil, err
+		}
+		return seq, errBreak
+	}
+	seq, err := executeConstructor(ctx, elem.Nodes, 0)
+	if err != nil {
+		return nil, err
+	}
+	return seq, errBreak
+}
+
+func executeNextIteration(ctx *Context) (xpath.Sequence, error) {
+	if err := applyParams(ctx); err != nil {
+		return nil, err
+	}
+	return nil, errIterate
+}
+
+func executeOnCompletion(ctx *Context) (xpath.Sequence, error) {
+	return nil, nil
+}
+
+func executeIterate(ctx *Context) (xpath.Sequence, error) {
+	elem, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
+	items, err := executeSelect(ctx, elem)
+	if err != nil {
+		return nil, err
+	}
+	var seq xpath.Sequence
+	for _, i := range items {
+		var (
+			sub   = ctx.Nest()
+			nodes []xml.Node
+			atEnd xml.Node
+		)
+		for i, n := range elem.Nodes {
+			if n.QualifiedName() != ctx.getQualifiedName("param") {
+				nodes = slices.Clone(elem.Nodes[i:])
+				break
+			}
+			_, err := transformNode(sub.WithXsl(n))
+			if err != nil {
+				return nil, err
+			}
+		}
+		if n := len(nodes); n > 0 {
+			last := nodes[0]
+			if last.QualifiedName() == ctx.getQualifiedName("on-completion") {
+				atEnd = last
+				nodes = nodes[1:]
+			}
+		}
+		others, err := executeConstructor(sub.WithXpath(i.Node()), nodes, 0)
+		if err != nil {
+			if errors.Is(err, errIterate) {
+				continue
+			}
+			if errors.Is(err, errBreak) {
+				break
+			}
+			return nil, err
+		}
+		seq.Concat(others)
+		if atEnd != nil {
+			rest, err := transformNode(ctx.WithXsl(atEnd))
+			if err != nil {
+				return nil, err
+			}
+			seq.Concat(rest)
+		}
 	}
 	return seq, nil
 }

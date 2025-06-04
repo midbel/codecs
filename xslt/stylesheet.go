@@ -21,6 +21,8 @@ var (
 	errImplemented = errors.New("not implemented")
 	errUndefined   = errors.New("undefined")
 	errSkip        = errors.New("skip")
+	errBreak       = errors.New("break")
+	errIterate     = errors.New("next-iteration")
 	ErrTerminate   = errors.New("terminate")
 )
 
