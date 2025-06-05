@@ -43,12 +43,12 @@ func TestTransform(t *testing.T) {
 			Failed: true,
 		},
 		{
-			Name:   "if/test-true",
-			Dir:    "testdata/if-basic-true",
+			Name: "if/test-true",
+			Dir:  "testdata/if-basic-true",
 		},
 		{
-			Name:   "if/test-false",
-			Dir:    "testdata/if-basic-false",
+			Name: "if/test-false",
+			Dir:  "testdata/if-basic-false",
 		},
 	}
 	for _, tt := range tests {

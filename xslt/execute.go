@@ -56,6 +56,8 @@ func init() {
 		xml.QualifiedName("apply-imports", xsltNamespacePrefix):   nest(executeApplyImport),
 		xml.QualifiedName("if", xsltNamespacePrefix):              nest(executeIf),
 		xml.QualifiedName("choose", xsltNamespacePrefix):          nest(executeChoose),
+		xml.QualifiedName("when", xsltNamespacePrefix):            trace(executeWhen),
+		xml.QualifiedName("otherwise", xsltNamespacePrefix):       trace(executeOtherwise),
 		xml.QualifiedName("where-populated", xsltNamespacePrefix): trace(executeWherePopulated),
 		xml.QualifiedName("on-empty", xsltNamespacePrefix):        trace(executeOnEmpty),
 		xml.QualifiedName("on-not-empty", xsltNamespacePrefix):    trace(executeOnNotEmpty),
@@ -514,36 +516,70 @@ func executeIf(ctx *Context) (xpath.Sequence, error) {
 	return seq, err
 }
 
-func executeChoose(ctx *Context) (xpath.Sequence, error) {
-	items, err := ctx.queryXSL("/when")
+func executeWhen(ctx *Context) (xpath.Sequence, error) {
+	elem, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
+	test, err := getAttribute(elem, "test")
 	if err != nil {
 		return nil, err
 	}
-	for i := range items {
-		node, err := getElementFromNode(items[i].Node())
-		if err != nil {
-			return nil, ctx.errorWithContext(err)
-		}
-		test, err := getAttribute(node, "test")
-		if err != nil {
-			return nil, err
-		}
-		ok, err := ctx.TestNode(test, ctx.ContextNode)
-		if err != nil {
-			return nil, err
-		}
-		if ok {
-			return processNode(ctx)
-		}
-	}
-
-	if items, err = ctx.queryXSL("otherwise"); err != nil {
+	ok, err := ctx.TestNode(test, ctx.ContextNode)
+	if err != nil {
 		return nil, err
 	}
-	if len(items) == 0 {
-		return nil, nil
+	var seq xpath.Sequence
+	if ok {
+		seq, err = executeConstructor(ctx, elem.Nodes, 0)
 	}
-	return processNode(ctx.WithXsl(items[0].Node()))
+	if err == nil {
+		err = errBreak
+	}
+	return seq, err
+}
+
+func executeOtherwise(ctx *Context) (xpath.Sequence, error) {
+	elem, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
+	return executeConstructor(ctx, elem.Nodes, 0)
+}
+
+func executeChoose(ctx *Context) (xpath.Sequence, error) {
+	elem, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
+	var (
+		other xml.Node
+		nodes = slices.Clone(elem.Nodes)
+	)
+	ix := slices.IndexFunc(nodes, func(n xml.Node) bool {
+		return n.QualifiedName() == ctx.getQualifiedName("otherwise")
+	})
+	if ix >= 0 && ix == len(nodes) - 1 {
+		other = nodes[ix]
+		nodes = nodes[:ix]		
+	}
+	for i := range nodes {
+		if nodes[i].QualifiedName() != ctx.getQualifiedName("when") {
+			err := fmt.Errorf("%s: unexpected element - want xsl:when", nodes[i].QualifiedName())
+			return nil, ctx.errorWithContext(err)
+		}
+		seq, err := transformNode(ctx.WithXsl(nodes[i]))
+		if err != nil {
+			if errors.Is(err, errBreak) {
+				return seq, nil
+			}
+			return nil, err
+		}
+	}
+	if other != nil {
+		return transformNode(ctx.WithXsl(other))
+	}
+	return nil, nil
 }
 
 func executeValueOf(ctx *Context) (xpath.Sequence, error) {
