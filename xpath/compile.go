@@ -433,6 +433,8 @@ func (c *Compiler) compileIdentity(left Expr) (Expr, error) {
 func (c *Compiler) compileRange(left Expr) (Expr, error) {
 	c.Enter("range")
 	defer c.Leave("range")
+	c.next()
+
 	right, err := c.compile()
 	if err != nil {
 		return nil, err
@@ -604,6 +606,7 @@ func (c *Compiler) compileLiteral() (Expr, error) {
 func (c *Compiler) compileNumber() (Expr, error) {
 	c.Enter("number")
 	defer c.Leave("number")
+
 	defer c.next()
 	f, err := strconv.ParseFloat(c.getCurrentLiteral(), 64)
 	if err != nil {
@@ -1021,6 +1024,7 @@ var bindings = map[rune]int{
 	opMul:     powMul,
 	opDiv:     powMul,
 	opMod:     powMul,
+	opRange:   powRange,
 	begGrp:    powCall,
 	begPred:   powPred,
 }

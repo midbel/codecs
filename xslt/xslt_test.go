@@ -1,38 +1,37 @@
 package xslt_test
 
 import (
-	"testing"
-	"path/filepath"
 	"bytes"
 	"fmt"
 	"os"
+	"path/filepath"
+	"testing"
 
 	"github.com/midbel/codecs/xml"
 	"github.com/midbel/codecs/xslt"
-
 )
 
 func TestTransform(t *testing.T) {
-	tests := []struct{
-		Name string
-		Dir string
+	tests := []struct {
+		Name   string
+		Dir    string
 		Failed bool
 	}{
 		{
 			Name: "value-of",
-			Dir: "testdata/valueof-basic",
+			Dir:  "testdata/valueof-basic",
 		},
 		{
 			Name: "value-of/empty",
-			Dir: "testdata/valueof-empty",
+			Dir:  "testdata/valueof-empty",
 		},
 		{
 			Name: "value-of/separator",
-			Dir: "testdata/valueof-separator",
+			Dir:  "testdata/valueof-separator",
 		},
 		{
-			Name: "value-of/select-error",
-			Dir: "testdata/valueof-errselect",
+			Name:   "value-of/select-error",
+			Dir:    "testdata/valueof-errselect",
 			Failed: true,
 		},
 	}
@@ -78,9 +77,9 @@ func compareBytes(t *testing.T, file string, got []byte) error {
 	if err != nil {
 		return err
 	}
-	t.Log(string(want))
-	t.Log(string(got))
 	if !bytes.Equal(want, got) {
+		t.Log("want:", string(want))
+		t.Log("got :", string(got))
 		return fmt.Errorf("bytes mismatched")
 	}
 	return nil

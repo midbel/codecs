@@ -99,6 +99,13 @@ func debugExpr(w io.Writer, expr Expr) {
 		io.WriteString(w, ", ")
 		io.WriteString(w, debugOp(v.op))
 		io.WriteString(w, ")")
+	case rng:
+		io.WriteString(w, "binary")
+		io.WriteString(w, "(")
+		debugExpr(w, v.left)
+		io.WriteString(w, ", ")
+		debugExpr(w, v.right)
+		io.WriteString(w, ")")
 	case reverse:
 		io.WriteString(w, "reverse")
 		io.WriteString(w, "(")
