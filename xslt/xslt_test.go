@@ -30,6 +30,14 @@ func TestTransform(t *testing.T) {
 			Dir:  "testdata/valueof-separator",
 		},
 		{
+			Name: "value-of/body",
+			Dir:  "testdata/valueof-body",
+		},
+		{
+			Name: "value-of/body-sep",
+			Dir:  "testdata/valueof-body-sep",
+		},
+		{
 			Name:   "value-of/select-error",
 			Dir:    "testdata/valueof-errselect",
 			Failed: true,
