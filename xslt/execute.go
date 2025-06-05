@@ -62,6 +62,7 @@ func init() {
 		xml.QualifiedName("on-empty", xsltNamespacePrefix):        trace(executeOnEmpty),
 		xml.QualifiedName("on-not-empty", xsltNamespacePrefix):    trace(executeOnNotEmpty),
 		xml.QualifiedName("try", xsltNamespacePrefix):             nest(executeTry),
+		xml.QualifiedName("catch", xsltNamespacePrefix):           trace(executeCatch),
 		xml.QualifiedName("variable", xsltNamespacePrefix):        trace(executeVariable),
 		xml.QualifiedName("result-document", xsltNamespacePrefix): trace(executeResultDocument),
 		xml.QualifiedName("source-document", xsltNamespacePrefix): nest(executeSourceDocument),
@@ -477,23 +478,61 @@ func executeForeach(ctx *Context) (xpath.Sequence, error) {
 	return seq, nil
 }
 
+func executeCatch(ctx *Context) (xpath.Sequence, error) {
+	elem, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return nil, err
+	}
+	return executeConstructor(ctx, elem.Nodes, 0)
+}
+
 func executeTry(ctx *Context) (xpath.Sequence, error) {
-	items, err := ctx.queryXSL("./catch[last()]")
+	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
 		return nil, err
 	}
-	if len(items) > 1 {
-		return nil, fmt.Errorf("only one catch element is allowed")
+	var (
+		catch []xml.Node
+		body  []xml.Node
+		seq   xpath.Sequence
+	)
+	ix := slices.IndexFunc(elem.Nodes, func(n xml.Node) bool {
+		return n.QualifiedName() == ctx.getQualifiedName("catch")
+	})
+	if ix >= 0 {
+		body = slices.Clone(elem.Nodes[:ix])
+		catch = slices.Clone(elem.Nodes[ix:])
+	} else {
+		body = slices.Clone(elem.Nodes)
 	}
-	seq, err := processNode(ctx)
-	if err != nil {
-		if len(items) > 0 {
-			catch := items[0].Node()
-			return processNode(ctx.WithXsl(catch))
+	if query, err1 := getAttribute(elem, "select"); err1 == nil {
+		if len(body) > 0 {
+			err := fmt.Errorf("select attribute can not be used with children")
+			return nil, ctx.errorWithContext(err)
 		}
+		seq, err = ctx.ExecuteQuery(query, ctx.ContextNode)
+	} else {
+		if !errors.Is(err, errMissed) {
+			return nil, ctx.errorWithContext(err)
+		}
+		seq, err = executeConstructor(ctx, body, 0)
+	}
+	if err == nil {
+		return seq, nil
+	}
+	if !Catchable(err) {
 		return nil, err
 	}
-	return seq, nil
+	for i := range catch {
+		seq, err := transformNode(ctx.WithXsl(catch[i]))
+		if err != nil {
+			if errors.Is(err, errBreak) {
+				return seq, nil
+			}
+			return nil, err
+		}
+	}
+	return nil, nil
 }
 
 func executeIf(ctx *Context) (xpath.Sequence, error) {
@@ -559,9 +598,9 @@ func executeChoose(ctx *Context) (xpath.Sequence, error) {
 	ix := slices.IndexFunc(nodes, func(n xml.Node) bool {
 		return n.QualifiedName() == ctx.getQualifiedName("otherwise")
 	})
-	if ix >= 0 && ix == len(nodes) - 1 {
+	if ix >= 0 && ix == len(nodes)-1 {
 		other = nodes[ix]
-		nodes = nodes[:ix]		
+		nodes = nodes[:ix]
 	}
 	for i := range nodes {
 		if nodes[i].QualifiedName() != ctx.getQualifiedName("when") {
@@ -599,9 +638,9 @@ func executeValueOf(ctx *Context) (xpath.Sequence, error) {
 		items, err = executeConstructor(ctx, elem.Nodes, 0)
 	} else {
 		if len(elem.Nodes) > 0 {
-			return nil, fmt.Errorf("select attribute can not be used with children")
+			err := fmt.Errorf("select attribute can not be used with children")
+			return nil, ctx.errorWithContext(err)
 		}
-
 		items, err = ctx.ExecuteQuery(query, ctx.ContextNode)
 	}
 	if err != nil {

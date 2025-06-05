@@ -8,6 +8,10 @@ import (
 	"github.com/midbel/codecs/xpath"
 )
 
+func Catchable(err error) bool {
+	return true
+}
+
 type Context struct {
 	XslNode     xml.Node
 	ContextNode xml.Node
