@@ -507,10 +507,11 @@ func executeIf(ctx *Context) (xpath.Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !ok {
-		return nil, nil
+	var seq xpath.Sequence
+	if ok {
+		seq, err = executeConstructor(ctx, elem.Nodes, 0)
 	}
-	return processNode(ctx)
+	return seq, err
 }
 
 func executeChoose(ctx *Context) (xpath.Sequence, error) {

@@ -42,6 +42,14 @@ func TestTransform(t *testing.T) {
 			Dir:    "testdata/valueof-errselect",
 			Failed: true,
 		},
+		{
+			Name:   "if/test-true",
+			Dir:    "testdata/if-basic-true",
+		},
+		{
+			Name:   "if/test-false",
+			Dir:    "testdata/if-basic-false",
+		},
 	}
 	for _, tt := range tests {
 		fn := executeTest(tt.Name, tt.Dir, tt.Failed)
