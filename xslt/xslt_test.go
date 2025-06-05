@@ -16,19 +16,33 @@ func TestTransform(t *testing.T) {
 	tests := []struct{
 		Name string
 		Dir string
+		Failed bool
 	}{
 		{
 			Name: "value-of",
-			Dir: "testdata/valueof",
+			Dir: "testdata/valueof-basic",
+		},
+		{
+			Name: "value-of/empty",
+			Dir: "testdata/valueof-empty",
+		},
+		{
+			Name: "value-of/separator",
+			Dir: "testdata/valueof-separator",
+		},
+		{
+			Name: "value-of/select-error",
+			Dir: "testdata/valueof-errselect",
+			Failed: true,
 		},
 	}
 	for _, tt := range tests {
-		fn := executeTest(tt.Name, tt.Dir)
+		fn := executeTest(tt.Name, tt.Dir, tt.Failed)
 		t.Run(tt.Name, fn)
 	}
 }
 
-func executeTest(name, dir string) func(*testing.T) {
+func executeTest(name, dir string, failure bool) func(*testing.T) {
 	return func(t *testing.T) {
 		doc, err := parseDocument(filepath.Join(dir, "doc.xml"))
 		if err != nil {
@@ -42,7 +56,14 @@ func executeTest(name, dir string) func(*testing.T) {
 		}
 		var str bytes.Buffer
 		if err := sheet.Generate(&str, doc); err != nil {
+			if failure {
+				return
+			}
 			t.Errorf("error executing transform: %s", err)
+			return
+		}
+		if failure {
+			t.Errorf("expected error but transformation pass!")
 			return
 		}
 		err = compareBytes(t, filepath.Join(dir, "result.xml"), str.Bytes())
@@ -57,6 +78,8 @@ func compareBytes(t *testing.T, file string, got []byte) error {
 	if err != nil {
 		return err
 	}
+	t.Log(string(want))
+	t.Log(string(got))
 	if !bytes.Equal(want, got) {
 		return fmt.Errorf("bytes mismatched")
 	}

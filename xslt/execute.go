@@ -550,20 +550,28 @@ func executeValueOf(ctx *Context) (xpath.Sequence, error) {
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
 	}
-	query, err := getAttribute(elem, "select")
-	if err != nil {
-		return nil, ctx.errorWithContext(err)
-	}
 	sep, err := getAttribute(elem, "separator")
 	if err != nil {
 		sep = " "
 	}
-	items, err := ctx.ExecuteQuery(query, ctx.ContextNode)
+	var items xpath.Sequence
+	if query, err1 := getAttribute(elem, "select"); err1 != nil {
+		if !errors.Is(err1, errMissed) {
+			return nil, ctx.errorWithContext(err1)
+		}
+		items, err = executeConstructor(ctx, elem.Nodes, 0)
+	} else {
+		if len(elem.Nodes) > 0 {
+			return nil, fmt.Errorf("select attribute can not be used with children")
+		}
+
+		items, err = ctx.ExecuteQuery(query, ctx.ContextNode)
+	}
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
 	}
 	if len(items) == 0 {
-		return nil, nil
+		return xpath.Singleton(xml.NewText("")), nil
 	}
 
 	var str strings.Builder
