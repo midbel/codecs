@@ -753,27 +753,22 @@ func (c *Compiler) compileVariable() (Expr, error) {
 func (c *Compiler) compileKind() (Expr, error) {
 	c.Enter("kind")
 	defer c.Leave("kind")
-	var (
-		kindTest kind
-		withArg  bool
-	)
+	var expr kind
 	switch c.getCurrentLiteral() {
 	case "node":
-		kindTest.kind = xml.TypeNode
+		expr.kind = xml.TypeNode
 	case "element":
-		kindTest.kind = xml.TypeElement
-		withArg = true
+		expr.kind = xml.TypeElement
 	case "text":
-		kindTest.kind = xml.TypeText
+		expr.kind = xml.TypeText
 	case "comment":
-		kindTest.kind = xml.TypeComment
+		expr.kind = xml.TypeComment
 	case "attribute":
-		kindTest.kind = xml.TypeAttribute
-		withArg = true
+		expr.kind = xml.TypeAttribute
 	case "processing-instruction":
-		kindTest.kind = xml.TypeInstruction
+		expr.kind = xml.TypeInstruction
 	case "document-node":
-		kindTest.kind = xml.TypeDocument
+		expr.kind = xml.TypeDocument
 	default:
 		return nil, fmt.Errorf("kind test not supported")
 	}
@@ -782,11 +777,11 @@ func (c *Compiler) compileKind() (Expr, error) {
 		return nil, ErrSyntax
 	}
 	c.next()
-	if withArg {
+	if expr.kind == xml.TypeElement || expr.kind == xml.TypeAttribute {
 		if !c.is(Name) {
 			return nil, fmt.Errorf("expected name")
 		}
-		kindTest.localName = c.getCurrentLiteral()
+		expr.localName = c.getCurrentLiteral()
 		c.next()
 		if c.is(opSeq) {
 			c.next()
@@ -800,7 +795,7 @@ func (c *Compiler) compileKind() (Expr, error) {
 		return nil, ErrSyntax
 	}
 	c.next()
-	return kindTest, nil
+	return expr, nil
 }
 
 func (c *Compiler) compileAxis() (Expr, error) {
