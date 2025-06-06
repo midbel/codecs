@@ -132,8 +132,6 @@ func compareValues(seq Sequence, values []string) ([]string, bool) {
 			str string
 		)
 		switch v := val.(type) {
-		case xml.Node:
-			str = v.QualifiedName()
 		case time.Time:
 			str = v.Format("2006-01-02")
 		case float64:

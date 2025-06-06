@@ -193,14 +193,15 @@ func (w *Writer) writeElement(node *Element, depth int) error {
 		w.writer.WriteRune(rangle)
 		return w.writer.Flush()
 	}
-	w.writer.WriteRune(rangle)
 	if w.MaxDepth == 0 || depth < w.MaxDepth {
+		w.writer.WriteRune(rangle)
 		for _, n := range node.Nodes {
 			if err := w.writeNode(n, depth+1); err != nil {
 				return err
 			}
 		}
 	} else if node.Leaf() {
+		w.writer.WriteRune(rangle)
 		w.writeNode(node.Nodes[0], depth+1)
 	} else {
 		w.writer.WriteRune(slash)

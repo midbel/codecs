@@ -23,6 +23,20 @@ type SyntaxError struct {
 	Code  string
 	Expr  string
 	Cause string
+	Position
+}
+
+func syntaxError(expr, cause string, pos Position) error {
+	return SyntaxError{
+		Code:     CodeGenericError,
+		Expr:     expr,
+		Cause:    cause,
+		Position: pos,
+	}
+}
+
+func (e SyntaxError) Error() string {
+	return fmt.Sprintf("[%s] %s: %s", e.Code, e.Expr, e.Cause)
 }
 
 type Tracer interface {
