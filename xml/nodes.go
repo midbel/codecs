@@ -40,6 +40,8 @@ func (n NodeType) String() string {
 		return "pi"
 	case TypeText:
 		return "text"
+	case TypeNode:
+		return "node"
 	}
 }
 

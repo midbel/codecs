@@ -11,6 +11,20 @@ import (
 	"github.com/midbel/codecs/xml"
 )
 
+const (
+	CodeGenericError = "XPST0003"
+	CodeUndefinedVar = "XPST0017"
+	CodeNumberArg    = "XPST0018"
+	CodeBadUsage     = "XPST0051"
+	CodeModuleError  = "XQST0039"
+)
+
+type SyntaxError struct {
+	Code  string
+	Expr  string
+	Cause string
+}
+
 type Tracer interface {
 	Enter(string)
 	Leave(string)
@@ -94,7 +108,6 @@ func NewCompiler(r io.Reader) *Compiler {
 		scan:   Scan(r),
 		Tracer: discardTracer{},
 	}
-	cp.resetCurrentStep()
 
 	cp.infix = map[rune]func(Expr) (Expr, error){
 		currLevel: cp.compileStep,
@@ -805,10 +818,9 @@ func (c *Compiler) compileName() (Expr, error) {
 		return nil, err
 	}
 	expr = axis{
-		kind: c.getCurrentAxis(),
+		kind: childAxis,
 		next: expr,
 	}
-	c.resetCurrentStep()
 	return expr, nil
 }
 
@@ -870,7 +882,6 @@ func (c *Compiler) compileStep(left Expr) (Expr, error) {
 	defer c.Leave("step")
 
 	c.next()
-	c.setCurrentStep(currLevel)
 	next, err := c.compileExpr(powStep)
 	if err != nil {
 		return nil, err
@@ -887,14 +898,22 @@ func (c *Compiler) compileDescendantStep(left Expr) (Expr, error) {
 	defer c.Leave("descendant-step")
 
 	c.next()
-	c.setCurrentStep(anyLevel)
 	next, err := c.compileExpr(powStep)
 	if err != nil {
 		return nil, err
 	}
+
 	expr := step{
 		curr: left,
-		next: next,
+		next: step{
+			curr: axis{
+				kind: descendantSelfAxis,
+				next: kind{
+					kind: xml.TypeNode,
+				},
+			},
+			next: next,
+		},
 	}
 	return expr, nil
 }
@@ -907,7 +926,6 @@ func (c *Compiler) compileRoot() (Expr, error) {
 	if c.done() {
 		return root{}, nil
 	}
-	c.setCurrentStep(currLevel)
 	next, err := c.compileExpr(powStep)
 	if err != nil {
 		return nil, err
@@ -924,31 +942,24 @@ func (c *Compiler) compileDescendantRoot() (Expr, error) {
 	defer c.Leave("descendant-root")
 
 	c.next()
-	c.setCurrentStep(anyLevel)
 	next, err := c.compileExpr(powStep)
 	if err != nil {
 		return nil, err
 	}
+
 	expr := step{
 		curr: root{},
-		next: next,
+		next: step{
+			curr: axis{
+				kind: descendantSelfAxis,
+				next: kind{
+					kind: xml.TypeNode,
+				},
+			},
+			next: next,
+		},
 	}
 	return expr, nil
-}
-
-func (c *Compiler) setCurrentStep(step rune) {
-	c.lastStep = step
-}
-
-func (c *Compiler) resetCurrentStep() {
-	c.lastStep = -1
-}
-
-func (c *Compiler) getCurrentAxis() string {
-	if c.lastStep == anyLevel {
-		return descendantSelfAxis
-	}
-	return childAxis
 }
 
 func (c *Compiler) power() int {

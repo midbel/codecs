@@ -34,6 +34,12 @@ func debugExpr(w io.Writer, expr Expr) {
 		}
 		io.WriteString(w, v.Name)
 		io.WriteString(w, ")")
+	case kind:
+		io.WriteString(w, "kind")
+		io.WriteString(w, "(")
+		io.WriteString(w, v.kind.String())
+		io.WriteString(w, "()")
+		io.WriteString(w, ")")
 	case axis:
 		io.WriteString(w, "axis")
 		io.WriteString(w, "(")

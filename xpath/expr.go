@@ -602,7 +602,7 @@ func (k kind) MatchPriority() int {
 }
 
 func (k kind) find(ctx Context) (Sequence, error) {
-	if k.kind == 0 || ctx.Type() == k.kind {
+	if k.kind == 0 || k.kind == xml.TypeNode || ctx.Type() == k.kind {
 		return Singleton(ctx.Node), nil
 	}
 	return nil, nil

@@ -72,6 +72,30 @@ func TestEval(t *testing.T) {
 			Expr:     "//@ignore",
 			Expected: []string{"true"},
 		},
+		{
+			Expr:     "//test[@ignore=\"true\"]",
+			Expected: []string{""},
+		},
+		{
+			Expr:     "//*[@ignore!=\"false\"]",
+			Expected: []string{""},
+		},
+		{
+			Expr:     "//test[@ignore=\"false\"]",
+			Expected: []string{},
+		},
+		{
+			Expr:     "//*[@ignore=\"false\"]",
+			Expected: []string{},
+		},
+		{
+			Expr:     "//*[not(self::item)]",
+			Expected: []string{"root", "group", "test"},
+		},
+		{
+			Expr:     "1 to 3",
+			Expected: []string{"1", "2", "3"},
+		},
 	}
 
 	doc, err := parseDocument()
@@ -94,19 +118,22 @@ func TestEval(t *testing.T) {
 			t.Errorf("%s: number of nodes mismatched! want %d, got %d", c.Expr, len(c.Expected), seq.Len())
 			continue
 		}
-		if !compareValues(seq, c.Expected) {
-			t.Errorf("%s: nodes mismatched! want %s, got %d", c.Expr, c.Expected, seq)
+		if got, ok := compareValues(seq, c.Expected); !ok {
+			t.Errorf("%s: nodes mismatched! want %s, got %s", c.Expr, c.Expected, got)
 		}
 	}
 }
 
-func compareValues(seq Sequence, values []string) bool {
+func compareValues(seq Sequence, values []string) ([]string, bool) {
+	var got []string
 	for i := range seq {
 		var (
 			val = seq[i].Value()
 			str string
 		)
 		switch v := val.(type) {
+		case xml.Node:
+			str = v.QualifiedName()
 		case time.Time:
 			str = v.Format("2006-01-02")
 		case float64:
@@ -116,12 +143,12 @@ func compareValues(seq Sequence, values []string) bool {
 		case string:
 			str = v
 		}
-
+		got = append(got, str)
 		if str != values[i] {
-			return false
+			return got, false
 		}
 	}
-	return true
+	return nil, true
 }
 
 func parseDocument() (*xml.Document, error) {
