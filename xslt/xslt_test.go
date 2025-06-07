@@ -70,6 +70,20 @@ func TestValueOf(t *testing.T) {
 	runTest(t, tests)
 }
 
+func TestForEach(t *testing.T) {
+	tests := []TestCase{
+		{
+			Name: "foreach/basic",
+			Dir:  "testdata/foreach-basic",
+		},
+		{
+			Name: "foreach/not-empty",
+			Dir:  "testdata/foreach-basic-notempty",
+		},
+	}
+	runTest(t, tests)
+}
+
 func runTest(t *testing.T, tests []TestCase) {
 	t.Helper()
 	for _, tt := range tests {
@@ -114,6 +128,8 @@ func compareBytes(t *testing.T, file string, got []byte) error {
 	if err != nil {
 		return err
 	}
+	want = normalizeDoc(want)
+	got = normalizeDoc(got)
 	if !bytes.Equal(want, got) {
 		t.Log("want:", string(want))
 		t.Log("got :", string(got))
@@ -131,4 +147,21 @@ func parseDocument(file string) (*xml.Document, error) {
 
 	p := xml.NewParser(r)
 	return p.Parse()
+}
+
+func normalizeDoc(doc []byte) []byte {
+	var (
+		r = bytes.NewBuffer(doc)
+		p = xml.NewParser(r)
+	)
+	x, err := p.Parse()
+	if err != nil {
+		return doc
+	}
+	r.Reset()
+	w := xml.NewWriter(r)
+	if err := w.Write(x); err != nil {
+		return doc
+	}
+	return r.Bytes()
 }

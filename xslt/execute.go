@@ -459,7 +459,7 @@ func executeForeach(ctx *Context) (xpath.Sequence, error) {
 		return nil, ctx.errorWithContext(err)
 	}
 	if len(items) == 0 {
-		return executeConstructor(ctx, elem.Nodes, AllowOnEmpty|AllowOnNonEmpty)
+		return nil, nil
 	}
 	it, err := applySort(ctx, items)
 	if err != nil {

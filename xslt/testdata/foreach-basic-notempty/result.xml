@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<language>
+	<lang>go</lang>
+	<item>foobar</item>
+	<lang>js</lang>
+	<item>foobar</item>
+</language>
