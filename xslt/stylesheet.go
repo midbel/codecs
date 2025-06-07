@@ -439,7 +439,7 @@ func (s *Stylesheet) Execute(doc xml.Node) (xml.Node, error) {
 	nodes, err := tpl.Execute(s.createContext(doc))
 	if err == nil {
 		var root xml.Node
-		if len(nodes) != 1 {
+		if len(nodes) > 1 {
 			if !s.WrapRoot {
 				return nil, fmt.Errorf("main template returns more than one node")
 			}
@@ -448,8 +448,10 @@ func (s *Stylesheet) Execute(doc xml.Node) (xml.Node, error) {
 				elem.Append(nodes[i])
 			}
 			root = elem
-		} else {
+		} else if len(nodes) == 1 {
 			root = nodes[0]
+		} else {
+			root = xml.NewElement(xml.LocalName("angle"))
 		}
 		return xml.NewDocument(root), nil
 	}

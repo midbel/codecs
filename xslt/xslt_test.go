@@ -50,6 +50,14 @@ func TestTransform(t *testing.T) {
 			Name: "if/test-false",
 			Dir:  "testdata/if-basic-false",
 		},
+		{
+			Name: "choose/basic",
+			Dir:  "testdata/choose-basic",
+		},
+		{
+			Name: "choose/otherwise",
+			Dir:  "testdata/choose-otherwise",
+		},
 	}
 	for _, tt := range tests {
 		fn := executeTest(tt.Name, tt.Dir, tt.Failed)

@@ -568,12 +568,13 @@ func executeWhen(ctx *Context) (xpath.Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	var seq xpath.Sequence
 	if ok {
 		seq, err = executeConstructor(ctx, elem.Nodes, 0)
-	}
-	if err == nil {
-		err = errBreak
+		if err == nil {
+			err = errBreak
+		}
 	}
 	return seq, err
 }
