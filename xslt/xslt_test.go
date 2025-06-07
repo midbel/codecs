@@ -11,12 +11,36 @@ import (
 	"github.com/midbel/codecs/xslt"
 )
 
-func TestTransform(t *testing.T) {
-	tests := []struct {
-		Name   string
-		Dir    string
-		Failed bool
-	}{
+type TestCase struct {
+	Name   string
+	Dir    string
+	Failed bool
+}
+
+func TestConditional(t *testing.T) {
+	tests := []TestCase{
+		{
+			Name: "if/test-true",
+			Dir:  "testdata/if-basic-true",
+		},
+		{
+			Name: "if/test-false",
+			Dir:  "testdata/if-basic-false",
+		},
+		{
+			Name: "choose/basic",
+			Dir:  "testdata/choose-basic",
+		},
+		{
+			Name: "choose/otherwise",
+			Dir:  "testdata/choose-otherwise",
+		},
+	}
+	runTest(t, tests)
+}
+
+func TestValueOf(t *testing.T) {
+	tests := []TestCase{
 		{
 			Name: "value-of",
 			Dir:  "testdata/valueof-basic",
@@ -42,23 +66,12 @@ func TestTransform(t *testing.T) {
 			Dir:    "testdata/valueof-errselect",
 			Failed: true,
 		},
-		{
-			Name: "if/test-true",
-			Dir:  "testdata/if-basic-true",
-		},
-		{
-			Name: "if/test-false",
-			Dir:  "testdata/if-basic-false",
-		},
-		{
-			Name: "choose/basic",
-			Dir:  "testdata/choose-basic",
-		},
-		{
-			Name: "choose/otherwise",
-			Dir:  "testdata/choose-otherwise",
-		},
 	}
+	runTest(t, tests)
+}
+
+func runTest(t *testing.T, tests []TestCase) {
+	t.Helper()
 	for _, tt := range tests {
 		fn := executeTest(tt.Name, tt.Dir, tt.Failed)
 		t.Run(tt.Name, fn)
