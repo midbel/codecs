@@ -461,15 +461,24 @@ func executeForeach(ctx *Context) (xpath.Sequence, error) {
 	if len(items) == 0 {
 		return nil, nil
 	}
-	it, err := applySort(ctx, items)
-	if err != nil {
-		return nil, ctx.errorWithContext(err)
+	var (
+		nodes = slices.Clone(elem.Nodes)
+		it    iter.Seq[xpath.Item]
+	)
+	if len(nodes) > 0 && nodes[0].QualifiedName() == ctx.getQualifiedName("sort") {
+		it, err = applySort(nodes[0], items)
+		if err != nil {
+			return nil, ctx.errorWithContext(err)
+		}
+		nodes = nodes[1:]
+	} else {
+		it = slices.Values(items)
 	}
 
 	seq := xpath.NewSequence()
 	for i := range it {
 		node := i.Node()
-		others, err := executeConstructor(ctx.WithXpath(node), elem.Nodes, AllowOnEmpty|AllowOnNonEmpty)
+		others, err := executeConstructor(ctx.WithXpath(node), nodes, AllowOnEmpty|AllowOnNonEmpty)
 		if err != nil {
 			return nil, err
 		}
@@ -920,17 +929,10 @@ func applyParams(ctx *Context) error {
 	return nil
 }
 
-func applySort(ctx *Context, items []xpath.Item) (iter.Seq[xpath.Item], error) {
-	sorts, err := ctx.queryXSL("./sort[1]")
+func applySort(node xml.Node, items []xpath.Item) (iter.Seq[xpath.Item], error) {
+	elem, err := getElementFromNode(node)
 	if err != nil {
 		return nil, err
-	}
-	if len(sorts) == 0 {
-		return slices.Values(items), nil
-	}
-	elem, err := getElementFromNode(sorts[0].Node())
-	if err != nil {
-		return nil, ctx.errorWithContext(err)
 	}
 	query, err := getAttribute(elem, "select")
 	if err != nil {

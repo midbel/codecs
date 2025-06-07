@@ -80,6 +80,10 @@ func TestForEach(t *testing.T) {
 			Name: "foreach/not-empty",
 			Dir:  "testdata/foreach-basic-notempty",
 		},
+		{
+			Name: "foreach/sort",
+			Dir:  "testdata/foreach-sort",
+		},
 	}
 	runTest(t, tests)
 }
