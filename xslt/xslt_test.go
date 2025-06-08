@@ -28,6 +28,11 @@ func TestConditional(t *testing.T) {
 			Dir:  "testdata/if-basic-false",
 		},
 		{
+			Name:   "if/missing-test",
+			Dir:    "testdata/if-no-test",
+			Failed: true,
+		},
+		{
 			Name: "choose/basic",
 			Dir:  "testdata/choose-basic",
 		},
@@ -79,6 +84,11 @@ func TestForEach(t *testing.T) {
 		{
 			Name: "foreach/not-empty",
 			Dir:  "testdata/foreach-basic-notempty",
+		},
+		{
+			Name:   "foreach/not-select",
+			Dir:    "testdata/foreach-no-select",
+			Failed: true,
 		},
 		{
 			Name: "foreach/sort",
