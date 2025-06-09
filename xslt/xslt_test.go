@@ -102,6 +102,30 @@ func TestForEach(t *testing.T) {
 	runTest(t, tests)
 }
 
+func TestVariables(t *testing.T) {
+	tests := []TestCase{
+		{
+			Name: "variable/basic",
+			Dir:  "testdata/variable-basic",
+		},
+		{
+			Name: "variable/body",
+			Dir:  "testdata/variable-body",
+		},
+		{
+			Name:   "variable/undefined",
+			Dir:    "testdata/variable-undefined",
+			Failed: true,
+		},
+		{
+			Name:   "variable/error-select",
+			Dir:    "testdata/variable-err-select",
+			Failed: true,
+		},
+	}
+	runTest(t, tests)
+}
+
 func runTest(t *testing.T, tests []TestCase) {
 	t.Helper()
 	for _, tt := range tests {
