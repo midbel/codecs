@@ -133,6 +133,9 @@ func executeVariable(ctx *Context) (xpath.Sequence, error) {
 	}
 	var seq xpath.Sequence
 	if query, err1 := getAttribute(elem, "select"); err1 == nil {
+		if len(elem.Nodes) > 0 {
+			return nil, fmt.Errorf("select attribute can not be used with children")
+		}
 		seq, err = ctx.ExecuteQuery(query, ctx.ContextNode)
 	} else {
 		for _, n := range slices.Clone(elem.Nodes) {
