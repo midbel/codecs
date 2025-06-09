@@ -728,7 +728,48 @@ func executeEvaluate(ctx *Context) (xpath.Sequence, error) {
 	return nil, errImplemented
 }
 
+func getMatchingElements(ctx *Context, elem *xml.ELement) (xml.Node, xml.Node, error) {
+	var (
+		match   xml.Node
+		nomatch xml.Node
+	)
+	if len(elem.Nodes) == 0 {
+		err := fmt.Errorf("at least one children expected")
+		return nil, nil, ctx.errorWithContext(err)
+	}
+	if elem.Nodes[0].QualifiedName() == ctx.getQualifiedName("matching-substring") {
+		match = elem.Nodes[0]
+	} else if elem.Nodes[0].QualifiedName() == ctx.getQualifiedName("non-matching-substring") {
+		nomatch = elem.Nodes[0]
+	} else {
+		err := fmt.Errorf("unexpected element")
+		return nil, nil, ctx.errorWithContext(err)
+	}
+	if len(elem.Nodes) > 1 && match != nil {
+		if elem.Nodes[1].QualifiedName() == ctx.getQualifiedName("non-matching-substring") {
+			nomatch = elem.Nodes[1]
+		}
+	}
+	return match, nomatch, nil
+}
+
 func executeAnalyzeString(ctx *Context) (xpath.Sequence, error) {
+	elem, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
+	query, err := getAttribute(elem, "select")
+	if err != nil {
+		return nil, err
+	}
+	regex, err := getAttribute(elem, "regex")
+	if err != nil {
+		return nil, err
+	}
+	match, nomatch, err := getMatchingElements(ctx, elem)
+	if err != nil {
+		return nil, err
+	}
 	return nil, errImplemented
 }
 

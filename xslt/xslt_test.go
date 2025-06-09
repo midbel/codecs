@@ -122,6 +122,11 @@ func TestVariables(t *testing.T) {
 			Dir:    "testdata/variable-err-select",
 			Failed: true,
 		},
+		{
+			Name:   "variable/error-name",
+			Dir:    "testdata/variable-err-name",
+			Failed: true,
+		},
 	}
 	runTest(t, tests)
 }
