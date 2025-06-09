@@ -94,6 +94,10 @@ func TestForEach(t *testing.T) {
 			Name: "foreach/sort",
 			Dir:  "testdata/foreach-sort",
 		},
+		{
+			Name: "foreach/empty",
+			Dir:  "testdata/foreach-empty",
+		},
 	}
 	runTest(t, tests)
 }

@@ -454,17 +454,22 @@ func executeForeach(ctx *Context) (xpath.Sequence, error) {
 		return nil, ctx.errorWithContext(err)
 	}
 
-	items, err := ctx.ExecuteQuery(query, ctx.ContextNode)
-	if err != nil {
-		return nil, ctx.errorWithContext(err)
-	}
-	if len(items) == 0 {
-		return nil, nil
-	}
 	var (
 		nodes = slices.Clone(elem.Nodes)
 		it    iter.Seq[xpath.Item]
 	)
+
+	items, err := ctx.ExecuteQuery(query, ctx.ContextNode)
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
+
+	if len(items) == 0 {
+		if n := len(nodes); n > 0 && nodes[n-1].QualifiedName() == ctx.getQualifiedName("on-empty") {
+			return transformNode(ctx.WithXsl(nodes[n-1]))
+		}
+		return nil, nil
+	}
 	if len(nodes) > 0 && nodes[0].QualifiedName() == ctx.getQualifiedName("sort") {
 		it, err = applySort(nodes[0], items)
 		if err != nil {
