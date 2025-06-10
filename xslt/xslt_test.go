@@ -12,9 +12,20 @@ import (
 )
 
 type TestCase struct {
-	Name   string
-	Dir    string
-	Failed bool
+	Name    string
+	Dir     string
+	Context string
+	Failed  bool
+}
+
+func TestMerge(t *testing.T) {
+	tests := []TestCase{
+		{
+			Name: "merge/basic",
+			Dir:  "testdata/merge-basic",
+		},
+	}
+	runTest(t, tests)
 }
 
 func TestConditional(t *testing.T) {
@@ -134,6 +145,9 @@ func TestVariables(t *testing.T) {
 func runTest(t *testing.T, tests []TestCase) {
 	t.Helper()
 	for _, tt := range tests {
+		if tt.Context == "" {
+			tt.Context = tt.Dir
+		}
 		fn := executeTest(tt.Name, tt.Dir, tt.Failed)
 		t.Run(tt.Name, fn)
 	}
@@ -146,7 +160,7 @@ func executeTest(name, dir string, failure bool) func(*testing.T) {
 			t.Errorf("error loading document: %s", err)
 			return
 		}
-		sheet, err := xslt.Load(filepath.Join(dir, "transform.xslt"), "testdata")
+		sheet, err := xslt.Load(filepath.Join(dir, "transform.xslt"), dir)
 		if err != nil {
 			t.Errorf("error loading stylesheet: %s", err)
 			return

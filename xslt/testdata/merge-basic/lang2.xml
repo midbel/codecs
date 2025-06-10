@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<lang>
+	<language id="go">golang</language>
+	<language id="py">python</language>
+	<language id="java">java</language>
+</lang>
