@@ -1314,7 +1314,7 @@ func callFalse(_ Context, _ []Expr) (Sequence, error) {
 }
 
 func callDoc(ctx Context, args []Expr) (Sequence, error) {
-	if len(args) != 0 {
+	if len(args) != 1 {
 		return nil, ErrArgument
 	}
 	file, err := getStringFromExpr(args[0], ctx)
