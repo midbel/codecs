@@ -160,6 +160,12 @@ func getAttribute(el *xml.Element, ident string) (string, error) {
 	return el.Attrs[ix].Value(), nil
 }
 
+func hasAttribute(name string, attrs []xml.Attribute) bool {
+	return slices.ContainsFunc(attrs, func(a xml.Attribute) bool {
+		return a.Name == name
+	})
+}
+
 func loadDocument(file string) (*xml.Document, error) {
 	r, err := os.Open(file)
 	if err != nil {

@@ -616,6 +616,10 @@ func (s *Stylesheet) simplified(root xml.Node) error {
 	return fmt.Errorf("unnamed mode not found")
 }
 
+func (s *Stylesheet) makeIdent() string {
+	return ""
+}
+
 func (s *Stylesheet) includeSheet(node xml.Node) error {
 	ctx := s.createContext(nil)
 	return includeSheet(ctx.WithXsl(node))

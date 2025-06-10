@@ -283,6 +283,78 @@ type MergedItem struct {
 	Source string
 }
 
+func getSequenceFromSource(ctx *Context, node xml.Node) (string, xpath.Sequence, error) {
+	elem, err := getElementFromNode(node)
+	if err != nil {
+		return "", nil, ctx.errorWithContext(err)
+	}
+
+	ident, _ := getAttribute(elem, "name")
+	if ident == "" {
+		ident = ctx.makeIdent()
+	}
+
+	query, err := getAttribute(elem, "select")
+	if err != nil {
+		return "", nil, ctx.errorWithContext(err)
+	}
+
+	expr, err := ctx.CompileQuery(query)
+	if err != nil {
+		return "", nil, ctx.errorWithContext(err)
+	}
+
+	var (
+		withItem   = hasAttribute("for-each-item", elem.Attrs)
+		withSource = hasAttribute("for-each-source", elem.Attrs)
+		seq        xpath.Sequence
+	)
+	switch {
+	case withItem && withSource:
+		err := fmt.Errorf("for-each-item and for-each-source can not be used simultaneously")
+		return "", nil, ctx.errorWithContext(err)
+	case withItem:
+		items, err1 := ctx.ExecuteQuery(query, ctx.ContextNode)
+		if err1 != nil {
+			return "", nil, err1
+		}
+		for i := range items {
+			doc, err1 := xml.ParseFile(toString(items[i]))
+			if err1 != nil {
+				return "", nil, ctx.errorWithContext(err1)
+			}
+			others, err1 := expr.Find(doc)
+			if err1 != nil {
+				return "", nil, err
+			}
+			seq.Concat(others)
+		}
+	case withSource:
+		items, err1 := ctx.ExecuteQuery(query, ctx.ContextNode)
+		if err1 != nil {
+			return "", nil, err1
+		}
+		for i := range items {
+			doc, err1 := xml.ParseFile(toString(items[i]))
+			if err1 != nil {
+				return "", nil, ctx.errorWithContext(err1)
+			}
+			others, err1 := expr.Find(doc)
+			if err1 != nil {
+				return "", nil, err
+			}
+			seq.Concat(others)
+		}
+	default:
+		seq, err = expr.Find(ctx.ContextNode)
+	}
+	if len(elem.Nodes) == 0 {
+		err := fmt.Errorf("at least one merge-key should be given")
+		return "", nil, ctx.errorWithContext(err)
+	}
+	return ident, seq, err
+}
+
 func executeMerge(ctx *Context) (xpath.Sequence, error) {
 	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
@@ -293,15 +365,15 @@ func executeMerge(ctx *Context) (xpath.Sequence, error) {
 		groups = make(map[string][]MergedItem)
 	)
 
-	for _, n := range elem.Nodes {
+	for i, n := range elem.Nodes {
 		if n.QualifiedName() != ctx.getQualifiedName("merge-source") {
 			action = n
 			break
 		}
 		el := n.(*xml.Element)
-		ident, err := getAttribute(el, "name")
+		ident, _ := getAttribute(el, "name")
 		if err != nil {
-			return nil, err
+			ident = fmt.Sprintf("source-%03d", i)
 		}
 		var items xpath.Sequence
 		if query, err := getAttribute(el, "select"); err == nil {
@@ -346,13 +418,13 @@ func executeMerge(ctx *Context) (xpath.Sequence, error) {
 
 	var (
 		keys = slices.Collect(maps.Keys(groups))
-		seq  = xpath.NewSequence()
+		seq  xpath.Sequence
 	)
 	slices.Sort(keys)
 	for _, key := range keys {
 		nested := ctx.Nest()
 		defineMergeBuiltins(nested, key, groups[key])
-		res, err := appendNode(nested)
+		res, err := executeConstructor(nested, elem.Nodes, AllowOnEmpty|AllowOnNonEmpty)
 		if err != nil {
 			return nil, err
 		}
@@ -728,7 +800,7 @@ func executeEvaluate(ctx *Context) (xpath.Sequence, error) {
 	return nil, errImplemented
 }
 
-func getMatchingElements(ctx *Context, elem *xml.ELement) (xml.Node, xml.Node, error) {
+func getMatchingElements(ctx *Context, elem *xml.Element) (xml.Node, xml.Node, error) {
 	var (
 		match   xml.Node
 		nomatch xml.Node
@@ -754,22 +826,22 @@ func getMatchingElements(ctx *Context, elem *xml.ELement) (xml.Node, xml.Node, e
 }
 
 func executeAnalyzeString(ctx *Context) (xpath.Sequence, error) {
-	elem, err := getElementFromNode(ctx.XslNode)
-	if err != nil {
-		return nil, ctx.errorWithContext(err)
-	}
-	query, err := getAttribute(elem, "select")
-	if err != nil {
-		return nil, err
-	}
-	regex, err := getAttribute(elem, "regex")
-	if err != nil {
-		return nil, err
-	}
-	match, nomatch, err := getMatchingElements(ctx, elem)
-	if err != nil {
-		return nil, err
-	}
+	// elem, err := getElementFromNode(ctx.XslNode)
+	// if err != nil {
+	// 	return nil, ctx.errorWithContext(err)
+	// }
+	// query, err := getAttribute(elem, "select")
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// regex, err := getAttribute(elem, "regex")
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// match, nomatch, err := getMatchingElements(ctx, elem)
+	// if err != nil {
+	// 	return nil, err
+	// }
 	return nil, errImplemented
 }
 
