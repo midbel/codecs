@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html"
 	"io"
+	"os"
 	"slices"
 	"strings"
 	"unicode"
@@ -71,6 +72,19 @@ func NewParser(r io.Reader) *Parser {
 	p.next()
 	p.next()
 	return &p
+}
+
+func ParseFile(file string) (*Document, error) {
+	r, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReader(r)
+}
+
+func ParseReader(r io.Reader) (*Document, error) {
+	p := NewParser(r)
+	return p.Parse()
 }
 
 func (p *Parser) RegisterPI(name string, fn PiFunc) {
