@@ -108,6 +108,10 @@ func (f *funcset) enableFuncSet(set []registeredBuiltin) {
 }
 
 var builtins = []registeredBuiltin{
+	registerFunc("uri-collection", "", callUriCollection),
+	registerFunc("uri-collection", "fn", callUriCollection),
+	registerFunc("collection", "", callCollection),
+	registerFunc("collection", "fn", callCollection),
 	registerFunc("true", "", callTrue),
 	registerFunc("true", "fn", callTrue),
 	registerFunc("false", "", callFalse),
@@ -498,6 +502,21 @@ func callListDir(ctx Context, args []Expr) (Sequence, error) {
 		list = append(list, createLiteral(es[i].Name()))
 	}
 	return list, nil
+}
+
+func callUriCollection(ctx Context, args []Expr) (Sequence, error) {
+	if len(args) == 0 {
+		return ctx.DefaultUriCollection(), nil
+	}
+	uri, err := getStringFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	return ctx.UriCollection(uri)
+}
+
+func callCollection(ctx Context, args []Expr) (Sequence, error) {
+	return nil, ErrImplemented
 }
 
 func callRound(ctx Context, args []Expr) (Sequence, error) {

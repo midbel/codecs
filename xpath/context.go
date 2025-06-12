@@ -1,6 +1,10 @@
 package xpath
 
 import (
+	"fmt"
+	"net/url"
+	"os"
+	"path/filepath"
 	"slices"
 
 	"github.com/midbel/codecs/environ"
@@ -11,6 +15,7 @@ type Context struct {
 	xml.Node
 	Index         int
 	Size          int
+	BaseURI       string
 	PrincipalType xml.NodeType
 
 	environ.Environ[Expr]
@@ -30,6 +35,37 @@ func createContext(node xml.Node, pos, size int) Context {
 		Size:     size,
 		Builtins: DefaultBuiltin(),
 	}
+}
+
+func (c Context) UriCollection(uri string) (Sequence, error) {
+	u, err := url.Parse(uri)
+	if err != nil {
+		return nil, err
+	}
+	if u.Scheme == "" && u.Host == "" {
+		b, _ := url.Parse(c.BaseURI)
+		u.Scheme = b.Scheme
+		u.Host = b.Host
+	}
+	switch u.Scheme {
+	case "file", "http", "":
+		es, err := os.ReadDir(u.Path)
+		if err != nil {
+			return nil, err
+		}
+		var s Sequence
+		for i := range es {
+			s.Append(NewLiteralItem(filepath.Join(u.Path, es[i].Name())))
+		}
+		return s, nil
+	default:
+		return nil, fmt.Errorf("unsupported uri scheme %s", u.Scheme)
+	}
+}
+
+func (c Context) DefaultUriCollection() Sequence {
+	var s Sequence
+	return s
 }
 
 func (c Context) Sub(node xml.Node, pos int, size int) Context {

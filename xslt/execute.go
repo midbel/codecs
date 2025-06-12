@@ -352,6 +352,12 @@ func getSequenceFromSource(ctx *Context, node xml.Node) (string, xpath.Sequence,
 		err := fmt.Errorf("at least one merge-key should be given")
 		return "", nil, ctx.errorWithContext(err)
 	}
+	for _, n := range elem.Nodes {
+		if n.QualifiedName() != ctx.getQualifiedName("merge-key") {
+			err := fmt.Errorf("%s: unexpected element", n.QualifiedName())
+			return "", nil, ctx.errorWithContext(err)
+		}
+	}
 	return ident, seq, err
 }
 
