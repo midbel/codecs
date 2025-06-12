@@ -283,10 +283,10 @@ type MergedItem struct {
 	Source string
 }
 
-func getSequenceFromSource(ctx *Context, node xml.Node) (string, xpath.Sequence, error) {
+func getSequenceFromSource(ctx *Context, node xml.Node) (map[string][]MergedItem, error) {
 	elem, err := getElementFromNode(node)
 	if err != nil {
-		return "", nil, ctx.errorWithContext(err)
+		return nil, ctx.errorWithContext(err)
 	}
 
 	ident, _ := getAttribute(elem, "name")
@@ -296,12 +296,12 @@ func getSequenceFromSource(ctx *Context, node xml.Node) (string, xpath.Sequence,
 
 	query, err := getAttribute(elem, "select")
 	if err != nil {
-		return "", nil, ctx.errorWithContext(err)
+		return nil, ctx.errorWithContext(err)
 	}
 
 	expr, err := ctx.CompileQuery(query)
 	if err != nil {
-		return "", nil, ctx.errorWithContext(err)
+		return nil, ctx.errorWithContext(err)
 	}
 
 	var (
@@ -312,36 +312,36 @@ func getSequenceFromSource(ctx *Context, node xml.Node) (string, xpath.Sequence,
 	switch {
 	case withItem && withSource:
 		err := fmt.Errorf("for-each-item and for-each-source can not be used simultaneously")
-		return "", nil, ctx.errorWithContext(err)
+		return nil, ctx.errorWithContext(err)
 	case withItem:
 		items, err1 := ctx.ExecuteQuery(query, ctx.ContextNode)
 		if err1 != nil {
-			return "", nil, err1
+			return nil, err1
 		}
 		for i := range items {
 			doc, err1 := xml.ParseFile(toString(items[i]))
 			if err1 != nil {
-				return "", nil, ctx.errorWithContext(err1)
+				return nil, ctx.errorWithContext(err1)
 			}
 			others, err1 := expr.Find(doc)
 			if err1 != nil {
-				return "", nil, err
+				return nil, err
 			}
 			seq.Concat(others)
 		}
 	case withSource:
 		items, err1 := ctx.ExecuteQuery(query, ctx.ContextNode)
 		if err1 != nil {
-			return "", nil, err1
+			return nil, err1
 		}
 		for i := range items {
 			doc, err1 := xml.ParseFile(toString(items[i]))
 			if err1 != nil {
-				return "", nil, ctx.errorWithContext(err1)
+				return nil, ctx.errorWithContext(err1)
 			}
 			others, err1 := expr.Find(doc)
 			if err1 != nil {
-				return "", nil, err
+				return nil, err
 			}
 			seq.Concat(others)
 		}
@@ -350,15 +350,53 @@ func getSequenceFromSource(ctx *Context, node xml.Node) (string, xpath.Sequence,
 	}
 	if len(elem.Nodes) == 0 {
 		err := fmt.Errorf("at least one merge-key should be given")
-		return "", nil, ctx.errorWithContext(err)
+		return nil, ctx.errorWithContext(err)
 	}
+	var list []xpath.Expr
 	for _, n := range elem.Nodes {
 		if n.QualifiedName() != ctx.getQualifiedName("merge-key") {
 			err := fmt.Errorf("%s: unexpected element", n.QualifiedName())
-			return "", nil, ctx.errorWithContext(err)
+			return nil, ctx.errorWithContext(err)
 		}
+		elem, err := getElementFromNode(n)
+		if err != nil {
+			return nil, ctx.errorWithContext(err)
+		}
+		query, err := getAttribute(elem, "select")
+		if err != nil {
+			return nil, ctx.errorWithContext(err)
+		}
+		expr, err := ctx.CompileQuery(query)
+		if err != nil {
+			return nil, err
+		}
+		list = append(list, expr)
 	}
-	return ident, seq, err
+	groups := make(map[string][]MergedItem)
+	for i := range seq {
+		var keys []string
+		for _, e := range list {
+			res, err := e.Find(seq[i].Node())
+			if err != nil {
+				return nil, err
+			}
+			if len(res) != 1 {
+				err := fmt.Errorf("merge-key should only produce one result")
+				return nil, ctx.errorWithContext(err)
+			}
+			keys = append(keys, toString(res[0]))
+		}
+		if len(keys) != len(list) {
+			continue
+		}
+		m := MergedItem{
+			Source: ident,
+			Key: strings.Join(keys, "/"),
+			Item: seq[i],
+		}
+		groups[m.Key] = append(groups[m.Key], m)
+	}
+	return groups, nil
 }
 
 func executeMerge(ctx *Context) (xpath.Sequence, error) {
@@ -367,52 +405,34 @@ func executeMerge(ctx *Context) (xpath.Sequence, error) {
 		return nil, ctx.errorWithContext(err)
 	}
 	var (
+		nodes = slices.Clone(elem.Nodes)
 		action xml.Node
 		groups = make(map[string][]MergedItem)
 	)
+	ix := slices.IndexFunc(nodes, func(n xml.Node) bool {
+		return n.QualifiedName() == ctx.getQualifiedName("merge-action")
+	})
+	if ix < 0 {
+		err := fmt.Errorf("missing merge-action element")
+		return nil, ctx.errorWithContext(err)
+	}
+	if ix != len(nodes) - 1 {
+		err := fmt.Errorf("merge-action should be the last element")
+		return nil, ctx.errorWithContext(err)
+	}
+	action = nodes[ix]
+	nodes = nodes[:ix]
 
-	for i, n := range elem.Nodes {
+	for _, n := range nodes {
 		if n.QualifiedName() != ctx.getQualifiedName("merge-source") {
-			action = n
-			break
+			err := fmt.Errorf("%s: unexpected element", n.QualifiedName())
+			return nil, ctx.errorWithContext(err)
 		}
-		el := n.(*xml.Element)
-		ident, _ := getAttribute(el, "name")
+		others, err := getSequenceFromSource(ctx, n)
 		if err != nil {
-			ident = fmt.Sprintf("source-%03d", i)
-		}
-		var items xpath.Sequence
-		if query, err := getAttribute(el, "select"); err == nil {
-			items, err = ctx.ExecuteQuery(query, ctx.ContextNode)
-			if err != nil {
-				return nil, err
-			}
-		} else {
 			return nil, err
 		}
-		if len(el.Nodes) == 0 {
-			return nil, fmt.Errorf("missing xsl:merge-key element")
-		}
-		if query, err := getAttribute(el.Nodes[0].(*xml.Element), "select"); err != nil {
-			return nil, err
-		} else {
-			grp, err := ctx.CompileQuery(query)
-			if err != nil {
-				return nil, err
-			}
-			for i := range items {
-				is, err := grp.Find(items[i].Node())
-				if err != nil {
-					return nil, err
-				}
-				mit := MergedItem{
-					Item:   items[i],
-					Source: ident,
-					Key:    fmt.Sprint(is[0].Value()),
-				}
-				groups[mit.Key] = append(groups[mit.Key], mit)
-			}
-		}
+		maps.Copy(groups, others)
 	}
 	if action.QualifiedName() != ctx.getQualifiedName("merge-action") {
 		return nil, fmt.Errorf("merge-action expected")
