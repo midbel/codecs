@@ -101,8 +101,14 @@ func processParam(node xml.Node, env *Env) error {
 		return err
 	}
 	if query, err := getAttribute(elem, "select"); err == nil {
+		if len(elem.Nodes) > 0 {
+			return fmt.Errorf("using select and children nodes is not allowed")
+		}
 		err = env.DefineParam(ident, query)
 	} else {
+		if len(elem.Nodes) == 0 {
+			return fmt.Errorf("at least one child node should be given")
+		}
 		var seq xpath.Sequence
 		for i := range elem.Nodes {
 			seq.Append(xpath.NewNodeItem(elem.Nodes[i]))

@@ -18,6 +18,20 @@ type TestCase struct {
 	Failed  bool
 }
 
+func TestCallTemplate(t *testing.T) {
+	tests := []TestCase{
+		{
+			Name: "call-template/basic",
+			Dir:  "testdata/call-template-basic",
+		},
+		{
+			Name: "call-template/with-param",
+			Dir:  "testdata/call-template-with-param",
+		},
+	}
+	runTest(t, tests)	
+}
+
 func TestMerge(t *testing.T) {
 	tests := []TestCase{
 		{
