@@ -325,9 +325,13 @@ func getMergeItems(ctx *Context, elem *xml.Element) (string, xpath.Sequence, err
 			seq.Concat(others)
 		}
 	case withSource:
-		items, err1 := ctx.ExecuteQuery(query, ctx.ContextNode)
-		if err1 != nil {
-			return "", nil, err1
+		source, err := getAttribute(elem, "for-each-source")
+		if err != nil {
+			return "", nil, err
+		}
+		items, err := ctx.ExecuteQuery(source, ctx.ContextNode)
+		if err != nil {
+			return "", nil, err
 		}
 		for i := range items {
 			doc, err1 := xml.ParseFile(toString(items[i]))
