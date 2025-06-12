@@ -1,6 +1,7 @@
 package alpha
 
 import (
+	"errors"
 	"io"
 	"strings"
 	"unicode/utf8"
@@ -139,14 +140,14 @@ func (c *chain) next() (string, error) {
 }
 
 type compose struct {
-	list []String
+	list []Namer
 	buf  []string
 	sep  string
 }
 
 func Compose(part ...Namer) Namer {
 	var c compose
-	c.list = append(c.list, str...)
+	c.list = append(c.list, part...)
 	c.sep = "-"
 	for i := range c.list {
 		str, _ := c.list[i].Next()
