@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 
+	"github.com/midbel/codecs/alpha"
 	"github.com/midbel/codecs/xml"
 	"github.com/midbel/codecs/xpath"
 )
