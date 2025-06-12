@@ -283,12 +283,7 @@ type MergedItem struct {
 	Source string
 }
 
-func getSequenceFromSource(ctx *Context, node xml.Node) (map[string][]MergedItem, error) {
-	elem, err := getElementFromNode(node)
-	if err != nil {
-		return nil, ctx.errorWithContext(err)
-	}
-
+func getMergeItems(ctx *Context, elem *xml.Element) (string, xpath.Sequence, error) {
 	ident, _ := getAttribute(elem, "name")
 	if ident == "" {
 		ident = ctx.makeIdent()
@@ -296,12 +291,12 @@ func getSequenceFromSource(ctx *Context, node xml.Node) (map[string][]MergedItem
 
 	query, err := getAttribute(elem, "select")
 	if err != nil {
-		return nil, ctx.errorWithContext(err)
+		return "", nil, ctx.errorWithContext(err)
 	}
 
 	expr, err := ctx.CompileQuery(query)
 	if err != nil {
-		return nil, ctx.errorWithContext(err)
+		return "", nil, ctx.errorWithContext(err)
 	}
 
 	var (
@@ -312,42 +307,56 @@ func getSequenceFromSource(ctx *Context, node xml.Node) (map[string][]MergedItem
 	switch {
 	case withItem && withSource:
 		err := fmt.Errorf("for-each-item and for-each-source can not be used simultaneously")
-		return nil, ctx.errorWithContext(err)
+		return "", nil, ctx.errorWithContext(err)
 	case withItem:
 		items, err1 := ctx.ExecuteQuery(query, ctx.ContextNode)
 		if err1 != nil {
-			return nil, err1
+			return "", nil, err1
 		}
 		for i := range items {
 			doc, err1 := xml.ParseFile(toString(items[i]))
 			if err1 != nil {
-				return nil, ctx.errorWithContext(err1)
+				return "", nil, ctx.errorWithContext(err1)
 			}
 			others, err1 := expr.Find(doc)
 			if err1 != nil {
-				return nil, err
+				return "", nil, err
 			}
 			seq.Concat(others)
 		}
 	case withSource:
 		items, err1 := ctx.ExecuteQuery(query, ctx.ContextNode)
 		if err1 != nil {
-			return nil, err1
+			return "", nil, err1
 		}
 		for i := range items {
 			doc, err1 := xml.ParseFile(toString(items[i]))
 			if err1 != nil {
-				return nil, ctx.errorWithContext(err1)
+				return "", nil, ctx.errorWithContext(err1)
 			}
 			others, err1 := expr.Find(doc)
 			if err1 != nil {
-				return nil, err
+				return "", nil, err
 			}
 			seq.Concat(others)
 		}
 	default:
 		seq, err = expr.Find(ctx.ContextNode)
 	}
+	return ident, seq, err
+}
+
+func getSequenceFromSource(ctx *Context, node xml.Node) (map[string][]MergedItem, error) {
+	elem, err := getElementFromNode(node)
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
+
+	ident, seq, err := getMergeItems(ctx, elem)
+	if err != nil {
+		return nil, err
+	}
+
 	if len(elem.Nodes) == 0 {
 		err := fmt.Errorf("at least one merge-key should be given")
 		return nil, ctx.errorWithContext(err)
