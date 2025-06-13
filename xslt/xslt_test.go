@@ -25,8 +25,21 @@ func TestCallTemplate(t *testing.T) {
 			Dir:  "testdata/call-template-basic",
 		},
 		{
+			Name: "call-template/mode",
+			Dir:  "testdata/call-template-mode",
+		},
+		{
 			Name: "call-template/with-param",
 			Dir:  "testdata/call-template-with-param",
+		},
+		{
+			Name: "call-template/global-variable",
+			Dir:  "testdata/call-template-with-param",
+		},
+		{
+			Name: "call-template/undefined-variable",
+			Dir:  "testdata/call-template-variable-error",
+			Failed: true,
 		},
 	}
 	runTest(t, tests)

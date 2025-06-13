@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<item>
+	<value>foobar</value>
+	<build-with>angle</build-with>
+	<build-with>test-1</build-with>
+	<build-with>test-2</build-with>
+	<demo>item</demo>
+</item>
