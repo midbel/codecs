@@ -829,7 +829,8 @@ type Template struct {
 
 	Nodes []xml.Node
 
-	env *Env
+	env    *Env
+	tunnel []string
 }
 
 func NewTemplate(node xml.Node) (*Template, error) {
@@ -869,10 +870,6 @@ func NewTemplate(node xml.Node) (*Template, error) {
 	return &tpl, nil
 }
 
-func (t *Template) BuiltinRule() bool {
-	return false
-}
-
 func (t *Template) Clone() *Template {
 	tpl := *t
 	tpl.Nodes = slices.Clone(tpl.Nodes)
@@ -898,6 +895,21 @@ func (t *Template) Execute(ctx *Context) ([]xml.Node, error) {
 		}
 	}
 	return nodes, nil
+}
+
+func (t *Template) EmptyContext(other *Context) *Context {
+	ctx := Context{
+		XslNode:     other.XslNode,
+		ContextNode: other.ContextNode,
+		Mode:        other.Mode,
+		Index:       other.Index,
+		Size:        other.Size,
+		Depth:       other.Depth,
+		Env:         Empty(),
+		Stylesheet:  other.Stylesheet,
+	}
+	ctx.Env.Merge(t.env)
+	return &ctx
 }
 
 func (t *Template) mergeContext(other *Context) *Context {

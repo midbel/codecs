@@ -37,8 +37,8 @@ func TestCallTemplate(t *testing.T) {
 			Dir:  "testdata/call-template-with-param",
 		},
 		{
-			Name: "call-template/undefined-variable",
-			Dir:  "testdata/call-template-variable-error",
+			Name:   "call-template/undefined-variable",
+			Dir:    "testdata/call-template-variable-error",
 			Failed: true,
 		},
 	}

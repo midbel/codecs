@@ -71,26 +71,6 @@ func processNode(ctx *Context) (xpath.Sequence, error) {
 	return xpath.Singleton(elem), nil
 }
 
-func appendNode(ctx *Context) (xpath.Sequence, error) {
-	elem, err := getElementFromNode(ctx.XslNode)
-	if err != nil {
-		return nil, ctx.errorWithContext(err)
-	}
-	seq := xpath.NewSequence()
-	for _, n := range elem.Nodes {
-		c := cloneNode(n)
-		if c == nil {
-			continue
-		}
-		res, err := transformNode(ctx.WithXsl(c))
-		if err != nil {
-			return nil, err
-		}
-		seq.Concat(res)
-	}
-	return seq, nil
-}
-
 func processParam(node xml.Node, env *Env) error {
 	elem, err := getElementFromNode(node)
 	if err != nil {
@@ -99,6 +79,9 @@ func processParam(node xml.Node, env *Env) error {
 	ident, err := getAttribute(elem, "name")
 	if err != nil {
 		return err
+	}
+	if tun, err := getAttribute(elem, "tunnel"); err == nil && tun == "yes" {
+		// TODO
 	}
 	if query, err := getAttribute(elem, "select"); err == nil {
 		if len(elem.Nodes) > 0 {

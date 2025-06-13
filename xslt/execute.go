@@ -211,8 +211,8 @@ func executeCallTemplate(ctx *Context) (xpath.Sequence, error) {
 		return nil, err
 	}
 	var sub *Context
-	if x, ok := tpl.(interface{ mergeContext(*Context) *Context }); ok {
-		sub = x.mergeContext(ctx)
+	if x, ok := tpl.(interface{ EmptyContext(*Context) *Context }); ok {
+		sub = x.EmptyContext(ctx)
 	} else {
 		sub = ctx.Copy()
 	}
