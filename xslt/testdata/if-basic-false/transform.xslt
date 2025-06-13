@@ -4,10 +4,17 @@
 	xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
 	<xsl:output method="xml" indent="yes"/>
 	<xsl:template match="/">
-		<item>
+		<if>
 			<xsl:if test="false()">
-				<xsl:value-of select="/root/item"/>
+				<item>
+					<result test="false"><xsl:value-of select="/root/item"/></result>
+				</item>
 			</xsl:if>
-		</item>
+			<xsl:if test="not(())">
+				<item>
+					<result test="empty"><xsl:value-of select="/root/item"/></result>
+				</item>
+			</xsl:if>
+		</if>
 	</xsl:template>
 </xsl:stylesheet>
