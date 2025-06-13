@@ -185,11 +185,11 @@ func (e *Env) CompileQueryWithNS(query, namespace string) (xpath.Expr, error) {
 }
 
 func (e *Env) TestNode(query string, datum xml.Node) (bool, error) {
-	items, err := e.ExecuteQuery(query, datum)
+	seq, err := e.ExecuteQuery(query, datum)
 	if err != nil {
 		return false, err
 	}
-	return isTrue(items), nil
+	return seq.True(), nil
 }
 
 func (e *Env) Merge(other *Env) {
@@ -242,26 +242,6 @@ func (e *Env) EvalParam(param, query string, datum xml.Node) error {
 
 func (e *Env) DefineExprParam(param string, expr xpath.Expr) {
 	e.Params.Define(param, expr)
-}
-
-func isTrue(seq xpath.Sequence) bool {
-	if seq.Empty() {
-		return false
-	}
-	first, ok := seq.First()
-	if !first.Atomic() {
-		return true
-	}
-	switch res := first.Value().(type) {
-	case bool:
-		ok = res
-	case float64:
-		ok = res != 0
-	case string:
-		ok = res != ""
-	default:
-	}
-	return ok
 }
 
 func errorWithContext(ctx string, err error) error {
