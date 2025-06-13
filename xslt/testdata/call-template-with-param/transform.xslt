@@ -11,6 +11,10 @@
 			<xsl:call-template name="foobar">
 				<xsl:with-param name="build" select="/root/item"/>
 			</xsl:call-template>
+			<xsl:call-template name="foobar">
+				<xsl:with-param name="build">test
+				</xsl:with-param>
+			</xsl:call-template>
 		</item>
 	</xsl:template>
 

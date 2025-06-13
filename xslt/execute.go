@@ -311,21 +311,36 @@ func getMergeItems(ctx *Context, elem *xml.Element) (string, xpath.Sequence, err
 		err := fmt.Errorf("for-each-item and for-each-source can not be used simultaneously")
 		return "", nil, ctx.errorWithContext(err)
 	case withItem:
-		items, err1 := ctx.ExecuteQuery(query, ctx.ContextNode)
-		if err1 != nil {
-			return "", nil, err1
+		source, err := getAttribute(elem, "for-each-item")
+		if err != nil {
+			return "", nil, err
+		}
+		items, err := ctx.ExecuteQuery(source, ctx.ContextNode)
+		if err != nil {
+			return "", nil, err
 		}
 		for i := range items {
-			doc, err1 := xml.ParseFile(toString(items[i]))
-			if err1 != nil {
-				return "", nil, ctx.errorWithContext(err1)
-			}
-			others, err1 := expr.Find(doc)
-			if err1 != nil {
-				return "", nil, err
+			others, err1 := expr.Find(items[i].Node())
+			if err != nil {
+				return "", nil, err1
 			}
 			seq.Concat(others)
 		}
+		// items, err1 := ctx.ExecuteQuery(query, ctx.ContextNode)
+		// if err1 != nil {
+		// 	return "", nil, err1
+		// }
+		// for i := range items {
+		// 	doc, err1 := xml.ParseFile(toString(items[i]))
+		// 	if err1 != nil {
+		// 		return "", nil, ctx.errorWithContext(err1)
+		// 	}
+		// 	others, err1 := expr.Find(doc)
+		// 	if err1 != nil {
+		// 		return "", nil, err
+		// 	}
+		// 	seq.Concat(others)
+		// }
 	case withSource:
 		source, err := getAttribute(elem, "for-each-source")
 		if err != nil {

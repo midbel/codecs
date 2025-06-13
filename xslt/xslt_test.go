@@ -55,6 +55,15 @@ func TestMerge(t *testing.T) {
 			Name: "merge/for-each-source",
 			Dir:  "testdata/merge-foreach-source",
 		},
+		{
+			Name: "merge/for-each-item",
+			Dir:  "testdata/merge-foreach-item",
+		},
+		{
+			Name:   "merge/for-each-error",
+			Dir:    "testdata/merge-foreach-error",
+			Failed: true,
+		},
 	}
 	runTest(t, tests)
 }

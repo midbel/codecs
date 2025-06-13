@@ -17,6 +17,13 @@ import (
 var errMissed = errors.New("missing attribute")
 
 func transformNode(ctx *Context) (xpath.Sequence, error) {
+	if ctx.XslNode.Type() != xml.TypeElement {
+		c := cloneNode(ctx.XslNode)
+		if c == nil {
+			return nil, nil
+		}
+		return xpath.Singleton(c), nil
+	}
 	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
@@ -35,6 +42,14 @@ func transformNode(ctx *Context) (xpath.Sequence, error) {
 func processNode(ctx *Context) (xpath.Sequence, error) {
 	ctx.Enter(ctx)
 	defer ctx.Leave(ctx)
+
+	if ctx.XslNode.Type() != xml.TypeElement {
+		c := cloneNode(ctx.XslNode)
+		if c == nil {
+			return nil, nil
+		}
+		return xpath.Singleton(c), nil
+	}
 
 	elem, err := getElementFromNode(cloneNode(ctx.XslNode))
 	if err != nil {
@@ -74,7 +89,7 @@ func processNode(ctx *Context) (xpath.Sequence, error) {
 func processParam(node xml.Node, env *Env) error {
 	elem, err := getElementFromNode(node)
 	if err != nil {
-		return fmt.Errorf("xml element expected")
+		return err
 	}
 	ident, err := getAttribute(elem, "name")
 	if err != nil {

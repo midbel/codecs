@@ -3,4 +3,5 @@
 <item>
 	<value>foobar</value>
 	<build-with>foobar</build-with>
+	<build-with>test</build-with>
 </item>
