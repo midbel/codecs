@@ -89,6 +89,13 @@ func debugExpr(w io.Writer, expr Expr) {
 		io.WriteString(w, "(")
 		io.WriteString(w, v.ident)
 		io.WriteString(w, ")")
+	case index:
+		io.WriteString(w, "index")
+		io.WriteString(w, "(")
+		debugExpr(w, v.expr)
+		io.WriteString(w, ", ")
+		io.WriteString(w, strconv.Itoa(v.pos))
+		io.WriteString(w, ")")
 	case filter:
 		io.WriteString(w, "filter")
 		io.WriteString(w, "(")
@@ -116,6 +123,16 @@ func debugExpr(w io.Writer, expr Expr) {
 		io.WriteString(w, "reverse")
 		io.WriteString(w, "(")
 		debugExpr(w, v.expr)
+		io.WriteString(w, ")")
+	case sequence:
+		io.WriteString(w, "sequence")
+		io.WriteString(w, "(")
+		for i := range v.all {
+			if i > 0 {
+				io.WriteString(w, ", ")
+			}
+			debugExpr(w, v.all[i])
+		}
 		io.WriteString(w, ")")
 	case identifier:
 		io.WriteString(w, "identifier")

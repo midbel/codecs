@@ -2,6 +2,7 @@ package xpath
 
 import (
 	"fmt"
+	"math"
 	"slices"
 	"strings"
 	"time"
@@ -56,13 +57,7 @@ func (s *Sequence) Concat(other Sequence) {
 }
 
 func (s *Sequence) True() bool {
-	if len(*s) == 0 {
-		return false
-	}
-	if len(*s) > 1 {
-		return (*s)[0].True()
-	}
-	return false
+	return EffectiveBooleanValue(*s)
 }
 
 func (s *Sequence) Empty() bool {
@@ -84,6 +79,33 @@ func (s *Sequence) Every(test func(i Item) bool) bool {
 		}
 	}
 	return true
+}
+
+func EffectiveBooleanValue(seq Sequence) bool {
+	if seq.Empty() {
+		return false
+	}
+	if seq.Singleton() {
+		if !seq[0].Atomic() {
+			return true
+		}
+		switch x := seq[0].Value().(type) {
+		case string:
+			return x != ""
+		case float64:
+			return x != 0 && !math.IsNaN(x)
+		case bool:
+			return x
+		default:
+			return false
+		}
+	}
+	for i := range seq {
+		if !seq[i].Atomic() {
+			return true
+		}
+	}
+	return false
 }
 
 func createSingle(item Item) Sequence {

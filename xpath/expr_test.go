@@ -96,6 +96,10 @@ func TestEval(t *testing.T) {
 			Expr:     "1 to 3",
 			Expected: []string{"1", "2", "3"},
 		},
+		{
+			Expr:     "('item1', 'item2', (), ((), ()), ('item-4-1', 'item-4-2'))",
+			Expected: []string{"item1", "item2", "item-4-1", "item-4-2"},
+		},
 	}
 
 	doc, err := parseDocument()

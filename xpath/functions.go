@@ -101,6 +101,10 @@ func (f *funcset) EnableCrypto() {
 	f.enableFuncSet(cryptoFuncs)
 }
 
+func (f *funcset) EnableAngle() {
+	f.enableFuncSet(angleFuncs)
+}
+
 func (f *funcset) enableFuncSet(set []registeredBuiltin) {
 	for _, b := range set {
 		f.Define(b.QualifiedName(), b.Func)
@@ -228,6 +232,10 @@ var fileFuncs = []registeredBuiltin{
 	registerFunc("exists", "file", callFileExists),
 	registerFunc("delete", "file", callDeleteFile),
 	registerFunc("list", "file", callListDir),
+}
+
+var angleFuncs = []registeredBuiltin{
+	registerFunc("coalesce", "agl", callXYZ),
 }
 
 var envFuncs = []registeredBuiltin{

@@ -171,15 +171,17 @@ func executeWithParam(ctx *Context) (xpath.Sequence, error) {
 			return nil, fmt.Errorf("select attribute can not be used with children")
 		}
 		ctx.EvalParam(ident, query, ctx.ContextNode)
+	} else {
+		if len(elem.Nodes) == 0 {
+			err := fmt.Errorf("no value given to param %q", ident)
+			return nil, ctx.errorWithContext(err)
+		}
+		seq, err := executeConstructor(ctx, elem.Nodes, 0)
+		if err != nil {
+			return nil, err
+		}
+		ctx.DefineExprParam(ident, xpath.NewValueFromSequence(seq))
 	}
-	if len(elem.Nodes) == 0 {
-		return nil, nil
-	}
-	seq, err := executeConstructor(ctx, elem.Nodes, 0)
-	if err != nil {
-		return nil, err
-	}
-	ctx.DefineExprParam(ident, xpath.NewValueFromSequence(seq))
 	return nil, nil
 }
 
@@ -404,8 +406,8 @@ func getSequenceFromSource(ctx *Context, node xml.Node) (map[string][]MergedItem
 		}
 		m := MergedItem{
 			Source: ident,
-			Key: strings.Join(keys, "/"),
-			Item: seq[i],
+			Key:    strings.Join(keys, "/"),
+			Item:   seq[i],
 		}
 		groups[m.Key] = append(groups[m.Key], m)
 	}
@@ -418,7 +420,7 @@ func executeMerge(ctx *Context) (xpath.Sequence, error) {
 		return nil, ctx.errorWithContext(err)
 	}
 	var (
-		nodes = slices.Clone(elem.Nodes)
+		nodes  = slices.Clone(elem.Nodes)
 		action xml.Node
 		groups = make(map[string][]MergedItem)
 	)
@@ -429,7 +431,7 @@ func executeMerge(ctx *Context) (xpath.Sequence, error) {
 		err := fmt.Errorf("missing merge-action element")
 		return nil, ctx.errorWithContext(err)
 	}
-	if ix != len(nodes) - 1 {
+	if ix != len(nodes)-1 {
 		err := fmt.Errorf("merge-action should be the last element")
 		return nil, ctx.errorWithContext(err)
 	}

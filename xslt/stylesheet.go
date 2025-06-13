@@ -328,7 +328,7 @@ type Stylesheet struct {
 	AttrSet   []*AttributeSet
 
 	output []*Output
-	namer alpha.Namer
+	namer  alpha.Namer
 	*Env
 	Tracer
 
@@ -346,7 +346,7 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 		namespace: xsltNamespacePrefix,
 		Env:       Empty(),
 		Tracer:    NoopTracer(),
-		namer: alpha.Compose(alpha.NewLowerString(3), alpha.NewNumberString(2)),
+		namer:     alpha.Compose(alpha.NewLowerString(3), alpha.NewNumberString(2)),
 	}
 	sheet.Modes = append(sheet.Modes, unnamedMode())
 	if sheet.Context == "" {

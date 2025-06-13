@@ -29,7 +29,7 @@ func TestCallTemplate(t *testing.T) {
 			Dir:  "testdata/call-template-with-param",
 		},
 	}
-	runTest(t, tests)	
+	runTest(t, tests)
 }
 
 func TestMerge(t *testing.T) {

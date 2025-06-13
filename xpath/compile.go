@@ -519,10 +519,32 @@ func (c *Compiler) compileType() (Type, error) {
 	return t, nil
 }
 
+func (c *Compiler) compileIndex(left Expr) (Expr, error) {
+	c.Enter("index")
+	defer c.Leave("index")
+	p, err := strconv.Atoi(c.getCurrentLiteral())
+	if err != nil {
+		return nil, err
+	}
+	i := index{
+		expr: left,
+		pos:  p,
+	}
+	c.next()
+	if !c.is(endPred) {
+		return nil, fmt.Errorf("%w: missing ']' after index", ErrSyntax)
+	}
+	c.next()
+	return i, nil
+}
+
 func (c *Compiler) compileFilter(left Expr) (Expr, error) {
 	c.Enter("filter")
 	defer c.Leave("filter")
 	c.next()
+	if c.is(Digit) && c.peek.Type == endPred {
+		return c.compileIndex(left)
+	}
 	expr, err := c.compile()
 	if err != nil {
 		return nil, err

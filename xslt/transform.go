@@ -106,9 +106,6 @@ func processParam(node xml.Node, env *Env) error {
 		}
 		err = env.DefineParam(ident, query)
 	} else {
-		if len(elem.Nodes) == 0 {
-			return fmt.Errorf("at least one child node should be given")
-		}
 		var seq xpath.Sequence
 		for i := range elem.Nodes {
 			seq.Append(xpath.NewNodeItem(elem.Nodes[i]))

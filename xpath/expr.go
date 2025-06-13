@@ -431,7 +431,13 @@ func (s sequence) MatchPriority() int {
 func (s sequence) find(ctx Context) (Sequence, error) {
 	var list Sequence
 	for i := range s.all {
-		is, _ := s.all[i].find(ctx)
+		is, err := s.all[i].find(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if is.Empty() {
+			continue
+		}
 		list.Concat(is)
 	}
 	return list, nil
@@ -763,6 +769,31 @@ func (u union) find(ctx Context) (Sequence, error) {
 	return list, nil
 }
 
+type index struct {
+	expr Expr
+	pos  int
+}
+
+func (i index) Find(node xml.Node) (Sequence, error) {
+	return i.find(DefaultContext(node))
+}
+
+func (i index) MatchPriority() int {
+	return getPriority(prioHigh, i.expr)
+}
+
+func (i index) find(ctx Context) (Sequence, error) {
+	seq, err := i.expr.find(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if i.pos < 1 || i.pos > seq.Len() {
+		var s Sequence
+		return s, nil
+	}
+	return Singleton(seq[i.pos-1].Node()), nil
+}
+
 type filter struct {
 	expr  Expr
 	check Expr
@@ -781,33 +812,18 @@ func (f filter) find(ctx Context) (Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	var ret Sequence
 	for j, n := range list {
 		res, err := f.check.find(ctx.Sub(n.Node(), j+1, len(list)))
 		if err != nil {
 			continue
 		}
-		if res.Empty() {
+		ebf := EffectiveBooleanValue(res)
+		if !ebf {
 			continue
 		}
-		if !res[0].Atomic() && isTrue(res) {
-			ret.Append(n)
-			continue
-		}
-		var keep bool
-		switch x := res[0].Value().(type) {
-		case float64:
-			keep = int(x) == j+1
-		case bool:
-			keep = x
-		case string:
-			keep = len(x) > 0
-		default:
-			return nil, ErrType
-		}
-		if keep {
-			ret.Append(n)
-		}
+		ret.Append(n)
 	}
 	return ret, nil
 }
