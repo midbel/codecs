@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math"
 	"slices"
-	"strings"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/midbel/codecs/environ"
@@ -82,9 +82,42 @@ func (s *Sequence) Every(test func(i Item) bool) bool {
 	return true
 }
 
+func (s *Sequence) CanonicalizeString() string {
+	if s.Empty() {
+		return ("seq()")
+	}
+	var str strings.Builder
+	str.WriteString("seq(")
+	for i := range *s {
+		switch x := (*s)[i].Value().(type) {
+		case xml.Node:
+			str.WriteString("node(")
+			str.WriteString(x.Identity())
+			str.WriteString(")")
+		case Sequence:
+			str.WriteString(x.CanonicalizeString())
+		case string:
+			str.WriteString("str(")
+			str.WriteString(x)
+			str.WriteString(")")
+		case float64:
+			str.WriteString("float(")
+			str.WriteString(strconv.FormatFloat(x, 'f', -1, 64))
+			str.WriteString(")")
+		case bool:
+			str.WriteString("bool(")
+			str.WriteString(strconv.FormatBool(x))
+			str.WriteString(")")
+		default:
+		}
+	}
+	str.WriteString(")")
+	return str.String()
+}
+
 func (s *Sequence) Hash() float64 {
 	if s.Empty() {
-		return math.NaN() 
+		return math.NaN()
 	}
 	var (
 		result float64
@@ -92,26 +125,24 @@ func (s *Sequence) Hash() float64 {
 	)
 	for i := range *s {
 		value := 1.0
-		if x := (*s)[i]; x.Atomic() {
-			switch x := x.Value().(type) {
-			case int64:
-				value = float64(x)
-			case float64:
-				value = x
-			case string:
-				v, err := strconv.ParseFloat(x, 64)
-				if err == nil {
-					value = v
-				} else {
-					value = math.NaN()
-				}
-			case bool:
-				if !x {
-					value = 0
-				}
-			default:
+		switch x := (*s)[i].Value().(type) {
+		case int64:
+			value = float64(x)
+		case float64:
+			value = x
+		case string:
+			v, err := strconv.ParseFloat(x, 64)
+			if err == nil {
+				value = v
+			} else {
 				value = math.NaN()
 			}
+		case bool:
+			if !x {
+				value = 0
+			}
+		default:
+			value = math.NaN()
 		}
 		result += value * weight
 		weight /= 10

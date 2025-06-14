@@ -231,7 +231,7 @@ func executeCallTemplate(ctx *Context) (xpath.Sequence, error) {
 }
 
 type GroupItem struct {
-	Id    string
+	Hash  string
 	Value xpath.Sequence
 	Items xpath.Sequence
 }
@@ -264,8 +264,7 @@ func executeForeachGroup(ctx *Context) (xpath.Sequence, error) {
 		return nil, err
 	}
 	var (
-		groups = make(map[string]xpath.Sequence)
-		seen   = make(map[string]struct{})
+		groups = make(map[string]GroupItem)
 		keys   []string
 	)
 	for i := range items {
@@ -273,35 +272,34 @@ func executeForeachGroup(ctx *Context) (xpath.Sequence, error) {
 		if err != nil {
 			return nil, err
 		}
-		if is.Empty() {
-
-		} else {
-			
+		sh := is.CanonicalizeString()
+		gi, ok := groups[sh]
+		if !ok {
+			gi.Hash = sh
+			gi.Value = is
+			keys = append(keys, sh)
 		}
-		key := is[0].Value().(string)
-		if _, ok := seen[key]; !ok {
-			keys = append(keys, key)
-			seen[key] = struct{}{}
-		}
-		groups[key] = append(groups[key], items[i])
+		gi.Items = append(gi.Items, items[i])
+		groups[sh] = gi
 	}
 
 	var (
 		seq   xpath.Sequence
 		nodes = slices.Clone(elem.Nodes)
-		// sort  xml.Node
+		sort  xml.Node
 	)
 
-	// if len(nodes) > 0 && nodes[0].QualifiedName() == ctx.getQualifiedName("sort") {
-	// 	sort = nodes[0]
-	// 	nodes = nodes[1:]
-	// }
-	// slices.SortFunc(keys, func(fst, snd string) bool {
-	// 	return
+	if len(nodes) > 0 && nodes[0].QualifiedName() == ctx.getQualifiedName("sort") {
+		sort = nodes[0]
+		nodes = nodes[1:]
+	}
+	_ = sort
+	// slices.SortFunc(keys, func(fst, snd float64) int {
+	// 	return 0
 	// })
 
 	for _, k := range keys {
-		defineForeachGroupBuiltins(ctx, k, groups[k])
+		defineForeachGroupBuiltins(ctx, groups[k].Value, groups[k].Items)
 		others, err := executeConstructor(ctx, nodes, AllowOnEmpty|AllowOnNonEmpty)
 		if err != nil {
 			return nil, err
@@ -1241,12 +1239,12 @@ func getNodesForTemplate(ctx *Context) ([]xml.Node, error) {
 	return res, nil
 }
 
-func defineForeachGroupBuiltins(nested *Context, key string, seq xpath.Sequence) {
+func defineForeachGroupBuiltins(nested *Context, key, items xpath.Sequence) {
 	currentGrp := func(_ xpath.Context, _ []xpath.Expr) (xpath.Sequence, error) {
-		return seq, nil
+		return items, nil
 	}
 	currentKey := func(_ xpath.Context, _ []xpath.Expr) (xpath.Sequence, error) {
-		return xpath.Singleton(key), nil
+		return key, nil
 	}
 
 	nested.Builtins.Define("current-group", currentGrp)
