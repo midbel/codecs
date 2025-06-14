@@ -126,6 +126,20 @@ func TestValueOf(t *testing.T) {
 	runTest(t, tests)
 }
 
+func TestForEachGroup(t *testing.T) {
+	tests := []TestCase{
+		{
+			Name: "foreach-group/basic",
+			Dir:  "testdata/foreach-group-basic",
+		},
+		{
+			Name: "foreach-group/basic",
+			Dir:  "testdata/foreach-group-basic2",
+		},
+	}
+	runTest(t, tests)
+}
+
 func TestForEach(t *testing.T) {
 	tests := []TestCase{
 		{

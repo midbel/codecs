@@ -5,6 +5,7 @@ import (
 	"math"
 	"slices"
 	"strings"
+	"strconv"
 	"time"
 
 	"github.com/midbel/codecs/environ"
@@ -79,6 +80,40 @@ func (s *Sequence) Every(test func(i Item) bool) bool {
 		}
 	}
 	return true
+}
+
+func (s *Sequence) Hash() float64 {
+	var (
+		result float64
+		weight = 1.0
+	)
+	for i := range *s {
+		value := 1.0
+		if x := (*s)[i]; x.Atomic() {
+			switch x := x.Value().(type) {
+			case int64:
+				value = float64(x)
+			case float64:
+				value = x
+			case string:
+				v, err := strconv.ParseFloat(x, 64)
+				if err == nil {
+					value = v
+				} else {
+					value = math.NaN()
+				}
+			case bool:
+				if !x {
+					value = 0
+				}
+			default:
+				value = math.NaN()
+			}
+		}
+		result += value * weight
+		weight /= 10
+	}
+	return result
 }
 
 func EffectiveBooleanValue(seq Sequence) bool {

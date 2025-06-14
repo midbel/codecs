@@ -230,6 +230,12 @@ func executeCallTemplate(ctx *Context) (xpath.Sequence, error) {
 	return seq, nil
 }
 
+type GroupItem struct {
+	Id    string
+	Value xpath.Sequence
+	Items xpath.Sequence
+}
+
 func executeForeachGroup(ctx *Context) (xpath.Sequence, error) {
 	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
@@ -257,20 +263,46 @@ func executeForeachGroup(ctx *Context) (xpath.Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	groups := make(map[string]xpath.Sequence)
+	var (
+		groups = make(map[string]xpath.Sequence)
+		seen   = make(map[string]struct{})
+		keys   []string
+	)
 	for i := range items {
 		is, err := grpby.Find(items[i].Node())
 		if err != nil {
 			return nil, err
 		}
+		if is.Empty() {
+
+		} else {
+			
+		}
 		key := is[0].Value().(string)
+		if _, ok := seen[key]; !ok {
+			keys = append(keys, key)
+			seen[key] = struct{}{}
+		}
 		groups[key] = append(groups[key], items[i])
 	}
 
-	seq := xpath.NewSequence()
-	for key, items := range groups {
-		defineForeachGroupBuiltins(ctx, key, items)
-		others, err := executeConstructor(ctx, elem.Nodes, AllowOnEmpty|AllowOnNonEmpty)
+	var (
+		seq   xpath.Sequence
+		nodes = slices.Clone(elem.Nodes)
+		// sort  xml.Node
+	)
+
+	// if len(nodes) > 0 && nodes[0].QualifiedName() == ctx.getQualifiedName("sort") {
+	// 	sort = nodes[0]
+	// 	nodes = nodes[1:]
+	// }
+	// slices.SortFunc(keys, func(fst, snd string) bool {
+	// 	return
+	// })
+
+	for _, k := range keys {
+		defineForeachGroupBuiltins(ctx, k, groups[k])
+		others, err := executeConstructor(ctx, nodes, AllowOnEmpty|AllowOnNonEmpty)
 		if err != nil {
 			return nil, err
 		}
@@ -326,21 +358,6 @@ func getMergeItems(ctx *Context, elem *xml.Element) (string, xpath.Sequence, err
 			}
 			seq.Concat(others)
 		}
-		// items, err1 := ctx.ExecuteQuery(query, ctx.ContextNode)
-		// if err1 != nil {
-		// 	return "", nil, err1
-		// }
-		// for i := range items {
-		// 	doc, err1 := xml.ParseFile(toString(items[i]))
-		// 	if err1 != nil {
-		// 		return "", nil, ctx.errorWithContext(err1)
-		// 	}
-		// 	others, err1 := expr.Find(doc)
-		// 	if err1 != nil {
-		// 		return "", nil, err
-		// 	}
-		// 	seq.Concat(others)
-		// }
 	case withSource:
 		source, err := getAttribute(elem, "for-each-source")
 		if err != nil {
@@ -1106,7 +1123,7 @@ func applyParams(ctx *Context) error {
 	return nil
 }
 
-func applySort(node xml.Node, items []xpath.Item) (iter.Seq[xpath.Item], error) {
+func applySort(node xml.Node, items xpath.Sequence) (iter.Seq[xpath.Item], error) {
 	elem, err := getElementFromNode(node)
 	if err != nil {
 		return nil, err
@@ -1229,8 +1246,7 @@ func defineForeachGroupBuiltins(nested *Context, key string, seq xpath.Sequence)
 		return seq, nil
 	}
 	currentKey := func(_ xpath.Context, _ []xpath.Expr) (xpath.Sequence, error) {
-		i := xpath.NewLiteralItem(key)
-		return xpath.Singleton(i), nil
+		return xpath.Singleton(key), nil
 	}
 
 	nested.Builtins.Define("current-group", currentGrp)

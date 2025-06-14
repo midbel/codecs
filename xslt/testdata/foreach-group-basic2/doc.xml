@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<breakdown>
+	<item>
+		<rate>01.010.10.01</rate>
+		<name>item-1</name>
+		<total>10</total>
+	</item>
+	<item>
+		<rate>01.010.10.01</rate>
+		<name>item-2</name>
+		<total>5</total>
+	</item>
+	<item>
+		<rate>07.900.40.15</rate>
+		<name>item-3</name>
+		<total>15</total>
+	</item>
+	<item>
+		<rate>07.900.40.15</rate>
+		<name>item-4</name>
+		<total>5</total>
+	</item>
+	<item>
+		<rate>01.010.10.01</rate>
+		<name>item-6</name>
+		<total>55</total>
+	</item>
+	<item>
+		<rate>02.200.70.85</rate>
+		<name>item-7</name>
+		<total>30</total>
+	</item>
+</breakdown>
