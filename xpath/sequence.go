@@ -83,6 +83,9 @@ func (s *Sequence) Every(test func(i Item) bool) bool {
 }
 
 func (s *Sequence) Hash() float64 {
+	if s.Empty() {
+		return math.NaN() 
+	}
 	var (
 		result float64
 		weight = 1.0
