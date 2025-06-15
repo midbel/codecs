@@ -249,12 +249,12 @@ func executeForeachGroup(ctx *Context) (xpath.Sequence, error) {
 	}
 	query, err := getAttribute(elem, "select")
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
 	}
 
 	items, err := ctx.ExecuteQuery(query, ctx.ContextNode)
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
 	}
 
 	if len(items) == 0 {
@@ -263,11 +263,11 @@ func executeForeachGroup(ctx *Context) (xpath.Sequence, error) {
 
 	key, err := getAttribute(elem, "group-by")
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
 	}
 	grpby, err := ctx.CompileQuery(key)
 	if err != nil {
-		return nil, err
+		return nil, ctx.errorWithContext(err)
 	}
 	var (
 		groups = make(map[string]GroupItem)
@@ -276,7 +276,7 @@ func executeForeachGroup(ctx *Context) (xpath.Sequence, error) {
 	for i := range items {
 		is, err := grpby.Find(items[i].Node())
 		if err != nil {
-			return nil, err
+			return nil, ctx.errorWithContext(err)
 		}
 		sh := is.CanonicalizeString()
 		gi, ok := groups[sh]
@@ -319,7 +319,7 @@ func executeForeachGroup(ctx *Context) (xpath.Sequence, error) {
 		if query != "" {
 			seq, err := sub.ExecuteQuery(query, sub.ContextNode)
 			if err != nil {
-				return nil, err
+				return nil, ctx.errorWithContext(err)
 			}
 			if seq.Len() == 0 {
 				sit.Sort = xpath.Singleton(0)
@@ -340,7 +340,7 @@ func executeForeachGroup(ctx *Context) (xpath.Sequence, error) {
 		defineForeachGroupBuiltins(ctx, gi.Value, gi.Items)
 		others, err := executeConstructor(ctx, nodes, AllowOnEmpty|AllowOnNonEmpty)
 		if err != nil {
-			return nil, err
+			return nil, ctx.errorWithContext(err)
 		}
 		seq.Concat(others)
 	}
