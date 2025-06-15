@@ -236,6 +236,11 @@ type GroupItem struct {
 	Items xpath.Sequence
 }
 
+type SortGroupItem struct {
+	GroupItem
+	Sort xpath.Sequence
+}
+
 func executeForeachGroup(ctx *Context) (xpath.Sequence, error) {
 	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
@@ -286,20 +291,46 @@ func executeForeachGroup(ctx *Context) (xpath.Sequence, error) {
 	var (
 		seq   xpath.Sequence
 		nodes = slices.Clone(elem.Nodes)
-		sort  xml.Node
 	)
 
 	if len(nodes) > 0 && nodes[0].QualifiedName() == ctx.getQualifiedName("sort") {
-		sort = nodes[0]
+		elem, err := getElementFromNode(nodes[0])
+		if err != nil {
+			return nil, ctx.errorWithContext(err)
+		}
+		query, err = getAttribute(elem, "select")
+		if err != nil {
+			return nil, ctx.errorWithContext(err)
+		}
 		nodes = nodes[1:]
 	}
-	_ = sort
-	// slices.SortFunc(keys, func(fst, snd float64) int {
-	// 	return 0
-	// })
-
-	for _, k := range keys {
-		defineForeachGroupBuiltins(ctx, groups[k].Value, groups[k].Items)
+	var list []SortGroupItem
+	for _, key := range keys {
+		var (
+			sit SortGroupItem
+			gi  = groups[key]
+			sub = ctx.Copy()
+		)
+		sit.GroupItem = gi
+		defineForeachGroupBuiltins(sub, gi.Value, gi.Items)
+		if query != "" {
+			seq, err := sub.ExecuteQuery(query, sub.ContextNode)
+			if err != nil {
+				return nil, err
+			}
+			if seq.Len() == 0 {
+				sit.Sort = xpath.Singleton(0)
+			} else {
+				sit.Sort = seq
+			}
+		}
+		list = append(list, sit)
+	}
+	slices.SortFunc(list, func(g1, g2 SortGroupItem) int {
+		return g1.Sort.Compare(&g2.Sort)
+	})
+	for _, gi := range list {
+		defineForeachGroupBuiltins(ctx, gi.Value, gi.Items)
 		others, err := executeConstructor(ctx, nodes, AllowOnEmpty|AllowOnNonEmpty)
 		if err != nil {
 			return nil, err
@@ -1193,6 +1224,7 @@ func iterItems(items []xpath.Item, orderBy, orderDir string) (iter.Seq[xpath.Ite
 	var compare func(string, string) bool
 	if orderDir == "descending" {
 		compare = func(str1, str2 string) bool {
+			fmt.Println("descending", str1, str2)
 			return strings.Compare(str1, str2) >= 0
 		}
 	} else {

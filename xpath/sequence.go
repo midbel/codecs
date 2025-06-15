@@ -82,6 +82,48 @@ func (s *Sequence) Every(test func(i Item) bool) bool {
 	return true
 }
 
+func (s *Sequence) Compare(other *Sequence) int {
+	if s.Len() < other.Len() {
+		return -1
+	}
+	if s.Len() > other.Len() {
+		return 1
+	}
+	var res int
+	for i := range *s {
+		v1, v2 := (*s)[i], (*other)[i]
+		switch v1 := v1.Value().(type) {
+		case string:
+			s, ok := v2.Value().(string)
+			if !ok {
+				break
+			}
+			res += strings.Compare(v1, s)
+		case float64:
+			s, ok := v2.Value().(float64)
+			if !ok {
+				break
+			}
+			res += int(v1 - s)
+		case int64:
+			s, ok := v2.Value().(int64)
+			if !ok {
+				break
+			}
+			res += int(v1 - s)
+		case time.Time:
+		case bool:
+			s, ok := v2.Value().(bool)
+			if !ok {
+				break
+			}
+			_ = s
+		default:
+		}
+	}
+	return res
+}
+
 func (s *Sequence) CanonicalizeString() string {
 	if s.Empty() {
 		return ("seq()")

@@ -136,6 +136,10 @@ func TestForEachGroup(t *testing.T) {
 			Name: "foreach-group/basic",
 			Dir:  "testdata/foreach-group-basic2",
 		},
+		{
+			Name: "foreach-group/sort",
+			Dir:  "testdata/foreach-group-sort",
+		},
 	}
 	runTest(t, tests)
 }
