@@ -41,6 +41,16 @@ func TestCallTemplate(t *testing.T) {
 			Dir:    "testdata/call-template-variable-error",
 			Failed: true,
 		},
+		{
+			Name:   "call-template/missing-name-attr",
+			Dir:    "testdata/call-template-no-name",
+			Failed: true,
+		},
+		{
+			Name:   "call-template/template-not-defuned",
+			Dir:    "testdata/call-template-not-defined",
+			Failed: true,
+		},
 	}
 	runTest(t, tests)
 }

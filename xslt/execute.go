@@ -239,6 +239,7 @@ type GroupItem struct {
 type SortGroupItem struct {
 	GroupItem
 	Sort xpath.Sequence
+	Dir  string
 }
 
 func executeForeachGroup(ctx *Context) (xpath.Sequence, error) {
@@ -290,6 +291,7 @@ func executeForeachGroup(ctx *Context) (xpath.Sequence, error) {
 
 	var (
 		seq   xpath.Sequence
+		order string
 		nodes = slices.Clone(elem.Nodes)
 	)
 
@@ -302,6 +304,7 @@ func executeForeachGroup(ctx *Context) (xpath.Sequence, error) {
 		if err != nil {
 			return nil, ctx.errorWithContext(err)
 		}
+		order, _ = getAttribute(elem, "order")
 		nodes = nodes[1:]
 	}
 	var list []SortGroupItem
@@ -327,7 +330,11 @@ func executeForeachGroup(ctx *Context) (xpath.Sequence, error) {
 		list = append(list, sit)
 	}
 	slices.SortFunc(list, func(g1, g2 SortGroupItem) int {
-		return g1.Sort.Compare(&g2.Sort)
+		res := g1.Sort.Compare(&g2.Sort)
+		if order == "descending" {
+			res = -res
+		}
+		return res
 	})
 	for _, gi := range list {
 		defineForeachGroupBuiltins(ctx, gi.Value, gi.Items)
