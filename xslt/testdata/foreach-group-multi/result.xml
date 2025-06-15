@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<cities>
+	<country>
+		<code>be</code>
+		<star>1</star>
+		<cities>
+			<city>brussels</city>
+		</cities>
+	</country>
+	<country>
+		<code>be</code>
+		<star>5</star>
+		<cities>
+			<city>antwerp</city>
+			<city>gent</city>
+		</cities>
+	</country>
+	<country>
+		<code>it</code>
+		<star>1</star>
+		<cities>
+			<city>napoli</city>
+		</cities>
+	</country>
+	<country>
+		<code>it</code>
+		<star>4</star>
+		<cities>
+			<city>roma</city>
+		</cities>
+	</country>
+	<country>
+		<code>ge</code>
+		<star>5</star>
+		<cities>
+			<city>berlin</city>
+			<city>munich</city>
+		</cities>
+	</country>
+</breakdown>

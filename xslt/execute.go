@@ -1231,7 +1231,6 @@ func iterItems(items []xpath.Item, orderBy, orderDir string) (iter.Seq[xpath.Ite
 	var compare func(string, string) bool
 	if orderDir == "descending" {
 		compare = func(str1, str2 string) bool {
-			fmt.Println("descending", str1, str2)
 			return strings.Compare(str1, str2) >= 0
 		}
 	} else {
