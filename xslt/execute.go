@@ -210,16 +210,18 @@ func executeCallTemplate(ctx *Context) (xpath.Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	var sub *Context
-	if x, ok := tpl.(interface{ EmptyContext(*Context) *Context }); ok {
-		sub = x.EmptyContext(ctx)
-	} else {
-		sub = ctx.Copy()
-	}
+	sub := ctx.Nest()
 	if err := applyParams(sub); err != nil {
 		return nil, ctx.errorWithContext(err)
 	}
-	nodes, err := tpl.Execute(sub)
+	call, ok := tpl.(interface {
+		Call(*Context) ([]xml.Node, error)
+	})
+	if !ok {
+		err := fmt.Errorf("template %q can not be called", name)
+		return nil, ctx.errorWithContext(err)
+	}
+	nodes, err := call.Call(sub)
 	if err != nil {
 		return nil, err
 	}

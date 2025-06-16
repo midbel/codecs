@@ -2,6 +2,7 @@ package xslt
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/midbel/codecs/environ"
 	"github.com/midbel/codecs/xml"
@@ -80,6 +81,12 @@ func (c *Context) Nest() *Context {
 	return child
 }
 
+func (c *Context) Last() *Context {
+	x := c.Copy()
+	x.Env = x.Env.Unwrap()
+	return x
+}
+
 func (c *Context) Copy() *Context {
 	return c.clone(c.XslNode, c.ContextNode)
 }
@@ -103,11 +110,6 @@ func (c *Context) errorWithContext(err error) error {
 		return err
 	}
 	return errorWithContext(c.XslNode.QualifiedName(), err)
-}
-
-func (c *Context) queryXSL(query string) (xpath.Sequence, error) {
-	c.Query(c, query)
-	return c.Env.queryXSL(query, c.XslNode)
 }
 
 type Resolver interface {
@@ -136,6 +138,14 @@ func Enclosed(other Resolver) *Env {
 	}
 }
 
+func (e *Env) Len() int {
+	return e.Vars.Len() + e.Params.Len()
+}
+
+func (e *Env) Names() []string {
+	return e.localNames()
+}
+
 func (e *Env) Sub() *Env {
 	return &Env{
 		other:     e.other,
@@ -145,6 +155,28 @@ func (e *Env) Sub() *Env {
 		Builtins:  e.Builtins,
 		Depth:     e.Depth + 1,
 	}
+}
+
+func (e *Env) Unwrap() *Env {
+	x := &Env{
+		other:     e.other,
+		Namespace: e.Namespace,
+		Vars:      e.Vars,
+		Params:    e.Params,
+		Builtins:  e.Builtins,
+		Depth:     e.Depth,
+	}
+	if u, ok := x.Vars.(interface {
+		Detach() environ.Environ[xpath.Expr]
+	}); ok {
+		x.Vars = u.Detach()
+	}
+	if u, ok := x.Params.(interface {
+		Detach() environ.Environ[xpath.Expr]
+	}); ok {
+		x.Params = u.Detach()
+	}
+	return x
 }
 
 func (e *Env) ExecuteQuery(query string, datum xml.Node) (xpath.Sequence, error) {
@@ -161,10 +193,6 @@ func (e *Env) ExecuteQueryWithNS(query, namespace string, datum xml.Node) (xpath
 		return nil, err
 	}
 	return q.Find(datum)
-}
-
-func (e *Env) queryXSL(query string, datum xml.Node) (xpath.Sequence, error) {
-	return e.ExecuteQueryWithNS(query, e.Namespace, datum)
 }
 
 func (e *Env) CompileQuery(query string) (xpath.Expr, error) {
@@ -195,12 +223,12 @@ func (e *Env) TestNode(query string, datum xml.Node) (bool, error) {
 func (e *Env) Merge(other *Env) {
 	if m, ok := e.Vars.(interface {
 		Merge(environ.Environ[xpath.Expr])
-	}); ok {
+	}); ok && other.Vars.Len() > 0 {
 		m.Merge(other.Vars)
 	}
 	if m, ok := e.Params.(interface {
 		Merge(environ.Environ[xpath.Expr])
-	}); ok {
+	}); ok && other.Params.Len() > 0 {
 		m.Merge(other.Params)
 	}
 }
@@ -224,24 +252,28 @@ func (e *Env) Define(ident string, expr xpath.Expr) {
 	e.Vars.Define(ident, expr)
 }
 
-func (e *Env) DefineParam(param, value string) error {
+func (e *Env) DefineParam(ident, value string) error {
 	expr, err := e.CompileQuery(value)
 	if err == nil {
-		e.DefineExprParam(param, expr)
+		e.DefineExprParam(ident, expr)
 	}
 	return err
 }
 
-func (e *Env) EvalParam(param, query string, datum xml.Node) error {
+func (e *Env) EvalParam(ident, query string, datum xml.Node) error {
 	items, err := e.ExecuteQuery(query, datum)
-	if err == nil {
-		e.DefineExprParam(param, xpath.NewValueFromSequence(items))
+	if err == nil && !items.Empty() {
+		e.DefineExprParam(ident, xpath.NewValueFromSequence(items))
 	}
 	return err
 }
 
-func (e *Env) DefineExprParam(param string, expr xpath.Expr) {
-	e.Params.Define(param, expr)
+func (e *Env) DefineExprParam(ident string, expr xpath.Expr) {
+	e.Params.Define(ident, expr)
+}
+
+func (e *Env) localNames() []string {
+	return slices.Concat(e.Vars.Names(), e.Params.Names())
 }
 
 func errorWithContext(ctx string, err error) error {

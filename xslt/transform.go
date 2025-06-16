@@ -86,33 +86,6 @@ func processNode(ctx *Context) (xpath.Sequence, error) {
 	return xpath.Singleton(elem), nil
 }
 
-func processParam(node xml.Node, env *Env) error {
-	elem, err := getElementFromNode(node)
-	if err != nil {
-		return err
-	}
-	ident, err := getAttribute(elem, "name")
-	if err != nil {
-		return err
-	}
-	if tun, err := getAttribute(elem, "tunnel"); err == nil && tun == "yes" {
-		// TODO
-	}
-	if query, err := getAttribute(elem, "select"); err == nil {
-		if len(elem.Nodes) > 0 {
-			return fmt.Errorf("using select and children nodes is not allowed")
-		}
-		err = env.DefineParam(ident, query)
-	} else {
-		var seq xpath.Sequence
-		for i := range elem.Nodes {
-			seq.Append(xpath.NewNodeItem(elem.Nodes[i]))
-		}
-		env.DefineExprParam(ident, xpath.NewValueFromSequence(seq))
-	}
-	return err
-}
-
 func isEmpty(seq xpath.Sequence) bool {
 	if seq.Empty() {
 		return true

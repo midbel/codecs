@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/midbel/codecs/alpha"
+	"github.com/midbel/codecs/environ"
 	"github.com/midbel/codecs/xml"
 	"github.com/midbel/codecs/xpath"
 )
@@ -863,7 +864,7 @@ func NewTemplate(node xml.Node) (*Template, error) {
 			tpl.Nodes = append(tpl.Nodes, elem.Nodes[i:]...)
 			break
 		}
-		if err := processParam(n, tpl.env); err != nil {
+		if err := tpl.defineParamFromNode(n); err != nil {
 			return nil, err
 		}
 	}
@@ -874,6 +875,16 @@ func (t *Template) Clone() *Template {
 	tpl := *t
 	tpl.Nodes = slices.Clone(tpl.Nodes)
 	return &tpl
+}
+
+func (t *Template) Call(ctx *Context) ([]xml.Node, error) {
+	ctx = ctx.Last()
+	if a, ok := ctx.Env.Params.(interface {
+		Attach(environ.Environ[xpath.Expr])
+	}); ok {
+		a.Attach(t.env)
+	}
+	return t.Execute(ctx)
 }
 
 func (t *Template) Execute(ctx *Context) ([]xml.Node, error) {
@@ -898,18 +909,9 @@ func (t *Template) Execute(ctx *Context) ([]xml.Node, error) {
 }
 
 func (t *Template) EmptyContext(other *Context) *Context {
-	ctx := Context{
-		XslNode:     other.XslNode,
-		ContextNode: other.ContextNode,
-		Mode:        other.Mode,
-		Index:       other.Index,
-		Size:        other.Size,
-		Depth:       other.Depth,
-		Env:         Empty(),
-		Stylesheet:  other.Stylesheet,
-	}
-	ctx.Env.Merge(t.env)
-	return &ctx
+	ctx := other.Nest()
+	// re-set the template.env
+	return ctx
 }
 
 func (t *Template) mergeContext(other *Context) *Context {
@@ -921,6 +923,30 @@ func (t *Template) mergeContext(other *Context) *Context {
 
 func (t *Template) isRoot() bool {
 	return t.Match == "/"
+}
+
+func (t *Template) defineParamFromNode(node xml.Node) error {
+	elem, err := getElementFromNode(node)
+	if err != nil {
+		return err
+	}
+	ident, err := getAttribute(elem, "name")
+	if err != nil {
+		return err
+	}
+	if query, err := getAttribute(elem, "select"); err == nil {
+		if len(elem.Nodes) > 0 {
+			return fmt.Errorf("using select and children nodes is not allowed")
+		}
+		err = t.env.DefineParam(ident, query)
+	} else {
+		var seq xpath.Sequence
+		for i := range elem.Nodes {
+			seq.Append(xpath.NewNodeItem(elem.Nodes[i]))
+		}
+		t.env.DefineExprParam(ident, xpath.NewValueFromSequence(seq))
+	}
+	return err
 }
 
 func templateMatch(expr xpath.Expr, node xml.Node) (bool, int) {
