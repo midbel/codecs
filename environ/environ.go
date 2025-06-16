@@ -82,3 +82,14 @@ func (e *Env[T]) Clone() Environ[T] {
 	}
 	return &x
 }
+
+func (e *Env[T]) Attach(p Environ[T]) {
+	e.parent = p
+}
+
+func (e *Env[T]) Detach() Environ[T] {
+	var x Env[T]
+	x.values = make(map[string]T)
+	maps.Copy(x.values, e.values)
+	return &x
+}
