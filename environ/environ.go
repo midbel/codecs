@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 )
 
 var ErrDefined = errors.New("undefined identifier")
@@ -11,6 +12,8 @@ var ErrDefined = errors.New("undefined identifier")
 type Environ[T any] interface {
 	Resolve(string) (T, error)
 	Define(string, T)
+	Names() []string
+	Len() int
 }
 
 type Env[T any] struct {
@@ -28,6 +31,14 @@ func Enclosed[T any](parent Environ[T]) Environ[T] {
 		parent: parent,
 	}
 	return &e
+}
+
+func (e *Env[T]) Len() int {
+	return len(e.values)
+}
+
+func (e *Env[T]) Names() []string {
+	return slices.Collect(maps.Keys(e.values))
 }
 
 func (e *Env[T]) Define(ident string, expr T) {
