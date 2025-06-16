@@ -33,6 +33,10 @@ func TestCallTemplate(t *testing.T) {
 			Dir:  "testdata/call-template-with-param",
 		},
 		{
+			Name: "call-template/with-param",
+			Dir:  "testdata/call-template-transfer-param",
+		},
+		{
 			Name: "call-template/global-variable",
 			Dir:  "testdata/call-template-with-param",
 		},
@@ -47,7 +51,7 @@ func TestCallTemplate(t *testing.T) {
 			Failed: true,
 		},
 		{
-			Name:   "call-template/template-not-defuned",
+			Name:   "call-template/template-not-defined",
 			Dir:    "testdata/call-template-not-defined",
 			Failed: true,
 		},
@@ -145,6 +149,10 @@ func TestForEachGroup(t *testing.T) {
 		{
 			Name: "foreach-group/basic",
 			Dir:  "testdata/foreach-group-basic2",
+		},
+		{
+			Name: "foreach-group/with-function",
+			Dir:  "testdata/foreach-group-with-function",
 		},
 		{
 			Name: "foreach-group/sort",

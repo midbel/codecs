@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<item>
+	<value>foobar</value>
+	<build-with>foobar</build-with>
+	<info>
+		<build-with>foobar</build-with>
+	</info>
+</item>

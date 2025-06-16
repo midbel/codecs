@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<breakdown>
+	<item>
+		<rate>6</rate>
+		<category>6.23.123</category>
+		<name>item-1</name>
+		<total>10</total>
+	</item>
+	<item>
+		<rate>6</rate>
+		<category>6.23.123</category>
+		<name>item-2</name>
+		<total>5</total>
+	</item>
+	<item>
+		<rate>21</rate>
+		<category>21.0.100</category>
+		<name>item-3</name>
+		<total>15</total>
+	</item>
+	<item>
+		<rate>21</rate>
+		<category>21.0.100</category>
+		<name>item-4</name>
+		<total>5</total>
+	</item>
+	<item>
+		<rate>6</rate>
+		<category>6.25.800</category>
+		<name>item-6</name>
+		<total>55</total>
+	</item>
+	<item>
+		<rate>12</rate>
+		<category>12.05.040</category>
+		<name>item-7</name>
+		<total>30</total>
+	</item>
+</breakdown>
