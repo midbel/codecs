@@ -134,6 +134,11 @@ func debugExpr(w io.Writer, expr Expr) {
 			debugExpr(w, v.all[i])
 		}
 		io.WriteString(w, ")")
+	case value:
+		io.WriteString(w, "value")
+		io.WriteString(w, "(")
+		io.WriteString(w, v.seq.CanonicalizeString())
+		io.WriteString(w, ")")
 	case identifier:
 		io.WriteString(w, "identifier")
 		io.WriteString(w, "(")
