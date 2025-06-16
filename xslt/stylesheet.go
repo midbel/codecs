@@ -361,7 +361,6 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 			return n.Uri == xsltNamespaceUri
 		})
 		if ix >= 0 {
-			sheet.Env.Namespace = all[ix].Prefix
 			sheet.namespace = all[ix].Prefix
 			for e, fn := range executers {
 				delete(executers, e)
@@ -539,7 +538,6 @@ func (s *Stylesheet) CurrentMode() string {
 
 func (s *Stylesheet) createContext(node xml.Node) *Context {
 	env := Enclosed(s)
-	env.Namespace = s.namespace
 	ctx := Context{
 		ContextNode: node,
 		Mode:        s.Mode,

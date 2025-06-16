@@ -118,7 +118,6 @@ type Resolver interface {
 
 type Env struct {
 	other     Resolver
-	Namespace string
 	Vars      environ.Environ[xpath.Expr]
 	Params    environ.Environ[xpath.Expr]
 	Builtins  environ.Environ[xpath.BuiltinFunc]
@@ -149,7 +148,6 @@ func (e *Env) Names() []string {
 func (e *Env) Sub() *Env {
 	return &Env{
 		other:     e.other,
-		Namespace: e.Namespace,
 		Vars:      environ.Enclosed[xpath.Expr](e.Vars),
 		Params:    environ.Enclosed[xpath.Expr](e.Params),
 		Builtins:  e.Builtins,
@@ -160,7 +158,6 @@ func (e *Env) Sub() *Env {
 func (e *Env) Unwrap() *Env {
 	x := &Env{
 		other:     e.other,
-		Namespace: e.Namespace,
 		Vars:      e.Vars,
 		Params:    e.Params,
 		Builtins:  e.Builtins,
