@@ -222,6 +222,24 @@ func TestVariables(t *testing.T) {
 	runTest(t, tests)
 }
 
+func TestSequence(t *testing.T) {
+	tests := []TestCase{
+		{
+			Name: "sequence/basic",
+			Dir: "testdata/sequence-basic",
+		},
+		{
+			Name: "sequence/basic2",
+			Dir: "testdata/sequence-basic2",
+		},
+		{
+			Name: "sequence/basic",
+			Dir: "testdata/sequence-foreach",
+		},
+	}
+	runTest(t, tests)
+}
+
 func runTest(t *testing.T, tests []TestCase) {
 	t.Helper()
 	for _, tt := range tests {
