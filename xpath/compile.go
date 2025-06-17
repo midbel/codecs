@@ -82,7 +82,7 @@ func NewCompiler(r io.Reader) *Compiler {
 		opAlt:     cp.compileAlt,
 		begGrp:    cp.compileCall,
 		reserved:  cp.compileReservedInfix,
-		opSeq:     cp.compileList,
+		opSeq: cp.compileList,
 	}
 	cp.prefix = map[rune]func() (Expr, error){
 		currLevel:  cp.compileRoot,
