@@ -3,10 +3,9 @@ package xpath
 import (
 	"fmt"
 	"io"
-	"log/slog"
-	"os"
 	"strconv"
 	"strings"
+	"slices"
 
 	"github.com/midbel/codecs/xml"
 )
@@ -37,71 +36,6 @@ func syntaxError(expr, cause string, pos Position) error {
 
 func (e SyntaxError) Error() string {
 	return fmt.Sprintf("[%s] %s: %s", e.Code, e.Expr, e.Cause)
-}
-
-type Tracer interface {
-	Enter(string)
-	Leave(string)
-	Error(string, error)
-}
-
-type discardTracer struct{}
-
-func (_ discardTracer) Enter(_ string)          {}
-func (_ discardTracer) Leave(_ string)          {}
-func (_ discardTracer) Error(_ string, _ error) {}
-
-type stdioTracer struct {
-	logger   *slog.Logger
-	depth    int
-	errcount int
-}
-
-func TraceStdout() Tracer {
-	tracer := stdioTracer{
-		logger: stdioLogger(os.Stdout),
-	}
-	return &tracer
-}
-
-func TraceStderr() Tracer {
-	tracer := stdioTracer{
-		logger: stdioLogger(os.Stderr),
-	}
-	return &tracer
-}
-
-func stdioLogger(w io.Writer) *slog.Logger {
-	opts := slog.HandlerOptions{
-		Level: slog.LevelDebug,
-	}
-	return slog.New(slog.NewTextHandler(w, &opts))
-}
-
-func (t *stdioTracer) Enter(rule string) {
-	t.depth++
-	args := []any{
-		"expression",
-		rule,
-		"depth",
-		t.depth,
-	}
-	t.logger.Debug("start compile expr", args...)
-}
-
-func (t *stdioTracer) Leave(rule string) {
-	t.depth--
-	args := []any{
-		"expression",
-		rule,
-		"depth",
-		t.depth,
-	}
-	t.logger.Debug("done compile expr", args...)
-}
-
-func (t *stdioTracer) Error(rule string, err error) {
-
 }
 
 type Compiler struct {
@@ -148,6 +82,7 @@ func NewCompiler(r io.Reader) *Compiler {
 		opAlt:     cp.compileAlt,
 		begGrp:    cp.compileCall,
 		reserved:  cp.compileReservedInfix,
+		opSeq:     cp.compileList,
 	}
 	cp.prefix = map[rune]func() (Expr, error){
 		currLevel:  cp.compileRoot,
@@ -559,6 +494,27 @@ func (c *Compiler) compileFilter(left Expr) (Expr, error) {
 		check: expr,
 	}
 	return f, nil
+}
+
+func (c *Compiler) compileList(left Expr) (Expr, error) {
+	c.Enter("list")
+	defer c.Leave("list")
+
+	c.next()
+
+	var seq sequence
+	seq.all = append(seq.all, left)
+
+	right, err := c.compileExpr(powLowest)
+	if err != nil {
+		return nil, err
+	}
+	if other, ok := right.(sequence); ok {
+		seq.all = slices.Concat(seq.all, other.all)
+	} else {
+		seq.all = append(seq.all, right)
+	}
+	return seq, nil
 }
 
 func (c *Compiler) compileSequence() (Expr, error) {

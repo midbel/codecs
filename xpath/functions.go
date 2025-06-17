@@ -168,6 +168,8 @@ var builtins = []registeredBuiltin{
 	registerFunc("substring-before", "fn", callSubstringBefore),
 	registerFunc("substring-after", "", callSubstringAfter),
 	registerFunc("substring-after", "fn", callSubstringAfter),
+	registerFunc("replace", "", callXYZ),
+	registerFunc("replace", "fn", callXYZ),
 	registerFunc("matches", "", callMatches),
 	registerFunc("matches", "fn", callMatches),
 	registerFunc("tokenize", "", callTokenize),

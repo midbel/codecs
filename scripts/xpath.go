@@ -20,7 +20,7 @@ func main() {
 		}
 	}
 	cp := xpath.NewCompiler(strings.NewReader(flag.Arg(0)))
-	cp.Tracer = xpath.TraceStdout()
+	// cp.Tracer = xpath.TraceStdout()
 	expr, err := cp.Compile()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
