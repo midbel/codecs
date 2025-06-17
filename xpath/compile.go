@@ -666,7 +666,7 @@ func (c *Compiler) compileCall(left Expr) (Expr, error) {
 		}
 		c.next()
 		for !c.done() && !c.is(endGrp) {
-			arg, err := c.compile()
+			arg, err := c.compileExpr(powLowest)
 			if err != nil {
 				return fn, err
 			}
