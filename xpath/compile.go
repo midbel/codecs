@@ -82,7 +82,6 @@ func NewCompiler(r io.Reader) *Compiler {
 		opAlt:     cp.compileAlt,
 		begGrp:    cp.compileCall,
 		reserved:  cp.compileReservedInfix,
-		opSeq: cp.compileList,
 	}
 	cp.prefix = map[rune]func() (Expr, error){
 		currLevel:  cp.compileRoot,
@@ -135,7 +134,14 @@ func (c *Compiler) Compile() (Expr, error) {
 }
 
 func (c *Compiler) compile() (Expr, error) {
-	return c.compileExpr(powLowest)
+	expr, err := c.compileExpr(powLowest)
+	if err != nil {
+		return nil, err
+	}
+	if c.is(opSeq) {
+		return c.compileList(expr)
+	}
+	return expr, nil
 }
 
 func (c *Compiler) compileReservedPrefix() (Expr, error) {
