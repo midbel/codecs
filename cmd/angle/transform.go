@@ -2,13 +2,13 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io"
 	"os"
 	"strings"
-	"fmt"
 
-	"github.com/midbel/codecs/xslt"
 	"github.com/midbel/codecs/xpath"
+	"github.com/midbel/codecs/xslt"
 )
 
 type UserDefinedParam struct {
@@ -29,7 +29,7 @@ type TransformCmd struct {
 func (c TransformCmd) Run(args []string) error {
 	var (
 		params []UserDefinedParam
-		set = flag.NewFlagSet("transform", flag.ContinueOnError)
+		set    = flag.NewFlagSet("transform", flag.ContinueOnError)
 	)
 	set.BoolVar(&c.Trace, "t", false, "trace")
 	set.BoolVar(&c.Quiet, "q", false, "quiet")

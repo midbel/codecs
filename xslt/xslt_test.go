@@ -136,6 +136,10 @@ func TestValueOf(t *testing.T) {
 			Dir:    "testdata/valueof-errselect",
 			Failed: true,
 		},
+		{
+			Name: "value-of/empty-element",
+			Dir:  "testdata/valueof-basic-with-empty",
+		},
 	}
 	runTest(t, tests)
 }
@@ -226,15 +230,15 @@ func TestSequence(t *testing.T) {
 	tests := []TestCase{
 		{
 			Name: "sequence/basic",
-			Dir: "testdata/sequence-basic",
+			Dir:  "testdata/sequence-basic",
 		},
 		{
 			Name: "sequence/basic2",
-			Dir: "testdata/sequence-basic2",
+			Dir:  "testdata/sequence-basic2",
 		},
 		{
 			Name: "sequence/basic",
-			Dir: "testdata/sequence-foreach",
+			Dir:  "testdata/sequence-foreach",
 		},
 	}
 	runTest(t, tests)

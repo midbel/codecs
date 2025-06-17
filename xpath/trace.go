@@ -2,8 +2,8 @@ package xpath
 
 import (
 	"io"
-	"os"
 	"log/slog"
+	"os"
 )
 
 type Tracer interface {

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<link>
+	<div>
+		<a href="foobar.xml" class="btn btn-default">
+			<div>
+				<i class="icon icon-see"/>
+				<span>foobar</span>
+			</div>
+		</a>
+	</div>
+</link>

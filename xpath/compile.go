@@ -3,9 +3,9 @@ package xpath
 import (
 	"fmt"
 	"io"
+	"slices"
 	"strconv"
 	"strings"
-	"slices"
 
 	"github.com/midbel/codecs/xml"
 )

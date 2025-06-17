@@ -117,11 +117,11 @@ type Resolver interface {
 }
 
 type Env struct {
-	other     Resolver
-	Vars      environ.Environ[xpath.Expr]
-	Params    environ.Environ[xpath.Expr]
-	Builtins  environ.Environ[xpath.BuiltinFunc]
-	Depth     int
+	other    Resolver
+	Vars     environ.Environ[xpath.Expr]
+	Params   environ.Environ[xpath.Expr]
+	Builtins environ.Environ[xpath.BuiltinFunc]
+	Depth    int
 }
 
 func Empty() *Env {
@@ -147,21 +147,21 @@ func (e *Env) Names() []string {
 
 func (e *Env) Sub() *Env {
 	return &Env{
-		other:     e.other,
-		Vars:      environ.Enclosed[xpath.Expr](e.Vars),
-		Params:    environ.Enclosed[xpath.Expr](e.Params),
-		Builtins:  e.Builtins,
-		Depth:     e.Depth + 1,
+		other:    e.other,
+		Vars:     environ.Enclosed[xpath.Expr](e.Vars),
+		Params:   environ.Enclosed[xpath.Expr](e.Params),
+		Builtins: e.Builtins,
+		Depth:    e.Depth + 1,
 	}
 }
 
 func (e *Env) Unwrap() *Env {
 	x := &Env{
-		other:     e.other,
-		Vars:      e.Vars,
-		Params:    e.Params,
-		Builtins:  e.Builtins,
-		Depth:     e.Depth,
+		other:    e.other,
+		Vars:     e.Vars,
+		Params:   e.Params,
+		Builtins: e.Builtins,
+		Depth:    e.Depth,
 	}
 	if u, ok := x.Vars.(interface {
 		Detach() environ.Environ[xpath.Expr]
