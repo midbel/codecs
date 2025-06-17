@@ -17,6 +17,8 @@ func Debug(expr Expr) string {
 
 func debugExpr(w io.Writer, expr Expr) {
 	switch v := expr.(type) {
+	case *Query:
+		debugExpr(w, v.expr)
 	case query:
 		debugExpr(w, v.expr)
 	case root:
