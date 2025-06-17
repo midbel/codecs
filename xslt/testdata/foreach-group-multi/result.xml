@@ -18,24 +18,24 @@
 	</country>
 	<country>
 		<code>it</code>
-		<star>1</star>
-		<cities>
-			<city>napoli</city>
-		</cities>
-	</country>
-	<country>
-		<code>it</code>
 		<star>4</star>
 		<cities>
 			<city>roma</city>
 		</cities>
 	</country>
 	<country>
+		<code>it</code>
+		<star>1</star>
+		<cities>
+			<city>napoli</city>
+		</cities>
+	</country>
+	<country>
 		<code>ge</code>
-		<star>5</star>
+		<star>4</star>
 		<cities>
 			<city>berlin</city>
 			<city>munich</city>
 		</cities>
 	</country>
-</breakdown>
+</cities>

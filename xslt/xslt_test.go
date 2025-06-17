@@ -151,7 +151,7 @@ func TestForEachGroup(t *testing.T) {
 			Dir:  "testdata/foreach-group-basic",
 		},
 		{
-			Name: "foreach-group/basic",
+			Name: "foreach-group/basic2",
 			Dir:  "testdata/foreach-group-basic2",
 		},
 		{
