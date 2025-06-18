@@ -146,6 +146,10 @@ func (c *Compiler) compile() (Expr, error) {
 
 func (c *Compiler) compileReservedPrefix() (Expr, error) {
 	switch c.getCurrentLiteral() {
+	case kwMap:
+		return c.compileMap()
+	case kwArray:
+		return c.compileArray()
 	case kwLet:
 		return c.compileLet()
 	case kwIf:
@@ -157,6 +161,60 @@ func (c *Compiler) compileReservedPrefix() (Expr, error) {
 	default:
 		return nil, fmt.Errorf("%s: reserved word can not be used as prefix operator", c.getCurrentLiteral())
 	}
+}
+
+func (c *Compiler) compileMap() (Expr, error) {
+	c.Enter("map")
+	defer c.Leave("map")
+
+	c.next()
+	if !c.is(begCurl) {
+		return nil, ErrSyntax
+	}
+	c.next()
+	for !c.done() && !c.is(endCurl) {
+
+	}
+	if !c.is(endCurl) {
+		return nil, ErrSyntax
+	}
+	c.next()
+	return nil, nil
+}
+
+func (c *Compiler) compileArray() (Expr, error) {
+	c.Enter("array")
+	defer c.Leave("array")
+
+	c.next()
+	if !c.is(begCurl) {
+		return nil, ErrSyntax
+	}
+	c.next()
+
+	var arr array
+	for !c.done() && !c.is(endCurl) {
+		e, err := c.compileExpr(powLowest)
+		if err != nil {
+			return nil, err
+		}
+		arr.all = append(arr.all, e)
+		switch {
+		case c.is(opSeq):
+			c.next()
+			if c.is(endCurl) {
+				return nil, ErrSyntax
+			}
+		case c.is(endCurl):
+		default:
+			return nil, ErrSyntax
+		}
+	}
+	if !c.is(endCurl) {
+		return nil, ErrSyntax
+	}
+	c.next()
+	return arr, nil
 }
 
 func (c *Compiler) compileCdt() (Expr, error) {

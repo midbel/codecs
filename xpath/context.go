@@ -68,6 +68,13 @@ func (c Context) DefaultUriCollection() Sequence {
 	return s
 }
 
+func (c Context) Nest() Context {
+	ctx := createContext(c.Node, c.Index, c.Size)
+	ctx.Environ = environ.Enclosed(c.Environ)
+	ctx.PrincipalType = c.PrincipalType
+	return ctx
+}
+
 func (c Context) Sub(node xml.Node, pos int, size int) Context {
 	ctx := createContext(node, pos, size)
 	ctx.Environ = environ.Enclosed(c)

@@ -37,6 +37,8 @@ const (
 	kwIs        = "is"
 	kwCast      = "cast"
 	kwCastable  = "castable"
+	kwMap       = "map"
+	kwArray     = "array"
 )
 
 func isReserved(str string) bool {
@@ -59,6 +61,8 @@ func isReserved(str string) bool {
 	case kwCastable:
 	case kwAs:
 	case kwIs:
+	case kwMap:
+	case kwArray:
 	default:
 		return false
 	}
@@ -87,6 +91,8 @@ const (
 	endPred
 	begGrp
 	endGrp
+	begCurl
+	endCurl
 	opAssign
 	opArrow
 	opRange
@@ -139,6 +145,10 @@ func (t Token) String() string {
 		return "<begin-group>"
 	case endGrp:
 		return "<end-group>"
+	case begCurl:
+		return "<begin-curly>"
+	case endCurl:
+		return "<end-curly>"
 	case opAdd:
 		return "<add>"
 	case opSub:
@@ -328,6 +338,10 @@ func (s *Scanner) scanDelimiter(tok *Token) {
 			s.read()
 			tok.Type = opConcat
 		}
+	case lcurly:
+		tok.Type = begCurl
+	case rcurly:
+		tok.Type = endCurl
 	case lsquare:
 		tok.Type = begPred
 		s.enterPredicate()
@@ -509,6 +523,8 @@ const (
 	rsquare    = ']'
 	lparen     = '('
 	rparen     = ')'
+	lcurly     = '{'
+	rcurly     = '}'
 	colon      = ':'
 	quote      = '"'
 	apos       = '\''
@@ -535,7 +551,8 @@ func isVariable(c rune) bool {
 
 func isDelimiter(c rune) bool {
 	return c == comma || c == dot || c == pipe || c == slash ||
-		c == lsquare || c == rsquare || c == colon
+		c == lsquare || c == rsquare || c == colon ||
+		c == lcurly || c == rcurly
 }
 
 func isOperator(c rune) bool {

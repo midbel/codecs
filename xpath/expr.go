@@ -975,21 +975,16 @@ func (q quantified) MatchPriority() int {
 }
 
 func (q quantified) find(ctx Context) (Sequence, error) {
-	env := ctx.Environ
-	ctx.Environ = environ.Enclosed(ctx)
-	defer func() {
-		ctx.Environ = env
-	}()
-
 	for items, err := range combine(q.binds, ctx) {
 		if err != nil {
 			return nil, err
 		}
+		nest := ctx.Nest()
 		for j := range items {
 			val := NewValue(items[j])
-			ctx.Environ.Define(q.binds[j].ident, val)
+			nest.Define(q.binds[j].ident, val)
 		}
-		res, err := q.test.find(ctx)
+		res, err := q.test.find(nest)
 		if err != nil {
 			return nil, err
 		}
@@ -1076,6 +1071,30 @@ func (v value) MatchPriority() int {
 
 func (v value) find(ctx Context) (Sequence, error) {
 	return slices.Clone(v.seq), nil
+}
+
+type array struct {
+	all []Expr
+}
+
+func (a array) Find(node xml.Node) (Sequence, error) {
+	return a.find(DefaultContext(node))
+}
+
+func (a array) MatchPriority() int {
+	return prioLow
+}
+
+func (a array) find(ctx Context) (Sequence, error) {
+	var seq Sequence
+	for i := range a.all {
+		others, err := a.all[i].find(ctx)
+		if err != nil {
+			return nil, err
+		}
+		seq.Concat(others)
+	}
+	return seq, nil
 }
 
 type Type struct {
