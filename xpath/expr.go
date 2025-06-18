@@ -980,6 +980,15 @@ func (q quantified) find(ctx Context) (Sequence, error) {
 	defer func() {
 		ctx.Environ = env
 	}()
+
+	seq, err := q.test.find(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if seq.Empty() {
+		return Singleton(q.every), nil
+	}
+
 	for items, err := range combine(q.binds, ctx) {
 		if err != nil {
 			return nil, err
@@ -988,17 +997,14 @@ func (q quantified) find(ctx Context) (Sequence, error) {
 			val := NewValue(item)
 			ctx.Environ.Define(q.binds[j].ident, val)
 		}
-		res, err := q.test.find(ctx)
-		if err != nil {
-			return nil, err
-		}
+		res, _ := q.test.find(ctx)
 		if !isTrue(res) && q.every {
 			return Singleton(false), nil
 		} else if isTrue(res) && !q.every {
 			return Singleton(true), nil
 		}
 	}
-	return Singleton(true), nil
+	return Singleton(q.every), nil
 }
 
 func combine(list []binding, ctx Context) iter.Seq2[Sequence, error] {

@@ -529,7 +529,7 @@ func (c *Compiler) compileSequence() (Expr, error) {
 	c.next()
 	var seq sequence
 	for !c.done() && !c.is(endGrp) {
-		expr, err := c.compile()
+		expr, err := c.compileExpr(powLowest)
 		if err != nil {
 			return nil, err
 		}
@@ -556,7 +556,7 @@ func (c *Compiler) compileAlt(left Expr) (Expr, error) {
 	c.Enter("union")
 	defer c.Leave("union")
 	c.next()
-	expr, err := c.compile()
+	expr, err := c.compileExpr(powLowest)
 	if err != nil {
 		return nil, err
 	}

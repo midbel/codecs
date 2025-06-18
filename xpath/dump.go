@@ -86,6 +86,29 @@ func debugExpr(w io.Writer, expr Expr) {
 			debugExpr(w, v.all[i])
 		}
 		io.WriteString(w, ")")
+	case quantified:
+		if v.every {
+			io.WriteString(w, "every")
+		} else {
+			io.WriteString(w, "some")
+		}
+		io.WriteString(w, "(")
+		for i, b := range v.binds {
+			if i > 0 {
+				io.WriteString(w, ", ")
+			}
+			io.WriteString(w, "(")
+			io.WriteString(w, b.ident)
+			io.WriteString(w, ", ")
+			debugExpr(w, b.expr)
+			io.WriteString(w, ")")
+		}
+		io.WriteString(w, ", ")
+		io.WriteString(w, "satisfies")
+		io.WriteString(w, "(")
+		debugExpr(w, v.test)
+		io.WriteString(w, ")")
+		io.WriteString(w, ")")
 	case attr:
 		io.WriteString(w, "attribute")
 		io.WriteString(w, "(")

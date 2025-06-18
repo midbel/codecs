@@ -446,7 +446,11 @@ func (s *Scanner) scanIdent(tok *Token) {
 	case "ge":
 		tok.Type = opGe
 	default:
-		tok.Type = Name
+		if isReserved(tok.Literal) {
+			tok.Type = reserved
+		} else {
+			tok.Type = Name
+		}
 	}
 	s.skipBlank()
 }

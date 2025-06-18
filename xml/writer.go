@@ -123,6 +123,7 @@ func writeNode(node Node, maxdepth int) string {
 	ws := NewWriter(&buf)
 	ws.MaxDepth = maxdepth
 	ws.writeNode(node, 0)
+	ws.writer.Flush()
 	return buf.String()
 }
 
