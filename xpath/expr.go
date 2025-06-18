@@ -981,24 +981,19 @@ func (q quantified) find(ctx Context) (Sequence, error) {
 		ctx.Environ = env
 	}()
 
-	seq, err := q.test.find(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if seq.Empty() {
-		return Singleton(q.every), nil
-	}
-
 	for items, err := range combine(q.binds, ctx) {
 		if err != nil {
 			return nil, err
 		}
-		for j, item := range items {
-			val := NewValue(item)
+		for j := range items {
+			val := NewValue(items[j])
 			ctx.Environ.Define(q.binds[j].ident, val)
 		}
-		res, _ := q.test.find(ctx)
-		if !isTrue(res) && q.every {
+		res, err := q.test.find(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if !res.True() && q.every {
 			return Singleton(false), nil
 		} else if isTrue(res) && !q.every {
 			return Singleton(true), nil
@@ -1012,12 +1007,20 @@ func combine(list []binding, ctx Context) iter.Seq2[Sequence, error] {
 		return nil
 	}
 	fn := func(yield func(Sequence, error) bool) {
-		is, err := list[0].expr.find(ctx)
-		if err != nil {
+		items, err := list[0].expr.find(ctx)
+		if err != nil || items.Empty() {
 			yield(nil, err)
 			return
 		}
-		for _, i := range is {
+		if len(list) == 1 {
+			for i := range items {
+				if !yield(Singleton(items[i]), nil) {
+					break
+				}
+			}
+			return
+		}
+		for _, i := range items {
 			it := combine(list[1:], ctx)
 			if it == nil {
 				break
@@ -1027,11 +1030,11 @@ func combine(list []binding, ctx Context) iter.Seq2[Sequence, error] {
 					yield(nil, err)
 					return
 				}
-				vs := NewSequence()
-				vs.Append(i)
-				vs.Concat(arr)
-				if ok := yield(vs, nil); !ok {
-					break
+				var seq Sequence
+				seq.Append(i)
+				seq.Concat(arr)
+				if ok := yield(seq, nil); !ok {
+					return
 				}
 			}
 		}
@@ -1044,10 +1047,8 @@ type value struct {
 }
 
 func NewValue(item Item) Expr {
-	seq := NewSequence()
-	seq.Append(item)
 	return value{
-		seq: seq,
+		seq: Singleton(item),
 	}
 }
 

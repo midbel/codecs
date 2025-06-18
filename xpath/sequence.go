@@ -224,7 +224,7 @@ func createSingle(item Item) Sequence {
 	return append(list, item)
 }
 
-func isTrue(list []Item) bool {
+func isTrue(list Sequence) bool {
 	return len(list) > 0 && list[0].True()
 }
 
@@ -248,6 +248,9 @@ func NewLiteralItem(value any) Item {
 }
 
 func createLiteral(value any) Item {
+	if i, ok := value.(literalItem); ok {
+		return i
+	}
 	return literalItem{
 		value: value,
 	}
@@ -262,6 +265,8 @@ func (i literalItem) True() bool {
 	case []byte:
 		return len(v) != 0
 	case float64:
+		return v != 0
+	case int64:
 		return v != 0
 	case string:
 		return v != ""
