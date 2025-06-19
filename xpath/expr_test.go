@@ -24,7 +24,6 @@ const document = `<?xml version="1.0" encoding="UTF-8"?>
 
 type TestCase struct {
 	Expr     string
-	Count    int
 	Expected []string
 }
 
@@ -67,7 +66,7 @@ func TestFilter(t *testing.T) {
 			Expected: []string{"root", "group", "test"},
 		},
 	}
-	runTestCase(t, tests)
+	runTests(t, tests)
 }
 
 func TestIndex(t *testing.T) {
@@ -77,7 +76,7 @@ func TestIndex(t *testing.T) {
 			Expected: []string{"element-1"},
 		},
 	}
-	runTestCase(t, tests)
+	runTests(t, tests)
 }
 
 func TestFunction(t *testing.T) {
@@ -87,7 +86,7 @@ func TestFunction(t *testing.T) {
 			Expected: []string{"4"},
 		},
 	}
-	runTestCase(t, tests)
+	runTests(t, tests)
 }
 
 func TestSequence(t *testing.T) {
@@ -101,7 +100,7 @@ func TestSequence(t *testing.T) {
 			Expected: []string{"item1", "item2", "item-4-1", "item-4-2"},
 		},
 	}
-	runTestCase(t, tests)
+	runTests(t, tests)
 }
 
 func TestPath(t *testing.T) {
@@ -128,10 +127,52 @@ func TestPath(t *testing.T) {
 			Expected: []string{"true"},
 		},
 	}
-	runTestCase(t, tests)
+	runTests(t, tests)
 }
 
-func runTestCase(t *testing.T, tests []TestCase) {
+func TestQuantified(t *testing.T) {
+	tests := []TestCase{
+		{
+			Expr:     "every $x in (1, 2, 3) satisfies $x <= 10",
+			Expected: []string{"true"},
+		},
+		{
+			Expr:     "every $x in (1, 2, 3) satisfies $x > 10",
+			Expected: []string{"false"},
+		},
+		{
+			Expr:     "some $x in (1, 2, 3) satisfies $x > 10",
+			Expected: []string{"false"},
+		},
+		{
+			Expr:     "some $x in (1, 2, 13) satisfies $x > 10",
+			Expected: []string{"true"},
+		},
+		{
+			Expr:     "some $x in (1, 2, 13), $y in (1, 2) satisfies $x * $y > 10",
+			Expected: []string{"true"},
+		},
+		{
+			Expr:     "every $el in //item satisfies contains(string($el), 'element')",
+			Expected: []string{"true"},
+		},
+		{
+			Expr:     "some $el in //* satisfies exists($el/@ignore)",
+			Expected: []string{"true"},
+		},
+		{
+			Expr:     "every $el in /root/items satisfies 1=1",
+			Expected: []string{"true"},
+		},
+		{
+			Expr:     "some $el in /root/items satisfies 1=1",
+			Expected: []string{"false"},
+		},
+	}
+	runTests(t, tests)
+}
+
+func runTests(t *testing.T, tests []TestCase) {
 	t.Helper()
 
 	doc, err := parseDocument()
