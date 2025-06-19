@@ -109,6 +109,7 @@ const (
 	opUnion
 	opExcept
 	opIntersect
+	opIs
 	opAnd
 	opOr
 	opSeq
@@ -123,6 +124,8 @@ type Token struct {
 
 func (t Token) String() string {
 	switch t.Type {
+	case opIs:
+		return "<identity>"
 	case opIntersect:
 		return "<intersect>"
 	case opUnion:
@@ -439,6 +442,8 @@ func (s *Scanner) scanIdent(tok *Token) {
 	}
 	tok.Literal = s.str.String()
 	switch tok.Literal {
+	case kwIs:
+		tok.Type = opIs
 	case kwIntersect:
 		tok.Type = opIntersect
 	case kwExcept:

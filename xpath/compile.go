@@ -82,6 +82,7 @@ func NewCompiler(r io.Reader) *Compiler {
 		opUnion:     cp.compileUnion,
 		opIntersect: cp.compileIntersect,
 		opExcept:    cp.compileExcept,
+		opIs:        cp.compileIdentity,
 		begGrp:      cp.compileCall,
 		reserved:    cp.compileReservedInfix,
 	}
@@ -406,8 +407,6 @@ func (c *Compiler) compileReservedInfix(left Expr) (Expr, error) {
 		err  error
 	)
 	switch keyword {
-	case kwIs:
-		return c.compileIdentity(left)
 	case kwCast:
 		return c.compileCast(left)
 	case kwCastable:
@@ -421,7 +420,8 @@ func (c *Compiler) compileReservedInfix(left Expr) (Expr, error) {
 func (c *Compiler) compileIdentity(left Expr) (Expr, error) {
 	c.Enter("identity")
 	defer c.Leave("identity")
-	right, err := c.compile()
+	c.next()
+	right, err := c.compileExpr(powLowest)
 	if err != nil {
 		return nil, err
 	}
@@ -1072,6 +1072,7 @@ const (
 	powAnd
 	powUnion
 	powIntersect
+	powIdentity
 	powRange
 	powCmp
 	powConcat
@@ -1092,6 +1093,7 @@ var bindings = map[rune]int{
 	opExcept:    powIntersect,
 	opConcat:    powConcat,
 	opAssign:    powAssign,
+	opIs:        powIdentity,
 	opEq:        powCmp,
 	opNe:        powCmp,
 	opGt:        powCmp,

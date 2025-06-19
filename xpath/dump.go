@@ -135,6 +135,13 @@ func debugExpr(w io.Writer, expr Expr) {
 		io.WriteString(w, ", ")
 		debugExpr(w, v.check)
 		io.WriteString(w, ")")
+	case identity:
+		io.WriteString(w, "identity")
+		io.WriteString(w, "(")
+		debugExpr(w, v.left)
+		io.WriteString(w, ", ")
+		debugExpr(w, v.right)
+		io.WriteString(w, ")")
 	case binary:
 		io.WriteString(w, "binary")
 		io.WriteString(w, "(")
