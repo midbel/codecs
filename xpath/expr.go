@@ -979,6 +979,9 @@ func (q quantified) find(ctx Context) (Sequence, error) {
 		if err != nil {
 			return nil, err
 		}
+		if items.Empty() {
+			continue
+		}
 		nest := ctx.Nest()
 		for j := range items {
 			val := NewValue(items[j])

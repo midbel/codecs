@@ -168,6 +168,14 @@ func TestQuantified(t *testing.T) {
 			Expr:     "some $el in /root/items satisfies 1=1",
 			Expected: []string{"false"},
 		},
+		{
+			Expr:     "some $x in (1, 2), $y in () satisfies $x + $y > 0",
+			Expected: []string{"false"},
+		},
+		{
+			Expr:     "every $x in (1, 2), $y in (3, 4) satisfies $x < $y",
+			Expected: []string{"true"},
+		},
 	}
 	runTests(t, tests)
 }
