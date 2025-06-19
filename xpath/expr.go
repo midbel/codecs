@@ -193,6 +193,38 @@ func (_ current) find(ctx Context) (Sequence, error) {
 	return Singleton(ctx.Node), nil
 }
 
+type stepmap struct {
+	step Expr
+	expr Expr
+}
+
+func (s stepmap) Find(node xml.Node) (Sequence, error) {
+	return s.find(DefaultContext(node))
+}
+
+func (s stepmap) MatchPriority() int {
+	return getPriority(prioMed, s.step, s.expr)
+}
+
+func (s stepmap) find(ctx Context) (Sequence, error) {
+	items, err := s.step.find(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if items.Empty() {
+		return items, nil
+	}
+	var seq Sequence
+	for j, n := range items {
+		others, err := s.expr.find(ctx.Sub(n.Node(), j+1, items.Len()))
+		if err != nil {
+			return nil, err
+		}
+		seq.Concat(others)
+	}
+	return seq, nil
+}
+
 type step struct {
 	curr Expr
 	next Expr
@@ -815,7 +847,7 @@ func (f filter) find(ctx Context) (Sequence, error) {
 
 	var ret Sequence
 	for j, n := range list {
-		res, err := f.check.find(ctx.Sub(n.Node(), j+1, len(list)))
+		res, err := f.check.find(ctx.Sub(n.Node(), j+1, list.Len()))
 		if err != nil {
 			continue
 		}

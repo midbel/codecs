@@ -935,6 +935,22 @@ func (c *Compiler) compileStep(left Expr) (Expr, error) {
 	defer c.Leave("step")
 
 	c.next()
+	if c.is(begGrp) {
+		c.next()
+		expr, err := c.compileExpr(powLowest)
+		if err != nil {
+			return nil, err
+		}
+		if !c.is(endGrp) {
+			return nil, fmt.Errorf("%w: missing closing ')'", ErrSyntax)
+		}
+		c.next()
+		ctx := stepmap{
+			step: left,
+			expr: expr,
+		}
+		return ctx, nil
+	}
 	next, err := c.compileExpr(powStep)
 	if err != nil {
 		return nil, err
