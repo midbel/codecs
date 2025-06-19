@@ -22,20 +22,14 @@ const document = `<?xml version="1.0" encoding="UTF-8"?>
 </root>
 `
 
-func TestEval(t *testing.T) {
-	tests := []struct {
-		Expr     string
-		Count    int
-		Expected []string
-	}{
-		{
-			Expr:     "/root/item",
-			Expected: []string{"element-1", "element-2"},
-		},
-		{
-			Expr:     "/root/item[1]",
-			Expected: []string{"element-1"},
-		},
+type TestCase struct {
+	Expr     string
+	Count    int
+	Expected []string
+}
+
+func TestFilter(t *testing.T) {
+	tests := []TestCase{
 		{
 			Expr:     "/root/item[last()]",
 			Expected: []string{"element-2"},
@@ -49,28 +43,8 @@ func TestEval(t *testing.T) {
 			Expected: []string{"element-2"},
 		},
 		{
-			Expr:     "count(//item))",
-			Expected: []string{"4"},
-		},
-		{
-			Expr:     "//item",
-			Expected: []string{"element-1", "element-2", "sub-element-1", "sub-element-2"},
-		},
-		{
-			Expr:     "//group/item[1]",
-			Expected: []string{"sub-element-1"},
-		},
-		{
-			Expr:     "/root/item[1] | /root/item[2]",
-			Expected: []string{"element-1", "element-2"},
-		},
-		{
 			Expr:     "//item[text()=\"element-1\"]",
 			Expected: []string{"element-1"},
-		},
-		{
-			Expr:     "//@ignore",
-			Expected: []string{"true"},
 		},
 		{
 			Expr:     "//test[@ignore=\"true\"]",
@@ -92,6 +66,32 @@ func TestEval(t *testing.T) {
 			Expr:     "//*[not(self::item)]",
 			Expected: []string{"root", "group", "test"},
 		},
+	}
+	runTestCase(t, tests)
+}
+
+func TestIndex(t *testing.T) {
+	tests := []TestCase{
+		{
+			Expr:     "/root/item[1]",
+			Expected: []string{"element-1"},
+		},
+	}
+	runTestCase(t, tests)
+}
+
+func TestFunction(t *testing.T) {
+	tests := []TestCase{
+		{
+			Expr:     "count(//item))",
+			Expected: []string{"4"},
+		},
+	}
+	runTestCase(t, tests)
+}
+
+func TestSequence(t *testing.T) {
+	tests := []TestCase{
 		{
 			Expr:     "1 to 3",
 			Expected: []string{"1", "2", "3"},
@@ -101,6 +101,38 @@ func TestEval(t *testing.T) {
 			Expected: []string{"item1", "item2", "item-4-1", "item-4-2"},
 		},
 	}
+	runTestCase(t, tests)
+}
+
+func TestPath(t *testing.T) {
+	tests := []TestCase{
+		{
+			Expr:     "/root/item",
+			Expected: []string{"element-1", "element-2"},
+		},
+
+		{
+			Expr:     "//item",
+			Expected: []string{"element-1", "element-2", "sub-element-1", "sub-element-2"},
+		},
+		{
+			Expr:     "//group/item[1]",
+			Expected: []string{"sub-element-1"},
+		},
+		{
+			Expr:     "/root/item[1] | /root/item[2]",
+			Expected: []string{"element-1", "element-2"},
+		},
+		{
+			Expr:     "//@ignore",
+			Expected: []string{"true"},
+		},
+	}
+	runTestCase(t, tests)
+}
+
+func runTestCase(t *testing.T, tests []TestCase) {
+	t.Helper()
 
 	doc, err := parseDocument()
 	if err != nil {
