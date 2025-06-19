@@ -240,6 +240,18 @@ func TestPath(t *testing.T) {
 			Expr:     "//@ignore",
 			Expected: []string{"true"},
 		},
+		{
+			Expr:     "/root/item union /root//group/item",
+			Expected: []string{"element-1", "element-2", "sub-element-1", "sub-element-2"},
+		},
+		{
+			Expr:     "/root//item[contains(., 'sub')] intersect /root/group/item",
+			Expected: []string{"sub-element-1", "sub-element-2"},
+		},
+		{
+			Expr:     "/root//item except /root/group/item",
+			Expected: []string{"element-1", "element-2"},
+		},
 	}
 	runTests(t, tests)
 }
@@ -297,12 +309,16 @@ func TestQuantified(t *testing.T) {
 func TestMath(t *testing.T) {
 	tests := []TestCase{
 		{
-			Expr: "sum(/root/lines/line/total)",
+			Expr:     "sum(/root/lines/line/total)",
 			Expected: []string{"35"},
 		},
 		{
-			Expr: "/root/lines/line/(quantity * unit/price)",
+			Expr:     "/root/lines/line/(quantity * unit/price)",
 			Expected: []string{"10", "25"},
+		},
+		{
+			Expr:     "/root/lines/line/quantity * /root/lines/line/unit/price",
+			Expected: []string{"10", "5", "50", "25"},
 		},
 	}
 	runTests(t, tests)
