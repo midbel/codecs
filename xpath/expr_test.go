@@ -79,7 +79,77 @@ func TestIndex(t *testing.T) {
 	runTests(t, tests)
 }
 
-func TestFunction(t *testing.T) {
+func TestFunctions(t *testing.T) {
+	t.Run("boolean", testBooleanFunctions)
+	t.Run("string", testStringFunctions)
+	t.Run("misc", testMiscFunctions)
+}
+
+func testStringFunctions(t *testing.T) {
+	tests := []TestCase{
+		{
+			Expr:     "concat('foo', 'bar')",
+			Expected: []string{"foobar"},
+		},
+		{
+			Expr:     "concat(/root/item[1], /root/item[2])",
+			Expected: []string{"element-1element-2"},
+		},
+		{
+			Expr:     "contains(/root/item[1], 'element')",
+			Expected: []string{"true"},
+		},
+		{
+			Expr:     "contains(/root/item[1], 'test')",
+			Expected: []string{"false"},
+		},
+		{
+			Expr:     "string(/root/item)",
+			Expected: []string{"element-1"},
+		},
+		{
+			Expr:     "string(10)",
+			Expected: []string{"10"},
+		},
+		{
+			Expr:     "string(true())",
+			Expected: []string{"true"},
+		},
+		{
+			Expr:     "string('')",
+			Expected: []string{""},
+		},
+		{
+			Expr:     "string-join(('foo', 'bar'), ' ')",
+			Expected: []string{"foo bar"},
+		},
+		{
+			Expr:     "string-join(1 to 3)",
+			Expected: []string{"123"},
+		},
+		{
+			Expr:     "string-join(1 to 3, ':')",
+			Expected: []string{"1:2:3"},
+		},
+	}
+	runTests(t, tests)
+}
+
+func testBooleanFunctions(t *testing.T) {
+	tests := []TestCase{
+		{
+			Expr:     "false()",
+			Expected: []string{"false"},
+		},
+		{
+			Expr:     "true()",
+			Expected: []string{"true"},
+		},
+	}
+	runTests(t, tests)
+}
+
+func testMiscFunctions(t *testing.T) {
 	tests := []TestCase{
 		{
 			Expr:     "count(//item))",

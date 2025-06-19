@@ -30,6 +30,10 @@ func Singleton(value any) Sequence {
 	var item Item
 	if n, ok := value.(xml.Node); ok {
 		item = createNode(n)
+	} else if i, ok := value.(literalItem); ok {
+		item = i
+	} else if i, ok := value.(nodeItem); ok {
+		item = i
 	} else {
 		item = createLiteral(value)
 	}

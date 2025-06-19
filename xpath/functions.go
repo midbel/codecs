@@ -838,7 +838,7 @@ func callString(ctx Context, args []Expr) (Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(items) == 0 {
+	if items.Empty() {
 		return Singleton(""), nil
 	}
 	if !items[0].Atomic() {
@@ -850,6 +850,8 @@ func callString(ctx Context, args []Expr) (Sequence, error) {
 		str = strconv.FormatBool(v)
 	case float64:
 		str = strconv.FormatFloat(v, 'f', -1, 64)
+	case int64:
+		str = strconv.FormatInt(v, 64)
 	case string:
 		str = v
 	default:
@@ -884,9 +886,6 @@ func callConcat(ctx Context, args []Expr) (Sequence, error) {
 	}
 	var list []string
 	for _, i := range items {
-		if !i.Atomic() {
-			return nil, fmt.Errorf("literal value expected")
-		}
 		str, err := toString(i.Value())
 		if err != nil {
 			return nil, err
