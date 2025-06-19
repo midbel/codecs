@@ -19,6 +19,22 @@ const document = `<?xml version="1.0" encoding="UTF-8"?>
 		<item lang="en">sub-element-2</item>
 		<test ignore="true"/>
 	</group>
+	<lines>
+		<line>
+			<quantity>1</quantity>
+			<total>10</total>
+			<unit>
+				<price>10</price>
+			</unit>
+		</line>
+		<line>
+			<quantity>5</quantity>
+			<total>25</total>
+			<unit>
+				<price>5</price>
+			</unit>
+		</line>
+	</lines>
 </root>
 `
 
@@ -130,6 +146,34 @@ func testStringFunctions(t *testing.T) {
 		{
 			Expr:     "string-join(1 to 3, ':')",
 			Expected: []string{"1:2:3"},
+		},
+		{
+			Expr:     "substring('foobar', 4)",
+			Expected: []string{"bar"},
+		},
+		{
+			Expr:     "substring('foobar', 0, 3)",
+			Expected: []string{"foo"},
+		},
+		{
+			Expr:     "string-length('foobar')",
+			Expected: []string{"6"},
+		},
+		{
+			Expr:     "upper-case('foobar')",
+			Expected: []string{"FOOBAR"},
+		},
+		{
+			Expr:     "upper-case('FOOBAR')",
+			Expected: []string{"FOOBAR"},
+		},
+		{
+			Expr:     "lower-case('foobar')",
+			Expected: []string{"foobar"},
+		},
+		{
+			Expr:     "lower-case('FOOBAR')",
+			Expected: []string{"foobar"},
 		},
 	}
 	runTests(t, tests)
@@ -245,6 +289,20 @@ func TestQuantified(t *testing.T) {
 		{
 			Expr:     "every $x in (1, 2), $y in (3, 4) satisfies $x < $y",
 			Expected: []string{"true"},
+		},
+	}
+	runTests(t, tests)
+}
+
+func TestMath(t *testing.T) {
+	tests := []TestCase{
+		{
+			Expr: "sum(/root/lines/line/total)",
+			Expected: []string{"35"},
+		},
+		{
+			Expr: "/root/lines/line/(quantity * unit/price)",
+			Expected: []string{"10", "25"},
 		},
 	}
 	runTests(t, tests)

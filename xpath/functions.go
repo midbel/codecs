@@ -942,6 +942,7 @@ func callSubstring(ctx Context, args []Expr) (Sequence, error) {
 		if err != nil {
 			return nil, err
 		}
+		size = size + 1
 	} else {
 		size = float64(len(str))
 	}

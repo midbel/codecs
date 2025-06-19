@@ -461,7 +461,7 @@ func (c *Compiler) compileRange(left Expr) (Expr, error) {
 	defer c.Leave("range")
 	c.next()
 
-	right, err := c.compile()
+	right, err := c.compileExpr(powLowest)
 	if err != nil {
 		return nil, err
 	}
