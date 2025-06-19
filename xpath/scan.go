@@ -49,10 +49,6 @@ func isReserved(str string) bool {
 	case kwThen:
 	case kwFor:
 	case kwIn:
-	case kwTo:
-	case kwUnion:
-	case kwIntersect:
-	case kwExcept:
 	case kwReturn:
 	case kwSome:
 	case kwEvery:
@@ -110,7 +106,9 @@ const (
 	opGe
 	opLt
 	opLe
-	opAlt
+	opUnion
+	opExcept
+	opIntersect
 	opAnd
 	opOr
 	opSeq
@@ -125,6 +123,12 @@ type Token struct {
 
 func (t Token) String() string {
 	switch t.Type {
+	case opIntersect:
+		return "<intersect>"
+	case opUnion:
+		return "<union>"
+	case opExcept:
+		return "<except>"
 	case opAxis:
 		return "<axis>"
 	case currNode:
@@ -177,8 +181,6 @@ func (t Token) String() string {
 		return "<lesser-than>"
 	case opLe:
 		return "<lesser-eq>"
-	case opAlt:
-		return "<alternative>"
 	case opAnd:
 		return "<and>"
 	case opOr:
@@ -333,7 +335,7 @@ func (s *Scanner) scanDelimiter(tok *Token) {
 	case comma:
 		tok.Type = opSeq
 	case pipe:
-		tok.Type = opAlt
+		tok.Type = opUnion
 		if k == s.char {
 			s.read()
 			tok.Type = opConcat
@@ -437,6 +439,12 @@ func (s *Scanner) scanIdent(tok *Token) {
 	}
 	tok.Literal = s.str.String()
 	switch tok.Literal {
+	case kwIntersect:
+		tok.Type = opIntersect
+	case kwExcept:
+		tok.Type = opExcept
+	case kwUnion:
+		tok.Type = opUnion
 	case kwAnd:
 		tok.Type = opAnd
 	case kwOr:

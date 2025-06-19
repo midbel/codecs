@@ -58,30 +58,32 @@ func NewCompiler(r io.Reader) *Compiler {
 	}
 
 	cp.infix = map[rune]func(Expr) (Expr, error){
-		currLevel: cp.compileStep,
-		anyLevel:  cp.compileDescendantStep,
-		begPred:   cp.compileFilter,
-		opArrow:   cp.compileArrow,
-		opRange:   cp.compileRange,
-		opConcat:  cp.compileBinary,
-		opAdd:     cp.compileBinary,
-		opSub:     cp.compileBinary,
-		opMul:     cp.compileBinary,
-		opDiv:     cp.compileBinary,
-		opMod:     cp.compileBinary,
-		opEq:      cp.compileBinary,
-		opNe:      cp.compileBinary,
-		opGt:      cp.compileBinary,
-		opGe:      cp.compileBinary,
-		opLt:      cp.compileBinary,
-		opLe:      cp.compileBinary,
-		opAnd:     cp.compileBinary,
-		opOr:      cp.compileBinary,
-		opBefore:  cp.compileBinary,
-		opAfter:   cp.compileBinary,
-		opAlt:     cp.compileAlt,
-		begGrp:    cp.compileCall,
-		reserved:  cp.compileReservedInfix,
+		currLevel:   cp.compileStep,
+		anyLevel:    cp.compileDescendantStep,
+		begPred:     cp.compileFilter,
+		opArrow:     cp.compileArrow,
+		opRange:     cp.compileRange,
+		opConcat:    cp.compileBinary,
+		opAdd:       cp.compileBinary,
+		opSub:       cp.compileBinary,
+		opMul:       cp.compileBinary,
+		opDiv:       cp.compileBinary,
+		opMod:       cp.compileBinary,
+		opEq:        cp.compileBinary,
+		opNe:        cp.compileBinary,
+		opGt:        cp.compileBinary,
+		opGe:        cp.compileBinary,
+		opLt:        cp.compileBinary,
+		opLe:        cp.compileBinary,
+		opAnd:       cp.compileBinary,
+		opOr:        cp.compileBinary,
+		opBefore:    cp.compileBinary,
+		opAfter:     cp.compileBinary,
+		opUnion:     cp.compileUnion,
+		opIntersect: cp.compileIntersect,
+		opExcept:    cp.compileExcept,
+		begGrp:      cp.compileCall,
+		reserved:    cp.compileReservedInfix,
 	}
 	cp.prefix = map[rune]func() (Expr, error){
 		currLevel:  cp.compileRoot,
@@ -410,32 +412,6 @@ func (c *Compiler) compileReservedInfix(left Expr) (Expr, error) {
 		return c.compileCast(left)
 	case kwCastable:
 		return c.compileCastable(left)
-	case kwUnion:
-		expr, err = c.compile()
-		if err != nil {
-			break
-		}
-		var res union
-		res.all = []Expr{left, expr}
-
-		expr = res
-	case kwIntersect:
-		expr, err = c.compile()
-		if err != nil {
-			break
-		}
-		var res intersect
-		res.all = []Expr{left, expr}
-
-		expr = res
-	case kwExcept:
-		expr, err = c.compile()
-		if err != nil {
-			break
-		}
-		var res except
-		res.all = []Expr{left, expr}
-		expr = res
 	default:
 		return nil, fmt.Errorf("%s: reserved word can not be used as infix operator", keyword)
 	}
@@ -610,7 +586,7 @@ func (c *Compiler) compileSequence() (Expr, error) {
 	return seq, nil
 }
 
-func (c *Compiler) compileAlt(left Expr) (Expr, error) {
+func (c *Compiler) compileUnion(left Expr) (Expr, error) {
 	c.Enter("union")
 	defer c.Leave("union")
 	c.next()
@@ -619,6 +595,32 @@ func (c *Compiler) compileAlt(left Expr) (Expr, error) {
 		return nil, err
 	}
 	var res union
+	res.all = []Expr{left, expr}
+	return res, nil
+}
+
+func (c *Compiler) compileIntersect(left Expr) (Expr, error) {
+	c.Enter("intersect")
+	defer c.Leave("intersect")
+	c.next()
+	expr, err := c.compileExpr(powLowest)
+	if err != nil {
+		return nil, err
+	}
+	var res intersect
+	res.all = []Expr{left, expr}
+	return res, nil
+}
+
+func (c *Compiler) compileExcept(left Expr) (Expr, error) {
+	c.Enter("except")
+	defer c.Leave("except")
+	c.next()
+	expr, err := c.compileExpr(powLowest)
+	if err != nil {
+		return nil, err
+	}
+	var res except
 	res.all = []Expr{left, expr}
 	return res, nil
 }
@@ -1052,13 +1054,14 @@ const (
 	powAssign // variable assignment
 	powOr
 	powAnd
+	powUnion
+	powIntersect
 	powRange
 	powCmp
 	powConcat
 	powAdd
 	powMul
 	powPrefix
-	powAlt  // union
 	powStep // step
 	powPred
 	powCall
@@ -1066,27 +1069,29 @@ const (
 )
 
 var bindings = map[rune]int{
-	currLevel: powStep,
-	anyLevel:  powStep,
-	opAlt:     powAlt,
-	opConcat:  powConcat,
-	opAssign:  powAssign,
-	opEq:      powCmp,
-	opNe:      powCmp,
-	opGt:      powCmp,
-	opGe:      powCmp,
-	opLt:      powCmp,
-	opLe:      powCmp,
-	opBefore:  powCmp,
-	opAfter:   powCmp,
-	opAnd:     powAnd,
-	opOr:      powOr,
-	opAdd:     powAdd,
-	opSub:     powAdd,
-	opMul:     powMul,
-	opDiv:     powMul,
-	opMod:     powMul,
-	opRange:   powRange,
-	begGrp:    powCall,
-	begPred:   powPred,
+	currLevel:   powStep,
+	anyLevel:    powStep,
+	opUnion:     powUnion,
+	opIntersect: powIntersect,
+	opExcept:    powIntersect,
+	opConcat:    powConcat,
+	opAssign:    powAssign,
+	opEq:        powCmp,
+	opNe:        powCmp,
+	opGt:        powCmp,
+	opGe:        powCmp,
+	opLt:        powCmp,
+	opLe:        powCmp,
+	opBefore:    powCmp,
+	opAfter:     powCmp,
+	opAnd:       powAnd,
+	opOr:        powOr,
+	opAdd:       powAdd,
+	opSub:       powAdd,
+	opMul:       powMul,
+	opDiv:       powMul,
+	opMod:       powMul,
+	opRange:     powRange,
+	begGrp:      powCall,
+	begPred:     powPred,
 }
