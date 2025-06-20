@@ -959,7 +959,7 @@ func (c *Compiler) compileStepmap(left Expr) (Expr, error) {
 		return nil, fmt.Errorf("%w: missing closing ')'", ErrSyntax)
 	}
 	c.next()
-	if !c.is(opSeq) && !c.done() {
+	if !c.is(opSeq) && !c.is(endPred) && !c.done() {
 		return nil, fmt.Errorf("%w: general expression can only be present after step expression", ErrSyntax)
 	}
 	ctx := stepmap{

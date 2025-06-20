@@ -727,22 +727,24 @@ func (e except) MatchPriority() int {
 }
 
 func (e except) find(ctx Context) (Sequence, error) {
-	var list Sequence
-	for i := range e.all {
-		res, err := e.all[i].find(ctx)
-		if err != nil {
-			continue
-		}
-		for i := range res {
-			ok := slices.ContainsFunc(list, func(item Item) bool {
-				return item.Node().Identity() == res[i].Node().Identity()
-			})
-			if !ok {
-				list.Append(res[i])
-			}
+	left, err := e.all[0].find(ctx)
+	if err != nil {
+		return nil, err
+	}
+	right, err := e.all[1].find(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var res Sequence
+	for i := range left {
+		ok := slices.ContainsFunc(right, func(item Item) bool {
+			return item.Node().Identity() == left[i].Node().Identity()
+		})
+		if !ok {
+			res.Append(left[i])
 		}
 	}
-	return list, nil
+	return res, nil
 }
 
 type intersect struct {
@@ -758,23 +760,24 @@ func (e intersect) MatchPriority() int {
 }
 
 func (e intersect) find(ctx Context) (Sequence, error) {
-	var list Sequence
-	for i := range e.all {
-		res, err := e.all[i].find(ctx)
-		if err != nil {
-			continue
-		}
-
-		for i := range res {
-			ok := slices.ContainsFunc(list, func(item Item) bool {
-				return item.Node().Identity() == res[i].Node().Identity()
-			})
-			if ok {
-				list.Append(res[i])
-			}
+	left, err := e.all[0].find(ctx)
+	if err != nil {
+		return nil, err
+	}
+	right, err := e.all[1].find(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var res Sequence
+	for i := range right {
+		ok := slices.ContainsFunc(left, func(item Item) bool {
+			return item.Node().Identity() == right[i].Node().Identity()
+		})
+		if ok {
+			res.Append(right[i])
 		}
 	}
-	return list, nil
+	return res, nil
 }
 
 type union struct {
@@ -790,15 +793,16 @@ func (u union) MatchPriority() int {
 }
 
 func (u union) find(ctx Context) (Sequence, error) {
-	var list Sequence
-	for i := range u.all {
-		res, err := u.all[i].find(ctx)
-		if err != nil {
-			continue
-		}
-		list.Concat(res)
+	left, err := u.all[0].find(ctx)
+	if err != nil {
+		return nil, err
 	}
-	return list, nil
+	right, err := u.all[1].find(ctx)
+	if err != nil {
+		return nil, err
+	}
+	left.Concat(right)
+	return left, nil
 }
 
 type index struct {

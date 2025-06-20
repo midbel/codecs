@@ -152,7 +152,7 @@ func testStringFunctions(t *testing.T) {
 			Expected: []string{"bar"},
 		},
 		{
-			Expr:     "substring('foobar', 0, 3)",
+			Expr:     "substring('foobar', 1, 3)",
 			Expected: []string{"foo"},
 		},
 		{
@@ -223,7 +223,10 @@ func TestPath(t *testing.T) {
 			Expr:     "/root/item",
 			Expected: []string{"element-1", "element-2"},
 		},
-
+		{
+			Expr: "/root/item[2]/../item[1]",
+			Expected: []string{"element-1"},
+		},
 		{
 			Expr:     "//item",
 			Expected: []string{"element-1", "element-2", "sub-element-1", "sub-element-2"},
@@ -344,6 +347,7 @@ func runTests(t *testing.T, tests []TestCase) {
 			continue
 		}
 		if seq.Len() != len(c.Expected) {
+			t.Logf("sequence: %s", seq.CanonicalizeString())
 			t.Errorf("%s: number of nodes mismatched! want %d, got %d", c.Expr, len(c.Expected), seq.Len())
 			continue
 		}

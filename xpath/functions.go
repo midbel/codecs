@@ -942,7 +942,7 @@ func callSubstring(ctx Context, args []Expr) (Sequence, error) {
 		if err != nil {
 			return nil, err
 		}
-		size = size + 1
+		size = size
 	} else {
 		size = float64(len(str))
 	}
@@ -1060,8 +1060,12 @@ func callTranslate(ctx Context, args []Expr) (Sequence, error) {
 }
 
 func callContains(ctx Context, args []Expr) (Sequence, error) {
-	if len(args) != 2 {
+	if len(args) < 1 {
 		return nil, ErrArgument
+	}
+	if len(args) == 1 {
+		list := []Expr{NewValueFromNode(ctx.Node)}
+		return callContains(ctx, append(list, args...))
 	}
 	fst, err := getStringFromExpr(args[0], ctx)
 	if err != nil {
