@@ -240,6 +240,10 @@ func TestVariables(t *testing.T) {
 			Dir:    "testdata/variable-err-name",
 			Failed: true,
 		},
+		{
+			Name: "variable/shadow",
+			Dir: "testdata/variable-shadowing",
+		},
 	}
 	runTest(t, tests)
 }

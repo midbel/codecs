@@ -572,6 +572,8 @@ func (s *Stylesheet) init(doc xml.Node) error {
 			err = s.loadOutput(n)
 		case s.getQualifiedName("param"):
 			err = s.loadParam(n)
+		case s.getQualifiedName("variable"):
+			err = s.loadVariable(n)
 		case s.getQualifiedName("attribute-set"):
 			err = s.loadAttributeSet(n)
 		case s.getQualifiedName("template"):
@@ -697,6 +699,10 @@ func (s *Stylesheet) loadMode(node xml.Node) error {
 	return nil
 }
 
+func (s *Stylesheet) loadVariable(node xml.Node) error {
+	return errImplemented
+}
+
 func (s *Stylesheet) loadParam(node xml.Node) error {
 	elem, err := getElementFromNode(node)
 	if err != nil {
@@ -706,7 +712,14 @@ func (s *Stylesheet) loadParam(node xml.Node) error {
 	if err != nil {
 		return err
 	}
+	var static bool
+	if yes, err := getAttribute(elem, "static"); err == nil && yes == "yes" {
+		static = true
+	}
 	if query, err := getAttribute(elem, "select"); err == nil {
+		if static {
+			return s.DefineParam(ident, query)
+		}
 		expr, err := s.CompileQuery(query)
 		if err != nil {
 			return err
