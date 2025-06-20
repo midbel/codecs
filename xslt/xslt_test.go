@@ -18,7 +18,7 @@ type TestCase struct {
 	Failed  bool
 }
 
-func TestEelement(t *testing.T) {
+func TestElement(t *testing.T) {
 	tests := []TestCase{
 		{
 			Name: "element/basic",
@@ -27,6 +27,10 @@ func TestEelement(t *testing.T) {
 		{
 			Name: "element/attribute",
 			Dir: "testdata/element-attribute",
+		},
+		{
+			Name: "element/basic-attribute",
+			Dir: "testdata/element-basic-attribute",
 		},
 	}
 	runTest(t, tests)
