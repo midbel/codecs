@@ -1147,14 +1147,21 @@ func executeAttribute(ctx *Context) (xpath.Sequence, error) {
 	}
 	var items xpath.Sequence
 	if query, err := getAttribute(elem, "select"); err == nil {
+		if len(elem.Nodes) != 0 {
+			return nil, fmt.Errorf("select attribute can not be used with children")
+		}
 		items, err = ctx.ExecuteQuery(query, ctx.ContextNode)
 	} else {
-		// TODO
+		items, err = executeConstructor(ctx, elem.Nodes, 0)
 	}
 	if err != nil {
 		return nil, err
 	}
-	attr := xml.NewAttribute(qn, toString(items[0]))
+	var value string
+	if !items.Empty() {
+		value = toString(items[0])
+	}
+	attr := xml.NewAttribute(qn, value)
 	return xpath.Singleton(&attr), nil
 }
 
