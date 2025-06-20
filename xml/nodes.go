@@ -664,7 +664,11 @@ func (e *Element) GetElementsByTagName(tag string) ([]Node, error) {
 func (e *Element) Append(node Node) {
 	node.setParent(e)
 	node.setPosition(len(e.Nodes))
-	e.Nodes = append(e.Nodes, node)
+	if a, ok := node.(*Attribute); ok {
+		e.Attrs = append(e.Attrs, *a)
+	} else {
+		e.Nodes = append(e.Nodes, node)
+	}
 }
 
 func (e *Element) Insert(node Node, index int) {

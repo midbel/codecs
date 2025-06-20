@@ -70,6 +70,7 @@ func init() {
 		xml.QualifiedName("copy", xsltNamespacePrefix):            trace(executeCopy),
 		xml.QualifiedName("copy-of", xsltNamespacePrefix):         trace(executeCopyOf),
 		xml.QualifiedName("sequence", xsltNamespacePrefix):        trace(executeSequence),
+		xml.QualifiedName("document", xsltNamespacePrefix):         trace(executeDocument),
 		xml.QualifiedName("element", xsltNamespacePrefix):         trace(executeElement),
 		xml.QualifiedName("attribute", xsltNamespacePrefix):       trace(executeAttribute),
 		xml.QualifiedName("text", xsltNamespacePrefix):            trace(executeText),
@@ -1102,6 +1103,10 @@ func executeSelect(ctx *Context, elem *xml.Element) (xpath.Sequence, error) {
 	return nil, err
 }
 
+func executeDocument(ctx *Context) (xpath.Sequence, error) {
+	return nil, errImplemented
+}
+
 func executeElement(ctx *Context) (xpath.Sequence, error) {
 	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
@@ -1121,13 +1126,36 @@ func executeElement(ctx *Context) (xpath.Sequence, error) {
 	}
 	curr := xml.NewElement(qn)
 	for i := range seq {
-		curr.Append(seq[i].Node())
+		n := seq[i].Node()
+		curr.Append(n)
 	}
 	return xpath.Singleton(curr), nil
 }
 
 func executeAttribute(ctx *Context) (xpath.Sequence, error) {
-	return nil, errImplemented
+	elem, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
+	ident, err := getAttribute(elem, "name")
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
+	qn, err := xml.ParseName(ident)
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
+	var items xpath.Sequence
+	if query, err := getAttribute(elem, "select"); err == nil {
+		items, err = ctx.ExecuteQuery(query, ctx.ContextNode)
+	} else {
+		// TODO
+	}
+	if err != nil {
+		return nil, err
+	}
+	attr := xml.NewAttribute(qn, toString(items[0]))
+	return xpath.Singleton(&attr), nil
 }
 
 func executeText(ctx *Context) (xpath.Sequence, error) {

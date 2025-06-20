@@ -18,6 +18,20 @@ type TestCase struct {
 	Failed  bool
 }
 
+func TestEelement(t *testing.T) {
+	tests := []TestCase{
+		{
+			Name: "element/basic",
+			Dir: "testdata/element-basic",
+		},
+		{
+			Name: "element/attribute",
+			Dir: "testdata/element-attribute",
+		},
+	}
+	runTest(t, tests)
+}
+
 func TestCallTemplate(t *testing.T) {
 	tests := []TestCase{
 		{
