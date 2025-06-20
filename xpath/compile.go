@@ -936,20 +936,7 @@ func (c *Compiler) compileStep(left Expr) (Expr, error) {
 
 	c.next()
 	if c.is(begGrp) {
-		c.next()
-		expr, err := c.compileExpr(powLowest)
-		if err != nil {
-			return nil, err
-		}
-		if !c.is(endGrp) {
-			return nil, fmt.Errorf("%w: missing closing ')'", ErrSyntax)
-		}
-		c.next()
-		ctx := stepmap{
-			step: left,
-			expr: expr,
-		}
-		return ctx, nil
+		return c.compileStepmap(left)
 	}
 	next, err := c.compileExpr(powStep)
 	if err != nil {
@@ -960,6 +947,26 @@ func (c *Compiler) compileStep(left Expr) (Expr, error) {
 		next: next,
 	}
 	return expr, nil
+}
+
+func (c *Compiler) compileStepmap(left Expr) (Expr, error) {
+	c.next()
+	expr, err := c.compileExpr(powLowest)
+	if err != nil {
+		return nil, err
+	}
+	if !c.is(endGrp) {
+		return nil, fmt.Errorf("%w: missing closing ')'", ErrSyntax)
+	}
+	c.next()
+	if !c.is(opSeq) && !c.done() {
+		return nil, fmt.Errorf("%w: general expression can only be present after step expression", ErrSyntax)
+	}
+	ctx := stepmap{
+		step: left,
+		expr: expr,
+	}
+	return ctx, nil
 }
 
 func (c *Compiler) compileDescendantStep(left Expr) (Expr, error) {
