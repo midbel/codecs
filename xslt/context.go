@@ -249,6 +249,14 @@ func (e *Env) Define(ident string, expr xpath.Expr) {
 	e.Vars.Define(ident, expr)
 }
 
+func (e *Env) Eval(ident, query string, datum xml.Node) error {
+	items, err := e.ExecuteQuery(query, datum)
+	if err == nil {
+		e.Define(ident, xpath.NewValueFromSequence(items))
+	}
+	return err
+}
+
 func (e *Env) DefineParam(ident, value string) error {
 	expr, err := e.CompileQuery(value)
 	if err == nil {
@@ -259,7 +267,7 @@ func (e *Env) DefineParam(ident, value string) error {
 
 func (e *Env) EvalParam(ident, query string, datum xml.Node) error {
 	items, err := e.ExecuteQuery(query, datum)
-	if err == nil && !items.Empty() {
+	if err == nil {
 		e.DefineExprParam(ident, xpath.NewValueFromSequence(items))
 	}
 	return err

@@ -797,8 +797,11 @@ func (s *Stylesheet) loadVariable(node xml.Node) error {
 		static = true
 	}
 	if query, err := getAttribute(elem, "select"); err == nil {
+		if len(elem.Nodes) > 0 {
+			return fmt.Errorf("select attribute can not be used with children")
+		}
 		if static {
-			return nil
+			return s.static.Eval(ident, query, elem)
 		}
 		expr, err := s.CompileQuery(query)
 		if err != nil {
@@ -806,11 +809,11 @@ func (s *Stylesheet) loadVariable(node xml.Node) error {
 		}
 		s.Define(ident, expr)
 	} else {
-		if len(elem.Nodes) != 1 {
-			return fmt.Errorf("only one node expected")
+		seq, err := executeConstructor(s.createContext(elem), elem.Nodes, 0)
+		if err != nil {
+			return err
 		}
-		n := cloneNode(elem.Nodes[0])
-		s.Define(ident, xpath.NewValueFromNode(n))
+		s.Define(ident, xpath.NewValueFromSequence(seq))
 	}
 	return nil
 }
@@ -832,20 +835,19 @@ func (s *Stylesheet) loadParam(node xml.Node) error {
 		static = true
 	}
 	if query, err := getAttribute(elem, "select"); err == nil {
-		if static {
-			return s.static.DefineParam(ident, query)
+		if len(elem.Nodes) > 0 {
+			return fmt.Errorf("select attribute can not be used with children")
 		}
-		expr, err := s.CompileQuery(query)
+		if static {
+			return s.static.EvalParam(ident, query, elem)
+		}
+		return s.DefineParam(ident, query)
+	} else {
+		seq, err := executeConstructor(s.createContext(elem), elem.Nodes, 0)
 		if err != nil {
 			return err
 		}
-		s.Define(ident, expr)
-	} else {
-		if len(elem.Nodes) != 1 {
-			return fmt.Errorf("only one node expected")
-		}
-		n := cloneNode(elem.Nodes[0])
-		s.Define(ident, xpath.NewValueFromNode(n))
+		s.DefineExprParam(ident, xpath.NewValueFromSequence(seq))
 	}
 	return nil
 }
