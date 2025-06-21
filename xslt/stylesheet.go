@@ -550,16 +550,14 @@ func (s *Stylesheet) CurrentMode() string {
 }
 
 func (s *Stylesheet) createContext(node xml.Node) *Context {
-	env := Enclosed(s)
-	ctx := Context{
+	return &Context{
 		ContextNode: node,
 		Mode:        s.Mode,
 		Size:        1,
 		Index:       1,
 		Stylesheet:  s,
-		Env:         env,
+		Env:         Enclosed(s),
 	}
-	return &ctx
 }
 
 func (s *Stylesheet) init(doc xml.Node) error {

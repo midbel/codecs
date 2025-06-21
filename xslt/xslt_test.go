@@ -244,6 +244,15 @@ func TestVariables(t *testing.T) {
 			Name: "variable/shadow",
 			Dir:  "testdata/variable-shadowing",
 		},
+		{
+			Name: "variable/static",
+			Dir:  "testdata/variable-static",
+		},
+		{
+			Name:   "variable/static-error",
+			Dir:    "testdata/variable-static-error",
+			Failed: true,
+		},
 	}
 	runTest(t, tests)
 }
