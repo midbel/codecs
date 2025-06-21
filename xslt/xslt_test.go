@@ -51,6 +51,10 @@ func TestCallTemplate(t *testing.T) {
 			Dir:  "testdata/call-template-with-param",
 		},
 		{
+			Name: "call-template/include",
+			Dir:  "testdata/call-template-include",
+		},
+		{
 			Name: "call-template/with-param",
 			Dir:  "testdata/call-template-transfer-param",
 		},
