@@ -330,6 +330,7 @@ type Stylesheet struct {
 
 	output []*Output
 	namer  alpha.Namer
+	static *Env
 	*Env
 	Tracer
 
@@ -345,6 +346,7 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 	sheet := Stylesheet{
 		Context:   contextDir,
 		namespace: xsltNamespacePrefix,
+		static:    Empty(),
 		Env:       Empty(),
 		Tracer:    NoopTracer(),
 		namer:     alpha.Compose(alpha.NewLowerString(3), alpha.NewNumberString(2)),
@@ -700,7 +702,35 @@ func (s *Stylesheet) loadMode(node xml.Node) error {
 }
 
 func (s *Stylesheet) loadVariable(node xml.Node) error {
-	return errImplemented
+	elem, err := getElementFromNode(node)
+	if err != nil {
+		return err
+	}
+	ident, err := getAttribute(elem, "name")
+	if err != nil {
+		return err
+	}
+	var static bool
+	if yes, err := getAttribute(elem, "static"); err == nil && yes == "yes" {
+		static = true
+	}
+	if query, err := getAttribute(elem, "select"); err == nil {
+		if static {
+			return s.static.Define(ident, query)
+		}
+		expr, err := s.CompileQuery(query)
+		if err != nil {
+			return err
+		}
+		s.Define(ident, expr)
+	} else {
+		if len(elem.Nodes) != 1 {
+			return fmt.Errorf("only one node expected")
+		}
+		n := cloneNode(elem.Nodes[0])
+		s.Define(ident, xpath.NewValueFromNode(n))
+	}
+	return nil
 }
 
 func (s *Stylesheet) loadParam(node xml.Node) error {
@@ -718,7 +748,7 @@ func (s *Stylesheet) loadParam(node xml.Node) error {
 	}
 	if query, err := getAttribute(elem, "select"); err == nil {
 		if static {
-			return s.DefineParam(ident, query)
+			return s.static.DefineParam(ident, query)
 		}
 		expr, err := s.CompileQuery(query)
 		if err != nil {
