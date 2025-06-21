@@ -322,8 +322,11 @@ func (c *Compiler) compileInClause() (binding, error) {
 func (c *Compiler) compileLet() (Expr, error) {
 	c.Enter("let")
 	defer c.Leave("let")
+
+	c.next()
+
 	var q let
-	for !c.done() {
+	for !c.done() && !c.is(reserved) {
 		var b binding
 		if !c.is(variable) {
 			return nil, fmt.Errorf("identifier expected")
@@ -355,7 +358,7 @@ func (c *Compiler) compileLet() (Expr, error) {
 		return nil, fmt.Errorf("expected return keyword")
 	}
 	c.next()
-	expr, err := c.compile()
+	expr, err := c.compileExpr(powLowest)
 	if err != nil {
 		return nil, err
 	}

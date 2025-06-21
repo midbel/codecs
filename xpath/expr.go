@@ -571,7 +571,10 @@ func (r reverse) find(ctx Context) (Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	x, err := toFloat(v)
+	if v.Empty() {
+		return v, nil
+	}
+	x, err := toFloat(v[0].Value())
 	if err == nil {
 		x = -x
 	}
@@ -864,31 +867,6 @@ func (f filter) find(ctx Context) (Sequence, error) {
 	return ret, nil
 }
 
-type Let struct {
-	ident string
-	expr  Expr
-}
-
-func Assign(ident string, expr Expr) Expr {
-	return Let{
-		ident: ident,
-		expr:  expr,
-	}
-}
-
-func (e Let) Find(node xml.Node) (Sequence, error) {
-	return e.find(DefaultContext(node))
-}
-
-func (e Let) MatchPriority() int {
-	return prioLow
-}
-
-func (e Let) find(ctx Context) (Sequence, error) {
-	ctx.Define(e.ident, e.expr)
-	return nil, nil
-}
-
 type let struct {
 	binds []binding
 	expr  Expr
@@ -903,7 +881,11 @@ func (e let) MatchPriority() int {
 }
 
 func (e let) find(ctx Context) (Sequence, error) {
-	return nil, nil
+	nest := ctx.Nest()
+	for _, b := range e.binds {
+		nest.Define(b.ident, b.expr)
+	}
+	return e.expr.find(nest)
 }
 
 type rng struct {

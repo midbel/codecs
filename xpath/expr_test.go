@@ -57,6 +57,20 @@ func TestIf(t *testing.T) {
 	runTests(t, tests)
 }
 
+func TestLet(t *testing.T) {
+	tests := []TestCase{
+		{
+			Expr:     "let $x := -1 return $x",
+			Expected: []string{"-1"},
+		},
+		{
+			Expr:     "let $x := 1, $y := 1 return $x+$y",
+			Expected: []string{"2"},
+		},
+	}
+	runTests(t, tests)
+}
+
 func TestFilter(t *testing.T) {
 	tests := []TestCase{
 		{
@@ -361,7 +375,7 @@ func runTests(t *testing.T, tests []TestCase) {
 			continue
 		}
 		if seq.Len() != len(c.Expected) {
-			t.Logf("sequence: %s", seq.CanonicalizeString())
+			t.Logf("result: %s (%d vs %d)", seq.CanonicalizeString(), seq.Len(), len(c.Expected))
 			t.Errorf("%s: number of nodes mismatched! want %d, got %d", c.Expr, len(c.Expected), seq.Len())
 			continue
 		}
