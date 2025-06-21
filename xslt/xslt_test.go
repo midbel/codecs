@@ -22,15 +22,15 @@ func TestElement(t *testing.T) {
 	tests := []TestCase{
 		{
 			Name: "element/basic",
-			Dir: "testdata/element-basic",
+			Dir:  "testdata/element-basic",
 		},
 		{
 			Name: "element/attribute",
-			Dir: "testdata/element-attribute",
+			Dir:  "testdata/element-attribute",
 		},
 		{
 			Name: "element/basic-attribute",
-			Dir: "testdata/element-basic-attribute",
+			Dir:  "testdata/element-basic-attribute",
 		},
 	}
 	runTest(t, tests)
@@ -242,7 +242,7 @@ func TestVariables(t *testing.T) {
 		},
 		{
 			Name: "variable/shadow",
-			Dir: "testdata/variable-shadowing",
+			Dir:  "testdata/variable-shadowing",
 		},
 	}
 	runTest(t, tests)

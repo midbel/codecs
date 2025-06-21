@@ -87,6 +87,10 @@ type ParserOptions struct {
 }
 
 func parseDocument(file string, opts ParserOptions) (*xml.Document, error) {
+	if file == "" {
+		root := xml.NewElement(xml.LocalName("angle"))
+		return xml.NewDocument(root), nil
+	}
 	r, err := openFile(file)
 	if err != nil {
 		return nil, err

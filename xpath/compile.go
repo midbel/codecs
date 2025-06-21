@@ -225,7 +225,7 @@ func (c *Compiler) compileCdt() (Expr, error) {
 		return nil, ErrSyntax
 	}
 	c.next()
-	expr, err := c.compile()
+	expr, err := c.compileExpr(powLowest)
 	if err != nil {
 		return nil, err
 	}
@@ -251,14 +251,14 @@ func (c *Compiler) compileIf() (Expr, error) {
 		return nil, fmt.Errorf("then keyword expected")
 	}
 	c.next()
-	if cdt.csq, err = c.compile(); err != nil {
+	if cdt.csq, err = c.compileExpr(powLowest); err != nil {
 		return nil, err
 	}
 	if !c.is(reserved) && c.getCurrentLiteral() != kwElse {
 		return nil, fmt.Errorf("else keyword expected")
 	}
 	c.next()
-	if cdt.alt, err = c.compile(); err != nil {
+	if cdt.alt, err = c.compileExpr(powLowest); err != nil {
 		return nil, err
 	}
 	return cdt, nil

@@ -989,8 +989,7 @@ func (c conditional) find(ctx Context) (Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	ok := isTrue(res)
-	if ok {
+	if res.True() {
 		return c.csq.find(ctx)
 	}
 	return c.alt.find(ctx)

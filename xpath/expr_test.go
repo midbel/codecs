@@ -43,6 +43,20 @@ type TestCase struct {
 	Expected []string
 }
 
+func TestIf(t *testing.T) {
+	tests := []TestCase{
+		{
+			Expr:     "if (/root/item[1] = 'element-1') then 'ok' else 'nok'",
+			Expected: []string{"ok"},
+		},
+		{
+			Expr:     "if (/root/item[1] = 'test') then 'ok' else 'nok'",
+			Expected: []string{"nok"},
+		},
+	}
+	runTests(t, tests)
+}
+
 func TestFilter(t *testing.T) {
 	tests := []TestCase{
 		{
@@ -224,7 +238,7 @@ func TestPath(t *testing.T) {
 			Expected: []string{"element-1", "element-2"},
 		},
 		{
-			Expr: "/root/item[2]/../item[1]",
+			Expr:     "/root/item[2]/../item[1]",
 			Expected: []string{"element-1"},
 		},
 		{

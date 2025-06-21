@@ -70,7 +70,7 @@ func init() {
 		xml.QualifiedName("copy", xsltNamespacePrefix):            trace(executeCopy),
 		xml.QualifiedName("copy-of", xsltNamespacePrefix):         trace(executeCopyOf),
 		xml.QualifiedName("sequence", xsltNamespacePrefix):        trace(executeSequence),
-		xml.QualifiedName("document", xsltNamespacePrefix):         trace(executeDocument),
+		xml.QualifiedName("document", xsltNamespacePrefix):        trace(executeDocument),
 		xml.QualifiedName("element", xsltNamespacePrefix):         trace(executeElement),
 		xml.QualifiedName("attribute", xsltNamespacePrefix):       trace(executeAttribute),
 		xml.QualifiedName("text", xsltNamespacePrefix):            trace(executeText),
