@@ -15,6 +15,14 @@ import (
 )
 
 const (
+	XslVersion        = "3"
+	XslVendor         = "angle"
+	XslVendorUrl      = "angle"
+	XslProduct        = "angle"
+	XslProductVersion = "0.0.0"
+)
+
+const (
 	xsltNamespaceUri    = "http://www.w3.org/1999/XSL/Transform"
 	xsltNamespacePrefix = "xsl"
 )
@@ -351,6 +359,9 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 		Tracer:    NoopTracer(),
 		namer:     alpha.Compose(alpha.NewLowerString(3), alpha.NewNumberString(2)),
 	}
+
+	sheet.defineBuiltins()
+
 	sheet.Modes = append(sheet.Modes, unnamedMode())
 	if sheet.Context == "" {
 		sheet.Context = filepath.Dir(file)
@@ -595,6 +606,10 @@ func (s *Stylesheet) init(doc xml.Node) error {
 	return nil
 }
 
+func (s *Stylesheet) defineBuiltins() {
+	s.static.Builtins.Define("system-property", s.getSystemProperty)
+}
+
 func (s *Stylesheet) simplified(root xml.Node) error {
 	elem, err := getElementFromNode(root)
 	if err != nil {
@@ -627,12 +642,70 @@ func (s *Stylesheet) makeIdent() string {
 	return id
 }
 
+func (s *Stylesheet) getSystemProperty(ctx xpath.Context, args []xpath.Expr) (xpath.Sequence, error) {
+	if len(args) > 1 {
+		return nil, fmt.Errorf("invalid number of arguments")
+	}
+	items, err := args[0].Find(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if items.Empty() {
+		return items, nil
+	}
+	str, ok := items[0].Value().(string)
+	if !ok {
+		return nil, nil
+	}
+	switch str {
+	case s.getQualifiedName("version"):
+		str = XslVersion
+	case s.getQualifiedName("vendor"):
+		str = XslVendor
+	case s.getQualifiedName("vendor-url"):
+		str = XslVendorUrl
+	case s.getQualifiedName("product-name"):
+		str = XslProduct
+	case s.getQualifiedName("product-version"):
+		str = XslProductVersion
+	default:
+		return nil, fmt.Errorf("%s: unknown system property", str)
+	}
+	return xpath.Singleton(str), nil
+}
+
+func (s *Stylesheet) useWhen(node *xml.Element) (bool, error) {
+	query, err := getAttribute(node, "use-when")
+	if err != nil {
+		return true, nil
+	}
+	items, err := s.static.ExecuteQuery(query, node)
+	if err != nil {
+		return false, err
+	}
+	return items.True(), nil
+}
+
 func (s *Stylesheet) includeSheet(node xml.Node) error {
+	elem, err := getElementFromNode(node)
+	if err != nil {
+		return err
+	}
+	if ok, _ := s.useWhen(elem); !ok {
+		return nil
+	}
 	ctx := s.createContext(nil)
 	return includeSheet(ctx.WithXsl(node))
 }
 
 func (s *Stylesheet) importSheet(node xml.Node) error {
+	elem, err := getElementFromNode(node)
+	if err != nil {
+		return err
+	}
+	if ok, _ := s.useWhen(elem); !ok {
+		return nil
+	}
 	ctx := s.createContext(nil)
 	return importSheet(ctx.WithXsl(node))
 }
@@ -641,6 +714,9 @@ func (s *Stylesheet) loadAttributeSet(node xml.Node) error {
 	elem, err := getElementFromNode(node)
 	if err != nil {
 		return err
+	}
+	if ok, _ := s.useWhen(elem); !ok {
+		return nil
 	}
 	ident, err := getAttribute(elem, "name")
 	if err != nil {
@@ -672,6 +748,9 @@ func (s *Stylesheet) loadMode(node xml.Node) error {
 	elem, err := getElementFromNode(node)
 	if err != nil {
 		return err
+	}
+	if ok, _ := s.useWhen(elem); !ok {
+		return nil
 	}
 	var m Mode
 	for _, a := range elem.Attrs {
@@ -706,6 +785,9 @@ func (s *Stylesheet) loadVariable(node xml.Node) error {
 	if err != nil {
 		return err
 	}
+	if ok, _ := s.useWhen(elem); !ok {
+		return nil
+	}
 	ident, err := getAttribute(elem, "name")
 	if err != nil {
 		return err
@@ -716,7 +798,7 @@ func (s *Stylesheet) loadVariable(node xml.Node) error {
 	}
 	if query, err := getAttribute(elem, "select"); err == nil {
 		if static {
-			return s.static.Define(ident, query)
+			return nil
 		}
 		expr, err := s.CompileQuery(query)
 		if err != nil {
@@ -737,6 +819,9 @@ func (s *Stylesheet) loadParam(node xml.Node) error {
 	elem, err := getElementFromNode(node)
 	if err != nil {
 		return err
+	}
+	if ok, _ := s.useWhen(elem); !ok {
+		return nil
 	}
 	ident, err := getAttribute(elem, "name")
 	if err != nil {
@@ -770,6 +855,9 @@ func (s *Stylesheet) loadOutput(node xml.Node) error {
 	if err != nil {
 		return err
 	}
+	if ok, _ := s.useWhen(elem); !ok {
+		return nil
+	}
 	var out Output
 	for _, a := range elem.Attrs {
 		switch value := a.Value(); a.Name {
@@ -796,6 +884,9 @@ func (s *Stylesheet) loadTemplate(node xml.Node) error {
 	elem, err := getElementFromNode(node)
 	if err != nil {
 		return err
+	}
+	if ok, _ := s.useWhen(elem); !ok {
+		return nil
 	}
 
 	tpl, err := NewTemplate(elem)
