@@ -57,6 +57,16 @@ func TestIf(t *testing.T) {
 	runTests(t, tests)
 }
 
+func TestFor(t *testing.T) {
+	tests := []TestCase{
+		{
+			Expr:     "for $i in 1 to 5 return $i",
+			Expected: []string{"1", "2", "3", "4", "5"},
+		},
+	}
+	runTests(t, tests)
+}
+
 func TestLet(t *testing.T) {
 	tests := []TestCase{
 		{
@@ -245,39 +255,25 @@ func TestSequence(t *testing.T) {
 	runTests(t, tests)
 }
 
-func TestPath(t *testing.T) {
+func testAttributes(t *testing.T) {
 	tests := []TestCase{
-		{
-			Expr:     "/root/item",
-			Expected: []string{"element-1", "element-2"},
-		},
-		{
-			Expr:     "/root/item[2]/../item[1]",
-			Expected: []string{"element-1"},
-		},
-		{
-			Expr:     "/root/item[1]/following-sibling::item",
-			Expected: []string{"element-2"},
-		},
-		{
-			Expr:     "/root/item[2]/preceding-sibling::item",
-			Expected: []string{"element-1"},
-		},
-		{
-			Expr:     "//item",
-			Expected: []string{"element-1", "element-2", "sub-element-1", "sub-element-2"},
-		},
-		{
-			Expr:     "//group/item[1]",
-			Expected: []string{"sub-element-1"},
-		},
-		{
-			Expr:     "/root/item[1] | /root/item[2]",
-			Expected: []string{"element-1", "element-2"},
-		},
 		{
 			Expr:     "//@ignore",
 			Expected: []string{"true"},
+		},
+		{
+			Expr:     "//attribute::ignore",
+			Expected: []string{"true"},
+		},
+	}
+	runTests(t, tests)
+}
+
+func testCombinations(t *testing.T) {
+	tests := []TestCase{
+		{
+			Expr:     "/root/item[1] | /root/item[2]",
+			Expected: []string{"element-1", "element-2"},
 		},
 		{
 			Expr:     "/root/item union /root//group/item",
@@ -291,12 +287,55 @@ func TestPath(t *testing.T) {
 			Expr:     "/root//item except /root/group/item",
 			Expected: []string{"element-1", "element-2"},
 		},
+	}
+	runTests(t, tests)
+}
+
+func testAxis(t *testing.T) {
+	tests := []TestCase{
+		{
+			Expr:     "/root/item[1]/following-sibling::item",
+			Expected: []string{"element-2"},
+		},
+		{
+			Expr:     "/root/item[2]/preceding-sibling::item",
+			Expected: []string{"element-1"},
+		},
+	}
+	runTests(t, tests)
+}
+
+func testPaths(t *testing.T) {
+	tests := []TestCase{
+		{
+			Expr:     "/root/item",
+			Expected: []string{"element-1", "element-2"},
+		},
+		{
+			Expr:     "/root/item[2]/../item[1]",
+			Expected: []string{"element-1"},
+		},
+		{
+			Expr:     "//item",
+			Expected: []string{"element-1", "element-2", "sub-element-1", "sub-element-2"},
+		},
+		{
+			Expr:     "//group/item[1]",
+			Expected: []string{"sub-element-1"},
+		},
 		{
 			Expr:     "/root/item[1], /root/item[2]",
 			Expected: []string{"element-1", "element-2"},
 		},
 	}
 	runTests(t, tests)
+}
+
+func TestPath(t *testing.T) {
+	t.Run("base", testPaths)
+	t.Run("axis", testAxis)
+	t.Run("combinations", testCombinations)
+	t.Run("attributes", testAttributes)
 }
 
 func TestQuantified(t *testing.T) {
