@@ -76,12 +76,12 @@ func doConcat(left, right Sequence) (Sequence, error) {
 }
 
 func doAnd(left, right Sequence) (Sequence, error) {
-	ok := isTrue(left) && isTrue(right)
+	ok := left.True() && right.True()
 	return Singleton(ok), nil
 }
 
 func doOr(left, right Sequence) (Sequence, error) {
-	ok := isTrue(left) || isTrue(right)
+	ok := left.True() || right.True()
 	return Singleton(ok), nil
 }
 
@@ -171,19 +171,25 @@ func apply(left, right Sequence, do func(left, right float64) (float64, error)) 
 	if left.Empty() || right.Empty() {
 		return Singleton(math.NaN()), nil
 	}
-	x, err := toFloat(left[0].Value())
-	if err != nil {
-		return nil, err
+	var res Sequence
+	for i := range left {
+		x, err := toFloat(left[i].Value())
+		if err != nil {
+			return nil, err
+		}
+		for j := range right {
+			y, err := toFloat(right[j].Value())
+			if err != nil {
+				return nil, err
+			}
+			v, err := do(x, y)
+			if err != nil {
+				return nil, err
+			}
+			res.Append(NewLiteralItem(v))
+		}
 	}
-	y, err := toFloat(right[0].Value())
-	if err != nil {
-		return nil, err
-	}
-	res, err := do(x, y)
-	if err != nil {
-		return nil, err
-	}
-	return Singleton(res), nil
+	return res, nil
 }
 
 func compareItems(left, right Sequence, cmp func(left, right Item) (bool, error)) (bool, error) {
