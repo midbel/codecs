@@ -256,6 +256,14 @@ func TestPath(t *testing.T) {
 			Expected: []string{"element-1"},
 		},
 		{
+			Expr:     "/root/item[1]/following-sibling::item",
+			Expected: []string{"element-2"},
+		},
+		{
+			Expr:     "/root/item[2]/preceding-sibling::item",
+			Expected: []string{"element-1"},
+		},
+		{
 			Expr:     "//item",
 			Expected: []string{"element-1", "element-2", "sub-element-1", "sub-element-2"},
 		},
@@ -281,6 +289,10 @@ func TestPath(t *testing.T) {
 		},
 		{
 			Expr:     "/root//item except /root/group/item",
+			Expected: []string{"element-1", "element-2"},
+		},
+		{
+			Expr:     "/root/item[1], /root/item[2]",
 			Expected: []string{"element-1", "element-2"},
 		},
 	}
@@ -332,6 +344,44 @@ func TestQuantified(t *testing.T) {
 		{
 			Expr:     "every $x in (1, 2), $y in (3, 4) satisfies $x < $y",
 			Expected: []string{"true"},
+		},
+	}
+	runTests(t, tests)
+}
+
+func TestOperators(t *testing.T) {
+	tests := []TestCase{
+		{
+			Expr:     "'foo'||'bar'",
+			Expected: []string{"foobar"},
+		},
+		{
+			Expr:     "/root/item[1] is /root/item[1]",
+			Expected: []string{"true"},
+		},
+		{
+			Expr:     "/root/item[1] is /root/item[2]",
+			Expected: []string{"false"},
+		},
+		{
+			Expr:     "/root/item[2] is /root/item[1]",
+			Expected: []string{"false"},
+		},
+		{
+			Expr:     "/root/item[1] >> /root/item[2]",
+			Expected: []string{"false"},
+		},
+		{
+			Expr:     "/root/item[1] << /root/item[2]",
+			Expected: []string{"true"},
+		},
+		{
+			Expr:     "/root/item[2] >> /root/item[1]",
+			Expected: []string{"true"},
+		},
+		{
+			Expr:     "/root/item[2] << /root/item[1]",
+			Expected: []string{"false"},
 		},
 	}
 	runTests(t, tests)
