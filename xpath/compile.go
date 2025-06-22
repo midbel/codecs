@@ -47,9 +47,9 @@ type Compiler struct {
 	Tracer
 	mode StepMode
 
-	infix  map[rune]func(Expr) (Expr, error)
+	infix   map[rune]func(Expr) (Expr, error)
 	postfix map[rune]func(Expr) (Expr, error)
-	prefix map[rune]func() (Expr, error)
+	prefix  map[rune]func() (Expr, error)
 }
 
 func NewCompiler(r io.Reader) *Compiler {
@@ -86,10 +86,11 @@ func NewCompiler(r io.Reader) *Compiler {
 		begGrp:      cp.compileCall,
 		reserved:    cp.compileReservedInfix,
 	}
-	cp.postfix = map[rune]func(Expr) (Expr, error) {
-		begPred:     cp.compileFilter,
+	cp.postfix = map[rune]func(Expr) (Expr, error){
+		begPred: cp.compileFilter,
 	}
 	cp.prefix = map[rune]func() (Expr, error){
+		begPred:    cp.compileArray,
 		currLevel:  cp.compileRoot,
 		anyLevel:   cp.compileDescendantRoot,
 		Name:       cp.compileName,
@@ -155,7 +156,7 @@ func (c *Compiler) compileReservedPrefix() (Expr, error) {
 	case kwMap:
 		return c.compileMap()
 	case kwArray:
-		return c.compileArray()
+		return c.compileArrayFunc()
 	case kwLet:
 		return c.compileLet()
 	case kwIf:
@@ -189,6 +190,36 @@ func (c *Compiler) compileMap() (Expr, error) {
 }
 
 func (c *Compiler) compileArray() (Expr, error) {
+	c.Enter("array")
+	defer c.Leave("array")
+
+	c.next()
+	var arr array
+	for !c.done() && !c.is(endPred) {
+		e, err := c.compileExpr(powLowest)
+		if err != nil {
+			return nil, err
+		}
+		arr.all = append(arr.all, e)
+		switch {
+		case c.is(opSeq):
+			c.next()
+			if c.is(endPred) {
+				return nil, ErrSyntax
+			}
+		case c.is(endPred):
+		default:
+			return nil, ErrSyntax
+		}
+	}
+	if !c.is(endPred) {
+		return nil, ErrSyntax
+	}
+	c.next()
+	return arr, nil
+}
+
+func (c *Compiler) compileArrayFunc() (Expr, error) {
 	c.Enter("array")
 	defer c.Leave("array")
 

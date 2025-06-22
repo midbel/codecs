@@ -43,6 +43,20 @@ type TestCase struct {
 	Expected []string
 }
 
+func TestArray(t *testing.T) {
+	tests := []TestCase{
+		{
+			Expr:     "[1, 2, 3, 'test']",
+			Expected: []string{"1", "2", "3", "test"},
+		},
+		{
+			Expr:     "array{1, 2, 3}",
+			Expected: []string{"1", "2", "3"},
+		},
+	}
+	runTests(t, tests)
+}
+
 func TestIf(t *testing.T) {
 	tests := []TestCase{
 		{
