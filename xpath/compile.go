@@ -48,6 +48,7 @@ type Compiler struct {
 	mode StepMode
 
 	infix  map[rune]func(Expr) (Expr, error)
+	postfix map[rune]func(Expr) (Expr, error)
 	prefix map[rune]func() (Expr, error)
 }
 
@@ -60,7 +61,6 @@ func NewCompiler(r io.Reader) *Compiler {
 	cp.infix = map[rune]func(Expr) (Expr, error){
 		currLevel:   cp.compileStep,
 		anyLevel:    cp.compileDescendantStep,
-		begPred:     cp.compileFilter,
 		opArrow:     cp.compileArrow,
 		opRange:     cp.compileRange,
 		opConcat:    cp.compileBinary,
@@ -85,6 +85,9 @@ func NewCompiler(r io.Reader) *Compiler {
 		opIs:        cp.compileIdentity,
 		begGrp:      cp.compileCall,
 		reserved:    cp.compileReservedInfix,
+	}
+	cp.postfix = map[rune]func(Expr) (Expr, error) {
+		begPred:     cp.compileFilter,
 	}
 	cp.prefix = map[rune]func() (Expr, error){
 		currLevel:  cp.compileRoot,
@@ -773,6 +776,16 @@ func (c *Compiler) compileExpr(pow int) (Expr, error) {
 	left, err := fn()
 	if err != nil {
 		return nil, err
+	}
+	for {
+		fn, ok := c.postfix[c.curr.Type]
+		if !ok {
+			break
+		}
+		left, err = fn(left)
+		if err != nil {
+			return nil, err
+		}
 	}
 	for !(c.done() || c.endExpr()) && pow < c.power() {
 		fn, ok := c.infix[c.curr.Type]
