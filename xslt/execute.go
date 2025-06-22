@@ -535,7 +535,7 @@ func executeMerge(ctx *Context) (xpath.Sequence, error) {
 	slices.Sort(keys)
 	for _, key := range keys {
 		nested := ctx.Nest()
-		defineMergeBuiltins(nested, key, groups[key])
+		defineMergeBuiltins(nested, key, keys, groups[key])
 		res, err := executeConstructor(nested, elem.Nodes, AllowOnEmpty|AllowOnNonEmpty)
 		if err != nil {
 			return nil, err
@@ -1328,7 +1328,7 @@ func defineForeachGroupBuiltins(nested *Context, key, items xpath.Sequence) {
 	nested.Builtins.Define("fn:current-grouping-key", currentKey)
 }
 
-func defineMergeBuiltins(nested *Context, key string, items []MergedItem) {
+func defineMergeBuiltins(nested *Context, key string, all []string, items []MergedItem) {
 	currentKey := func(_ xpath.Context, _ []xpath.Expr) (xpath.Sequence, error) {
 		return xpath.Singleton(key), nil
 	}
@@ -1358,8 +1358,16 @@ func defineMergeBuiltins(nested *Context, key string, items []MergedItem) {
 		}
 		return seq, nil
 	}
+	mergeKeys := func(_ xpath.Context, _ []xpath.Expr) (xpath.Sequence, error) {
+		var seq xpath.Sequence
+		for i := range all {
+			seq.Append(xpath.NewLiteralItem(all[i]))
+		}
+		return seq, nil
+	}
 	nested.Builtins.Define("current-merge-group", currentGrp)
 	nested.Builtins.Define("fn:current-merge-group", currentGrp)
 	nested.Builtins.Define("current-merge-key", currentKey)
 	nested.Builtins.Define("fn:current-merge-key", currentKey)
+	nested.Builtins.Define("angle:merge-keys", mergeKeys)
 }
