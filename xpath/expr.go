@@ -12,6 +12,7 @@ import (
 
 var (
 	ErrType        = errors.New("invalid type")
+	ErrIndex       = errors.New("index out of range")
 	ErrNode        = errors.New("element node expected")
 	ErrRoot        = errors.New("root element expected")
 	ErrUndefined   = errors.New("undefined")
@@ -806,6 +807,51 @@ func (u union) find(ctx Context) (Sequence, error) {
 	}
 	left.Concat(right)
 	return left, nil
+}
+
+type subscript struct {
+	expr  Expr
+	index Expr
+}
+
+func (i subscript) Find(node xml.Node) (Sequence, error) {
+	return i.find(DefaultContext(node))
+}
+
+func (i subscript) MatchPriority() int {
+	return getPriority(prioHigh, i.expr, i.index)
+}
+
+func (i subscript) find(ctx Context) (Sequence, error) {
+	id, ok := i.expr.(identifier)
+	if !ok {
+		return nil, fmt.Errorf("identifier expected")
+	}
+	arr, err := ctx.Resolve(id.ident)
+	if err != nil {
+		return nil, err
+	}
+	res, err := i.index.find(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if res.Empty() {
+		return nil, nil
+	}
+	switch a := arr.(type) {
+	case array:
+		ix, err := toInt(res[0].Value())
+		if err != nil {
+			return nil, err
+		}
+		ix--
+		if ix < 0 || ix >= int64(len(a.all)) {
+			return nil, ErrIndex
+		}
+		return a.all[ix].find(ctx)
+	default:
+		return nil, ErrType
+	}
 }
 
 type index struct {

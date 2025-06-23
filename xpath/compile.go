@@ -83,11 +83,11 @@ func NewCompiler(r io.Reader) *Compiler {
 		opIntersect: cp.compileIntersect,
 		opExcept:    cp.compileExcept,
 		opIs:        cp.compileIdentity,
-		begGrp:      cp.compileCall,
 		reserved:    cp.compileReservedInfix,
 	}
 	cp.postfix = map[rune]func(Expr) (Expr, error){
 		begPred: cp.compileFilter,
+		begGrp:  cp.compileCall,
 	}
 	cp.prefix = map[rune]func() (Expr, error){
 		begPred:    cp.compileArray,
@@ -750,9 +750,27 @@ func (c *Compiler) compileAttr() (Expr, error) {
 	return a, nil
 }
 
-func (c *Compiler) compileCall(left Expr) (Expr, error) {
-	c.Enter("call")
-	defer c.Leave("call")
+func (c *Compiler) compileSubscriptCall(left Expr) (Expr, error) {
+	c.Enter("subscript-call")
+	defer c.Leave("subscript-call")
+	c.next()
+
+	index, err := c.compileExpr(powLowest)
+	if err != nil {
+		return nil, err
+	}
+	if !c.is(endGrp) {
+		return nil, fmt.Errorf("%w: missing closing ')'", ErrSyntax)
+	}
+	c.next()
+	expr := subscript{
+		expr:  left,
+		index: index,
+	}
+	return expr, nil
+}
+
+func (c *Compiler) compileFunctionCall(left Expr) (Expr, error) {
 	compile := func(left Expr) (call, error) {
 		n, ok := left.(name)
 		if !ok {
@@ -785,6 +803,8 @@ func (c *Compiler) compileCall(left Expr) (Expr, error) {
 		c.next()
 		return fn, nil
 	}
+	c.Enter("function-call")
+	defer c.Leave("function-call")
 	switch e := left.(type) {
 	case axis:
 		return compile(e.next)
@@ -795,6 +815,19 @@ func (c *Compiler) compileCall(left Expr) (Expr, error) {
 		}
 		return fn, nil
 	}
+}
+
+func (c *Compiler) compileCall(left Expr) (Expr, error) {
+	c.Enter("call")
+	defer c.Leave("call")
+
+	switch left.(type) {
+	case identifier:
+		return c.compileSubscriptCall(left)
+	default:
+		return c.compileFunctionCall(left)
+	}
+
 }
 
 func (c *Compiler) compileExpr(pow int) (Expr, error) {

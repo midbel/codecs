@@ -11,8 +11,8 @@ import (
 )
 
 type QueryCmd struct {
-	Root  string
-	Noout bool
+	Root       string
+	Noout      bool
 	PrintDepth int
 	ParserOptions
 }

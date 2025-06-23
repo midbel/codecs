@@ -53,6 +53,10 @@ func TestArray(t *testing.T) {
 			Expr:     "array{1, 2, 3}",
 			Expected: []string{"1", "2", "3"},
 		},
+		{
+			Expr:     "let $arr := array{1, 2, 3} return $arr(1)",
+			Expected: []string{"1"},
+		},
 	}
 	runTests(t, tests)
 }
