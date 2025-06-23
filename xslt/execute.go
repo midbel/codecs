@@ -637,8 +637,10 @@ func executeIterate(ctx *Context) (xpath.Sequence, error) {
 			}
 			others, err := transformNode(nest.WithXsl(c))
 			if err != nil {
-				if errors.Is(err, errBreak) {
-					err = nil
+				if errors.Is(err, errIterate) {
+					continue
+				} else if errors.Is(err, errBreak) {
+					return others, nil
 				}
 				return nil, err
 			}
