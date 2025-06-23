@@ -824,6 +824,8 @@ func (c *Compiler) compileCall(left Expr) (Expr, error) {
 	switch left.(type) {
 	case identifier:
 		return c.compileSubscriptCall(left)
+	case array:
+		return c.compileSubscriptCall(left)
 	default:
 		return c.compileFunctionCall(left)
 	}

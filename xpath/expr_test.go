@@ -57,6 +57,14 @@ func TestArray(t *testing.T) {
 			Expr:     "let $arr := array{1, 2, 3} return $arr(1)",
 			Expected: []string{"1"},
 		},
+		{
+			Expr:     "[[1, 2, 3], [4, 5, 6]](1)",
+			Expected: []string{"1", "2", "3"},
+		},
+		{
+			Expr:     "[[1, 2, 3], [4, 5, 6]](1)(2)",
+			Expected: []string{"2"},
+		},
 	}
 	runTests(t, tests)
 }

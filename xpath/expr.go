@@ -823,11 +823,7 @@ func (i subscript) MatchPriority() int {
 }
 
 func (i subscript) find(ctx Context) (Sequence, error) {
-	id, ok := i.expr.(identifier)
-	if !ok {
-		return nil, fmt.Errorf("identifier expected")
-	}
-	arr, err := ctx.Resolve(id.ident)
+	arr, err := i.getArrayFromExpr(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -838,19 +834,40 @@ func (i subscript) find(ctx Context) (Sequence, error) {
 	if res.Empty() {
 		return nil, nil
 	}
-	switch a := arr.(type) {
-	case array:
-		ix, err := toInt(res[0].Value())
+	ix, err := toInt(res[0].Value())
+	if err != nil {
+		return nil, err
+	}
+	ix--
+	if ix < 0 || ix >= int64(len(arr.all)) {
+		return nil, ErrIndex
+	}
+	return arr.all[ix].find(ctx)
+}
+
+func (i subscript) getArrayFromExpr(ctx Context) (array, error) {
+	switch id := i.expr.(type) {
+	case identifier:
+		id, ok := i.expr.(identifier)
+		if !ok {
+			var arr array
+			return arr, fmt.Errorf("identifier expected")
+		}
+		value, err := ctx.Resolve(id.ident)
 		if err != nil {
-			return nil, err
+			var arr array
+			return arr, err
 		}
-		ix--
-		if ix < 0 || ix >= int64(len(a.all)) {
-			return nil, ErrIndex
+		arr, ok := value.(array)
+		if !ok {
+			return arr, ErrType
 		}
-		return a.all[ix].find(ctx)
+		return arr, nil
+	case array:
+		return id, nil
 	default:
-		return nil, ErrType
+		var arr array
+		return arr, ErrType
 	}
 }
 
