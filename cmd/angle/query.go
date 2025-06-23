@@ -13,6 +13,7 @@ import (
 type QueryCmd struct {
 	Root  string
 	Noout bool
+	PrintDepth int
 	ParserOptions
 }
 
@@ -24,6 +25,7 @@ func (q QueryCmd) Run(args []string) error {
 	set.BoolVar(&q.Noout, "noout", false, "suppress output - default is to print the result nodes")
 	set.BoolVar(&q.StrictNS, "strict-ns", false, "strict namespace checking")
 	set.BoolVar(&q.OmitProlog, "omit-prolog", false, "omit xml prolog")
+	set.IntVar(&q.PrintDepth, "print-depth", 0, "print depth")
 	if err := set.Parse(args); err != nil {
 		return err
 	}
@@ -41,10 +43,10 @@ func (q QueryCmd) Run(args []string) error {
 		return err
 	}
 	elapsed := time.Since(now)
-	if !q.Noout {
+	if !q.Noout && q.PrintDepth >= 0 {
 		for i := range results {
 			n := results[i].Node()
-			fmt.Fprint(os.Stdout, xml.WriteNodeDepth(n, 1))
+			fmt.Fprint(os.Stdout, xml.WriteNodeDepth(n, q.PrintDepth+1))
 		}
 		fmt.Fprintln(os.Stdout)
 	}
