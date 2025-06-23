@@ -550,15 +550,15 @@ func executeBreak(ctx *Context) (xpath.Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	query, err := getAttribute(elem, "select")
-	if err == nil {
-		seq, err := ctx.ExecuteQuery(query, ctx.ContextNode)
-		if err != nil {
-			return nil, err
+	var seq xpath.Sequence
+	if query, err1 := getAttribute(elem, "select"); err1 == nil {
+		if len(elem.Nodes) > 0 {
+			return nil, fmt.Errorf("using select and children nodes is not allowed")
 		}
-		return seq, errBreak
+		seq, err = ctx.ExecuteQuery(query, ctx.ContextNode)
+	} else {
+		seq, err = executeConstructor(ctx, elem.Nodes, 0)
 	}
-	seq, err := executeConstructor(ctx, elem.Nodes, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -570,10 +570,6 @@ func executeNextIteration(ctx *Context) (xpath.Sequence, error) {
 		return nil, err
 	}
 	return nil, errIterate
-}
-
-func executeOnCompletion(ctx *Context) (xpath.Sequence, error) {
-	return nil, nil
 }
 
 func executeIterate(ctx *Context) (xpath.Sequence, error) {
@@ -641,6 +637,9 @@ func executeIterate(ctx *Context) (xpath.Sequence, error) {
 			}
 			others, err := transformNode(nest.WithXsl(c))
 			if err != nil {
+				if errors.Is(err, errBreak) {
+					err = nil
+				}
 				return nil, err
 			}
 		}
