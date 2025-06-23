@@ -581,54 +581,74 @@ func executeIterate(ctx *Context) (xpath.Sequence, error) {
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
 	}
+	if len(elem.Nodes) == 0 {
+		return nil, fmt.Errorf("%s: empty", elem.QualifiedName())
+	}
 	items, err := executeSelect(ctx, elem)
 	if err != nil {
 		return nil, err
 	}
-	var seq xpath.Sequence
-	for _, i := range items {
-		var (
-			sub   = ctx.Nest()
-			nodes []xml.Node
-			atEnd xml.Node
-		)
-		for i, n := range elem.Nodes {
-			if n.QualifiedName() != ctx.getQualifiedName("param") {
-				nodes = slices.Clone(elem.Nodes[i:])
-				break
-			}
-			_, err := transformNode(sub.WithXsl(n))
-			if err != nil {
-				return nil, err
-			}
+	var (
+		seq        xpath.Sequence
+		onComplete xml.Node
+		nodes      = slices.Clone(elem.Nodes)
+	)
+	if nodes[0].QualifiedName() == ctx.getQualifiedName("on-completion") {
+		onComplete = nodes[0]
+		nodes = nodes[1:]
+	}
+	if items.Empty() {
+		if onComplete != nil {
+			return transformNode(ctx.WithXsl(onComplete))
 		}
-		if n := len(nodes); n > 0 {
-			last := nodes[0]
-			if last.QualifiedName() == ctx.getQualifiedName("on-completion") {
-				atEnd = last
-				nodes = nodes[1:]
-			}
+		return nil, nil
+	}
+	nest := ctx.Nest()
+	for i := range nodes {
+		if nodes[i].QualifiedName() != ctx.getQualifiedName("param") {
+			nodes = nodes[i:]
+			break
 		}
-		others, err := executeConstructor(sub.WithXpath(i.Node()), nodes, 0)
+		elem, err := getElementFromNode(nodes[i])
 		if err != nil {
-			if errors.Is(err, errIterate) {
-				continue
-			}
-			if errors.Is(err, errBreak) {
-				break
-			}
 			return nil, err
 		}
-		seq.Concat(others)
-		if atEnd != nil {
-			rest, err := transformNode(ctx.WithXsl(atEnd))
+		ident, err := getAttribute(elem, "name")
+		if err != nil {
+			return nil, err
+		}
+		if query, err := getAttribute(elem, "select"); err == nil {
+			if len(elem.Nodes) > 0 {
+				return fmt.Errorf("using select and children nodes is not allowed")
+			}
+			if err := nest.DefineParam(ident, query); err != nil {
+				return nil, err
+			}
+		} else {
+			seq, err := executeConstructor()
 			if err != nil {
 				return nil, err
 			}
-			seq.Concat(rest)
+			nest.DefineExprParam(ident, xpath.NewValueFromSequence(seq))
 		}
 	}
-	return seq, nil
+
+	for _, i := range items {
+		for _, n := range nodes {
+			c := cloneNode(n)
+			if c == nil {
+				continue
+			}
+			others, err := transformNode(nest.WithXsl(c))
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	if onComplete != nil {
+		return transformNode(ctx.WithXsl(onComplete))
+	}
+	return nil, nil
 }
 
 func executeForeach(ctx *Context) (xpath.Sequence, error) {
