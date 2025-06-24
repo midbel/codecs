@@ -15,7 +15,12 @@ import (
 
 type ExecuteFunc func(*Context) (xpath.Sequence, error)
 
-var executers map[xml.QName]ExecuteFunc
+var (
+	executers         map[xml.QName]ExecuteFunc
+	iterateExecuters  map[xml.QName]ExecuteFunc
+	mergeExecuters    map[xml.QName]ExecuteFunc
+	forgroupExecuters map[xml.QName]ExecuteFunc
+)
 
 func init() {
 	nest := func(exec ExecuteFunc) ExecuteFunc {
@@ -43,13 +48,13 @@ func init() {
 		}
 		return fn
 	}
+	iterateExecuters = map[xml.QName]ExecuteFunc{
+		xml.QualifiedName("next-iteration", xsltNamespacePrefix): nest(executeNextIteration),
+		xml.QualifiedName("break", xsltNamespacePrefix):          trace(executeBreak),
+	}
 	executers = map[xml.QName]ExecuteFunc{
 		xml.QualifiedName("for-each", xsltNamespacePrefix):        nest(executeForeach),
 		xml.QualifiedName("iterate", xsltNamespacePrefix):         nest(executeIterate),
-		xml.QualifiedName("next-iteration", xsltNamespacePrefix):  nest(executeNextIteration),
-		xml.QualifiedName("on-completion", xsltNamespacePrefix):   nest(executeOnCompletion),
-		xml.QualifiedName("iterate", xsltNamespacePrefix):         nest(executeIterate),
-		xml.QualifiedName("break", xsltNamespacePrefix):           trace(executeBreak),
 		xml.QualifiedName("value-of", xsltNamespacePrefix):        trace(executeValueOf),
 		xml.QualifiedName("call-template", xsltNamespacePrefix):   nest(executeCallTemplate),
 		xml.QualifiedName("apply-templates", xsltNamespacePrefix): nest(executeApplyTemplates),
@@ -79,6 +84,23 @@ func init() {
 		xml.QualifiedName("fallback", xsltNamespacePrefix):        trace(executeFallback),
 		xml.QualifiedName("merge", xsltNamespacePrefix):           trace(executeMerge),
 		xml.QualifiedName("for-each-group", xsltNamespacePrefix):  trace(executeForeachGroup),
+	}
+}
+
+func registerExecuters(set map[xml.QName]ExecuteFunc) bool {
+	for qn, fn := range set {
+		_, ok := set[qn]
+		if ok {
+			return false
+		}
+		executers[qn] = fn
+	}
+	return true
+}
+
+func unregisterExecuters(set map[xml.QName]ExecuteFunc) {
+	for qn := range set {
+		delete(executers, qn)
 	}
 }
 
@@ -573,6 +595,10 @@ func executeNextIteration(ctx *Context) (xpath.Sequence, error) {
 }
 
 func executeIterate(ctx *Context) (xpath.Sequence, error) {
+	if registerExecuters(iterateExecuters) {
+		defer unregisterExecuters(iterateExecuters)
+	}
+
 	elem, err := getElementFromNode(ctx.XslNode)
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
@@ -585,7 +611,6 @@ func executeIterate(ctx *Context) (xpath.Sequence, error) {
 		return nil, err
 	}
 	var (
-		seq        xpath.Sequence
 		onComplete xml.Node
 		nodes      = slices.Clone(elem.Nodes)
 	)
@@ -615,13 +640,13 @@ func executeIterate(ctx *Context) (xpath.Sequence, error) {
 		}
 		if query, err := getAttribute(elem, "select"); err == nil {
 			if len(elem.Nodes) > 0 {
-				return fmt.Errorf("using select and children nodes is not allowed")
+				return nil, fmt.Errorf("using select and children nodes is not allowed")
 			}
 			if err := nest.DefineParam(ident, query); err != nil {
 				return nil, err
 			}
 		} else {
-			seq, err := executeConstructor()
+			seq, err := executeConstructor(nest, elem.Nodes, 0)
 			if err != nil {
 				return nil, err
 			}
@@ -630,12 +655,13 @@ func executeIterate(ctx *Context) (xpath.Sequence, error) {
 	}
 
 	for _, i := range items {
+		sub := nest.WithXpath(i.Node())
 		for _, n := range nodes {
 			c := cloneNode(n)
 			if c == nil {
 				continue
 			}
-			others, err := transformNode(nest.WithXsl(c))
+			others, err := transformNode(sub.WithXsl(c))
 			if err != nil {
 				if errors.Is(err, errIterate) {
 					continue
