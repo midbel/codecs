@@ -35,7 +35,11 @@ func Singleton(value any) Sequence {
 	} else if i, ok := value.(nodeItem); ok {
 		item = i
 	} else {
-		item = createLiteral(value)
+		if vs, ok := value.([]Item); ok {
+			item = createArray(vs)
+		} else {
+			item = createLiteral(value)
+		}
 	}
 	var seq Sequence
 	seq.Append(item)
@@ -294,6 +298,44 @@ func (i literalItem) Value() any {
 
 func (i literalItem) Assert(_ Expr, _ environ.Environ[Expr]) (Sequence, error) {
 	return nil, fmt.Errorf("can not assert on literal item")
+}
+
+type arrayItem struct {
+	values []Item
+}
+
+func createArray(vs []Item) Item {
+	return arrayItem{
+		values: slices.Clone(vs),
+	}
+}
+
+func (i arrayItem) Node() xml.Node {
+	return nil
+}
+
+func (i arrayItem) Value() any {
+	var list []any
+	for j := range i.values {
+		list = append(list, i.values[j].Value())
+	}
+	return list
+}
+
+func (i arrayItem) True() bool {
+	if len(i.values) == 0 {
+		return false
+	}
+	for j := range i.values {
+		if !i.values[j].True() {
+			return false
+		}
+	}
+	return true
+}
+
+func (i arrayItem) Atomic() bool {
+	return false
 }
 
 type nodeItem struct {

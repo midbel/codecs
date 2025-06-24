@@ -39,27 +39,31 @@ const document = `<?xml version="1.0" encoding="UTF-8"?>
 `
 
 type TestCase struct {
-	Expr     string
-	Expected []string
+	Expr      string
+	Expected  []string
+	Composite bool
 }
 
 func TestArray(t *testing.T) {
 	tests := []TestCase{
 		{
-			Expr:     "[1, 2, 3, 'test']",
-			Expected: []string{"1", "2", "3", "test"},
+			Expr:      "[1, 2, 3, 'test']",
+			Expected:  []string{"1", "2", "3", "test"},
+			Composite: true,
 		},
 		{
-			Expr:     "array{1, 2, 3}",
-			Expected: []string{"1", "2", "3"},
+			Expr:      "array{1, 2, 3}",
+			Expected:  []string{"1", "2", "3"},
+			Composite: true,
 		},
 		{
 			Expr:     "let $arr := array{1, 2, 3} return $arr(1)",
 			Expected: []string{"1"},
 		},
 		{
-			Expr:     "[[1, 2, 3], [4, 5, 6]](1)",
-			Expected: []string{"1", "2", "3"},
+			Expr:      "[[1, 2, 3], [4, 5, 6]](1)",
+			Expected:  []string{"1", "2", "3"},
+			Composite: true,
 		},
 		{
 			Expr:     "[[1, 2, 3], [4, 5, 6]](1)(2)",
@@ -489,6 +493,10 @@ func runTests(t *testing.T, tests []TestCase) {
 			t.Errorf("error evaluating expression %s: %s", c.Expr, err)
 			continue
 		}
+		if c.Composite {
+			checkArrayValues(t, seq, c)
+			continue
+		}
 		if seq.Len() != len(c.Expected) {
 			t.Logf("result: %s (%d vs %d)", seq.CanonicalizeString(), seq.Len(), len(c.Expected))
 			t.Errorf("%s: number of nodes mismatched! want %d, got %d", c.Expr, len(c.Expected), seq.Len())
@@ -497,6 +505,30 @@ func runTests(t *testing.T, tests []TestCase) {
 		if got, ok := compareValues(seq, c.Expected); !ok {
 			t.Errorf("%s: nodes mismatched! want %s, got %s", c.Expr, c.Expected, got)
 		}
+	}
+}
+
+func checkArrayValues(t *testing.T, seq Sequence, c TestCase) {
+	if seq.Len() != 1 {
+		t.Errorf("sequence does not contains number of expected element (1)")
+		return
+	}
+	items, ok := seq[0].Value().([]any)
+	if !ok {
+		t.Errorf("expected array of item but got something else (%T)", seq[0].Value())
+		return
+	}
+	var res Sequence
+	for j := range items {
+		res.Append(NewLiteralItem(items[j]))
+	}
+	if res.Len() != len(c.Expected) {
+		t.Logf("result: %s (%d vs %d)", res.CanonicalizeString(), res.Len(), len(c.Expected))
+		t.Errorf("%s: number of nodes mismatched! want %d, got %d", c.Expr, len(c.Expected), res.Len())
+		return
+	}
+	if got, ok := compareValues(res, c.Expected); !ok {
+		t.Errorf("%s: nodes mismatched! want %s, got %s", c.Expr, c.Expected, got)
 	}
 }
 

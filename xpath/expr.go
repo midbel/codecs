@@ -846,16 +846,31 @@ func (i subscript) find(ctx Context) (Sequence, error) {
 }
 
 func (i subscript) getArrayFromExpr(ctx Context) (array, error) {
+	var arr array
 	switch id := i.expr.(type) {
+	case subscript:
+		seq, err := id.find(ctx)
+		if err != nil {
+			return arr, err
+		}
+		if seq.Empty() {
+			return arr, nil
+		}
+		values, ok := seq[0].Value().([]any)
+		if !ok {
+			return arr, ErrType
+		}
+		for j := range values {
+			arr.all = append(arr.all, NewValueFromLiteral(values[j]))
+		}
+		return arr, nil
 	case identifier:
 		id, ok := i.expr.(identifier)
 		if !ok {
-			var arr array
 			return arr, fmt.Errorf("identifier expected")
 		}
 		value, err := ctx.Resolve(id.ident)
 		if err != nil {
-			var arr array
 			return arr, err
 		}
 		arr, ok := value.(array)
@@ -866,7 +881,6 @@ func (i subscript) getArrayFromExpr(ctx Context) (array, error) {
 	case array:
 		return id, nil
 	default:
-		var arr array
 		return arr, ErrType
 	}
 }
@@ -1194,15 +1208,20 @@ func (a array) MatchPriority() int {
 }
 
 func (a array) find(ctx Context) (Sequence, error) {
-	var seq Sequence
+	var list []Item
 	for i := range a.all {
 		others, err := a.all[i].find(ctx)
 		if err != nil {
 			return nil, err
 		}
-		seq.Concat(others)
+		if others.Empty() {
+			continue
+		}
+		for j := range others {
+			list = append(list, others[j])
+		}
 	}
-	return seq, nil
+	return Singleton(list), nil
 }
 
 type Type struct {
