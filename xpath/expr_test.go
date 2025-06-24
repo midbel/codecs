@@ -499,6 +499,12 @@ func runTests(t *testing.T, tests []TestCase) {
 			t.Errorf("error evaluating expression %s: %s", c.Expr, err)
 			continue
 		}
+		if c.Failed {
+			if err == nil {
+				t.Errorf("test pass but expected to fail")
+			}
+			continue
+		}
 		if c.Composite {
 			checkArrayValues(t, seq, c)
 			continue

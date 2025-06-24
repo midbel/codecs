@@ -46,13 +46,6 @@ func Singleton(value any) Sequence {
 	return seq
 }
 
-func (s *Sequence) First() (Item, bool) {
-	if s.Empty() {
-		return nil, false
-	}
-	return (*s)[0], true
-}
-
 func (s *Sequence) Len() int {
 	return len(*s)
 }
