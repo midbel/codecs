@@ -42,6 +42,7 @@ type TestCase struct {
 	Expr      string
 	Expected  []string
 	Composite bool
+	Failed    bool
 }
 
 func TestArray(t *testing.T) {
@@ -68,6 +69,11 @@ func TestArray(t *testing.T) {
 		{
 			Expr:     "[[1, 2, 3], [4, 5, 6]](1)(2)",
 			Expected: []string{"2"},
+		},
+		{
+			Expr: "array{1, 2, 3}(79)",
+			Expected: []string{},
+			Failed: true,
 		},
 	}
 	runTests(t, tests)
