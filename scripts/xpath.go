@@ -10,6 +10,7 @@ import (
 )
 
 func main() {
+	trace := flag.Bool("t", false, "trace")
 	flag.Parse()
 	scanner := xpath.Scan(strings.NewReader(flag.Arg(0)))
 	for {
@@ -20,7 +21,9 @@ func main() {
 		}
 	}
 	cp := xpath.NewCompiler(strings.NewReader(flag.Arg(0)))
-	// cp.Tracer = xpath.TraceStdout()
+	if *trace {
+		cp.Tracer = xpath.TraceStdout()
+	}
 	expr, err := cp.Compile()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

@@ -37,8 +37,16 @@ const (
 	kwIs        = "is"
 	kwCast      = "cast"
 	kwCastable  = "castable"
+	kwInstance  = "instance"
+	kwOf        = "of"
 	kwMap       = "map"
 	kwArray     = "array"
+	kwEq        = "eq"
+	kwNe        = "ne"
+	kwLt        = "lt"
+	kwLe        = "le"
+	kwGt        = "gt"
+	kwGe        = "ge"
 )
 
 func isReserved(str string) bool {
@@ -53,10 +61,6 @@ func isReserved(str string) bool {
 	case kwSome:
 	case kwEvery:
 	case kwSatisfies:
-	case kwCast:
-	case kwCastable:
-	case kwAs:
-	case kwIs:
 	case kwMap:
 	case kwArray:
 	default:
@@ -114,6 +118,9 @@ const (
 	opOr
 	opSeq
 	opAxis
+	opInstanceOf
+	opCastAs
+	opCastableAs
 )
 
 type Token struct {
@@ -124,6 +131,12 @@ type Token struct {
 
 func (t Token) String() string {
 	switch t.Type {
+	case opCastAs:
+		return "<cast-as>"
+	case opCastableAs:
+		return "<castable-as>"
+	case opInstanceOf:
+		return "<instance-of>"
 	case opIs:
 		return "<identity>"
 	case opIntersect:
@@ -214,7 +227,7 @@ func (t Token) String() string {
 }
 
 type Scanner struct {
-	input io.RuneScanner
+	input *bufio.Reader
 	char  rune
 	str   bytes.Buffer
 
@@ -460,18 +473,36 @@ func (s *Scanner) scanIdent(tok *Token) {
 		tok.Type = opDiv
 	case kwMod:
 		tok.Type = opMod
-	case "eq":
+	case kwEq:
 		tok.Type = opEq
-	case "ne":
+	case kwNe:
 		tok.Type = opNe
-	case "lt":
+	case kwLt:
 		tok.Type = opLt
-	case "le":
+	case kwLe:
 		tok.Type = opLe
-	case "gt":
+	case kwGt:
 		tok.Type = opGt
-	case "ge":
+	case kwGe:
 		tok.Type = opGe
+	case kwCast:
+		tok.Type = Name
+		ok := s.lookForward("as")
+		if ok {
+			tok.Type = opCastAs
+		}
+	case kwCastable:
+		tok.Type = Name
+		ok := s.lookForward("as")
+		if ok {
+			tok.Type = opCastableAs
+		}
+	case kwInstance:
+		tok.Type = Name
+		ok := s.lookForward("of")
+		if ok {
+			tok.Type = opInstanceOf
+		}
 	default:
 		if isReserved(tok.Literal) {
 			tok.Type = reserved
@@ -480,6 +511,19 @@ func (s *Scanner) scanIdent(tok *Token) {
 		}
 	}
 	s.skipBlank()
+}
+
+func (s *Scanner) lookForward(want string) bool {
+	peek, _ := s.input.Peek(64)
+	tmp := bytes.TrimSpace(peek)
+
+	ok := bytes.HasPrefix(tmp, []byte(want))
+	if ok {
+		skip := len(want) + bytes.Index(peek, []byte(want))
+		s.input.Discard(skip)
+		s.Position.Column += skip
+	}
+	return ok
 }
 
 func (s *Scanner) enterPredicate() {

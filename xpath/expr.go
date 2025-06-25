@@ -1261,6 +1261,23 @@ func (t Type) Cast(in any) (Item, error) {
 	return createLiteral(val), nil
 }
 
+type instanceof struct {
+	expr Expr
+	kind Type
+}
+
+func (i instanceof) Find(node xml.Node) (Sequence, error) {
+	return i.find(DefaultContext(node))
+}
+
+func (i instanceof) MatchPriority() int {
+	return getPriority(prioLow, i.expr)
+}
+
+func (i instanceof) find(ctx Context) (Sequence, error) {
+	return nil, errImplemented
+}
+
 type cast struct {
 	expr Expr
 	kind Type

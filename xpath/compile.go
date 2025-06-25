@@ -59,31 +59,33 @@ func NewCompiler(r io.Reader) *Compiler {
 	}
 
 	cp.infix = map[rune]func(Expr) (Expr, error){
-		currLevel:   cp.compileStep,
-		anyLevel:    cp.compileDescendantStep,
-		opArrow:     cp.compileArrow,
-		opRange:     cp.compileRange,
-		opConcat:    cp.compileBinary,
-		opAdd:       cp.compileBinary,
-		opSub:       cp.compileBinary,
-		opMul:       cp.compileBinary,
-		opDiv:       cp.compileBinary,
-		opMod:       cp.compileBinary,
-		opEq:        cp.compileBinary,
-		opNe:        cp.compileBinary,
-		opGt:        cp.compileBinary,
-		opGe:        cp.compileBinary,
-		opLt:        cp.compileBinary,
-		opLe:        cp.compileBinary,
-		opAnd:       cp.compileBinary,
-		opOr:        cp.compileBinary,
-		opBefore:    cp.compileBinary,
-		opAfter:     cp.compileBinary,
-		opUnion:     cp.compileUnion,
-		opIntersect: cp.compileIntersect,
-		opExcept:    cp.compileExcept,
-		opIs:        cp.compileIdentity,
-		reserved:    cp.compileReservedInfix,
+		currLevel:    cp.compileStep,
+		anyLevel:     cp.compileDescendantStep,
+		opArrow:      cp.compileArrow,
+		opRange:      cp.compileRange,
+		opConcat:     cp.compileBinary,
+		opAdd:        cp.compileBinary,
+		opSub:        cp.compileBinary,
+		opMul:        cp.compileBinary,
+		opDiv:        cp.compileBinary,
+		opMod:        cp.compileBinary,
+		opEq:         cp.compileBinary,
+		opNe:         cp.compileBinary,
+		opGt:         cp.compileBinary,
+		opGe:         cp.compileBinary,
+		opLt:         cp.compileBinary,
+		opLe:         cp.compileBinary,
+		opAnd:        cp.compileBinary,
+		opOr:         cp.compileBinary,
+		opBefore:     cp.compileBinary,
+		opAfter:      cp.compileBinary,
+		opUnion:      cp.compileUnion,
+		opIntersect:  cp.compileIntersect,
+		opExcept:     cp.compileExcept,
+		opIs:         cp.compileIdentity,
+		opCastAs:     cp.compileCast,
+		opCastableAs: cp.compileCastable,
+		opInstanceOf: cp.compileInstanceOf,
 	}
 	cp.postfix = map[rune]func(Expr) (Expr, error){
 		begPred: cp.compileFilter,
@@ -435,25 +437,6 @@ func (c *Compiler) compileQuantified(every bool) (Expr, error) {
 	return q, nil
 }
 
-func (c *Compiler) compileReservedInfix(left Expr) (Expr, error) {
-	keyword := c.getCurrentLiteral()
-	c.next()
-
-	var (
-		expr Expr
-		err  error
-	)
-	switch keyword {
-	case kwCast:
-		return c.compileCast(left)
-	case kwCastable:
-		return c.compileCastable(left)
-	default:
-		return nil, fmt.Errorf("%s: reserved word can not be used as infix operator", keyword)
-	}
-	return expr, err
-}
-
 func (c *Compiler) compileIdentity(left Expr) (Expr, error) {
 	c.Enter("identity")
 	defer c.Leave("identity")
@@ -485,9 +468,27 @@ func (c *Compiler) compileRange(left Expr) (Expr, error) {
 	return expr, nil
 }
 
+func (c *Compiler) compileInstanceOf(left Expr) (Expr, error) {
+	c.Enter("instanceof")
+	defer c.Leave("instanceof")
+	c.next()
+	
+	t, err := c.compileType()
+	if err != nil {
+		return nil, err
+	}
+	expr := instanceof{
+		expr: left,
+		kind: t,
+	}
+	return expr, nil
+}
+
 func (c *Compiler) compileCast(left Expr) (Expr, error) {
 	c.Enter("cast")
 	defer c.Leave("cast")
+	c.next()
+
 	t, err := c.compileType()
 	if err != nil {
 		return nil, err
@@ -502,6 +503,8 @@ func (c *Compiler) compileCast(left Expr) (Expr, error) {
 func (c *Compiler) compileCastable(left Expr) (Expr, error) {
 	c.Enter("castable")
 	defer c.Leave("castable")
+	c.next()
+
 	t, err := c.compileType()
 	if err != nil {
 		return nil, err
@@ -514,13 +517,9 @@ func (c *Compiler) compileCastable(left Expr) (Expr, error) {
 }
 
 func (c *Compiler) compileType() (Type, error) {
-	var t Type
-	if !c.is(reserved) && c.getCurrentLiteral() != kwAs {
-		return t, fmt.Errorf("as expected")
+	t := Type{
+		QName: xml.LocalName(c.getCurrentLiteral()),
 	}
-	c.next()
-
-	t.Name = c.getCurrentLiteral()
 	c.next()
 	if c.is(Namespace) {
 		c.next()
@@ -609,11 +608,11 @@ func (c *Compiler) compileSequence() (Expr, error) {
 		case c.is(opSeq):
 			c.next()
 			if c.is(endGrp) {
-				return nil, ErrSyntax
+				return nil, fmt.Errorf("%w: closing ')' unexpected after ','", ErrSyntax)
 			}
 		case c.is(endGrp):
 		default:
-			return nil, ErrSyntax
+			return nil, fmt.Errorf("%w: expected ')' or ',' but got %s", ErrSyntax, c.curr)
 		}
 	}
 	if !c.is(endGrp) {
@@ -1157,12 +1156,14 @@ const (
 	powAssign // variable assignment
 	powOr
 	powAnd
-	powUnion
-	powIntersect
+	powCast
+	powInstanceOf
 	powIdentity
 	powRange
 	powCmp
 	powConcat
+	powIntersect
+	powUnion
 	powAdd
 	powMul
 	powPrefix
@@ -1173,30 +1174,33 @@ const (
 )
 
 var bindings = map[rune]int{
-	currLevel:   powStep,
-	anyLevel:    powStep,
-	opUnion:     powUnion,
-	opIntersect: powIntersect,
-	opExcept:    powIntersect,
-	opConcat:    powConcat,
-	opAssign:    powAssign,
-	opIs:        powIdentity,
-	opEq:        powCmp,
-	opNe:        powCmp,
-	opGt:        powCmp,
-	opGe:        powCmp,
-	opLt:        powCmp,
-	opLe:        powCmp,
-	opBefore:    powCmp,
-	opAfter:     powCmp,
-	opAnd:       powAnd,
-	opOr:        powOr,
-	opAdd:       powAdd,
-	opSub:       powAdd,
-	opMul:       powMul,
-	opDiv:       powMul,
-	opMod:       powMul,
-	opRange:     powRange,
-	begGrp:      powCall,
-	begPred:     powPred,
+	currLevel:    powStep,
+	anyLevel:     powStep,
+	opInstanceOf: powInstanceOf,
+	opCastAs:     powCast,
+	opCastableAs: powCast,
+	opUnion:      powUnion,
+	opIntersect:  powIntersect,
+	opExcept:     powIntersect,
+	opConcat:     powConcat,
+	opAssign:     powAssign,
+	opIs:         powIdentity,
+	opEq:         powCmp,
+	opNe:         powCmp,
+	opGt:         powCmp,
+	opGe:         powCmp,
+	opLt:         powCmp,
+	opLe:         powCmp,
+	opBefore:     powCmp,
+	opAfter:      powCmp,
+	opAnd:        powAnd,
+	opOr:         powOr,
+	opAdd:        powAdd,
+	opSub:        powAdd,
+	opMul:        powMul,
+	opDiv:        powMul,
+	opMod:        powMul,
+	opRange:      powRange,
+	begGrp:       powCall,
+	begPred:      powPred,
 }
