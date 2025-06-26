@@ -1275,7 +1275,7 @@ func (i instanceof) MatchPriority() int {
 }
 
 func (i instanceof) find(ctx Context) (Sequence, error) {
-	return nil, errImplemented
+	return nil, ErrImplemented
 }
 
 type cast struct {
