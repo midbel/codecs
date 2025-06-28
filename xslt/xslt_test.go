@@ -36,6 +36,20 @@ func TestElement(t *testing.T) {
 	runTest(t, tests)
 }
 
+func TestApplyTemplates(t *testing.T) {
+	tests := []TestCase{
+		{
+			Name: "apply-templates/basic",
+			Dir:  "testdata/apply-templates-basic",
+		},
+		{
+			Name: "apply-templates/mode",
+			Dir:  "testdata/apply-templates-mode",
+		},
+	}
+	runTest(t, tests)
+}
+
 func TestCallTemplate(t *testing.T) {
 	tests := []TestCase{
 		{
@@ -274,6 +288,16 @@ func TestSequence(t *testing.T) {
 		{
 			Name: "sequence/basic",
 			Dir:  "testdata/sequence-foreach",
+		},
+	}
+	runTest(t, tests)
+}
+
+func TestStylesheet(t *testing.T) {
+	tests := []TestCase{
+		{
+			Name: "stylesheet/simplified",
+			Dir:  "testdata/style-simplified",
 		},
 	}
 	runTest(t, tests)

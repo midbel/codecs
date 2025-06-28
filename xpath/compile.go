@@ -472,7 +472,7 @@ func (c *Compiler) compileInstanceOf(left Expr) (Expr, error) {
 	c.Enter("instanceof")
 	defer c.Leave("instanceof")
 	c.next()
-	
+
 	t, err := c.compileType()
 	if err != nil {
 		return nil, err

@@ -563,6 +563,12 @@ func (s *Stylesheet) createContext(node xml.Node) *Context {
 func (s *Stylesheet) init(doc xml.Node) error {
 	if doc.Type() != xml.TypeDocument {
 		return fmt.Errorf("document expected")
+	} else {
+		doc := doc.(*xml.Document)
+		root := doc.Root()
+		if root != nil && root.LocalName() != "stylesheet" && root.LocalName() != "transform" {
+			return s.simplified(root)
+		}
 	}
 	var (
 		top  = doc.(*xml.Document)
