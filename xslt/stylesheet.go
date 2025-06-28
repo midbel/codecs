@@ -630,8 +630,12 @@ func (s *Stylesheet) simplified(root xml.Node) (xml.Node, error) {
 	}
 	elem.RemoveAttribute(xml.QualifiedName(xsltNamespacePrefix, "xmlns"))
 
-	tpl := xml.NewElement(xml.QualifiedName("template", xsltNamespacePrefix))
-	tpl.SetAttribute(xml.NewAttribute(xml.LocalName("match"), "/"))
+	var (
+		name  = xml.QualifiedName("template", xsltNamespacePrefix)
+		tpl   = xml.NewElement(name)
+		match = xml.NewAttribute(xml.LocalName("match"), "/")
+	)
+	tpl.SetAttribute(match)
 
 	ix := slices.IndexFunc(elem.Nodes, func(n xml.Node) bool {
 		ns, _, ok := strings.Cut(n.QualifiedName(), ":")
@@ -639,13 +643,12 @@ func (s *Stylesheet) simplified(root xml.Node) (xml.Node, error) {
 	})
 	top := xml.NewElement(elem.QName)
 	if ix >= 0 {
-		top.Nodes = append(top.Nodes, slices.Clone(elem.Nodes[:ix])...)
-		tpl.Nodes = append(tpl.Nodes, slices.Clone(elem.Nodes[ix:])...)
-		top.Nodes = append(top.Nodes, tpl)
+		tpl.Nodes = append(tpl.Nodes, elem.Nodes[ix:]...)
 	} else {
-		top.Nodes = append(top.Nodes, slices.Clone(elem.Nodes[:ix])...)
-		top.Nodes = append(top.Nodes, tpl)
+		ix = 0
 	}
+	top.Nodes = append(top.Nodes, elem.Nodes[:ix]...)
+	top.Nodes = append(top.Nodes, tpl)
 	return top, nil
 }
 
