@@ -647,6 +647,12 @@ func (s *Stylesheet) simplified(root xml.Node) (xml.Node, error) {
 	} else {
 		ix = 0
 	}
+	ok = slices.IndexFunc(elem.Nodes[:ix], func(n xml.Node) bool {
+		return n.QualifiedName() == xml.QualifiedName("template", xsltNamespacePrefix)
+	})
+	if ok {
+		return nil, fmt.Errorf("simplified root can not contains xsl template")
+	}
 	top.Nodes = append(top.Nodes, elem.Nodes[:ix]...)
 	top.Nodes = append(top.Nodes, tpl)
 	return top, nil

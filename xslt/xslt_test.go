@@ -299,6 +299,11 @@ func TestStylesheet(t *testing.T) {
 			Name: "stylesheet/simplified",
 			Dir:  "testdata/style-simplified",
 		},
+		{
+			Name:   "stylesheet/simplified-with-error",
+			Dir:    "testdata/style-simplified-error",
+			Failed: true,
+		},
 	}
 	runTest(t, tests)
 }
@@ -323,6 +328,9 @@ func executeTest(name, dir string, failure bool) func(*testing.T) {
 		}
 		sheet, err := xslt.Load(filepath.Join(dir, "transform.xslt"), dir)
 		if err != nil {
+			if failure {
+				return
+			}
 			t.Errorf("error loading stylesheet: %s", err)
 			return
 		}
