@@ -30,6 +30,10 @@ func transformNode(ctx *Context) (xpath.Sequence, error) {
 	}
 	fn, ok := executers[elem.QName]
 	if !ok {
+		if space := elem.QName.Space; space == ctx.namespace {
+			err := fmt.Errorf("%s: instruction/declaration not expected here", space)
+			return nil, ctx.errorWithContext(err)
+		}
 		seq, err := processNode(ctx)
 		return seq, err
 	}

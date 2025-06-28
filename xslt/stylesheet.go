@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/midbel/codecs/alpha"
 	"github.com/midbel/codecs/environ"
@@ -539,7 +540,7 @@ func (s *Stylesheet) GetOutput(name string) *Output {
 	ix := slices.IndexFunc(s.output, func(o *Output) bool {
 		return o.Name == name
 	})
-	if ix < 0 && name != "" {
+	if ix < 0 && name == "" {
 		return defaultOutput()
 	}
 	return s.output[ix]
@@ -563,17 +564,18 @@ func (s *Stylesheet) createContext(node xml.Node) *Context {
 func (s *Stylesheet) init(doc xml.Node) error {
 	if doc.Type() != xml.TypeDocument {
 		return fmt.Errorf("document expected")
-	} else {
-		doc := doc.(*xml.Document)
-		root := doc.Root()
-		if root != nil && root.LocalName() != "stylesheet" && root.LocalName() != "transform" {
-			return s.simplified(root)
-		}
 	}
 	var (
 		top  = doc.(*xml.Document)
 		root = top.Root()
 	)
+	if root != nil && root.LocalName() != "stylesheet" && root.LocalName() != "transform" {
+		r, err := s.simplified(root)
+		if err != nil {
+			return err
+		}
+		root = r
+	}
 	r, err := getElementFromNode(root)
 	if err != nil {
 		return err
@@ -614,31 +616,37 @@ func (s *Stylesheet) defineBuiltins() {
 	s.static.Builtins.Define("system-property", s.getSystemProperty)
 }
 
-func (s *Stylesheet) simplified(root xml.Node) error {
+func (s *Stylesheet) simplified(root xml.Node) (xml.Node, error) {
 	elem, err := getElementFromNode(root)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	list := elem.Namespaces()
 	ok := slices.ContainsFunc(list, func(ns xml.NS) bool {
 		return ns.Prefix == xsltNamespacePrefix && ns.Uri == xsltNamespaceUri
 	})
 	if !ok {
-		return fmt.Errorf("simplified stylesheet should declared the xsl namespace")
+		return nil, fmt.Errorf("simplified stylesheet should declared the xsl namespace")
 	}
 	elem.RemoveAttribute(xml.QualifiedName(xsltNamespacePrefix, "xmlns"))
-	tpl, err := NewTemplate(elem)
-	if err != nil {
-		return err
-	}
-	tpl.Match = "/"
-	ix := slices.IndexFunc(s.Modes, func(m *Mode) bool {
-		return m.Unnamed()
+
+	tpl := xml.NewElement(xml.QualifiedName("template", xsltNamespacePrefix))
+	tpl.SetAttribute(xml.NewAttribute(xml.LocalName("match"), "/"))
+
+	ix := slices.IndexFunc(elem.Nodes, func(n xml.Node) bool {
+		ns, _, ok := strings.Cut(n.QualifiedName(), ":")
+		return !ok && ns != xsltNamespacePrefix
 	})
+	top := xml.NewElement(elem.QName)
 	if ix >= 0 {
-		return s.Modes[ix].Append(tpl)
+		top.Nodes = append(top.Nodes, slices.Clone(elem.Nodes[:ix])...)
+		tpl.Nodes = append(tpl.Nodes, slices.Clone(elem.Nodes[ix:])...)
+		top.Nodes = append(top.Nodes, tpl)
+	} else {
+		top.Nodes = append(top.Nodes, slices.Clone(elem.Nodes[:ix])...)
+		top.Nodes = append(top.Nodes, tpl)
 	}
-	return fmt.Errorf("unnamed mode not found")
+	return top, nil
 }
 
 func (s *Stylesheet) makeIdent() string {
