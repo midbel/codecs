@@ -647,8 +647,8 @@ func (s *Stylesheet) simplified(root xml.Node) (xml.Node, error) {
 	} else {
 		ix = 0
 	}
-	ok = slices.IndexFunc(elem.Nodes[:ix], func(n xml.Node) bool {
-		return n.QualifiedName() == xml.QualifiedName("template", xsltNamespacePrefix)
+	ok = slices.ContainsFunc(elem.Nodes[:ix], func(n xml.Node) bool {
+		return n.QualifiedName() == name.QualifiedName()
 	})
 	if ok {
 		return nil, fmt.Errorf("simplified root can not contains xsl template")

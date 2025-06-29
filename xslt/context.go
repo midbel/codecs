@@ -246,6 +246,10 @@ func (e *Env) Resolve(ident string) (xpath.Expr, error) {
 }
 
 func (e *Env) Define(ident string, expr xpath.Expr) {
+	ok := slices.Contains(e.localNames(), ident)
+	if ok {
+		return
+	}
 	e.Vars.Define(ident, expr)
 }
 
@@ -274,6 +278,10 @@ func (e *Env) EvalParam(ident, query string, datum xml.Node) error {
 }
 
 func (e *Env) DefineExprParam(ident string, expr xpath.Expr) {
+	ok := slices.Contains(e.localNames(), ident)
+	if ok {
+		return
+	}
 	e.Params.Define(ident, expr)
 }
 
