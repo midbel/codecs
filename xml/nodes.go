@@ -665,7 +665,7 @@ func (e *Element) Append(node Node) {
 	node.setParent(e)
 	node.setPosition(len(e.Nodes))
 	if a, ok := node.(*Attribute); ok {
-		e.Attrs = append(e.Attrs, *a)
+		e.SetAttribute(*a)
 	} else {
 		e.Nodes = append(e.Nodes, node)
 	}
