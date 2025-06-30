@@ -588,6 +588,10 @@ func (s *Stylesheet) init(doc xml.Node) error {
 		return err
 	}
 	for _, n := range r.Nodes {
+		ctx := s.createContext(n)
+		if err := processAVT(ctx.WithXsl(n)); err != nil {
+			return err
+		}
 		var err error
 		switch name := n.QualifiedName(); name {
 		case s.getQualifiedName("include"):

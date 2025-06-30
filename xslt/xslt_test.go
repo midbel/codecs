@@ -285,6 +285,10 @@ func TestVariables(t *testing.T) {
 			Dir:    "testdata/variable-static-error",
 			Failed: true,
 		},
+		{
+			Name: "variable/static-avt",
+			Dir: "testdata/variable-static-avt",
+		},
 	}
 	runTest(t, tests)
 }
