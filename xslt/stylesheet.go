@@ -525,10 +525,13 @@ func (s *Stylesheet) SetAttributes(node xml.Node) error {
 	if ix < 0 {
 		return fmt.Errorf("%s: attribute set not found", ident)
 	}
+	fmt.Println(ident, ix)
+	if err := elem.RemoveAttr(elem.Attrs[ix].Position()); err != nil {
+		return err
+	}
 	for _, a := range s.AttrSet[ix].Attrs {
 		elem.SetAttribute(a)
 	}
-	elem.RemoveAttr(elem.Attrs[ix].Position())
 	return nil
 }
 

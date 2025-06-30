@@ -250,6 +250,10 @@ func TestVariables(t *testing.T) {
 			Dir:  "testdata/variable-basic",
 		},
 		{
+			Name: "variable/global",
+			Dir:  "testdata/variable-global",
+		},
+		{
 			Name: "variable/body",
 			Dir:  "testdata/variable-body",
 		},
@@ -313,6 +317,24 @@ func TestStylesheet(t *testing.T) {
 			Name:   "stylesheet/simplified-with-error",
 			Dir:    "testdata/style-simplified-error",
 			Failed: true,
+		},
+	}
+	runTest(t, tests)
+}
+
+func TestAttributesSet(t *testing.T) {
+	tests := []TestCase{
+		{
+			Name: "attribute-set/basic",
+			Dir:  "testdata/attribute-set-basic",
+		},
+		{
+			Name: "attribute-set/overwrite",
+			Dir:  "testdata/attribute-set-overwrite",
+		},
+		{
+			Name: "attribute-set/with-attributes",
+			Dir:  "testdata/attribute-set-attribute",
 		},
 	}
 	runTest(t, tests)

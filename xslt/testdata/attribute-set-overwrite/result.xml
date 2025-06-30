@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<root>
+	<item type="dev" code="allowed"/>
+	<item type="dev" code="allowed"/>
+	<item type="prod" code="allowed"/>
+</root>
