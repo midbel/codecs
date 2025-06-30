@@ -7,16 +7,16 @@
 	<xsl:param name="var" select="'shadow'"/>
 
 	<xsl:template match="/">
+		<xsl:variable name="var" select="'angle'"/>
 		<root>
 			<xsl:call-template name="shadow">
-				<xsl:with-param name="var" select="'angle'"/>
+				<xsl:with-param name="var" select="$var"/>
 			</xsl:call-template>
 		</root>
 	</xsl:template>
 
 	<xsl:template name="shadow">
 		<xsl:param name="var"/>
-		<xsl:variable name="var" select="'test'"/>
 		<item>
 			<xsl:value-of select="$var"/>
 		</item>

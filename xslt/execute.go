@@ -84,6 +84,7 @@ func init() {
 		xml.QualifiedName("fallback", xsltNamespacePrefix):        trace(executeFallback),
 		xml.QualifiedName("merge", xsltNamespacePrefix):           trace(executeMerge),
 		xml.QualifiedName("for-each-group", xsltNamespacePrefix):  trace(executeForeachGroup),
+		xml.QualifiedName("assert", xsltNamespacePrefix): trace(executeAssert),
 	}
 }
 
@@ -781,6 +782,10 @@ func executeTry(ctx *Context) (xpath.Sequence, error) {
 		}
 	}
 	return nil, nil
+}
+
+func executeAssert(ctx *Context) (xpath.Sequence, error) {
+	return nil, errImplemented
 }
 
 func executeIf(ctx *Context) (xpath.Sequence, error) {
