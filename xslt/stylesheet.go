@@ -557,6 +557,18 @@ func (s *Stylesheet) CurrentMode() string {
 	return s.Mode
 }
 
+func (s *Stylesheet) staticContext(node xml.Node) *Context {
+	return &Context{
+		XslNode:     node,
+		ContextNode: node,
+		Mode:        s.Mode,
+		Size:        1,
+		Index:       1,
+		Stylesheet:  s,
+		Env:         s.static,
+	}
+}
+
 func (s *Stylesheet) createContext(node xml.Node) *Context {
 	return &Context{
 		ContextNode: node,
@@ -588,8 +600,8 @@ func (s *Stylesheet) init(doc xml.Node) error {
 		return err
 	}
 	for _, n := range r.Nodes {
-		ctx := s.createContext(n)
-		if err := processAVT(ctx.WithXsl(n)); err != nil {
+		ctx := s.staticContext(n)
+		if err := processAVT(ctx); err != nil {
 			return err
 		}
 		var err error

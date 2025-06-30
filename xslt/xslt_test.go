@@ -287,7 +287,7 @@ func TestVariables(t *testing.T) {
 		},
 		{
 			Name: "variable/static-avt",
-			Dir: "testdata/variable-static-avt",
+			Dir:  "testdata/variable-static-avt",
 		},
 	}
 	runTest(t, tests)
