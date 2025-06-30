@@ -3,7 +3,7 @@
 <xsl:stylesheet version="3.0" 
 	xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
 	<xsl:output method="xml" indent="yes"/>
-	<xsl:variable name="version" select="'0.1'"/>
+	<xsl:variable name="version" select="'0.1'" static="yes"/>
 	<xsl:include href="commons-{$version}.xslt"/>
 	<xsl:template match="/">
 		<xsl:variable name="var" select="/root/language[1]"/>
