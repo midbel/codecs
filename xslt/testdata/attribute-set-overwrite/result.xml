@@ -2,6 +2,6 @@
 
 <root>
 	<item type="dev" code="allowed"/>
-	<item type="dev" code="allowed"/>
+	<item type="prod" code="allowed"/>
 	<item type="prod" code="allowed"/>
 </root>

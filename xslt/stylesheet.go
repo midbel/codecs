@@ -519,17 +519,21 @@ func (s *Stylesheet) SetAttributes(node xml.Node) error {
 	if err != nil {
 		return nil
 	}
-	ix := slices.IndexFunc(s.AttrSet, func(set *AttributeSet) bool {
+	ix := slices.IndexFunc(elem.Attrs, func(a xml.Attribute) bool {
+		return a.Name == "use-attribute-sets"
+	})
+	elem.RemoveAttr(ix)
+
+	ix = slices.IndexFunc(s.AttrSet, func(set *AttributeSet) bool {
 		return set.Name == ident
 	})
 	if ix < 0 {
 		return fmt.Errorf("%s: attribute set not found", ident)
 	}
-	fmt.Println(ident, ix)
-	if err := elem.RemoveAttr(elem.Attrs[ix].Position()); err != nil {
-		return err
-	}
-	for _, a := range s.AttrSet[ix].Attrs {
+	attrs := slices.Clone(s.AttrSet[ix].Attrs)
+	attrs = slices.Concat(attrs, slices.Clone(elem.Attrs))
+	elem.ClearAttributes()
+	for _, a := range attrs {
 		elem.SetAttribute(a)
 	}
 	return nil

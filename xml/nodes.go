@@ -737,6 +737,13 @@ func (e *Element) RemoveAttr(at int) error {
 	return nil
 }
 
+func (e *Element) ClearAttributes() {
+	for i := range e.Attrs {
+		e.Attrs[i].setParent(nil)
+	}
+	e.Attrs = nil
+}
+
 func (e *Element) SetAttribute(attr Attribute) error {
 	ix := slices.IndexFunc(e.Attrs, func(a Attribute) bool {
 		return a.QualifiedName() == attr.QualifiedName()
