@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<xsl:stylesheet version="3.0" 
+	xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+	<xsl:output method="xml" indent="yes"/>
+	<xsl:template match="/">
+		<result>
+			<xsl:iterate select="/root/item/value">
+				<xsl:param name="sum" select="0"/>
+				<total>
+					<xsl:value-of select="$sum"/>
+				</total>
+				<xsl:next-iteration>
+					<xsl:with-param name="sum" select="$sum + number(.)"/>
+				</xsl:next-iteration>
+			</xsl:iterate>
+		</result>
+	</xsl:template>
+</xsl:stylesheet>

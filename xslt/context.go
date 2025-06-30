@@ -280,7 +280,7 @@ func (e *Env) EvalParam(ident, query string, datum xml.Node) error {
 func (e *Env) DefineExprParam(ident string, expr xpath.Expr) {
 	ok := slices.Contains(e.localNames(), ident)
 	if ok {
-		return
+		// pass
 	}
 	e.Params.Define(ident, expr)
 }

@@ -114,6 +114,16 @@ func TestMerge(t *testing.T) {
 			Dir:    "testdata/merge-foreach-error",
 			Failed: true,
 		},
+		{
+			Name:   "merge/missing-action",
+			Dir:    "testdata/merge-action-missing",
+			Failed: true,
+		},
+		{
+			Name:   "merge/error-action",
+			Dir:    "testdata/merge-action-error",
+			Failed: true,
+		},
 	}
 	runTest(t, tests)
 }
@@ -303,6 +313,28 @@ func TestStylesheet(t *testing.T) {
 			Name:   "stylesheet/simplified-with-error",
 			Dir:    "testdata/style-simplified-error",
 			Failed: true,
+		},
+	}
+	runTest(t, tests)
+}
+
+func TestIterate(t *testing.T) {
+	tests := []TestCase{
+		{
+			Name: "iterate/basic",
+			Dir:  "testdata/iterate-basic",
+		},
+		{
+			Name: "iterate/break",
+			Dir:  "testdata/iterate-break",
+		},
+		{
+			Name: "iterate/empty",
+			Dir:  "testdata/iterate-empty",
+		},
+		{
+			Name: "iterate/progress",
+			Dir:  "testdata/iterate-progress",
 		},
 	}
 	runTest(t, tests)

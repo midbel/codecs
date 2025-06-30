@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<merge-lang>
+	<lang>go</lang>
+	<lang>java</lang>
+	<lang>js</lang>
+	<lang>py</lang>
+	<lang>rs</lang>
+	<lang>ts</lang>
+</merge-lang>

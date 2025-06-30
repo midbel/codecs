@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<root>
+	<item>
+		<name>foo</name>
+		<value>35</value>
+	</item>
+	<item>
+		<name>bar</name>
+		<value>15</value>
+	</item>
+</root>

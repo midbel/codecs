@@ -49,7 +49,7 @@ func init() {
 		return fn
 	}
 	iterateExecuters = map[xml.QName]ExecuteFunc{
-		xml.QualifiedName("next-iteration", xsltNamespacePrefix): nest(executeNextIteration),
+		xml.QualifiedName("next-iteration", xsltNamespacePrefix): trace(executeNextIteration),
 		xml.QualifiedName("break", xsltNamespacePrefix):          trace(executeBreak),
 	}
 	executers = map[xml.QName]ExecuteFunc{
@@ -84,13 +84,13 @@ func init() {
 		xml.QualifiedName("fallback", xsltNamespacePrefix):        trace(executeFallback),
 		xml.QualifiedName("merge", xsltNamespacePrefix):           trace(executeMerge),
 		xml.QualifiedName("for-each-group", xsltNamespacePrefix):  trace(executeForeachGroup),
-		xml.QualifiedName("assert", xsltNamespacePrefix): trace(executeAssert),
+		xml.QualifiedName("assert", xsltNamespacePrefix):          trace(executeAssert),
 	}
 }
 
 func registerExecuters(set map[xml.QName]ExecuteFunc) bool {
 	for qn, fn := range set {
-		_, ok := set[qn]
+		_, ok := executers[qn]
 		if ok {
 			return false
 		}
@@ -543,14 +543,10 @@ func executeMerge(ctx *Context) (xpath.Sequence, error) {
 		}
 		maps.Copy(groups, others)
 	}
-	if action.QualifiedName() != ctx.getQualifiedName("merge-action") {
-		return nil, fmt.Errorf("merge-action expected")
+	elem, err = getElementFromNode(action)
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
 	}
-	elem, ok := action.(*xml.Element)
-	if !ok {
-		return nil, fmt.Errorf("merge-action: expected xml element")
-	}
-
 	var (
 		keys = slices.Collect(maps.Keys(groups))
 		seq  xpath.Sequence
@@ -607,7 +603,11 @@ func executeIterate(ctx *Context) (xpath.Sequence, error) {
 	if len(elem.Nodes) == 0 {
 		return nil, fmt.Errorf("%s: empty", elem.QualifiedName())
 	}
-	items, err := executeSelect(ctx, elem)
+	query, err := getAttribute(elem, "select")
+	if err != nil {
+		return nil, err
+	}
+	items, err := ctx.ExecuteQuery(query, ctx.ContextNode)
 	if err != nil {
 		return nil, err
 	}
@@ -618,12 +618,6 @@ func executeIterate(ctx *Context) (xpath.Sequence, error) {
 	if nodes[0].QualifiedName() == ctx.getQualifiedName("on-completion") {
 		onComplete = nodes[0]
 		nodes = nodes[1:]
-	}
-	if items.Empty() {
-		if onComplete != nil {
-			return transformNode(ctx.WithXsl(onComplete))
-		}
-		return nil, nil
 	}
 	nest := ctx.Nest()
 	for i := range nodes {
@@ -655,6 +649,7 @@ func executeIterate(ctx *Context) (xpath.Sequence, error) {
 		}
 	}
 
+	var seq xpath.Sequence
 	for _, i := range items {
 		sub := nest.WithXpath(i.Node())
 		for _, n := range nodes {
@@ -671,12 +666,17 @@ func executeIterate(ctx *Context) (xpath.Sequence, error) {
 				}
 				return nil, err
 			}
+			seq.Concat(others)
 		}
 	}
 	if onComplete != nil {
-		return transformNode(ctx.WithXsl(onComplete))
+		elem, err := getElementFromNode(onComplete)
+		if err != nil {
+			return nil, err
+		}
+		return executeConstructor(nest, elem.Nodes, 0)
 	}
-	return nil, nil
+	return seq, nil
 }
 
 func executeForeach(ctx *Context) (xpath.Sequence, error) {
@@ -1109,7 +1109,7 @@ func executeConstructor(ctx *Context, nodes []xml.Node, options constructorFlags
 		default:
 			others, err := transformNode(ctx.WithXsl(c))
 			if err != nil {
-				return nil, err
+				return others, err
 			}
 			if !others.Empty() && len(pending) > 0 && options.AllowNotEmpty() {
 				tmp, err := executeNodes(ctx, pending)

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<lang>
+	<language id="go">golang</language>
+	<language id="js">javascript</language>
+	<language id="ts">typescript</language>
+	<language id="rs">rust</language>
+</lang>
