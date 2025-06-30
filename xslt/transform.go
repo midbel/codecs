@@ -7,7 +7,6 @@ import (
 	"os"
 	"slices"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/midbel/codecs/xml"
@@ -88,28 +87,6 @@ func processNode(ctx *Context) (xpath.Sequence, error) {
 		}
 	}
 	return xpath.Singleton(elem), nil
-}
-
-func isEmpty(seq xpath.Sequence) bool {
-	if seq.Empty() {
-		return true
-	}
-	return !slices.ContainsFunc(seq, func(item xpath.Item) bool {
-		node := item.Node()
-		switch node.Type() {
-		case xml.TypeText:
-			return strings.TrimSpace(node.Value()) == ""
-		case xml.TypeDocument:
-			d := node.(*xml.Document)
-			r := d.Root()
-			return r == nil
-		case xml.TypeElement:
-			e := node.(*xml.Element)
-			return len(e.Nodes) == 0
-		default:
-			return false
-		}
-	})
 }
 
 func cloneNode(n xml.Node) xml.Node {

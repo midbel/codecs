@@ -1096,7 +1096,7 @@ func executeConstructor(ctx *Context, nodes []xml.Node, options constructorFlags
 				err := fmt.Errorf("%s can only be the last child of node", c.QualifiedName())
 				return nil, ctx.errorWithContext(err)
 			}
-			if !isEmpty(seq) {
+			if !seq.Empty() {
 				break
 			}
 			return transformNode(ctx.WithXsl(c))
