@@ -11,11 +11,11 @@ import (
 )
 
 const (
-	CodeGenericError = "XPST0003"
-	CodeUndefinedVar = "XPST0017"
-	CodeNumberArg    = "XPST0018"
-	CodeBadUsage     = "XPST0051"
-	CodeModuleError  = "XQST0039"
+	CodeInvalidSyntax = "XPST0003"
+	CodeUndefinedVar  = "XPST0017"
+	CodeNumberArg     = "XPST0018"
+	CodeBadUsage      = "XPST0051"
+	CodeModuleError   = "XQST0039"
 )
 
 type SyntaxError struct {
@@ -27,7 +27,7 @@ type SyntaxError struct {
 
 func syntaxError(expr, cause string, pos Position) error {
 	return SyntaxError{
-		Code:     CodeGenericError,
+		Code:     CodeInvalidSyntax,
 		Expr:     expr,
 		Cause:    cause,
 		Position: pos,
@@ -150,6 +150,9 @@ func (c *Compiler) compile() (Expr, error) {
 	if c.is(opSeq) {
 		return c.compileList(expr)
 	}
+	if !c.done() {
+		return nil, c.unexpectedError("expression")
+	}
 	return expr, nil
 }
 
@@ -168,7 +171,7 @@ func (c *Compiler) compileReservedPrefix() (Expr, error) {
 	case kwSome, kwEvery:
 		return c.compileQuantified(c.getCurrentLiteral() == kwEvery)
 	default:
-		return nil, fmt.Errorf("%s: reserved word can not be used as prefix operator", c.getCurrentLiteral())
+		return nil, c.unexpectedError(c.getCurrentLiteral())
 	}
 }
 
@@ -207,15 +210,15 @@ func (c *Compiler) compileArray() (Expr, error) {
 		case c.is(opSeq):
 			c.next()
 			if c.is(endPred) {
-				return nil, ErrSyntax
+				return nil, c.syntaxError("array", "',' before ']' is not allowed")
 			}
 		case c.is(endPred):
 		default:
-			return nil, ErrSyntax
+			return nil, c.unexpectedError("array")
 		}
 	}
 	if !c.is(endPred) {
-		return nil, ErrSyntax
+		return nil, c.syntaxError("array", "expected ']'")
 	}
 	c.next()
 	return arr, nil
@@ -227,7 +230,7 @@ func (c *Compiler) compileArrayFunc() (Expr, error) {
 
 	c.next()
 	if !c.is(begCurl) {
-		return nil, ErrSyntax
+		return nil, c.syntaxError("array", "expected '{'")
 	}
 	c.next()
 
@@ -242,15 +245,15 @@ func (c *Compiler) compileArrayFunc() (Expr, error) {
 		case c.is(opSeq):
 			c.next()
 			if c.is(endCurl) {
-				return nil, ErrSyntax
+				return nil, c.syntaxError("array", "',' before '}' is not allowed")
 			}
 		case c.is(endCurl):
 		default:
-			return nil, ErrSyntax
+			return nil, c.syntaxError("array", "unexpected token")
 		}
 	}
 	if !c.is(endCurl) {
-		return nil, ErrSyntax
+		return nil, c.syntaxError("array", "expected '}'")
 	}
 	c.next()
 	return arr, nil
@@ -258,7 +261,7 @@ func (c *Compiler) compileArrayFunc() (Expr, error) {
 
 func (c *Compiler) compileCdt() (Expr, error) {
 	if !c.is(begGrp) {
-		return nil, ErrSyntax
+		return nil, c.syntaxError("if", "expected '('")
 	}
 	c.next()
 	expr, err := c.compileExpr(powLowest)
@@ -266,7 +269,7 @@ func (c *Compiler) compileCdt() (Expr, error) {
 		return nil, err
 	}
 	if !c.is(endGrp) {
-		return nil, ErrSyntax
+		return nil, c.syntaxError("if", "expected ')'")
 	}
 	c.next()
 	return expr, nil
@@ -284,14 +287,14 @@ func (c *Compiler) compileIf() (Expr, error) {
 		return nil, err
 	}
 	if !c.is(reserved) && c.getCurrentLiteral() != kwThen {
-		return nil, fmt.Errorf("then keyword expected")
+		return nil, c.syntaxError("if", "expected 'then'")
 	}
 	c.next()
 	if cdt.csq, err = c.compileExpr(powLowest); err != nil {
 		return nil, err
 	}
 	if !c.is(reserved) && c.getCurrentLiteral() != kwElse {
-		return nil, fmt.Errorf("else keyword expected")
+		return nil, c.syntaxError("if", "expected 'else'")
 	}
 	c.next()
 	if cdt.alt, err = c.compileExpr(powLowest); err != nil {
@@ -339,12 +342,12 @@ func (c *Compiler) compileInClause() (binding, error) {
 	defer c.Leave("in")
 	var b binding
 	if !c.is(variable) {
-		return b, fmt.Errorf("identifier expected")
+		return b, c.syntaxError("in", "expected identifier")
 	}
 	b.ident = c.getCurrentLiteral()
 	c.next()
 	if !c.is(reserved) && c.getCurrentLiteral() != kwIn {
-		return b, fmt.Errorf("expected in operator")
+		return b, c.syntaxError("in", "expected 'in' operator")
 	}
 	c.next()
 	expr, err := c.compileExpr(powLowest)
@@ -365,12 +368,12 @@ func (c *Compiler) compileLet() (Expr, error) {
 	for !c.done() && !c.is(reserved) {
 		var b binding
 		if !c.is(variable) {
-			return nil, fmt.Errorf("identifier expected")
+			return nil, c.syntaxError("let", "identifier expected")
 		}
 		b.ident = c.getCurrentLiteral()
 		c.next()
 		if !c.is(opAssign) {
-			return nil, fmt.Errorf("expected assignment operator")
+			return nil, c.syntaxError("let", "expected ':='")
 		}
 		c.next()
 		expr, err := c.compileExpr(powLowest)
@@ -387,11 +390,11 @@ func (c *Compiler) compileLet() (Expr, error) {
 			}
 		case reserved:
 		default:
-			return nil, fmt.Errorf("unexpected operator")
+			return nil, c.unexpectedError("let")
 		}
 	}
 	if !c.is(reserved) && c.getCurrentLiteral() != kwReturn {
-		return nil, fmt.Errorf("expected return keyword")
+		return nil, c.syntaxError("let", "expected 'return'")
 	}
 	c.next()
 	expr, err := c.compileExpr(powLowest)
@@ -403,8 +406,8 @@ func (c *Compiler) compileLet() (Expr, error) {
 }
 
 func (c *Compiler) compileQuantified(every bool) (Expr, error) {
-	c.Enter("some/every")
-	defer c.Leave("some/every")
+	c.Enter("quantified")
+	defer c.Leave("quantified")
 	c.next()
 	var q quantified
 	q.every = every
@@ -556,7 +559,7 @@ func (c *Compiler) compileFilter(left Expr) (Expr, error) {
 	if c.is(Digit) && c.peek.Type == endPred {
 		return c.compileIndex(left)
 	}
-	expr, err := c.compile()
+	expr, err := c.compileExpr(powLowest)
 	if err != nil {
 		return nil, err
 	}
@@ -1149,6 +1152,15 @@ func (c *Compiler) done() bool {
 func (c *Compiler) next() {
 	c.curr = c.peek
 	c.peek = c.scan.Scan()
+}
+
+func (c *Compiler) syntaxError(expr, cause string) error {
+	return syntaxError(expr, cause, c.curr.Position)
+}
+
+func (c *Compiler) unexpectedError(expr string) error {
+	cause := fmt.Sprintf("unexpected token %s", c.getCurrentLiteral())
+	return c.syntaxError(expr, cause)
 }
 
 const (
