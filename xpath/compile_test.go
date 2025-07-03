@@ -9,13 +9,35 @@ func TestCompileError(t *testing.T) {
 	t.Run("array", testErrorArray)
 	t.Run("if", testErrorIf)
 	t.Run("let", testErrorLet)
+	t.Run("some_every", testErrorQuantified)
+	t.Run("instanceof_castas_castableas", testErrorCastInstanceOf)
+}
+
+func testErrorQuantified(t *testing.T) {
+	tests := []string{
+		"some x in (1, 2, 3)",
+		"every x in (1, 2, 3)",
+		"some $x in (1, 2), $x in (1, 2) satisfies",
+	}
+	compileExpr(t, tests)
 }
 
 func testErrorExpr(t *testing.T) {
 	tests := []string{
+		"10 20",
+	}
+	compileExpr(t, tests)
+}
+
+func testErrorCastInstanceOf(t *testing.T) {
+	tests := []string{
 		"$x instance xs:integer",
 		"$x castable xs:integer",
-		"10 20",
+		"$x instance of /proc",
+		"$x castable as $var",
+		"$x cast as 10",
+		"/proc instance of x:",
+		"/proc instance of x:$x",
 	}
 	compileExpr(t, tests)
 }
@@ -33,6 +55,7 @@ func testErrorIf(t *testing.T) {
 	tests := []string{
 		"if (10 < 20) (true()) else (false())",
 		"if 10 > 20 then true() else false()",
+		"if (10 > 20) then true()",
 	}
 	compileExpr(t, tests)
 }

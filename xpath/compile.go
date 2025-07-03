@@ -210,7 +210,7 @@ func (c *Compiler) compileArray() (Expr, error) {
 		case c.is(opSeq):
 			c.next()
 			if c.is(endPred) {
-				return nil, c.syntaxError("array", "',' before ']' is not allowed")
+				return nil, c.syntaxError("array", "unexpected ',' before ']'")
 			}
 		case c.is(endPred):
 		default:
@@ -245,7 +245,7 @@ func (c *Compiler) compileArrayFunc() (Expr, error) {
 		case c.is(opSeq):
 			c.next()
 			if c.is(endCurl) {
-				return nil, c.syntaxError("array", "',' before '}' is not allowed")
+				return nil, c.syntaxError("array", "unexpected ',' before '}'")
 			}
 		case c.is(endCurl):
 		default:
@@ -385,9 +385,6 @@ func (c *Compiler) compileLet() (Expr, error) {
 		switch c.curr.Type {
 		case opSeq:
 			c.next()
-			if c.is(reserved) {
-				return nil, ErrSyntax
-			}
 		case reserved:
 		default:
 			return nil, c.unexpectedError("let")
@@ -421,18 +418,18 @@ func (c *Compiler) compileQuantified(every bool) (Expr, error) {
 		case opSeq:
 			c.next()
 			if c.is(reserved) {
-				return nil, ErrSyntax
+				return nil, c.syntaxError("some/every", "unexpected ',' before keyword")
 			}
 		case reserved:
 		default:
-			return nil, fmt.Errorf("unexpected operator")
+			return nil, c.unexpectedError("some/every")
 		}
 	}
 	if !c.is(reserved) && c.getCurrentLiteral() != kwSatisfies {
-		return nil, fmt.Errorf("expected satisfies operator")
+		return nil, c.syntaxError("some/every", "expected 'satisfies' keyword")
 	}
 	c.next()
-	test, err := c.compile()
+	test, err := c.compileExpr(powLowest)
 	if err != nil {
 		return nil, err
 	}
@@ -520,12 +517,17 @@ func (c *Compiler) compileCastable(left Expr) (Expr, error) {
 }
 
 func (c *Compiler) compileType() (Type, error) {
-	t := Type{
-		QName: xml.LocalName(c.getCurrentLiteral()),
+	var t Type
+	if !c.is(Name) {
+		return t, c.unexpectedError("type")
 	}
+	t.Name = c.getCurrentLiteral()
 	c.next()
 	if c.is(Namespace) {
 		c.next()
+		if !c.is(Name) {
+			return t, c.unexpectedError("type")
+		}
 		t.Space = t.Name
 		t.Name = c.getCurrentLiteral()
 		c.next()
@@ -546,7 +548,7 @@ func (c *Compiler) compileIndex(left Expr) (Expr, error) {
 	}
 	c.next()
 	if !c.is(endPred) {
-		return nil, fmt.Errorf("%w: missing ']' after index", ErrSyntax)
+		return nil, t.syntaxError("expected ']")
 	}
 	c.next()
 	return i, nil
@@ -564,7 +566,7 @@ func (c *Compiler) compileFilter(left Expr) (Expr, error) {
 		return nil, err
 	}
 	if !c.is(endPred) {
-		return nil, fmt.Errorf("%w: missing ']' after filter", ErrSyntax)
+		return nil, t.syntaxError("expected ']")
 	}
 	c.next()
 
@@ -611,15 +613,15 @@ func (c *Compiler) compileSequence() (Expr, error) {
 		case c.is(opSeq):
 			c.next()
 			if c.is(endGrp) {
-				return nil, fmt.Errorf("%w: closing ')' unexpected after ','", ErrSyntax)
+				return nil, c.syntaxError("sequence", "unexpected ',' before ')'")
 			}
 		case c.is(endGrp):
 		default:
-			return nil, fmt.Errorf("%w: expected ')' or ',' but got %s", ErrSyntax, c.curr)
+			return nil, c.unexpectedError("sequence")
 		}
 	}
 	if !c.is(endGrp) {
-		return nil, fmt.Errorf("%w: missing ')' at end of sequence", ErrSyntax)
+		return nil, c.syntaxError("sequence", "expected ')'")
 	}
 	c.next()
 	return seq, nil
@@ -762,7 +764,7 @@ func (c *Compiler) compileSubscriptCall(left Expr) (Expr, error) {
 		return nil, err
 	}
 	if !c.is(endGrp) {
-		return nil, fmt.Errorf("%w: missing closing ')'", ErrSyntax)
+		return nil, c.syntaxError("expected ')'")
 	}
 	c.next()
 	expr := subscript{
@@ -776,7 +778,7 @@ func (c *Compiler) compileFunctionCall(left Expr) (Expr, error) {
 	compile := func(left Expr) (call, error) {
 		n, ok := left.(name)
 		if !ok {
-			return call{}, fmt.Errorf("invalid function identifier")
+			return call{}, c.syntaxError("call", "expected identifier")
 		}
 		fn := call{
 			QName: n.QName,
@@ -800,7 +802,7 @@ func (c *Compiler) compileFunctionCall(left Expr) (Expr, error) {
 			}
 		}
 		if !c.is(endGrp) {
-			return fn, fmt.Errorf("%w: missing closing ')'", ErrSyntax)
+			return fn, c.syntaxError("call", "expected ')'")
 		}
 		c.next()
 		return fn, nil
@@ -837,7 +839,7 @@ func (c *Compiler) compileExpr(pow int) (Expr, error) {
 	defer c.Leave("expr")
 	fn, ok := c.prefix[c.curr.Type]
 	if !ok {
-		return nil, fmt.Errorf("unexpected prefix expression")
+		return nil, c.unexpectedError("expression")
 	}
 	left, err := fn()
 	if err != nil {
@@ -856,7 +858,7 @@ func (c *Compiler) compileExpr(pow int) (Expr, error) {
 	for !(c.done() || c.endExpr()) && pow < c.power() {
 		fn, ok := c.infix[c.curr.Type]
 		if !ok {
-			return nil, fmt.Errorf("unexpected infix expression")
+			return nil, c.unexpectedError("expression")
 		}
 		left, err = fn(left)
 		if err != nil {
@@ -905,20 +907,20 @@ func (c *Compiler) compileKind() (Expr, error) {
 	c.next()
 	if expr.kind == xml.TypeElement || expr.kind == xml.TypeAttribute {
 		if !c.is(Name) {
-			return nil, fmt.Errorf("expected name")
+			return nil, c.syntaxError("kind", "expected name")
 		}
 		expr.localName = c.getCurrentLiteral()
 		c.next()
 		if c.is(opSeq) {
 			c.next()
 			if !c.is(Name) {
-				return nil, fmt.Errorf("expected type annotation")
+				return nil, c.syntaxError("kind", "expected type")
 			}
 			c.next()
 		}
 	}
 	if !c.is(endGrp) {
-		return nil, ErrSyntax
+		return nil, c.syntaxError("kind", "expected ')'")
 	}
 	c.next()
 	return expr, nil
@@ -980,7 +982,7 @@ func (c *Compiler) compileQName() (Expr, error) {
 		c.next()
 		qn.Space = qn.Name
 		if !c.is(Name) {
-			return nil, fmt.Errorf("name expected after namespace")
+			return nil, c.syntaxError("name", "expected name")
 		}
 		qn.Name = c.getCurrentLiteral()
 		c.next()
@@ -1038,11 +1040,11 @@ func (c *Compiler) compileStepmap(left Expr) (Expr, error) {
 		return nil, err
 	}
 	if !c.is(endGrp) {
-		return nil, fmt.Errorf("%w: missing closing ')'", ErrSyntax)
+		return nil, c.syntaxError("step", "expected ')'")
 	}
 	c.next()
 	if !c.is(opSeq) && !c.is(endPred) && !c.done() {
-		return nil, fmt.Errorf("%w: general expression can only be present after step expression", ErrSyntax)
+		return nil, c.syntaxError("step", "erroneous expression")
 	}
 	ctx := stepmap{
 		step: left,
