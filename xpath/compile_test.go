@@ -42,6 +42,7 @@ func testErrorArray(t *testing.T) {
 		"[1, 2, 3,]",
 		"array{1, 2, 3,}",
 		"array[1]",
+		"array[if $x < 10 then true() else false()]",
 	}
 	compileExpr(t, tests)
 }
