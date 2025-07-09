@@ -548,7 +548,7 @@ func (c *Compiler) compileIndex(left Expr) (Expr, error) {
 	}
 	c.next()
 	if !c.is(endPred) {
-		return nil, t.syntaxError("expected ']")
+		return nil, c.syntaxError("index", "expected ']")
 	}
 	c.next()
 	return i, nil
@@ -566,7 +566,7 @@ func (c *Compiler) compileFilter(left Expr) (Expr, error) {
 		return nil, err
 	}
 	if !c.is(endPred) {
-		return nil, t.syntaxError("expected ']")
+		return nil, c.syntaxError("filter", "expected ']")
 	}
 	c.next()
 
@@ -764,7 +764,7 @@ func (c *Compiler) compileSubscriptCall(left Expr) (Expr, error) {
 		return nil, err
 	}
 	if !c.is(endGrp) {
-		return nil, c.syntaxError("expected ')'")
+		return nil, c.syntaxError("subscript", "expected ')'")
 	}
 	c.next()
 	expr := subscript{
