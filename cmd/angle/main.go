@@ -1,10 +1,13 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 )
+
+var errFail = errors.New("fail")
 
 type Command interface {
 	Run([]string) error
@@ -37,7 +40,9 @@ func main() {
 	}
 	args := flag.Args()
 	if err := command.Run(args[1:]); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		if !errors.Is(err, errFail) {
+			fmt.Fprintln(os.Stderr, err)
+		}
 		os.Exit(1)
 	}
 }

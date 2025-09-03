@@ -13,6 +13,7 @@ import (
 type QueryCmd struct {
 	Root       string
 	Noout      bool
+	Limit      int
 	PrintDepth int
 	ParserOptions
 }
@@ -21,8 +22,9 @@ const queryInfo = "query took %s - %d nodes matching %q"
 
 func (q QueryCmd) Run(args []string) error {
 	set := flag.NewFlagSet("query", flag.ContinueOnError)
+	set.IntVar(&q.Limit, "limit", 0, "limit number of results returned by query")
 	set.StringVar(&q.Root, "root", "", "rename root element")
-	set.BoolVar(&q.Noout, "noout", false, "suppress output - default is to print the result nodes")
+	set.BoolVar(&q.Noout, "quiet", false, "suppress output - default is to print the result nodes")
 	set.BoolVar(&q.StrictNS, "strict-ns", false, "strict namespace checking")
 	set.BoolVar(&q.OmitProlog, "omit-prolog", false, "omit xml prolog")
 	set.IntVar(&q.PrintDepth, "print-depth", 0, "print depth")
@@ -52,5 +54,8 @@ func (q QueryCmd) Run(args []string) error {
 	}
 	fmt.Fprintf(os.Stdout, queryInfo, elapsed, results.Len(), set.Arg(0))
 	fmt.Fprintln(os.Stdout)
+	if results.Len() == 0 {
+		return errFail
+	}
 	return nil
 }
