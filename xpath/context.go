@@ -11,6 +11,40 @@ import (
 	"github.com/midbel/codecs/xml"
 )
 
+type DecimalFormatter struct {
+	GroupSep    rune
+	DecimalSep  rune
+	ExponentSep rune
+
+	PercentChar rune
+}
+
+func (f DecimalFormatter) Format(value float64) float64 {
+	return value
+}
+
+type Engine struct {
+	baseURI   url.URL
+	defaultNS map[string]url.URL
+	funcNS    url.URL
+	elemNS    url.URL
+	variables environ.Environ[Expr]
+	builtins  environ.Environ[BuiltinFunc]
+}
+
+func NewEngine() *Engine {
+	e := Engine{
+		defaultNS: make(map[string]url.URL),
+		variables: environ.Empty[Expr](),
+		builtins:  DefaultBuiltin(),
+	}
+	return &e
+}
+
+func (e *Engine) Eval(query string) (Sequence, error) {
+	return nil, nil
+}
+
 type Context struct {
 	xml.Node
 	Index         int
