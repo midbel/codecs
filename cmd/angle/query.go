@@ -74,6 +74,8 @@ func printNodes(results xpath.Sequence, depth int) {
 	for i := range results {
 		n := results[i].Node()
 		fmt.Fprint(os.Stdout, xml.WriteNodeDepth(n, depth+1))
-	}	
-	fmt.Fprintln(os.Stdout)
+	}
+	if len(results) > 0 {
+	 	fmt.Fprintln(os.Stdout)
+	}
 }

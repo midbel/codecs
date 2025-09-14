@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"iter"
 	"slices"
+	"net/url"
 
 	"github.com/midbel/codecs/environ"
 	"github.com/midbel/codecs/xml"
@@ -72,6 +73,11 @@ func Call(ctx Context, body []Expr) (Sequence, error) {
 }
 
 type Query struct {
+	baseURI   url.URL
+	defaultNS map[string]url.URL
+	funcNS    url.URL
+	elemNS    url.URL
+
 	expr Expr
 	environ.Environ[Expr]
 	Builtins environ.Environ[BuiltinFunc]
@@ -84,6 +90,7 @@ func Build(query string) (*Query, error) {
 	}
 	q := Query{
 		expr: expr,
+		defaultNS: make(map[string]url.URL),
 	}
 	return &q, nil
 }
