@@ -11,11 +11,11 @@ import (
 )
 
 type QueryCmd struct {
-	Root       string
-	Noout      bool
-	Limit      int
+	Root  string
+	Noout bool
+	Limit int
 	Depth int
-	Text bool
+	Text  bool
 	ParserOptions
 }
 
@@ -62,7 +62,6 @@ func (q QueryCmd) Run(args []string) error {
 	return nil
 }
 
-
 func printValues(results xpath.Sequence) {
 	for i := range results {
 		n := results[i].Node()
@@ -76,6 +75,6 @@ func printNodes(results xpath.Sequence, depth int) {
 		fmt.Fprint(os.Stdout, xml.WriteNodeDepth(n, depth+1))
 	}
 	if len(results) > 0 {
-	 	fmt.Fprintln(os.Stdout)
+		fmt.Fprintln(os.Stdout)
 	}
 }

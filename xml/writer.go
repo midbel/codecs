@@ -180,6 +180,7 @@ func (w *Writer) writeElement(node *Element, depth int) error {
 	if w.NoNamespace() {
 		w.writer.WriteString(name.LocalName())
 	} else {
+		// w.writer.WriteString(name.FullUri())
 		w.writer.WriteString(name.QualifiedName())
 	}
 	level := depth + 1

@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"iter"
-	"slices"
 	"net/url"
+	"slices"
 
 	"github.com/midbel/codecs/environ"
 	"github.com/midbel/codecs/xml"
@@ -89,7 +89,7 @@ func Build(query string) (*Query, error) {
 		return nil, err
 	}
 	q := Query{
-		expr: expr,
+		expr:      expr,
 		defaultNS: make(map[string]url.URL),
 	}
 	return &q, nil

@@ -305,6 +305,7 @@ func (d *Document) setParent(_ Node) {}
 func (d *Document) setPosition(_ int) {}
 
 type QName struct {
+	Uri   string
 	Space string
 	Name  string
 }
@@ -345,6 +346,13 @@ func (q QName) Equal(other QName) bool {
 
 func (q QName) LocalName() string {
 	return q.Name
+}
+
+func (q QName) FullUri() string {
+	if q.Uri == "" {
+		return q.LocalName()
+	}
+	return fmt.Sprintf("{%s}%s", q.Uri, q.Name)
 }
 
 func (q QName) QualifiedName() string {

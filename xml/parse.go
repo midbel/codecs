@@ -82,6 +82,10 @@ func ParseFile(file string) (*Document, error) {
 	return ParseReader(r)
 }
 
+func ParseString(xml string) (*Document, error) {
+	return ParseReader(strings.NewReader(xml))
+}
+
 func ParseReader(r io.Reader) (*Document, error) {
 	p := NewParser(r)
 	return p.Parse()
@@ -213,9 +217,6 @@ func (p *Parser) parseElement() (Node, error) {
 	if p.is(Namespace) {
 		elem.Space = p.getCurrentLiteral()
 		p.next()
-		if err := p.isDefined(elem.Space); err != nil {
-			return nil, err
-		}
 	}
 	if !p.is(Name) {
 		return nil, p.createError("element", "name is missing")
@@ -229,6 +230,11 @@ func (p *Parser) parseElement() (Node, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if elem.Uri, err = p.isDefined(elem.QName); err != nil {
+		return nil, err
+	}
+
 	switch p.curr.Type {
 	case EmptyElemTag:
 		p.next()
@@ -263,7 +269,7 @@ func (p *Parser) parseCloseElement(elem Element) error {
 		return p.createError("element", "closing element without namespace")
 	}
 	if p.is(Namespace) {
-		if err := p.isDefined(p.getCurrentLiteral()); err != nil {
+		if _, err := p.isDefined(elem.QName); err != nil {
 			return err
 		}
 		if elem.Space != p.getCurrentLiteral() {
@@ -332,13 +338,13 @@ func (p *Parser) parseAttributes(parent Node, done func() bool) ([]Attribute, er
 }
 
 func (p *Parser) parseAttr() (Attribute, error) {
-	var attr Attribute
+	var (
+		attr Attribute
+		err  error
+	)
 	if p.is(Namespace) {
 		attr.Space = p.getCurrentLiteral()
 		p.next()
-		if err := p.isDefined(attr.Space); err != nil {
-			return attr, err
-		}
 	}
 	if !p.is(Attr) {
 		return attr, p.createError("attribute", "name is expected")
@@ -350,8 +356,13 @@ func (p *Parser) parseAttr() (Attribute, error) {
 	}
 	attr.Datum = p.getCurrentLiteral()
 	p.next()
-	if attr.Space == "xmlns" {
+	if attr.Name == "xmlns" {
+		p.defineNS("", attr.Datum)
+	} else if attr.Space == "xmlns" {
 		p.defineNS(attr.Name, attr.Datum)
+	}
+	if attr.Uri, err = p.isDefined(attr.QName); err != nil {
+		return attr, err
 	}
 	return attr, nil
 }
@@ -386,18 +397,15 @@ func (p *Parser) parseLiteral() (Node, error) {
 	return &text, nil
 }
 
-func (p *Parser) isDefined(ident string) error {
-	if !p.StrictNS {
-		return nil
+func (p *Parser) isDefined(qn QName) (string, error) {
+	if qn.Name == "xmlns" {
+		return "", nil
 	}
-	if ident == "xmlns" {
-		return nil
+	uri, err := p.namespaces.Resolve(qn.Space)
+	if err != nil && p.StrictNS {
+		return "", fmt.Errorf("%s: namespace is not defined", qn.Space)
 	}
-	_, err := p.namespaces.Resolve(ident)
-	if err != nil {
-		return fmt.Errorf("%s: namespace is not defined", ident)
-	}
-	return err
+	return uri, nil
 }
 
 func (p *Parser) defineNS(ident, uri string) {
