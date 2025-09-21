@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/midbel/codecs/environ"
 	"github.com/midbel/codecs/xml"
 )
 
@@ -38,6 +39,15 @@ func (e SyntaxError) Error() string {
 	return fmt.Sprintf("[%s] %s: %s", e.Code, e.Expr, e.Cause)
 }
 
+var defaultNS = map[string]string{
+	"xs":    "http://www.w3.org/2001/XMLSchema ",
+	"fn":    "http://www.w3.org/2005/xpath-functions ",
+	"map":   "http://www.w3.org/2005/xpath-functions/map ",
+	"array": "http://www.w3.org/2005/xpath-functions/array ",
+	"math":  "http://www.w3.org/2005/xpath-functions/math ",
+	"err":   "http://www.w3.org/2005/xqt-errors",
+}
+
 type Compiler struct {
 	scan     *Scanner
 	curr     Token
@@ -47,6 +57,8 @@ type Compiler struct {
 	Tracer
 	mode StepMode
 
+	namespaces environ.Environ[string]
+
 	infix   map[rune]func(Expr) (Expr, error)
 	postfix map[rune]func(Expr) (Expr, error)
 	prefix  map[rune]func() (Expr, error)
@@ -54,8 +66,9 @@ type Compiler struct {
 
 func NewCompiler(r io.Reader) *Compiler {
 	cp := Compiler{
-		scan:   Scan(r),
-		Tracer: discardTracer{},
+		scan:       Scan(r),
+		Tracer:     discardTracer{},
+		namespaces: environ.Empty[string](),
 	}
 
 	cp.infix = map[rune]func(Expr) (Expr, error){
@@ -108,6 +121,10 @@ func NewCompiler(r io.Reader) *Compiler {
 		reserved:   cp.compileReservedPrefix,
 	}
 
+	for prefix, ns := range defaultNS {
+		cp.DefineNS(prefix, ns)
+	}
+
 	cp.next()
 	cp.next()
 	return &cp
@@ -140,6 +157,10 @@ func (c *Compiler) Compile() (Expr, error) {
 		expr: expr,
 	}
 	return q, err
+}
+
+func (c *Compiler) DefineNS(prefix, uri string) {
+	c.namespaces.Define(prefix, uri)
 }
 
 func (c *Compiler) compile() (Expr, error) {
@@ -532,6 +553,7 @@ func (c *Compiler) compileType() (Type, error) {
 		t.Name = c.getCurrentLiteral()
 		c.next()
 	}
+	t.Uri, _ = c.isDefined(t.QName)
 	return t, nil
 }
 
@@ -990,6 +1012,7 @@ func (c *Compiler) compileQName() (Expr, error) {
 	n := name{
 		QName: qn,
 	}
+	n.Uri, _ = c.isDefined(n.QName)
 	return n, nil
 }
 
@@ -1120,6 +1143,17 @@ func (c *Compiler) compileDescendantRoot() (Expr, error) {
 		},
 	}
 	return expr, nil
+}
+
+func (c *Compiler) isDefined(qn xml.QName) (string, error) {
+	if qn.Name == "" {
+		return "", nil
+	}
+	uri, err := c.namespaces.Resolve(qn.Space)
+	if err != nil {
+		return "", fmt.Errorf("%s: namespace is not defined", qn.Space)
+	}
+	return uri, nil
 }
 
 func (c *Compiler) power() int {
