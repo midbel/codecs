@@ -30,6 +30,14 @@ func (q QueryCmd) Run(args []string) error {
 	set.BoolVar(&q.OmitProlog, "omit-prolog", false, "omit xml prolog")
 	set.IntVar(&q.Depth, "print-depth", 0, "print depth")
 	set.BoolVar(&q.Text, "text", false, "print only value of node")
+	set.Func("context", "context configuration", func(file string) error {
+		doc, err := xml.ParseFile(file)
+		if err != nil {
+			return err
+		}
+		_ = doc
+		return nil
+	})
 	if err := set.Parse(args); err != nil {
 		return err
 	}
