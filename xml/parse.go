@@ -23,6 +23,8 @@ const (
 	SupportedEncoding = "UTF-8"
 )
 
+const AttrXmlNS = "xmlns"
+
 type ParseError struct {
 	Position
 	Element string
@@ -356,9 +358,9 @@ func (p *Parser) parseAttr() (Attribute, error) {
 	}
 	attr.Datum = p.getCurrentLiteral()
 	p.next()
-	if attr.Name == "xmlns" {
+	if attr.Name == AttrXmlNS {
 		p.defineNS("", attr.Datum)
-	} else if attr.Space == "xmlns" {
+	} else if attr.Space == AttrXmlNS {
 		p.defineNS(attr.Name, attr.Datum)
 	}
 	if attr.Uri, err = p.isDefined(attr.QName); err != nil {
@@ -398,7 +400,7 @@ func (p *Parser) parseLiteral() (Node, error) {
 }
 
 func (p *Parser) isDefined(qn QName) (string, error) {
-	if qn.Name == "xmlns" {
+	if qn.Name == AttrXmlNS {
 		return "", nil
 	}
 	uri, err := p.namespaces.Resolve(qn.Space)
