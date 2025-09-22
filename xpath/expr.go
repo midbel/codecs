@@ -123,7 +123,10 @@ func BuildWith(query string, options ...Option) (*Query, error) {
 		cp  = NewCompiler(strings.NewReader(query))
 		err error
 	)
-	cp.namespaces = q.namespaces
+	for _, n := range q.namespaces.Names() {
+		uri, _ := q.namespaces.Resolve(n)
+		cp.DefineNS(n, uri)
+	}
 	if q.expr, err = cp.Compile(); err != nil {
 		return nil, err
 	}
