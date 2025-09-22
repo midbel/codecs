@@ -11,6 +11,38 @@ import (
 	"github.com/midbel/codecs/xml"
 )
 
+type StepMode int8
+
+func IsXsl(mode StepMode) bool {
+	return mode == ModeXsl2 || mode == ModeXsl3
+}
+
+const (
+	ModeXpath3 StepMode = 1 << iota
+	ModeXsl2
+	ModeXsl3
+)
+
+const (
+	ModeDefault = ModeXpath3
+	ModeXpath   = ModeXpath3
+	ModeXsl     = ModeXsl3
+)
+
+type Option func(*Compiler)
+
+func WithNamespace(prefix, uri string) Option {
+	return func(cp *Compiler) {
+		cp.namespaces.Define(prefix, uri)
+	}
+}
+
+func WithMode(mode StepMode) Option {
+	return func(cp *Compiler) {
+		cp.mode = mode
+	}
+}
+
 const (
 	CodeInvalidSyntax = "XPST0003"
 	CodeUndefinedVar  = "XPST0017"
@@ -64,11 +96,37 @@ type Compiler struct {
 	prefix  map[rune]func() (Expr, error)
 }
 
+func CompileString(q string) (Expr, error) {
+	return Compile(strings.NewReader(q))
+}
+
+func Compile(r io.Reader) (Expr, error) {
+	return CompileMode(r, ModeDefault)
+}
+
+func CompileMode(r io.Reader, mode StepMode) (Expr, error) {
+	cp := NewCompilerWith(r, WithMode(mode))
+	return cp.Compile()
+}
+
+func NewCompilerWith(r io.Reader, options ...Option) *Compiler {
+	cp := createCompiler(r)
+	for _, o := range options {
+		o(cp)
+	}
+	return cp
+}
+
 func NewCompiler(r io.Reader) *Compiler {
+	return NewCompilerWith(r)
+}
+
+func createCompiler(r io.Reader) *Compiler {
 	cp := Compiler{
 		scan:       Scan(r),
 		Tracer:     discardTracer{},
 		namespaces: environ.Empty[string](),
+		mode:       ModeDefault,
 	}
 
 	cp.infix = map[rune]func(Expr) (Expr, error){
@@ -128,20 +186,6 @@ func NewCompiler(r io.Reader) *Compiler {
 	cp.next()
 	cp.next()
 	return &cp
-}
-
-func CompileString(q string) (Expr, error) {
-	return Compile(strings.NewReader(q))
-}
-
-func Compile(r io.Reader) (Expr, error) {
-	return CompileMode(r, ModeDefault)
-}
-
-func CompileMode(r io.Reader, mode StepMode) (Expr, error) {
-	cp := NewCompiler(r)
-	cp.mode = mode
-	return cp.Compile()
 }
 
 func (c *Compiler) Compile() (Expr, error) {

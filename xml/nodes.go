@@ -706,22 +706,6 @@ func (e *Element) Identity() string {
 	return fmt.Sprintf("node(%s)[%s]", e.QualifiedName(), strings.Join(list, "/"))
 }
 
-func (e *Element) path() []int {
-	if e.parent == nil {
-		return []int{e.position}
-	}
-	steps := e.parent.path()
-	return append(steps, e.position)
-}
-
-func (e *Element) setPosition(pos int) {
-	e.position = pos
-}
-
-func (e *Element) setParent(parent Node) {
-	e.parent = parent
-}
-
 func (e *Element) RemoveAttribute(name QName) error {
 	ix := slices.IndexFunc(e.Attrs, func(a Attribute) bool {
 		return a.QName == name
@@ -752,6 +736,17 @@ func (e *Element) ClearAttributes() {
 	e.Attrs = nil
 }
 
+func (e *Element) GetAttribute(name string) Attribute {
+	ix := slices.IndexFunc(e.Attrs, func(a Attribute) bool {
+		return a.Name == name
+	})
+	var attr Attribute
+	if ix < 0 {
+		return attr
+	}
+	return e.Attrs[ix]
+}
+
 func (e *Element) SetAttribute(attr Attribute) error {
 	ix := slices.IndexFunc(e.Attrs, func(a Attribute) bool {
 		return a.QualifiedName() == attr.QualifiedName()
@@ -762,6 +757,22 @@ func (e *Element) SetAttribute(attr Attribute) error {
 		e.Attrs[ix] = attr
 	}
 	return nil
+}
+
+func (e *Element) path() []int {
+	if e.parent == nil {
+		return []int{e.position}
+	}
+	steps := e.parent.path()
+	return append(steps, e.position)
+}
+
+func (e *Element) setPosition(pos int) {
+	e.position = pos
+}
+
+func (e *Element) setParent(parent Node) {
+	e.parent = parent
 }
 
 type Instruction struct {

@@ -22,7 +22,10 @@ type QueryCmd struct {
 const queryInfo = "query took %s - %d nodes matching %q"
 
 func (q QueryCmd) Run(args []string) error {
-	set := flag.NewFlagSet("query", flag.ContinueOnError)
+	var (
+		set     = flag.NewFlagSet("query", flag.ContinueOnError)
+		options []xpath.Option
+	)
 	set.IntVar(&q.Limit, "limit", 0, "limit number of results returned by query")
 	set.StringVar(&q.Root, "root", "", "rename root element")
 	set.BoolVar(&q.Noout, "quiet", false, "suppress output - default is to print the result nodes")
@@ -30,13 +33,12 @@ func (q QueryCmd) Run(args []string) error {
 	set.BoolVar(&q.OmitProlog, "omit-prolog", false, "omit xml prolog")
 	set.IntVar(&q.Depth, "print-depth", 0, "print depth")
 	set.BoolVar(&q.Text, "text", false, "print only value of node")
-	set.Func("context", "context configuration", func(file string) error {
-		doc, err := xml.ParseFile(file)
-		if err != nil {
-			return err
+	set.Func("config", "context configuration", func(file string) error {
+		all, err := getCompilerOptions(file)
+		if err == nil {
+			options = all
 		}
-		_ = doc
-		return nil
+		return err
 	})
 	if err := set.Parse(args); err != nil {
 		return err
@@ -46,7 +48,7 @@ func (q QueryCmd) Run(args []string) error {
 		return err
 	}
 	now := time.Now()
-	query, err := xpath.Build(set.Arg(0))
+	query, err := xpath.BuildWith(set.Arg(0), options...)
 	if err != nil {
 		return err
 	}
@@ -68,6 +70,30 @@ func (q QueryCmd) Run(args []string) error {
 		return errFail
 	}
 	return nil
+}
+
+func getCompilerOptions(file string) ([]xpath.Option, error) {
+	doc, err := xml.ParseFile(file)
+	if err != nil {
+		return nil, err
+	}
+	var options []xpath.Option
+	ns, err := xpath.Find(doc, "/angle/namespace")
+	if err != nil {
+		return nil, err
+	}
+	for i := range ns {
+		el, ok := ns[i].Node().(*xml.Element)
+		if !ok {
+			continue
+		}
+		var (
+			a = el.GetAttribute("prefix")
+			o = xpath.WithNamespace(a.Value(), el.Value())
+		)
+		options = append(options, o)
+	}
+	return options, nil
 }
 
 func printValues(results xpath.Sequence) {

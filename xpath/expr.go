@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"iter"
-	"net/url"
 	"slices"
+	"strings"
 
 	"github.com/midbel/codecs/environ"
 	"github.com/midbel/codecs/xml"
@@ -22,24 +22,6 @@ var (
 	ErrZero        = errors.New("division by zero")
 	ErrArgument    = errors.New("invalid number of argument(s)")
 	ErrSyntax      = errors.New("invalid syntax")
-)
-
-type StepMode int8
-
-func IsXsl(mode StepMode) bool {
-	return mode == ModeXsl2 || mode == ModeXsl3
-}
-
-const (
-	ModeXpath3 StepMode = 1 << iota
-	ModeXsl2
-	ModeXsl3
-)
-
-const (
-	ModeDefault = ModeXpath3
-	ModeXpath   = ModeXpath3
-	ModeXsl     = ModeXsl3
 )
 
 const (
@@ -73,26 +55,33 @@ func Call(ctx Context, body []Expr) (Sequence, error) {
 }
 
 type Query struct {
-	baseURI   url.URL
-	defaultNS map[string]url.URL
-	funcNS    url.URL
-	elemNS    url.URL
-
 	expr Expr
 	environ.Environ[Expr]
 	Builtins environ.Environ[BuiltinFunc]
 }
 
-func Build(query string) (*Query, error) {
-	expr, err := CompileString(query)
+func Find(node xml.Node, query string) (Sequence, error) {
+	q, err := Build(query)
+	if err != nil {
+		return nil, err
+	}
+	return q.Find(node)
+}
+
+func BuildWith(query string, options ...Option) (*Query, error) {
+	cp := NewCompilerWith(strings.NewReader(query), options...)
+	expr, err := cp.Compile()
 	if err != nil {
 		return nil, err
 	}
 	q := Query{
-		expr:      expr,
-		defaultNS: make(map[string]url.URL),
+		expr: expr,
 	}
 	return &q, nil
+}
+
+func Build(query string) (*Query, error) {
+	return BuildWith(query)
 }
 
 func (q *Query) Find(node xml.Node) (Sequence, error) {

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<context version="1">
+<angle type="query" version="1">
 	<base-uri>http://midbel.org</base-uri>
 	<namespace prefix="angle">http://midbel.org/angle</namespace>
 	<namespace prefix="sweet">http://midbel.org/sweet</namespace>
-</context>
+</angle>
