@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"time"
 
 	"github.com/midbel/codecs/environ"
 	"github.com/midbel/codecs/xml"
@@ -32,6 +33,7 @@ type Context struct {
 
 	environ.Environ[Expr]
 	Builtins environ.Environ[BuiltinFunc]
+	Now      time.Time
 }
 
 func DefaultContext(node xml.Node) Context {
@@ -46,6 +48,7 @@ func createContext(node xml.Node, pos, size int) Context {
 		Index:    pos,
 		Size:     size,
 		Builtins: DefaultBuiltin(),
+		Now:      time.Now(),
 	}
 }
 

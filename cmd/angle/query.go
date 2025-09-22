@@ -72,13 +72,20 @@ func (q QueryCmd) Run(args []string) error {
 	return nil
 }
 
+const (
+	queryNamespace = "/angle/namespace[@prefix]"
+	queryVariable  = "/angle/variable[@name]"
+	prefixAttrName = "prefix"
+	nameAttrName   = "name"
+)
+
 func getCompilerOptions(file string) ([]xpath.Option, error) {
 	doc, err := xml.ParseFile(file)
 	if err != nil {
 		return nil, err
 	}
 	var options []xpath.Option
-	ns, err := xpath.Find(doc, "/angle/namespace")
+	ns, err := xpath.Find(doc, queryNamespace)
 	if err != nil {
 		return nil, err
 	}
@@ -88,8 +95,23 @@ func getCompilerOptions(file string) ([]xpath.Option, error) {
 			continue
 		}
 		var (
-			a = el.GetAttribute("prefix")
+			a = el.GetAttribute(prefixAttrName)
 			o = xpath.WithNamespace(a.Value(), el.Value())
+		)
+		options = append(options, o)
+	}
+	vs, err := xpath.Find(doc, queryVariable)
+	if err != nil {
+		return nil, err
+	}
+	for i := range vs {
+		el, ok := ns[i].Node().(*xml.Element)
+		if !ok {
+			continue
+		}
+		var (
+			a = el.GetAttribute(nameAttrName)
+			o = xpath.WithVariable(a.Value(), el.Value())
 		)
 		options = append(options, o)
 	}

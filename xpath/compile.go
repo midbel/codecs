@@ -43,6 +43,24 @@ func WithMode(mode StepMode) Option {
 	}
 }
 
+func WithVariable(ident, value string) Option {
+	return func(cp *Compiler) {
+
+	}
+}
+
+func WithElementNamespace(uri string) Option {
+	return func(cp *Compiler) {
+
+	}
+}
+
+func WithTypeNamespace(uri string) Option {
+	return func(cp *Compiler) {
+
+	}
+}
+
 const (
 	CodeInvalidSyntax = "XPST0003"
 	CodeUndefinedVar  = "XPST0017"

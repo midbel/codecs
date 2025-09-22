@@ -30,6 +30,20 @@ const (
 	prioHigh = 1
 )
 
+// type Option func(q *Query) error
+
+// func WithNamespace(prefix, uri string) Option {
+// 	return func(q *Query) error {
+// 		return nil
+// 	}
+// }
+
+// func WithVariable(ident, value string) Option {
+// 	return func(q *Query) error {
+// 		return nil
+// 	}
+// }
+
 type Expr interface {
 	Find(xml.Node) (Sequence, error)
 	find(Context) (Sequence, error)
