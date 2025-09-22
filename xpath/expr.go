@@ -30,19 +30,41 @@ const (
 	prioHigh = 1
 )
 
-// type Option func(q *Query) error
+type Option func(q *Query) error
 
-// func WithNamespace(prefix, uri string) Option {
-// 	return func(q *Query) error {
-// 		return nil
-// 	}
-// }
+func WithNamespace(prefix, uri string) Option {
+	return func(q *Query) error {
+		q.namespaces.Define(prefix, uri)
+		return nil
+	}
+}
 
-// func WithVariable(ident, value string) Option {
-// 	return func(q *Query) error {
-// 		return nil
-// 	}
-// }
+func WithElementNamespace(uri string) Option {
+	return func(q *Query) error {
+		return nil
+	}
+}
+
+func WithTypeNamespace(uri string) Option {
+	return func(q *Query) error {
+		q.baseURI = uri
+		return nil
+	}
+}
+
+func WithVariable(ident, value string) Option {
+	return func(q *Query) error {
+		q.Define(ident, NewValueFromLiteral(value))
+		return nil
+	}
+}
+
+func WithBaseUri(uri string) Option {
+	return func(q *Query) error {
+		q.baseURI = uri
+		return nil
+	}
+}
 
 type Expr interface {
 	Find(xml.Node) (Sequence, error)
@@ -72,6 +94,11 @@ type Query struct {
 	expr Expr
 	environ.Environ[Expr]
 	Builtins environ.Environ[BuiltinFunc]
+
+	namespaces environ.Environ[string]
+	baseURI    string
+	elementNS  string
+	typeNS     string
 }
 
 func Find(node xml.Node, query string) (Sequence, error) {
@@ -83,13 +110,22 @@ func Find(node xml.Node, query string) (Sequence, error) {
 }
 
 func BuildWith(query string, options ...Option) (*Query, error) {
-	cp := NewCompilerWith(strings.NewReader(query), options...)
-	expr, err := cp.Compile()
-	if err != nil {
-		return nil, err
-	}
 	q := Query{
-		expr: expr,
+		namespaces: environ.Empty[string](),
+		Environ:    environ.Empty[Expr](),
+	}
+	for _, o := range options {
+		if err := o(&q); err != nil {
+			return nil, err
+		}
+	}
+	var (
+		cp  = NewCompiler(strings.NewReader(query))
+		err error
+	)
+	cp.namespaces = q.namespaces
+	if q.expr, err = cp.Compile(); err != nil {
+		return nil, err
 	}
 	return &q, nil
 }

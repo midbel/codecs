@@ -29,37 +29,37 @@ const (
 	ModeXsl     = ModeXsl3
 )
 
-type Option func(*Compiler)
+// type Option func(*Compiler)
 
-func WithNamespace(prefix, uri string) Option {
-	return func(cp *Compiler) {
-		cp.namespaces.Define(prefix, uri)
-	}
-}
+// func WithNamespace(prefix, uri string) Option {
+// 	return func(cp *Compiler) {
+// 		cp.namespaces.Define(prefix, uri)
+// 	}
+// }
 
-func WithMode(mode StepMode) Option {
-	return func(cp *Compiler) {
-		cp.mode = mode
-	}
-}
+// func WithMode(mode StepMode) Option {
+// 	return func(cp *Compiler) {
+// 		cp.mode = mode
+// 	}
+// }
 
-func WithVariable(ident, value string) Option {
-	return func(cp *Compiler) {
+// func WithVariable(ident, value string) Option {
+// 	return func(cp *Compiler) {
 
-	}
-}
+// 	}
+// }
 
-func WithElementNamespace(uri string) Option {
-	return func(cp *Compiler) {
+// func WithElementNamespace(uri string) Option {
+// 	return func(cp *Compiler) {
 
-	}
-}
+// 	}
+// }
 
-func WithTypeNamespace(uri string) Option {
-	return func(cp *Compiler) {
+// func WithTypeNamespace(uri string) Option {
+// 	return func(cp *Compiler) {
 
-	}
-}
+// 	}
+// }
 
 const (
 	CodeInvalidSyntax = "XPST0003"
@@ -123,20 +123,13 @@ func Compile(r io.Reader) (Expr, error) {
 }
 
 func CompileMode(r io.Reader, mode StepMode) (Expr, error) {
-	cp := NewCompilerWith(r, WithMode(mode))
+	cp := NewCompiler(r)
+	cp.mode = mode
 	return cp.Compile()
 }
 
-func NewCompilerWith(r io.Reader, options ...Option) *Compiler {
-	cp := createCompiler(r)
-	for _, o := range options {
-		o(cp)
-	}
-	return cp
-}
-
 func NewCompiler(r io.Reader) *Compiler {
-	return NewCompilerWith(r)
+	return createCompiler(r)
 }
 
 func createCompiler(r io.Reader) *Compiler {
