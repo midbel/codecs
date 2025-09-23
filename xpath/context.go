@@ -12,18 +12,6 @@ import (
 	"github.com/midbel/codecs/xml"
 )
 
-type DecimalFormatter struct {
-	GroupSep    rune
-	DecimalSep  rune
-	ExponentSep rune
-
-	PercentChar rune
-}
-
-func (f DecimalFormatter) Format(value float64) float64 {
-	return value
-}
-
 type Context struct {
 	xml.Node
 	Index         int

@@ -29,38 +29,6 @@ const (
 	ModeXsl     = ModeXsl3
 )
 
-// type Option func(*Compiler)
-
-// func WithNamespace(prefix, uri string) Option {
-// 	return func(cp *Compiler) {
-// 		cp.namespaces.Define(prefix, uri)
-// 	}
-// }
-
-// func WithMode(mode StepMode) Option {
-// 	return func(cp *Compiler) {
-// 		cp.mode = mode
-// 	}
-// }
-
-// func WithVariable(ident, value string) Option {
-// 	return func(cp *Compiler) {
-
-// 	}
-// }
-
-// func WithElementNamespace(uri string) Option {
-// 	return func(cp *Compiler) {
-
-// 	}
-// }
-
-// func WithTypeNamespace(uri string) Option {
-// 	return func(cp *Compiler) {
-
-// 	}
-// }
-
 const (
 	CodeInvalidSyntax = "XPST0003"
 	CodeUndefinedVar  = "XPST0017"
