@@ -158,41 +158,6 @@ func (s *Sequence) CanonicalizeString() string {
 	return str.String()
 }
 
-func (s *Sequence) Hash() float64 {
-	if s.Empty() {
-		return math.NaN()
-	}
-	var (
-		result float64
-		weight = 1.0
-	)
-	for i := range *s {
-		value := 1.0
-		switch x := (*s)[i].Value().(type) {
-		case int64:
-			value = float64(x)
-		case float64:
-			value = x
-		case string:
-			v, err := strconv.ParseFloat(x, 64)
-			if err == nil {
-				value = v
-			} else {
-				value = math.NaN()
-			}
-		case bool:
-			if !x {
-				value = 0
-			}
-		default:
-			value = math.NaN()
-		}
-		result += value * weight
-		weight /= 10
-	}
-	return result
-}
-
 func EffectiveBooleanValue(seq Sequence) bool {
 	if seq.Empty() {
 		return false
