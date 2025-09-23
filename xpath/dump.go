@@ -32,6 +32,9 @@ func debugExpr(w io.Writer, expr Expr) {
 		io.WriteString(w, "(")
 		if v.Space != "" {
 			io.WriteString(w, v.Space)
+			io.WriteString(w, "(")
+			io.WriteString(w, v.Uri)
+			io.WriteString(w, ")")
 			io.WriteString(w, ":")
 		}
 		io.WriteString(w, v.Name)
