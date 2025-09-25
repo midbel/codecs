@@ -12,7 +12,17 @@ import (
 	"github.com/midbel/codecs/xml"
 )
 
+type static struct {
+	namespaces environ.Environ[string]
+	variables  environ.Environ[Expr]
+	baseURI    string
+	elementNS  string
+	typeNS     string
+}
+
 type Context struct {
+	static
+
 	xml.Node
 	Index         int
 	Size          int
@@ -24,8 +34,12 @@ type Context struct {
 	Now      time.Time
 }
 
-func DefaultContext(node xml.Node) Context {
+func defaultContext(node xml.Node) Context {
 	ctx := createContext(node, 1, 1)
+	ctx.static = static{
+		namespaces: environ.Empty[string](),
+		variables:  environ.Empty[Expr](),
+	}
 	ctx.Environ = environ.Empty[Expr]()
 	return ctx
 }
@@ -73,6 +87,7 @@ func (c Context) DefaultUriCollection() Sequence {
 
 func (c Context) Nest() Context {
 	ctx := createContext(c.Node, c.Index, c.Size)
+	ctx.static = c.static
 	ctx.Environ = environ.Enclosed(c.Environ)
 	ctx.PrincipalType = c.PrincipalType
 	return ctx
@@ -80,6 +95,7 @@ func (c Context) Nest() Context {
 
 func (c Context) Sub(node xml.Node, pos int, size int) Context {
 	ctx := createContext(node, pos, size)
+	ctx.static = c.static
 	ctx.Environ = environ.Enclosed(c)
 	ctx.PrincipalType = c.PrincipalType
 	return ctx

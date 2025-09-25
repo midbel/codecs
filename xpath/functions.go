@@ -842,7 +842,7 @@ func callString(ctx Context, args []Expr) (Sequence, error) {
 		return Singleton(""), nil
 	}
 	if !items[0].Atomic() {
-		return callString(DefaultContext(items[0].Node()), nil)
+		return callString(ctx.Sub(items[0].Node(), 1, 1), nil)
 	}
 	var str string
 	switch v := items[0].Value().(type) {
@@ -970,7 +970,7 @@ func callStringLength(ctx Context, args []Expr) (Sequence, error) {
 		return Singleton(0.0), nil
 	}
 	if !items[0].Atomic() {
-		return callStringLength(DefaultContext(items[0].Node()), nil)
+		return callStringLength(ctx.Sub(items[0].Node(), 1, 1), nil)
 	}
 	str, ok := items[0].Value().(string)
 	if !ok {
@@ -1288,7 +1288,7 @@ func callPath(ctx Context, args []Expr) (Sequence, error) {
 	if !ok {
 		return nil, ErrType
 	}
-	return callPath(DefaultContext(n.Node()), nil)
+	return callPath(ctx.Sub(n.Node(), 1, 1), nil)
 }
 
 func callHasChildren(ctx Context, args []Expr) (Sequence, error) {
@@ -1304,7 +1304,7 @@ func callHasChildren(ctx Context, args []Expr) (Sequence, error) {
 	if !ok {
 		return nil, ErrType
 	}
-	return callHasChildren(DefaultContext(n.Node()), nil)
+	return callHasChildren(ctx.Sub(n.Node(), 1, 1), nil)
 }
 
 func callInnermost(ctx Context, args []Expr) (Sequence, error) {
