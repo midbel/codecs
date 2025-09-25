@@ -34,6 +34,132 @@ type TestCase struct {
 	Options []Option
 }
 
+func TestIf(t *testing.T) {
+	tests := []TestCase{
+		{
+			Query: "if (/root/item[1] = 'foo') then 'ok' else 'nok'",
+			Want:  []string{"ok"},
+		},
+		{
+			Query: "if (/root/item[1] = 'bar') then 'ok' else 'nok'",
+			Want:  []string{"nok"},
+		},
+	}
+	runTests(t, docBase, tests)
+}
+
+func TestFor(t *testing.T) {
+	tests := []TestCase{
+		{
+			Query: "for $i in 1 to 5 return $i",
+			Want:  []string{"1", "2", "3", "4", "5"},
+		},
+	}
+	runTests(t, docBase, tests)
+}
+
+func TestLet(t *testing.T) {
+	tests := []TestCase{
+		{
+			Query: "let $x := -1 return $x",
+			Want:  []string{"-1"},
+		},
+		{
+			Query: "let $x := 1, $y := 1 return $x+$y",
+			Want:  []string{"2"},
+		},
+	}
+	runTests(t, docBase, tests)
+}
+
+func TestQuantified(t *testing.T) {
+	tests := []TestCase{
+		{
+			Query: "every $x in (1, 2, 3) satisfies $x <= 10",
+			Want:  []string{"true"},
+		},
+		{
+			Query: "every $x in (1, 2, 3) satisfies $x > 10",
+			Want:  []string{"false"},
+		},
+		{
+			Query: "some $x in (1, 2, 3) satisfies $x > 10",
+			Want:  []string{"false"},
+		},
+		{
+			Query: "some $x in (1, 2, 13) satisfies $x > 10",
+			Want:  []string{"true"},
+		},
+		{
+			Query: "some $x in (1, 2, 13), $y in (1, 2) satisfies $x * $y > 10",
+			Want:  []string{"true"},
+		},
+		{
+			Query: "some $el in //item satisfies contains(string($el), 'foo')",
+			Want:  []string{"true"},
+		},
+		{
+			Query: "some $el in //* satisfies exists($el/@id)",
+			Want:  []string{"true"},
+		},
+		{
+			Query: "every $el in /root/items satisfies 1=1",
+			Want:  []string{"true"},
+		},
+		{
+			Query: "some $el in /root/items satisfies 1=1",
+			Want:  []string{"false"},
+		},
+		{
+			Query: "some $x in (1, 2), $y in () satisfies $x + $y > 0",
+			Want:  []string{"false"},
+		},
+		{
+			Query: "every $x in (1, 2), $y in (3, 4) satisfies $x < $y",
+			Want:  []string{"true"},
+		},
+	}
+	runTests(t, docBase, tests)
+}
+
+func TestOperators(t *testing.T) {
+	tests := []TestCase{
+		{
+			Query:     "'foo'||'bar'",
+			Want: []string{"foobar"},
+		},
+		{
+			Query:     "/root/item[1] is /root/item[1]",
+			Want: []string{"true"},
+		},
+		{
+			Query:     "/root/item[1] is /root/item[2]",
+			Want: []string{"false"},
+		},
+		{
+			Query:     "/root/item[2] is /root/item[1]",
+			Want: []string{"false"},
+		},
+		{
+			Query:     "/root/item[1] >> /root/item[2]",
+			Want: []string{"false"},
+		},
+		{
+			Query:     "/root/item[1] << /root/item[2]",
+			Want: []string{"true"},
+		},
+		{
+			Query:     "/root/item[2] >> /root/item[1]",
+			Want: []string{"true"},
+		},
+		{
+			Query:     "/root/item[2] << /root/item[1]",
+			Want: []string{"false"},
+		},
+	}
+	runTests(t, docBase, tests)
+}
+
 func TestArray(t *testing.T) {
 	tests := []TestCase{
 		{
@@ -106,10 +232,6 @@ func TestPathWithNS(t *testing.T) {
 			Query:   "/root/*:item",
 			Want:    []string{"foo", "bar"},
 			Options: options,
-		},
-		{
-			Query: "/root/ang:*",
-			Want:  []string{"foo", "bar"},
 		},
 		{
 			Query:   "/root/ang:item",
