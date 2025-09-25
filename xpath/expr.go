@@ -114,12 +114,8 @@ func Find(node xml.Node, query string) (Sequence, error) {
 }
 
 func BuildWith(query string, options ...Option) (*Query, error) {
-	s := static{
-		namespaces: environ.Empty[string](),
-		variables:  environ.Empty[Expr](),
-	}
 	q := Query{
-		static: s,
+		static: createStatic(),
 	}
 	for _, o := range options {
 		if err := o(&q); err != nil {

@@ -21,6 +21,17 @@ type static struct {
 	skipNS     bool
 }
 
+func createStatic() static {
+	var (
+		ns = environ.Empty[string]()
+		vs = environ.Empty[Expr]()
+	)
+	return static{
+		namespaces: environ.ReadOnly(ns),
+		variables:  environ.ReadOnly(vs),
+	}
+}
+
 type Context struct {
 	static
 
@@ -37,10 +48,7 @@ type Context struct {
 
 func defaultContext(node xml.Node) Context {
 	ctx := createContext(node, 1, 1)
-	ctx.static = static{
-		namespaces: environ.Empty[string](),
-		variables:  environ.Empty[Expr](),
-	}
+	ctx.static = createStatic()
 	ctx.Environ = environ.Empty[Expr]()
 	return ctx
 }
