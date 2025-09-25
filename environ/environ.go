@@ -93,3 +93,17 @@ func (e *Env[T]) Detach() Environ[T] {
 	maps.Copy(x.values, e.values)
 	return &x
 }
+
+type readonlyEnv[T any] struct {
+	Environ[T]
+}
+
+func ReadOnly[T any](env Environ[T]) Environ[T] {
+	return &readonlyEnv[T]{
+		Environ: env,
+	}
+}
+
+func (e *readonlyEnv[T]) Define(ident string, expr T) {
+	return
+}

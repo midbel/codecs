@@ -125,36 +125,36 @@ func TestQuantified(t *testing.T) {
 func TestOperators(t *testing.T) {
 	tests := []TestCase{
 		{
-			Query:     "'foo'||'bar'",
-			Want: []string{"foobar"},
+			Query: "'foo'||'bar'",
+			Want:  []string{"foobar"},
 		},
 		{
-			Query:     "/root/item[1] is /root/item[1]",
-			Want: []string{"true"},
+			Query: "/root/item[1] is /root/item[1]",
+			Want:  []string{"true"},
 		},
 		{
-			Query:     "/root/item[1] is /root/item[2]",
-			Want: []string{"false"},
+			Query: "/root/item[1] is /root/item[2]",
+			Want:  []string{"false"},
 		},
 		{
-			Query:     "/root/item[2] is /root/item[1]",
-			Want: []string{"false"},
+			Query: "/root/item[2] is /root/item[1]",
+			Want:  []string{"false"},
 		},
 		{
-			Query:     "/root/item[1] >> /root/item[2]",
-			Want: []string{"false"},
+			Query: "/root/item[1] >> /root/item[2]",
+			Want:  []string{"false"},
 		},
 		{
-			Query:     "/root/item[1] << /root/item[2]",
-			Want: []string{"true"},
+			Query: "/root/item[1] << /root/item[2]",
+			Want:  []string{"true"},
 		},
 		{
-			Query:     "/root/item[2] >> /root/item[1]",
-			Want: []string{"true"},
+			Query: "/root/item[2] >> /root/item[1]",
+			Want:  []string{"true"},
 		},
 		{
-			Query:     "/root/item[2] << /root/item[1]",
-			Want: []string{"false"},
+			Query: "/root/item[2] << /root/item[1]",
+			Want:  []string{"false"},
 		},
 	}
 	runTests(t, docBase, tests)
