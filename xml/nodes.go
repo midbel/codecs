@@ -341,7 +341,7 @@ func (q QName) Zero() bool {
 }
 
 func (q QName) Equal(other QName) bool {
-	return q.Space == other.Space && q.Name == other.Name
+	return q.Uri == other.Uri && q.Space == other.Space && q.Name == other.Name
 }
 
 func (q QName) LocalName() string {

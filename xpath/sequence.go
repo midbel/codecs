@@ -222,6 +222,10 @@ func createLiteral(value any) Item {
 	}
 }
 
+func (i literalItem) Sequence() Sequence {
+	return Singleton(i)
+}
+
 func (i literalItem) Atomic() bool {
 	return true
 }
@@ -268,6 +272,14 @@ func createArray(vs []Item) Item {
 	}
 }
 
+func (i arrayItem) Sequence() Sequence {
+	s := NewSequence()
+	for j := range i.values {
+		s.Append(i.values[j])
+	}
+	return s
+}
+
 func (i arrayItem) Node() xml.Node {
 	return nil
 }
@@ -308,6 +320,10 @@ func createNode(node xml.Node) Item {
 	return nodeItem{
 		node: node,
 	}
+}
+
+func (i nodeItem) Sequence() Sequence {
+	return Singleton(i)
 }
 
 func (i nodeItem) Atomic() bool {

@@ -18,6 +18,7 @@ type static struct {
 	baseURI    string
 	elementNS  string
 	typeNS     string
+	skipNS     bool
 }
 
 type Context struct {

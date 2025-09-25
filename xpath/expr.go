@@ -32,6 +32,13 @@ const (
 
 type Option func(q *Query) error
 
+func WithNoNamespace() Option {
+	return func(q *Query) error {
+		q.skipNS = true
+		return nil
+	}
+}
+
 func WithNamespace(prefix, uri string) Option {
 	return func(q *Query) error {
 		q.namespaces.Define(prefix, uri)
@@ -493,7 +500,23 @@ func (n name) find(ctx Context) (Sequence, error) {
 	if n.Space == "*" && n.Name == ctx.LocalName() {
 		return Singleton(ctx.Node), nil
 	}
-	if ctx.QualifiedName() != n.QualifiedName() {
+	if ctx.skipNS {
+		if ctx.QualifiedName() != n.QualifiedName() {
+			return nil, nil
+		}
+		return Singleton(ctx.Node), nil
+	}
+	var qn xml.QName
+	switch x := ctx.Node.(type) {
+	case *xml.Element:
+		qn = x.QName
+	case *xml.Attribute:
+		qn = x.QName
+	case *xml.Instruction:
+		qn = x.QName
+	default:
+	}
+	if !n.QName.Equal(qn) {
 		return nil, nil
 	}
 	return Singleton(ctx.Node), nil
