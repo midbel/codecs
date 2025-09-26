@@ -348,7 +348,7 @@ func (q QName) LocalName() string {
 	return q.Name
 }
 
-func (q QName) FullUri() string {
+func (q QName) ExpandedName() string {
 	if q.Uri == "" {
 		return q.LocalName()
 	}
