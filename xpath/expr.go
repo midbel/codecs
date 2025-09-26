@@ -39,6 +39,13 @@ func WithEnforceNS() Option {
 	}
 }
 
+func WithBaseUri(uri string) Option {
+	return func(q *Query) error {
+		q.baseURI = uri
+		return nil
+	}
+}
+
 func WithNamespace(prefix, uri string) Option {
 	return func(q *Query) error {
 		q.namespaces.Define(prefix, uri)
@@ -46,15 +53,23 @@ func WithNamespace(prefix, uri string) Option {
 	}
 }
 
-func WithElementNamespace(uri string) Option {
+func WithElementNS(uri string) Option {
 	return func(q *Query) error {
+		q.static.elementNS = uri
 		return nil
 	}
 }
 
-func WithTypeNamespace(uri string) Option {
+func WithTypeNS(uri string) Option {
 	return func(q *Query) error {
-		q.baseURI = uri
+		q.typeNS = uri
+		return nil
+	}
+}
+
+func WithFuncNS(uri string) Option {
+	return func(q *Query) error {
+		q.funcNS = uri
 		return nil
 	}
 }
@@ -62,13 +77,6 @@ func WithTypeNamespace(uri string) Option {
 func WithVariable(ident, value string) Option {
 	return func(q *Query) error {
 		q.Define(ident, NewValueFromLiteral(value))
-		return nil
-	}
-}
-
-func WithBaseUri(uri string) Option {
-	return func(q *Query) error {
-		q.baseURI = uri
 		return nil
 	}
 }
@@ -268,9 +276,13 @@ func (s stepmap) find(ctx Context) (Sequence, error) {
 	if items.Empty() {
 		return items, nil
 	}
+	ctx.Size = items.Len()
+
 	var seq Sequence
 	for j, n := range items {
-		others, err := s.expr.find(ctx.Sub(n.Node(), j+1, items.Len()))
+		ctx.Node = n.Node()
+		ctx.Index = j + 1
+		others, err := s.expr.find(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -297,10 +309,13 @@ func (s step) find(ctx Context) (Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
+	ctx.Size = len(is)
+
 	var list Sequence
 	for i, n := range is {
-		sub := ctx.Sub(n.Node(), i+1, len(is))
-		others, err := s.next.find(sub)
+		ctx.Node = n.Node()
+		ctx.Index = i + 1
+		others, err := s.next.find(ctx)
 		if err != nil {
 			continue
 		}
@@ -321,6 +336,7 @@ const (
 	prevSiblingAxis    = "preceding-sibling"
 	nextAxis           = "following"
 	nextSiblingAxis    = "following-sibling"
+	attributeAxis      = "attribute"
 
 	childTopAxis = "child-or-top"
 	attrTopAxis  = "attribute-or-top"
@@ -341,7 +357,7 @@ func (a axis) MatchPriority() int {
 
 func (a axis) principalType() xml.NodeType {
 	switch a.kind {
-	case "attribueAxis":
+	case attributeAxis:
 		return xml.TypeAttribute
 	default:
 		return xml.TypeElement
@@ -370,7 +386,10 @@ func (a axis) find(ctx Context) (Sequence, error) {
 	case parentAxis:
 		p := ctx.Node.Parent()
 		if p != nil {
-			return a.next.find(createContext(p, 1, 1))
+			ctx.Node = p
+			ctx.Index = 1
+			ctx.Size = 1
+			return a.next.find(ctx)
 		}
 		return nil, nil
 	case ancestorAxis, ancestorSelfAxis:
@@ -382,7 +401,10 @@ func (a axis) find(ctx Context) (Sequence, error) {
 		}
 		node := ctx.Node.Parent()
 		for node != nil {
-			other, err := a.next.find(createContext(node, 1, 1))
+			ctx.Node = node
+			ctx.Size = 1
+			ctx.Index = 1
+			other, err := a.next.find(ctx)
 			if err == nil {
 				list.Concat(other)
 			}
@@ -402,8 +424,11 @@ func (a axis) find(ctx Context) (Sequence, error) {
 	case prevAxis:
 	case prevSiblingAxis:
 		nodes := getNodes(ctx.Parent())
+		ctx.Size = len(nodes)
 		for i := ctx.Node.Position() - 1; i >= 0; i-- {
-			others, err := a.next.find(ctx.Sub(nodes[i], i, len(nodes)))
+			ctx.Node = nodes[i]
+			ctx.Index = i
+			others, err := a.next.find(ctx)
 			if err == nil {
 				list.Concat(others)
 			}
@@ -411,12 +436,16 @@ func (a axis) find(ctx Context) (Sequence, error) {
 	case nextAxis:
 	case nextSiblingAxis:
 		nodes := getNodes(ctx.Parent())
+		ctx.Size = len(nodes)
 		for i := ctx.Node.Position() + 1; i < len(nodes); i++ {
-			others, err := a.next.find(ctx.Sub(nodes[i], i, len(nodes)))
+			ctx.Node = nodes[i]
+			ctx.Index = i
+			others, err := a.next.find(ctx)
 			if err == nil {
 				list.Concat(others)
 			}
 		}
+	case attributeAxis:
 	default:
 		return nil, ErrImplemented
 	}
@@ -428,15 +457,17 @@ func (a axis) descendant(ctx Context) (Sequence, error) {
 		list  Sequence
 		nodes = getNodes(ctx.Node)
 	)
+	ctx.Size = len(nodes)
 	for i, n := range nodes {
-		sub := ctx.Sub(n, i+1, len(nodes))
-		matches, err := a.next.find(sub)
+		ctx.Node = n
+		ctx.Index = i
+		matches, err := a.next.find(ctx)
 		if err != nil {
 			return nil, err
 		}
 		list.Concat(matches)
 
-		matches, err = a.descendant(sub)
+		matches, err = a.descendant(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -450,8 +481,11 @@ func (a axis) child(ctx Context) (Sequence, error) {
 		list  Sequence
 		nodes = getNodes(ctx.Node)
 	)
+	ctx.Size = len(nodes)
 	for i, c := range nodes {
-		others, _ := a.next.find(ctx.Sub(c, i+1, len(nodes)))
+		ctx.Node = c
+		ctx.Index = i + 1
+		others, _ := a.next.find(ctx)
 		list.Concat(others)
 	}
 	return list, nil
@@ -511,6 +545,9 @@ func (n name) find(ctx Context) (Sequence, error) {
 	case *xml.Instruction:
 		qn = x.QName
 	default:
+	}
+	if qn.Uri == "" {
+		qn.Uri = ctx.elementNS
 	}
 	if !n.QName.Equal(qn) {
 		return nil, nil
@@ -733,6 +770,9 @@ func (c call) MatchPriority() int {
 }
 
 func (c call) find(ctx Context) (Sequence, error) {
+	if c.QName.Uri == "" {
+		c.QName.Uri = ctx.funcNS
+	}
 	fn, err := ctx.Builtins.Resolve(c.QualifiedName())
 	if err != nil {
 		return c.callUserDefinedFunction(ctx)
@@ -997,10 +1037,12 @@ func (f filter) find(ctx Context) (Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	ctx.Size = list.Len()
 	var ret Sequence
 	for j, n := range list {
-		res, err := f.check.find(ctx.Sub(n.Node(), j+1, list.Len()))
+		ctx.Node = n.Node()
+		ctx.Index = j + 1
+		res, err := f.check.find(ctx)
 		if err != nil {
 			continue
 		}

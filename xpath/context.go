@@ -18,6 +18,7 @@ type static struct {
 	baseURI    string
 	elementNS  string
 	typeNS     string
+	funcNS     string
 	enforceNS  bool
 }
 
@@ -32,13 +33,43 @@ func createStatic() static {
 	}
 }
 
+func (c static) UriCollection(uri string) (Sequence, error) {
+	u, err := url.Parse(uri)
+	if err != nil {
+		return nil, err
+	}
+	if u.Scheme == "" && u.Host == "" {
+		b, _ := url.Parse(c.baseURI)
+		u.Scheme = b.Scheme
+		u.Host = b.Host
+	}
+	switch u.Scheme {
+	case "file", "http", "":
+		es, err := os.ReadDir(u.Path)
+		if err != nil {
+			return nil, err
+		}
+		var s Sequence
+		for i := range es {
+			s.Append(NewLiteralItem(filepath.Join(u.Path, es[i].Name())))
+		}
+		return s, nil
+	default:
+		return nil, fmt.Errorf("unsupported uri scheme %s", u.Scheme)
+	}
+}
+
+func (c static) DefaultUriCollection() Sequence {
+	var s Sequence
+	return s
+}
+
 type Context struct {
 	static
 
 	xml.Node
 	Index         int
 	Size          int
-	BaseURI       string
 	PrincipalType xml.NodeType
 
 	environ.Environ[Expr]
@@ -63,35 +94,12 @@ func createContext(node xml.Node, pos, size int) Context {
 	}
 }
 
-func (c Context) UriCollection(uri string) (Sequence, error) {
-	u, err := url.Parse(uri)
-	if err != nil {
-		return nil, err
+func (c Context) Resolve(ident string) (Expr, error) {
+	e, err := c.Environ.Resolve(ident)
+	if err == nil {
+		return e, err
 	}
-	if u.Scheme == "" && u.Host == "" {
-		b, _ := url.Parse(c.BaseURI)
-		u.Scheme = b.Scheme
-		u.Host = b.Host
-	}
-	switch u.Scheme {
-	case "file", "http", "":
-		es, err := os.ReadDir(u.Path)
-		if err != nil {
-			return nil, err
-		}
-		var s Sequence
-		for i := range es {
-			s.Append(NewLiteralItem(filepath.Join(u.Path, es[i].Name())))
-		}
-		return s, nil
-	default:
-		return nil, fmt.Errorf("unsupported uri scheme %s", u.Scheme)
-	}
-}
-
-func (c Context) DefaultUriCollection() Sequence {
-	var s Sequence
-	return s
+	return c.variables.Resolve(ident)
 }
 
 func (c Context) Nest() Context {

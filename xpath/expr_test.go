@@ -217,16 +217,10 @@ func TestPathWithNS(t *testing.T) {
 		{
 			Query: "/root/ang:item",
 			Want:  []string{"foo", "bar"},
-			Options: []Option{
-				WithNoNamespace(),
-			},
 		},
 		{
 			Query: "/root/item",
 			Want:  []string{},
-			Options: []Option{
-				WithNoNamespace(),
-			},
 		},
 		{
 			Query:   "/root/*:item",
