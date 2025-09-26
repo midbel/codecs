@@ -1358,7 +1358,7 @@ func (t Type) Cast(in any) (Item, error) {
 	)
 	switch t.QualifiedName() {
 	case "xs:date", "date":
-		val, err = castToDate(in)
+		val, err = castToTime(in)
 	case "xs:decimal", "decimal":
 		val, err = castToFloat(in)
 	case "xs:boolean", "boolean":

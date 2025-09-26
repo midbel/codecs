@@ -2,6 +2,7 @@
 
 <angle type="query" version="1">
 	<base-uri>http://midbel.org</base-uri>
+	
 	<namespace prefix="angle">http://midbel.org/angle</namespace>
 	<namespace prefix="sweet">http://midbel.org/sweet</namespace>
 	

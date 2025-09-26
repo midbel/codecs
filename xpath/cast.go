@@ -2,14 +2,68 @@ package xpath
 
 import (
 	"errors"
-	"math"
 	"strconv"
 	"time"
 )
 
+func toString(value any) (string, error) {
+	switch v := value.(type) {
+	case string:
+		return v, nil
+	case []byte:
+		return string(v), nil
+	case float64:
+		return strconv.FormatFloat(v, 'f', -1, 64), nil
+	case bool:
+		return strconv.FormatBool(v), nil
+	case time.Time:
+		return v.Format("2006-01-02"), nil
+	default:
+		return "", ErrType
+	}
+}
+
+func toInt(value any) (int64, error) {
+	switch v := value.(type) {
+	case int64:
+		return v, nil
+	case float64:
+		return int64(v), nil
+	case string:
+		return strconv.ParseInt(v, 0, 64)
+	case time.Time:
+		return v.Unix(), nil
+	default:
+		return 0, nil
+	}
+}
+
+func toFloat(value any) (float64, error) {
+	return castToFloat(value)
+}
+
+func toBool(v any) bool {
+	switch v := v.(type) {
+	case bool:
+		return v
+	case float64:
+		return v != 0
+	case string:
+		return len(v) > 0
+	case time.Time:
+		return !v.IsZero()
+	default:
+		return false
+	}
+}
+
+func toTime(value any) (time.Time, error) {
+	return castToTime(value)
+}
+
 var ErrCast = errors.New("value can not be cast to target type")
 
-func castToDate(val any) (time.Time, error) {
+func castToTime(val any) (time.Time, error) {
 	if t, ok := val.(time.Time); ok {
 		return t, nil
 	}
@@ -58,78 +112,4 @@ func castToBool(val any) (bool, error) {
 		err = ErrCast
 	}
 	return b, err
-}
-
-func toString(value any) (string, error) {
-	switch v := value.(type) {
-	case string:
-		return v, nil
-	case []byte:
-		return string(v), nil
-	case float64:
-		return strconv.FormatFloat(v, 'f', -1, 64), nil
-	case bool:
-		return strconv.FormatBool(v), nil
-	case time.Time:
-		return v.Format("2006-01-02"), nil
-	default:
-		return "", ErrType
-	}
-}
-
-func toInt(value any) (int64, error) {
-	switch v := value.(type) {
-	case int64:
-		return v, nil
-	case float64:
-		return int64(v), nil
-	case string:
-		return strconv.ParseInt(v, 0, 64)
-	case time.Time:
-		return v.Unix(), nil
-	default:
-		return 0, nil
-	}
-}
-
-func toFloat(value any) (float64, error) {
-	switch v := value.(type) {
-	case float64:
-		return v, nil
-	case string:
-		return strconv.ParseFloat(v, 64)
-	case time.Time:
-		return float64(v.Unix()), nil
-	default:
-		return math.NaN(), nil
-	}
-}
-
-func toBool(v any) bool {
-	switch v := v.(type) {
-	case bool:
-		return v
-	case float64:
-		return v != 0
-	case string:
-		return len(v) > 0
-	case time.Time:
-		return !v.IsZero()
-	default:
-		return false
-	}
-}
-
-func toTime(value any) (time.Time, error) {
-	switch v := value.(type) {
-	case time.Time:
-		return v, nil
-	case string:
-		return time.Parse("2006-01-02", v)
-	case float64:
-		return time.UnixMilli(int64(v)), nil
-	default:
-		var zero time.Time
-		return zero, ErrType
-	}
 }
