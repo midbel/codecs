@@ -26,7 +26,7 @@ type TransformCmd struct {
 	ParserOptions
 }
 
-func (c TransformCmd) Run(args []string) error {
+func (c *TransformCmd) Run(args []string) error {
 	var (
 		params []UserDefinedParam
 		set    = flag.NewFlagSet("transform", flag.ContinueOnError)

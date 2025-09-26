@@ -20,7 +20,7 @@ type AssertCmd struct {
 	options    sch.ReportOptions
 }
 
-func (a AssertCmd) Run(args []string) error {
+func (a *AssertCmd) Run(args []string) error {
 	set := flag.NewFlagSet("assert", flag.ExitOnError)
 	set.StringVar(&a.reportType, "r", "", "report type")
 	set.StringVar(&a.options.RootSpace, "root-namespace", "", "modify namespace of root element")

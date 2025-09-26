@@ -11,65 +11,88 @@ import (
 )
 
 type QueryCmd struct {
-	Root  string
-	Noout bool
-	Limit int
-	Depth int
-	Text  bool
+	Quiet   bool
+	Limit   int
+	Depth   int
+	Text    bool
+	Options []xpath.Option
 	ParserOptions
+
+	query string
+	files []string
 }
 
 const queryInfo = "query took %s - %d nodes matching %q"
 
-func (q QueryCmd) Run(args []string) error {
-	var (
-		set     = flag.NewFlagSet("query", flag.ContinueOnError)
-		options []xpath.Option
-	)
-	set.IntVar(&q.Limit, "limit", 0, "limit number of results returned by query")
-	set.StringVar(&q.Root, "root", "", "rename root element")
-	set.BoolVar(&q.Noout, "quiet", false, "suppress output - default is to print the result nodes")
-	set.BoolVar(&q.StrictNS, "strict-ns", false, "strict namespace checking")
-	set.BoolVar(&q.OmitProlog, "omit-prolog", false, "omit xml prolog")
-	set.IntVar(&q.Depth, "print-depth", 0, "print depth")
-	set.BoolVar(&q.Text, "text", false, "print only value of node")
-	set.Func("config", "context configuration", func(file string) error {
-		all, err := getCompilerOptions(file)
-		if err == nil {
-			options = all
-		}
-		return err
-	})
-	if err := set.Parse(args); err != nil {
-		return err
-	}
-	doc, err := parseDocument(set.Arg(1), q.ParserOptions)
-	if err != nil {
+func (q *QueryCmd) Run(args []string) error {
+	if err := q.parseArgs(args); err != nil {
 		return err
 	}
 	now := time.Now()
-	query, err := xpath.BuildWith(set.Arg(0), options...)
-	if err != nil {
-		return err
-	}
-	results, err := query.Find(doc)
+	results, err := q.run()
 	if err != nil {
 		return err
 	}
 	elapsed := time.Since(now)
-	if !q.Noout {
+	if !q.Quiet {
 		if q.Depth >= 0 && !q.Text {
 			printNodes(results, q.Depth)
 		} else if q.Text {
 			printValues(results)
 		}
 	}
-	fmt.Fprintf(os.Stdout, queryInfo, elapsed, results.Len(), set.Arg(0))
+	fmt.Fprintf(os.Stdout, queryInfo, elapsed, results.Len(), q.query)
 	fmt.Fprintln(os.Stdout)
 	if results.Len() == 0 {
 		return errFail
 	}
 	return nil
+}
+
+func (q *QueryCmd) parseArgs(args []string) error {
+	set := flag.NewFlagSet("query", flag.ContinueOnError)
+	set.BoolVar(&q.Quiet, "quiet", false, "suppress output")
+	set.BoolVar(&q.StrictNS, "strict-ns", false, "strict namespace checking")
+	set.BoolVar(&q.OmitProlog, "omit-prolog", false, "omit xml prolog")
+	set.IntVar(&q.Limit, "limit", 0, "limit number of results returned by query")
+	set.IntVar(&q.Depth, "level", 0, "print n level of matching node")
+	set.BoolVar(&q.Text, "text", false, "print only the value of matching node")
+	set.Func("config", "context configuration", func(file string) error {
+		options, err := getXpathOptions(file)
+		if err == nil {
+			q.Options = options
+		}
+		return err
+	})
+	err := set.Parse(args)
+	if err == nil {
+		q.query = set.Arg(0)
+		q.files = set.Args()[1:]
+	}
+	return err
+}
+
+func (q *QueryCmd) run() (xpath.Sequence, error) {
+	query, err := xpath.BuildWith(q.query, q.Options...)
+	if err != nil {
+		return nil, err
+	}
+	var res xpath.Sequence
+	for _, f := range q.files {
+		doc, err := parseDocument(f, q.ParserOptions)
+		if err != nil {
+			return nil, err
+		}
+		results, err := query.Find(doc)
+		if err != nil {
+			return nil, err
+		}
+		res.Concat(results)
+		if res.Len() > q.Limit {
+			break
+		}
+	}
+	return res, nil
 }
 
 const (
@@ -79,7 +102,7 @@ const (
 	nameAttrName   = "name"
 )
 
-func getCompilerOptions(file string) ([]xpath.Option, error) {
+func getXpathOptions(file string) ([]xpath.Option, error) {
 	doc, err := xml.ParseFile(file)
 	if err != nil {
 		return nil, err

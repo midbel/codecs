@@ -10,7 +10,7 @@ type FormatCmd struct {
 	ParserOptions
 }
 
-func (f FormatCmd) Run(args []string) error {
+func (f *FormatCmd) Run(args []string) error {
 	set := flag.NewFlagSet("format", flag.ContinueOnError)
 
 	set.BoolVar(&f.NoNamespace, "no-namespace", false, "don't write xml namespace into the output document")
