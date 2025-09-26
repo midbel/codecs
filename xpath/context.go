@@ -18,7 +18,7 @@ type static struct {
 	baseURI    string
 	elementNS  string
 	typeNS     string
-	skipNS     bool
+	enforceNS  bool
 }
 
 func createStatic() static {

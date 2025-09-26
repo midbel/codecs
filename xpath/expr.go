@@ -32,9 +32,9 @@ const (
 
 type Option func(q *Query) error
 
-func WithNoNamespace() Option {
+func WithEnforceNS() Option {
 	return func(q *Query) error {
-		q.skipNS = true
+		q.enforceNS = true
 		return nil
 	}
 }
@@ -496,7 +496,7 @@ func (n name) find(ctx Context) (Sequence, error) {
 	if n.Space == "*" && n.Name == ctx.LocalName() {
 		return Singleton(ctx.Node), nil
 	}
-	if ctx.skipNS {
+	if !ctx.enforceNS {
 		if ctx.QualifiedName() != n.QualifiedName() {
 			return nil, nil
 		}
