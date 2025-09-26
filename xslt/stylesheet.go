@@ -1177,7 +1177,7 @@ func includeSheet(ctx *Context) error {
 func xsltQualifiedName(name string) xml.QName {
 	return xml.QName{
 		Name:  name,
-		Space: xsltNamespaceUri,
+		Space: xsltNamespacePrefix,
 		Uri:   xsltNamespaceUri,
 	}
 }
