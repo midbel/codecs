@@ -1173,3 +1173,11 @@ func includeSheet(ctx *Context) error {
 	}
 	return ctx.IncludeSheet(file)
 }
+
+func xsltQualifiedName(name string) xml.QName {
+	return xml.QName{
+		Name:  name,
+		Space: xsltNamespaceUri,
+		Uri:   xsltNamespaceUri,
+	}
+}
