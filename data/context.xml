@@ -2,11 +2,19 @@
 
 <angle type="query" version="1">
 	<base-uri>http://midbel.org</base-uri>
+
+	<namespaces enforce="true">
+		<namespace target="element"></namespace>
+		<namespace target="type"></namespace>
+		<namespace target="function"></namespace>
+		<namespace prefix="angle">http://midbel.org/angle</namespace>
+		<namespace prefix="sweet">http://midbel.org/sweet</namespace>
+	</namespaces>
+
+	<variables>
+		<variable name="name">foobar</variable>
+		<variable name="host">midbel</variable>
+		<variable name="version">3.0</variable>
+	</variables>
 	
-	<namespace prefix="angle">http://midbel.org/angle</namespace>
-	<namespace prefix="sweet">http://midbel.org/sweet</namespace>
-	
-	<variable name="name">foobar</variable>
-	<variable name="host">midbel</variable>
-	<variable name="version">3.0</variable>
 </angle>
