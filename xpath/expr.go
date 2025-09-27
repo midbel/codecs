@@ -446,10 +446,32 @@ func (a axis) find(ctx Context) (Sequence, error) {
 			}
 		}
 	case attributeAxis:
+		return a.attribute(ctx)
 	default:
 		return nil, ErrImplemented
 	}
 	return list, nil
+}
+
+func (a axis) attribute(ctx Context) (Sequence, error) {
+	if ctx.Type() != xml.TypeElement {
+		return nil, nil
+	}
+	var (
+		seq Sequence
+		el  = ctx.Node.(*xml.Element)
+	)
+	ctx.Size = len(el.Attrs)
+	for i := range el.Attrs {
+		ctx.Node = &el.Attrs[i]
+		ctx.Index = i + 1
+		matches, err := a.next.Find(ctx)
+		if err != nil {
+			return nil, err
+		}
+		seq.Concat(matches)
+	}
+	return seq, nil
 }
 
 func (a axis) descendant(ctx Context) (Sequence, error) {
