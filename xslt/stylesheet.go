@@ -327,6 +327,14 @@ func (_ shallowSkip) Execute(ctx *Context) ([]xml.Node, error) {
 	return list, nil
 }
 
+type Function struct {
+	xml.QName
+	Return xml.QName
+
+	Params []string
+	Body   []xml.Node
+}
+
 type Stylesheet struct {
 	DefaultMode           string
 	WrapRoot              bool
@@ -336,6 +344,7 @@ type Stylesheet struct {
 	Mode      string
 	Modes     []*Mode
 	AttrSet   []*AttributeSet
+	Functions []*Function
 
 	output []*Output
 	namer  alpha.Namer
@@ -622,6 +631,7 @@ func (s *Stylesheet) init(doc xml.Node) error {
 			err = s.loadTemplate(n)
 		case s.getQualifiedName("mode"):
 			err = s.loadMode(n)
+		case s.getQualifiedName("function"):
 		default:
 			err = fmt.Errorf("%s: unexpected element", name)
 		}
@@ -752,6 +762,57 @@ func (s *Stylesheet) importSheet(node xml.Node) error {
 	}
 	ctx := s.createContext(nil)
 	return importSheet(ctx.WithXsl(node))
+}
+
+func (s *Stylesheet) loadFunction(node xml.Node) error {
+	elem, err := getElementFromNode(node)
+	if err != nil {
+		return err
+	}
+	if ok, _ := s.useWhen(elem); !ok {
+		return nil
+	}
+	ident, err := getAttribute(elem, "name")
+	if err != nil {
+		return err
+	}
+	qn, err := xml.ParseName(ident)
+	if err != nil {
+		return err
+	}
+	fn := Function{
+		QName: qn,
+	}
+	if n, err := getAttribute(elem, "as"); n != "" {
+		qn, err = xml.ParseName(n)
+		if err != nil {
+			return err
+		}
+		fn.Return = qn
+	}
+	for i, c := range elem.Nodes {
+		if c.LocalName() != "param" {
+			fn.Body = slices.Clone(elem.Nodes[i:])
+			break
+		}
+		el, err := getElementFromNode(c)
+		if err != nil {
+			return err
+		}
+		if !el.Leaf() {
+			return fmt.Errorf("function param should not have children")
+		}
+		if v, err := getAttribute(el, "select"); v != "" && err == nil {
+			return fmt.Errorf("function param should not have select attribute")
+		}
+		ident, err := getAttribute(el, "ident")
+		if err != nil {
+			return err
+		}
+		fn.Params = append(fn.Params, ident)
+	}
+	s.Functions = append(s.Functions, &fn)
+	return nil
 }
 
 func (s *Stylesheet) loadAttributeSet(node xml.Node) error {

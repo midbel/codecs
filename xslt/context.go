@@ -13,6 +13,20 @@ func Catchable(err error) bool {
 	return true
 }
 
+type callFunc struct {
+	args []string
+	body []xml.Node
+
+	parent *Context
+}
+
+func (c *callFunc) Call(ctx xpath.Context, args []xpath.Expr) (xpath.Sequence, error) {
+	if len(args) != len(c.args) {
+		return nil, fmt.Errorf("invalid number of arguments given")
+	}
+	return executeConstructor(c.parent, c.body, AllowOnNonEmpty)
+}
+
 type Context struct {
 	XslNode     xml.Node
 	ContextNode xml.Node
@@ -24,6 +38,24 @@ type Context struct {
 
 	*Stylesheet
 	*Env
+}
+
+func (c *Context) ResolveFunc(ident string) (xpath.Callable, error) {
+	ix := slices.IndexFunc(c.Functions, func(fn *Function) bool {
+		return fn.Name == ident
+	})
+	if ix < 0 {
+		return nil, fmt.Errorf("%s: function undefined", ident)
+	}
+	var (
+		fn   = c.Functions[ix]
+		call = callFunc{
+			args:   slices.Clone(fn.Params),
+			body:   slices.Clone(fn.Body),
+			parent: c,
+		}
+	)
+	return &call, nil
 }
 
 func (c *Context) ApplyTemplate() ([]xml.Node, error) {

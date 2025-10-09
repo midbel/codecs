@@ -810,6 +810,7 @@ func (c call) find(ctx Context) (Sequence, error) {
 }
 
 func (c call) callUserDefinedFunction(ctx Context) (Sequence, error) {
+	fmt.Println("callUserDefinedFunction")
 	res, ok := ctx.Environ.(interface {
 		ResolveFunc(string) (Callable, error)
 	})

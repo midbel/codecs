@@ -85,6 +85,7 @@ func init() {
 		xsltQualifiedName("merge"):           trace(executeMerge),
 		xsltQualifiedName("for-each-group"):  trace(executeForeachGroup),
 		xsltQualifiedName("assert"):          trace(executeAssert),
+		xsltQualifiedName("evaluate"):        trace(executeEvaluate),
 	}
 }
 
