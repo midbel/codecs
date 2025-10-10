@@ -37,8 +37,10 @@ func init() {
 	}
 	trace := func(exec ExecuteFunc) ExecuteFunc {
 		fn := func(ctx *Context) (xpath.Sequence, error) {
-			ctx.Enter(ctx)
-			defer ctx.Leave(ctx)
+			if ctx.Stylesheet != nil {
+				defer ctx.Leave(ctx)
+				ctx.Enter(ctx)
+			}
 
 			seq, err := exec(ctx)
 			if err != nil {

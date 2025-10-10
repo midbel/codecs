@@ -13,20 +13,6 @@ func Catchable(err error) bool {
 	return true
 }
 
-type callFunc struct {
-	args []string
-	body []xml.Node
-
-	parent *Context
-}
-
-func (c *callFunc) Call(ctx xpath.Context, args []xpath.Expr) (xpath.Sequence, error) {
-	if len(args) != len(c.args) {
-		return nil, fmt.Errorf("invalid number of arguments given")
-	}
-	return executeConstructor(c.parent, c.body, AllowOnNonEmpty)
-}
-
 type Context struct {
 	XslNode     xml.Node
 	ContextNode xml.Node
@@ -38,24 +24,6 @@ type Context struct {
 
 	*Stylesheet
 	*Env
-}
-
-func (c *Context) ResolveFunc(ident string) (xpath.Callable, error) {
-	ix := slices.IndexFunc(c.Functions, func(fn *Function) bool {
-		return fn.Name == ident
-	})
-	if ix < 0 {
-		return nil, fmt.Errorf("%s: function undefined", ident)
-	}
-	var (
-		fn   = c.Functions[ix]
-		call = callFunc{
-			args:   slices.Clone(fn.Params),
-			body:   slices.Clone(fn.Body),
-			parent: c,
-		}
-	)
-	return &call, nil
 }
 
 func (c *Context) ApplyTemplate() ([]xml.Node, error) {
@@ -153,6 +121,7 @@ type Env struct {
 	Vars     environ.Environ[xpath.Expr]
 	Params   environ.Environ[xpath.Expr]
 	Builtins environ.Environ[xpath.BuiltinFunc]
+	Funcs    environ.Environ[*Function]
 	Depth    int
 }
 
@@ -166,6 +135,7 @@ func Enclosed(other Resolver) *Env {
 		Vars:     environ.Empty[xpath.Expr](),
 		Params:   environ.Empty[xpath.Expr](),
 		Builtins: xpath.DefaultBuiltin(),
+		Funcs:    environ.Empty[*Function](),
 	}
 }
 
@@ -182,6 +152,7 @@ func (e *Env) Sub() *Env {
 		other:    e.other,
 		Vars:     environ.Enclosed[xpath.Expr](e.Vars),
 		Params:   environ.Enclosed[xpath.Expr](e.Params),
+		Funcs:    e.Funcs,
 		Builtins: e.Builtins,
 		Depth:    e.Depth + 1,
 	}
@@ -193,6 +164,7 @@ func (e *Env) Unwrap() *Env {
 		Vars:     e.Vars,
 		Params:   e.Params,
 		Builtins: e.Builtins,
+		Funcs:    e.Funcs,
 		Depth:    e.Depth,
 	}
 	if u, ok := x.Vars.(interface {
@@ -275,6 +247,20 @@ func (e *Env) Resolve(ident string) (xpath.Expr, error) {
 		return e.other.Resolve(ident)
 	}
 	return nil, err
+}
+
+func (e *Env) ResolveFunc(ident string) (xpath.Callable, error) {
+	fn, err := e.Funcs.Resolve(ident)
+	if err != nil {
+		rs, ok := e.other.(interface {
+			ResolveFunc(string) (xpath.Callable, error)
+		})
+		if !ok {
+			return nil, err
+		}
+		return rs.ResolveFunc(ident)
+	}
+	return fn, nil
 }
 
 func (e *Env) Define(ident string, expr xpath.Expr) {

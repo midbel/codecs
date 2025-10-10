@@ -327,12 +327,44 @@ func (_ shallowSkip) Execute(ctx *Context) ([]xml.Node, error) {
 	return list, nil
 }
 
+type FunctionArg struct {
+	xml.QName
+	As xml.QName
+}
+
 type Function struct {
 	xml.QName
 	Return xml.QName
 
-	Params []string
+	Args []FunctionArg
 	Body   []xml.Node
+}
+
+func (f *Function) Call(xtc xpath.Context, args []xpath.Expr) (xpath.Sequence, error) {
+	if len(args) != len(f.Args) {
+		return nil, fmt.Errorf("%s: invalid number of arguments given", f.QualifiedName())
+	}
+	ctx := Context{
+		ContextNode: xtc.Node,
+		XslNode:     xtc.Node,
+		Env:         Empty(),
+	}
+	for i, a := range f.Args {
+		ctx.Env.Define(a.Name, args[i])
+	}
+	var res xpath.Sequence
+	for _, n := range f.Body {
+		c := cloneNode(n)
+		if c == nil {
+			continue
+		}
+		others, err := transformNode(ctx.WithXsl(c))
+		if err != nil {
+			return nil, err
+		}
+		res.Concat(others)
+	}
+	return res, nil
 }
 
 type Stylesheet struct {
@@ -344,7 +376,6 @@ type Stylesheet struct {
 	Mode      string
 	Modes     []*Mode
 	AttrSet   []*AttributeSet
-	Functions []*Function
 
 	output []*Output
 	namer  alpha.Namer
@@ -469,7 +500,7 @@ func (s *Stylesheet) Execute(doc xml.Node) (xml.Node, error) {
 			if !s.WrapRoot {
 				return nil, fmt.Errorf("main template returns more than one node")
 			}
-			elem := xml.NewElement(xml.LocalName("angle"))
+			elem := xml.NewElement(xml.LocalName(XslProduct))
 			for i := range nodes {
 				elem.Append(nodes[i])
 			}
@@ -477,7 +508,7 @@ func (s *Stylesheet) Execute(doc xml.Node) (xml.Node, error) {
 		} else if len(nodes) == 1 {
 			root = nodes[0]
 		} else {
-			root = xml.NewElement(xml.LocalName("angle"))
+			root = xml.NewElement(xml.LocalName(XslProduct))
 		}
 		return xml.NewDocument(root), nil
 	}
@@ -632,6 +663,7 @@ func (s *Stylesheet) init(doc xml.Node) error {
 		case s.getQualifiedName("mode"):
 			err = s.loadMode(n)
 		case s.getQualifiedName("function"):
+			err = s.loadFunction(n)
 		default:
 			err = fmt.Errorf("%s: unexpected element", name)
 		}
@@ -805,13 +837,20 @@ func (s *Stylesheet) loadFunction(node xml.Node) error {
 		if v, err := getAttribute(el, "select"); v != "" && err == nil {
 			return fmt.Errorf("function param should not have select attribute")
 		}
-		ident, err := getAttribute(el, "ident")
+		ident, err := getAttribute(el, "name")
 		if err != nil {
 			return err
 		}
-		fn.Params = append(fn.Params, ident)
+		qn, err := xml.ParseName(ident)
+		if err != nil {
+			return err
+		}
+		arg := FunctionArg{
+			QName: qn,
+		}
+		fn.Args = append(fn.Args, arg)
 	}
-	s.Functions = append(s.Functions, &fn)
+	s.Funcs.Define(fn.QualifiedName(), &fn)
 	return nil
 }
 
