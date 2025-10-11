@@ -86,6 +86,7 @@ const (
 const (
 	currentMode = "#current"
 	defaultMode = "#default"
+	allValues   = "#all"
 )
 
 type Mode struct {
@@ -372,11 +373,12 @@ type Stylesheet struct {
 	WrapRoot              bool
 	StrictModeDeclaration bool
 
-	xpathNamespace string
-	xsltNamespace  string
-	Mode           string
-	Modes          []*Mode
-	AttrSet        []*AttributeSet
+	excludeNamespaces []string
+	xpathNamespace    string
+	xsltNamespace     string
+	Mode              string
+	Modes             []*Mode
+	AttrSet           []*AttributeSet
 
 	output []*Output
 	namer  alpha.Namer
@@ -437,6 +439,10 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 
 	if ns, err := getAttribute(root, sheet.getQualifiedName("xpath-default-namespace")); err == nil {
 		sheet.xpathNamespace = ns
+	}
+	if list, err := getAttribute(root, sheet.getQualifiedName("xpath-default-namespace")); err == nil {
+		sheet.excludeNamespaces = strings.Fields(list)
+
 	}
 
 	if err := sheet.init(doc); err != nil {
@@ -674,6 +680,8 @@ func (s *Stylesheet) init(doc xml.Node) error {
 			err = s.loadMode(n)
 		case s.getQualifiedName("function"):
 			err = s.loadFunction(n)
+		case s.getQualifiedName("namespace-alias"):
+			err = s.loadNamespaceAlias(n)
 		default:
 			err = fmt.Errorf("%s: unexpected element", name)
 		}
@@ -804,6 +812,10 @@ func (s *Stylesheet) importSheet(node xml.Node) error {
 	}
 	ctx := s.createContext(nil)
 	return importSheet(ctx.WithXsl(node))
+}
+
+func (s *Stylesheet) loadNamespaceAlias(node xml.Node) error {
+	return nil
 }
 
 func (s *Stylesheet) loadFunction(node xml.Node) error {

@@ -108,6 +108,7 @@ func (c *Context) clone(xslNode, ctxNode xml.Node) *Context {
 		Env:         c.Env,
 		Depth:       c.Depth + 1,
 	}
+	child.SetXpathNamespace(c.xpathNamespace)
 	return &child
 }
 
