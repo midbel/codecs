@@ -337,7 +337,7 @@ type Function struct {
 	Return xml.QName
 
 	Args []FunctionArg
-	Body   []xml.Node
+	Body []xml.Node
 }
 
 func (f *Function) Call(xtc xpath.Context, args []xpath.Expr) (xpath.Sequence, error) {
@@ -372,10 +372,11 @@ type Stylesheet struct {
 	WrapRoot              bool
 	StrictModeDeclaration bool
 
-	namespace string
-	Mode      string
-	Modes     []*Mode
-	AttrSet   []*AttributeSet
+	xpathNamespace string
+	xsltNamespace  string
+	Mode           string
+	Modes          []*Mode
+	AttrSet        []*AttributeSet
 
 	output []*Output
 	namer  alpha.Namer
@@ -393,12 +394,12 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 		return nil, err
 	}
 	sheet := Stylesheet{
-		Context:   contextDir,
-		namespace: xsltNamespacePrefix,
-		static:    Empty(),
-		Env:       Empty(),
-		Tracer:    NoopTracer(),
-		namer:     alpha.Compose(alpha.NewLowerString(3), alpha.NewNumberString(2)),
+		Context:       contextDir,
+		xsltNamespace: xsltNamespacePrefix,
+		static:        Empty(),
+		Env:           Empty(),
+		Tracer:        NoopTracer(),
+		namer:         alpha.Compose(alpha.NewLowerString(3), alpha.NewNumberString(2)),
 	}
 
 	sheet.defineBuiltins()
@@ -408,29 +409,34 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 		sheet.Context = filepath.Dir(file)
 	}
 
-	root := doc.Root().(*xml.Element)
-	if root != nil {
-		all := root.Namespaces()
-		ix := slices.IndexFunc(all, func(n xml.NS) bool {
-			return n.Uri == xsltNamespaceUri
-		})
-		if ix >= 0 {
-			sheet.namespace = all[ix].Prefix
-			for e, fn := range executers {
-				delete(executers, e)
-				e.Space = sheet.namespace
-				executers[e] = fn
-			}
+	root, err := getElementFromNode(doc.Root())
+	if err != nil {
+		return nil, err
+	}
+	all := root.Namespaces()
+	ix := slices.IndexFunc(all, func(n xml.NS) bool {
+		return n.Uri == xsltNamespaceUri
+	})
+	if ix >= 0 {
+		sheet.xsltNamespace = all[ix].Prefix
+		for e, fn := range executers {
+			delete(executers, e)
+			e.Space = sheet.xsltNamespace
+			executers[e] = fn
 		}
-		ix = slices.IndexFunc(root.Attrs, func(a xml.Attribute) bool {
-			return a.Name == "default-mode"
-		})
-		if ix >= 0 {
-			mode := namedMode(sheet.DefaultMode)
-			mode.Default = true
-			sheet.Modes = append(sheet.Modes, mode)
-			sheet.DefaultMode = root.Attrs[ix].Value()
-		}
+	}
+	ix = slices.IndexFunc(root.Attrs, func(a xml.Attribute) bool {
+		return a.Name == "default-mode"
+	})
+	if ix >= 0 {
+		mode := namedMode(sheet.DefaultMode)
+		mode.Default = true
+		sheet.Modes = append(sheet.Modes, mode)
+		sheet.DefaultMode = root.Attrs[ix].Value()
+	}
+
+	if ns, err := getAttribute(root, sheet.getQualifiedName("xpath-default-namespace")); err == nil {
+		sheet.xpathNamespace = ns
 	}
 
 	if err := sheet.init(doc); err != nil {
@@ -598,7 +604,7 @@ func (s *Stylesheet) CurrentMode() string {
 }
 
 func (s *Stylesheet) staticContext(node xml.Node) *Context {
-	return &Context{
+	ctx := &Context{
 		XslNode:     node,
 		ContextNode: node,
 		Mode:        s.Mode,
@@ -607,10 +613,12 @@ func (s *Stylesheet) staticContext(node xml.Node) *Context {
 		Stylesheet:  s,
 		Env:         s.static,
 	}
+	ctx.SetXpathNamespace(s.xpathNamespace)
+	return ctx
 }
 
 func (s *Stylesheet) createContext(node xml.Node) *Context {
-	return &Context{
+	ctx := &Context{
 		ContextNode: node,
 		Mode:        s.Mode,
 		Size:        1,
@@ -618,6 +626,8 @@ func (s *Stylesheet) createContext(node xml.Node) *Context {
 		Stylesheet:  s,
 		Env:         Enclosed(s),
 	}
+	ctx.SetXpathNamespace(s.xpathNamespace)
+	return ctx
 }
 
 func (s *Stylesheet) init(doc xml.Node) error {
@@ -1086,7 +1096,7 @@ func (s *Stylesheet) resolve(ident string) (xpath.Expr, error) {
 }
 
 func (s *Stylesheet) getQualifiedName(name string) string {
-	qn := xml.QualifiedName(name, s.namespace)
+	qn := xml.QualifiedName(name, s.xsltNamespace)
 	return qn.QualifiedName()
 }
 

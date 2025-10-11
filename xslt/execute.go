@@ -25,8 +25,17 @@ var (
 func init() {
 	nest := func(exec ExecuteFunc) ExecuteFunc {
 		fn := func(ctx *Context) (xpath.Sequence, error) {
-			ctx.Enter(ctx)
-			defer ctx.Leave(ctx)
+			if ctx.Stylesheet != nil {
+				ctx.Enter(ctx)
+				defer ctx.Leave(ctx)
+			}
+			if el, err := getElementFromNode(ctx.XslNode); err == nil {
+				if ns, err := getAttribute(el, ctx.getQualifiedName("xpath-default-namespace")); err == nil {
+					xns := ctx.xpathNamespace
+					ctx.SetXpathNamespace(ns)
+					defer ctx.SetXpathNamespace(xns)
+				}
+			}
 			seq, err := exec(ctx.Nest())
 			if err != nil {
 				ctx.Error(ctx, err)
@@ -40,6 +49,13 @@ func init() {
 			if ctx.Stylesheet != nil {
 				defer ctx.Leave(ctx)
 				ctx.Enter(ctx)
+			}
+			if el, err := getElementFromNode(ctx.XslNode); err == nil {
+				if ns, err := getAttribute(el, ctx.getQualifiedName("xpath-default-namespace")); err == nil {
+					xns := ctx.xpathNamespace
+					ctx.SetXpathNamespace(ns)
+					defer ctx.SetXpathNamespace(xns)
+				}
 			}
 
 			seq, err := exec(ctx)

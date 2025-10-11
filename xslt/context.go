@@ -22,8 +22,14 @@ type Context struct {
 	Size  int
 	Depth int
 
+	xpathNamespace string
+
 	*Stylesheet
 	*Env
+}
+
+func (c *Context) SetXpathNamespace(ns string) {
+	c.xpathNamespace = ns
 }
 
 func (c *Context) ApplyTemplate() ([]xml.Node, error) {
