@@ -376,6 +376,7 @@ type Stylesheet struct {
 	excludeNamespaces []string
 	xpathNamespace    string
 	xsltNamespace     string
+	namespaces        environ.Environ[string]
 	Mode              string
 	Modes             []*Mode
 	AttrSet           []*AttributeSet
@@ -400,6 +401,7 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 		xsltNamespace: xsltNamespacePrefix,
 		static:        Empty(),
 		Env:           Empty(),
+		namespaces:    environ.Empty[string](),
 		Tracer:        NoopTracer(),
 		namer:         alpha.Compose(alpha.NewLowerString(3), alpha.NewNumberString(2)),
 	}
@@ -412,22 +414,10 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 	}
 
 	root, err := getElementFromNode(doc.Root())
-	if err != nil {
+	if err := sheet.loadNamespacesFromRoot(root); err != nil {
 		return nil, err
 	}
-	all := root.Namespaces()
-	ix := slices.IndexFunc(all, func(n xml.NS) bool {
-		return n.Uri == xsltNamespaceUri
-	})
-	if ix >= 0 {
-		sheet.xsltNamespace = all[ix].Prefix
-		for e, fn := range executers {
-			delete(executers, e)
-			e.Space = sheet.xsltNamespace
-			executers[e] = fn
-		}
-	}
-	ix = slices.IndexFunc(root.Attrs, func(a xml.Attribute) bool {
+	ix := slices.IndexFunc(root.Attrs, func(a xml.Attribute) bool {
 		return a.Name == "default-mode"
 	})
 	if ix >= 0 {
@@ -812,6 +802,25 @@ func (s *Stylesheet) importSheet(node xml.Node) error {
 	}
 	ctx := s.createContext(nil)
 	return importSheet(ctx.WithXsl(node))
+}
+
+func (s *Stylesheet) loadNamespacesFromRoot(root *xml.Element) error {
+	for _, qn := range root.Namespaces() {
+		if qn.Uri == xsltNamespaceUri {
+			s.xsltNamespace = qn.Prefix
+			continue
+		}
+		s.namespaces.Define(qn.Prefix, qn.Uri)
+	}
+	if s.xsltNamespace == xsltNamespacePrefix {
+		return nil
+	}
+	for e, fn := range executers {
+		delete(executers, e)
+		e.Space = s.xsltNamespace
+		executers[e] = fn
+	}
+	return nil
 }
 
 func (s *Stylesheet) loadNamespaceAlias(node xml.Node) error {
