@@ -22,14 +22,26 @@ type static struct {
 	enforceNS  bool
 }
 
-func createStatic() static {
+func createStatic() *static {
 	var (
 		ns = environ.Empty[string]()
 		vs = environ.Empty[Expr]()
 	)
-	return static{
-		namespaces: environ.ReadOnly(ns),
-		variables:  environ.ReadOnly(vs),
+	return &static{
+		namespaces: ns,
+		variables:  vs,
+	}
+}
+
+func (c static) Readonly() *static {
+	return &static{
+		namespaces: environ.ReadOnly(c.namespaces),
+		variables:  environ.ReadOnly(c.variables),
+		baseURI:    c.baseURI,
+		elementNS:  c.elementNS,
+		typeNS:     c.typeNS,
+		funcNS:     c.funcNS,
+		enforceNS:  c.enforceNS,
 	}
 }
 
@@ -65,7 +77,7 @@ func (c static) DefaultUriCollection() Sequence {
 }
 
 type Context struct {
-	static
+	*static
 
 	xml.Node
 	Index         int

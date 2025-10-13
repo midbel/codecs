@@ -110,7 +110,7 @@ type Query struct {
 	environ.Environ[Expr]
 	Builtins environ.Environ[BuiltinFunc]
 
-	static
+	*static
 }
 
 func Find(node xml.Node, query string) (Sequence, error) {
@@ -150,7 +150,7 @@ func Build(query string) (*Query, error) {
 
 func (q *Query) Find(node xml.Node) (Sequence, error) {
 	ctx := createContext(node, 1, 1)
-	ctx.static = q.static
+	ctx.static = q.static.Readonly()
 	ctx.Builtins = q.Builtins
 	ctx.Environ = q.Environ
 
@@ -568,8 +568,8 @@ func (n name) find(ctx Context) (Sequence, error) {
 		qn = x.QName
 	default:
 	}
-	if qn.Uri == "" {
-		qn.Uri = ctx.elementNS
+	if n.Uri == "" {
+		n.Uri = ctx.elementNS
 	}
 	if !n.QName.Equal(qn) {
 		return nil, nil

@@ -376,7 +376,6 @@ type Stylesheet struct {
 	excludeNamespaces []string
 	xpathNamespace    string
 	xsltNamespace     string
-	namespaces        environ.Environ[string]
 	Mode              string
 	Modes             []*Mode
 	AttrSet           []*AttributeSet
@@ -401,7 +400,6 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 		xsltNamespace: xsltNamespacePrefix,
 		static:        Empty(),
 		Env:           Empty(),
-		namespaces:    environ.Empty[string](),
 		Tracer:        NoopTracer(),
 		namer:         alpha.Compose(alpha.NewLowerString(3), alpha.NewNumberString(2)),
 	}
@@ -810,7 +808,7 @@ func (s *Stylesheet) loadNamespacesFromRoot(root *xml.Element) error {
 			s.xsltNamespace = qn.Prefix
 			continue
 		}
-		s.namespaces.Define(qn.Prefix, qn.Uri)
+		s.Env.registerNS(qn.Prefix, qn.Uri)
 	}
 	if s.xsltNamespace == xsltNamespacePrefix {
 		return nil

@@ -130,6 +130,8 @@ type Env struct {
 	Builtins environ.Environ[xpath.BuiltinFunc]
 	Funcs    environ.Environ[*Function]
 	Depth    int
+
+	namespaces environ.Environ[string]
 }
 
 func Empty() *Env {
@@ -138,11 +140,12 @@ func Empty() *Env {
 
 func Enclosed(other Resolver) *Env {
 	return &Env{
-		other:    other,
-		Vars:     environ.Empty[xpath.Expr](),
-		Params:   environ.Empty[xpath.Expr](),
-		Builtins: xpath.DefaultBuiltin(),
-		Funcs:    environ.Empty[*Function](),
+		other:      other,
+		Vars:       environ.Empty[xpath.Expr](),
+		Params:     environ.Empty[xpath.Expr](),
+		Builtins:   xpath.DefaultBuiltin(),
+		Funcs:      environ.Empty[*Function](),
+		namespaces: environ.Empty[string](),
 	}
 }
 
@@ -156,23 +159,25 @@ func (e *Env) Names() []string {
 
 func (e *Env) Sub() *Env {
 	return &Env{
-		other:    e.other,
-		Vars:     environ.Enclosed[xpath.Expr](e.Vars),
-		Params:   environ.Enclosed[xpath.Expr](e.Params),
-		Funcs:    e.Funcs,
-		Builtins: e.Builtins,
-		Depth:    e.Depth + 1,
+		other:      e.other,
+		Vars:       environ.Enclosed[xpath.Expr](e.Vars),
+		Params:     environ.Enclosed[xpath.Expr](e.Params),
+		Funcs:      e.Funcs,
+		Builtins:   e.Builtins,
+		Depth:      e.Depth + 1,
+		namespaces: e.namespaces,
 	}
 }
 
 func (e *Env) Unwrap() *Env {
 	x := &Env{
-		other:    e.other,
-		Vars:     e.Vars,
-		Params:   e.Params,
-		Builtins: e.Builtins,
-		Funcs:    e.Funcs,
-		Depth:    e.Depth,
+		other:      e.other,
+		Vars:       e.Vars,
+		Params:     e.Params,
+		Builtins:   e.Builtins,
+		Funcs:      e.Funcs,
+		Depth:      e.Depth,
+		namespaces: e.namespaces,
 	}
 	if u, ok := x.Vars.(interface {
 		Detach() environ.Environ[xpath.Expr]
@@ -191,12 +196,12 @@ func (e *Env) ExecuteQuery(query string, datum xml.Node) (xpath.Sequence, error)
 	return e.ExecuteQueryWithNS(query, "", datum)
 }
 
-func (e *Env) ExecuteQueryWithNS(query, namespace string, datum xml.Node) (xpath.Sequence, error) {
+func (e *Env) ExecuteQueryWithNS(query, _ string, datum xml.Node) (xpath.Sequence, error) {
 	if query == "" {
 		i := xpath.NewNodeItem(datum)
 		return xpath.Singleton(i), nil
 	}
-	q, err := e.CompileQueryWithNS(query, namespace)
+	q, err := e.CompileQueryWithNS(query, "")
 	if err != nil {
 		return nil, err
 	}
@@ -207,16 +212,25 @@ func (e *Env) CompileQuery(query string) (xpath.Expr, error) {
 	return e.CompileQueryWithNS(query, "")
 }
 
-func (e *Env) CompileQueryWithNS(query, namespace string) (xpath.Expr, error) {
-	q, err := xpath.Build(query)
+func (e *Env) CompileQueryWithNS(query, _ string) (xpath.Expr, error) {
+	options := []xpath.Option{
+		xpath.WithEnforceNS(),
+		xpath.WithElementNS("http://midbel.org/angle"),
+	}
+	for _, n := range e.namespaces.Names() {
+		u, err := e.namespaces.Resolve(n)
+		if err != nil {
+			return nil, err
+		}
+		o := xpath.WithNamespace(n, u)
+		options = append(options, o)
+	}
+	q, err := xpath.BuildWith(query, options...)
 	if err != nil {
 		return nil, err
 	}
 	q.Environ = e
 	q.Builtins = e.Builtins
-	if namespace != "" {
-		q.UseNamespace(namespace)
-	}
 	return q, nil
 }
 
@@ -312,6 +326,10 @@ func (e *Env) DefineExprParam(ident string, expr xpath.Expr) {
 
 func (e *Env) localNames() []string {
 	return slices.Concat(e.Vars.Names(), e.Params.Names())
+}
+
+func (e *Env) registerNS(prefix, uri string) {
+	e.namespaces.Define(prefix, uri)
 }
 
 func errorWithContext(ctx string, err error) error {
