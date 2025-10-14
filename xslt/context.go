@@ -170,13 +170,14 @@ func (e *Env) Sub() *Env {
 
 func (e *Env) Unwrap() *Env {
 	x := &Env{
-		other:      e.other,
-		Vars:       e.Vars,
-		Params:     e.Params,
-		Builtins:   e.Builtins,
-		Funcs:      e.Funcs,
-		Depth:      e.Depth,
-		namespaces: e.namespaces,
+		other:          e.other,
+		Vars:           e.Vars,
+		Params:         e.Params,
+		Builtins:       e.Builtins,
+		Funcs:          e.Funcs,
+		Depth:          e.Depth,
+		namespaces:     e.namespaces,
+		xpathNamespace: e.xpathNamespace,
 	}
 	if u, ok := x.Vars.(interface {
 		Detach() environ.Environ[xpath.Expr]
@@ -187,6 +188,11 @@ func (e *Env) Unwrap() *Env {
 		Detach() environ.Environ[xpath.Expr]
 	}); ok {
 		x.Params = u.Detach()
+	}
+	if u, ok := x.namespaces.(interface {
+		Detach() environ.Environ[string]
+	}); ok {
+		x.namespaces = u.Detach()
 	}
 	return x
 }

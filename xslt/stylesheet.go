@@ -341,6 +341,7 @@ type FunctionArg struct {
 type Function struct {
 	xml.QName
 	Return xml.QName
+	sheet *Stylesheet
 
 	Args []FunctionArg
 	Body []xml.Node
@@ -353,7 +354,8 @@ func (f *Function) Call(xtc xpath.Context, args []xpath.Expr) (xpath.Sequence, e
 	ctx := Context{
 		ContextNode: xtc.Node,
 		XslNode:     xtc.Node,
-		Env:         Empty(),
+		Env:         Enclosed(f.sheet.Env),
+		Stylesheet: f.sheet,
 	}
 	for i, a := range f.Args {
 		ctx.Env.Define(a.Name, args[i])
@@ -846,6 +848,7 @@ func (s *Stylesheet) loadFunction(node xml.Node) error {
 	}
 	fn := Function{
 		QName: qn,
+		sheet: s,
 	}
 	if n, err := getAttribute(elem, "as"); n != "" {
 		qn, err = xml.ParseName(n)
@@ -1269,7 +1272,7 @@ func templateMatch(expr xpath.Expr, node xml.Node) (bool, int) {
 		if err != nil {
 			break
 		}
-		if len(items) > 0 {
+		if items.Len() > 0 {
 			ok := slices.ContainsFunc(items, func(i xpath.Item) bool {
 				n := i.Node()
 				return n.Identity() == node.Identity()
