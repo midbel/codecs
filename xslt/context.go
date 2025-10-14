@@ -22,14 +22,8 @@ type Context struct {
 	Size  int
 	Depth int
 
-	xpathNamespace string
-
 	*Stylesheet
 	*Env
-}
-
-func (c *Context) SetXpathNamespace(ns string) {
-	c.xpathNamespace = ns
 }
 
 func (c *Context) ApplyTemplate() ([]xml.Node, error) {
@@ -108,7 +102,6 @@ func (c *Context) clone(xslNode, ctxNode xml.Node) *Context {
 		Env:         c.Env,
 		Depth:       c.Depth + 1,
 	}
-	child.SetXpathNamespace(c.xpathNamespace)
 	return &child
 }
 
@@ -119,26 +112,23 @@ func (c *Context) errorWithContext(err error) error {
 	return errorWithContext(c.XslNode.QualifiedName(), err)
 }
 
-type Resolver interface {
-	Resolve(string) (xpath.Expr, error)
-}
-
 type Env struct {
-	other    Resolver
 	Vars     environ.Environ[xpath.Expr]
 	Params   environ.Environ[xpath.Expr]
 	Builtins environ.Environ[xpath.BuiltinFunc]
 	Funcs    environ.Environ[*Function]
 	Depth    int
 
-	namespaces environ.Environ[string]
+	xpathNamespace string
+	namespaces     environ.Environ[string]
+	other          *Env
 }
 
 func Empty() *Env {
 	return Enclosed(nil)
 }
 
-func Enclosed(other Resolver) *Env {
+func Enclosed(other *Env) *Env {
 	return &Env{
 		other:      other,
 		Vars:       environ.Empty[xpath.Expr](),
@@ -147,6 +137,14 @@ func Enclosed(other Resolver) *Env {
 		Funcs:      environ.Empty[*Function](),
 		namespaces: environ.Empty[string](),
 	}
+}
+
+func (e *Env) GetXpathNamespace() string {
+	return e.xpathNamespace
+}
+
+func (e *Env) SetXpathNamespace(ns string) {
+	e.xpathNamespace = ns
 }
 
 func (e *Env) Len() int {
@@ -159,13 +157,14 @@ func (e *Env) Names() []string {
 
 func (e *Env) Sub() *Env {
 	return &Env{
-		other:      e.other,
-		Vars:       environ.Enclosed[xpath.Expr](e.Vars),
-		Params:     environ.Enclosed[xpath.Expr](e.Params),
-		Funcs:      e.Funcs,
-		Builtins:   e.Builtins,
-		Depth:      e.Depth + 1,
-		namespaces: e.namespaces,
+		other:          e.other,
+		Vars:           environ.Enclosed[xpath.Expr](e.Vars),
+		Params:         environ.Enclosed[xpath.Expr](e.Params),
+		Funcs:          e.Funcs,
+		Builtins:       e.Builtins,
+		Depth:          e.Depth + 1,
+		namespaces:     environ.Enclosed[string](e.namespaces),
+		xpathNamespace: e.xpathNamespace,
 	}
 }
 
@@ -192,39 +191,28 @@ func (e *Env) Unwrap() *Env {
 	return x
 }
 
-func (e *Env) ExecuteQuery(query string, datum xml.Node) (xpath.Sequence, error) {
-	return e.ExecuteQueryWithNS(query, "", datum)
-}
-
-func (e *Env) ExecuteQueryWithNS(query, _ string, datum xml.Node) (xpath.Sequence, error) {
+func (e *Env) ExecuteQuery(query string, node xml.Node) (xpath.Sequence, error) {
 	if query == "" {
-		i := xpath.NewNodeItem(datum)
+		i := xpath.NewNodeItem(node)
 		return xpath.Singleton(i), nil
 	}
-	q, err := e.CompileQueryWithNS(query, "")
+	q, err := e.CompileQuery(query)
 	if err != nil {
 		return nil, err
 	}
-	return q.Find(datum)
+	return q.Find(node)
 }
 
 func (e *Env) CompileQuery(query string) (xpath.Expr, error) {
-	return e.CompileQueryWithNS(query, "")
-}
-
-func (e *Env) CompileQueryWithNS(query, _ string) (xpath.Expr, error) {
 	options := []xpath.Option{
 		xpath.WithEnforceNS(),
-		xpath.WithElementNS("http://midbel.org/angle"),
+		xpath.WithElementNS(e.xpathNamespace),
 	}
-	for _, n := range e.namespaces.Names() {
-		u, err := e.namespaces.Resolve(n)
-		if err != nil {
-			return nil, err
-		}
-		o := xpath.WithNamespace(n, u)
-		options = append(options, o)
+	if e.other != nil {
+		options = slices.Concat(options, e.other.getNamespacesForQuery())
 	}
+	options = slices.Concat(options, e.getNamespacesForQuery())
+
 	q, err := xpath.BuildWith(query, options...)
 	if err != nil {
 		return nil, err
@@ -234,8 +222,8 @@ func (e *Env) CompileQueryWithNS(query, _ string) (xpath.Expr, error) {
 	return q, nil
 }
 
-func (e *Env) TestNode(query string, datum xml.Node) (bool, error) {
-	seq, err := e.ExecuteQuery(query, datum)
+func (e *Env) TestNode(query string, node xml.Node) (bool, error) {
+	seq, err := e.ExecuteQuery(query, node)
 	if err != nil {
 		return false, err
 	}
@@ -273,13 +261,10 @@ func (e *Env) Resolve(ident string) (xpath.Expr, error) {
 func (e *Env) ResolveFunc(ident string) (xpath.Callable, error) {
 	fn, err := e.Funcs.Resolve(ident)
 	if err != nil {
-		rs, ok := e.other.(interface {
-			ResolveFunc(string) (xpath.Callable, error)
-		})
-		if !ok {
-			return nil, err
+		if e.other != nil {
+			return e.other.ResolveFunc(ident)
 		}
-		return rs.ResolveFunc(ident)
+		return nil, err
 	}
 	return fn, nil
 }
@@ -330,6 +315,19 @@ func (e *Env) localNames() []string {
 
 func (e *Env) registerNS(prefix, uri string) {
 	e.namespaces.Define(prefix, uri)
+}
+
+func (e *Env) getNamespacesForQuery() []xpath.Option {
+	var options []xpath.Option
+	for _, n := range e.namespaces.Names() {
+		u, err := e.namespaces.Resolve(n)
+		if err != nil {
+			continue
+		}
+		o := xpath.WithNamespace(n, u)
+		options = append(options, o)
+	}
+	return options
 }
 
 func errorWithContext(ctx string, err error) error {

@@ -41,35 +41,45 @@ func WithEnforceNS() Option {
 
 func WithBaseUri(uri string) Option {
 	return func(q *Query) error {
-		q.baseURI = uri
+		if uri != "" {
+			q.baseURI = uri
+		}
 		return nil
 	}
 }
 
 func WithNamespace(prefix, uri string) Option {
 	return func(q *Query) error {
-		q.namespaces.Define(prefix, uri)
+		if uri != "" && prefix != "" {
+			q.namespaces.Define(prefix, uri)
+		}
 		return nil
 	}
 }
 
 func WithElementNS(uri string) Option {
 	return func(q *Query) error {
-		q.static.elementNS = uri
+		if uri != "" {
+			q.static.elementNS = uri
+		}
 		return nil
 	}
 }
 
 func WithTypeNS(uri string) Option {
 	return func(q *Query) error {
-		q.typeNS = uri
+		if uri != "" {
+			q.typeNS = uri
+		}
 		return nil
 	}
 }
 
 func WithFuncNS(uri string) Option {
 	return func(q *Query) error {
-		q.funcNS = uri
+		if uri != "" {
+			q.funcNS = uri
+		}
 		return nil
 	}
 }

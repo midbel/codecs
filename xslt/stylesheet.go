@@ -28,6 +28,11 @@ const (
 	xsltNamespacePrefix = "xsl"
 )
 
+const (
+	xsltStylesheetName = "stylesheet"
+	xsltTransformName  = "transform"
+)
+
 var (
 	errImplemented = errors.New("not implemented")
 	errUndefined   = errors.New("undefined")
@@ -428,11 +433,9 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 	if ns, err := getAttribute(root, sheet.getQualifiedName("xpath-default-namespace")); err == nil {
 		sheet.xpathNamespace = ns
 	}
-	if list, err := getAttribute(root, sheet.getQualifiedName("xpath-default-namespace")); err == nil {
+	if list, err := getAttribute(root, sheet.getQualifiedName("exclude-result-prefixes")); err == nil {
 		sheet.excludeNamespaces = strings.Fields(list)
-
 	}
-
 	if err := sheet.init(doc); err != nil {
 		return nil, err
 	}
@@ -618,7 +621,7 @@ func (s *Stylesheet) createContext(node xml.Node) *Context {
 		Size:        1,
 		Index:       1,
 		Stylesheet:  s,
-		Env:         Enclosed(s),
+		Env:         Enclosed(s.Env),
 	}
 	ctx.SetXpathNamespace(s.xpathNamespace)
 	return ctx
@@ -632,7 +635,7 @@ func (s *Stylesheet) init(doc xml.Node) error {
 		top  = doc.(*xml.Document)
 		root = top.Root()
 	)
-	if root != nil && root.LocalName() != "stylesheet" && root.LocalName() != "transform" {
+	if root != nil && root.LocalName() != xsltStylesheetName && root.LocalName() != xsltTransformName {
 		r, err := s.simplified(root)
 		if err != nil {
 			return err
@@ -683,10 +686,6 @@ func (s *Stylesheet) init(doc xml.Node) error {
 	return nil
 }
 
-func (s *Stylesheet) defineBuiltins() {
-	s.static.Builtins.Define("system-property", s.getSystemProperty)
-}
-
 func (s *Stylesheet) simplified(root xml.Node) (xml.Node, error) {
 	elem, err := getElementFromNode(root)
 	if err != nil {
@@ -732,6 +731,10 @@ func (s *Stylesheet) simplified(root xml.Node) (xml.Node, error) {
 func (s *Stylesheet) makeIdent() string {
 	id, _ := s.namer.Next()
 	return id
+}
+
+func (s *Stylesheet) defineBuiltins() {
+	s.static.Builtins.Define("system-property", s.getSystemProperty)
 }
 
 func (s *Stylesheet) getSystemProperty(ctx xpath.Context, args []xpath.Expr) (xpath.Sequence, error) {
