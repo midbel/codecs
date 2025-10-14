@@ -562,14 +562,31 @@ func (n name) find(ctx Context) (Sequence, error) {
 	if n.Space == "*" && n.Name == ctx.LocalName() {
 		return Singleton(ctx.Node), nil
 	}
+	qn := n.getQName(ctx.Node)
 	if !ctx.enforceNS {
+		if n.Name == "*" && n.Space == qn.Space {
+			return Singleton(ctx.Node), nil
+		}
 		if ctx.QualifiedName() != n.QualifiedName() {
 			return nil, nil
 		}
 		return Singleton(ctx.Node), nil
 	}
+	if n.Uri == "" {
+		n.Uri = ctx.elementNS
+	}
+	if n.Name == "*" && n.Uri == qn.Uri {
+		return Singleton(ctx.Node), nil
+	}
+	if !n.QName.Equal(qn) {
+		return nil, nil
+	}
+	return Singleton(ctx.Node), nil
+}
+
+func (n name) getQName(node xml.Node) xml.QName {
 	var qn xml.QName
-	switch x := ctx.Node.(type) {
+	switch x := node.(type) {
 	case *xml.Element:
 		qn = x.QName
 	case *xml.Attribute:
@@ -578,13 +595,7 @@ func (n name) find(ctx Context) (Sequence, error) {
 		qn = x.QName
 	default:
 	}
-	if n.Uri == "" {
-		n.Uri = ctx.elementNS
-	}
-	if !n.QName.Equal(qn) {
-		return nil, nil
-	}
-	return Singleton(ctx.Node), nil
+	return qn	
 }
 
 type sequence struct {

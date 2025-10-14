@@ -1026,10 +1026,13 @@ func (c *Compiler) compileQName() (Expr, error) {
 	if c.is(Namespace) {
 		c.next()
 		qn.Space = qn.Name
-		if !c.is(Name) {
+		if !c.is(Name) && !c.is(opMul) {
 			return nil, c.syntaxError("name", "expected name")
 		}
 		qn.Name = c.getCurrentLiteral()
+		if c.is(opMul) {
+			qn.Name = "*"
+		}
 		c.next()
 	}
 	n := name{
