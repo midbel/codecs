@@ -57,12 +57,17 @@ func (e SyntaxError) Error() string {
 	return fmt.Sprintf("[%s] %s: %s", e.Code, e.Expr, e.Cause)
 }
 
+const (
+	functionNS = "http://www.w3.org/2005/xpath-functions"
+	schemaNS   = "http://www.w3.org/2001/XMLSchema"
+)
+
 var defaultNS = map[string]string{
-	"xs":    "http://www.w3.org/2001/XMLSchema ",
-	"fn":    "http://www.w3.org/2005/xpath-functions ",
-	"map":   "http://www.w3.org/2005/xpath-functions/map ",
-	"array": "http://www.w3.org/2005/xpath-functions/array ",
-	"math":  "http://www.w3.org/2005/xpath-functions/math ",
+	"xs":    schemaNS,
+	"fn":    functionNS,
+	"map":   "http://www.w3.org/2005/xpath-functions/map",
+	"array": "http://www.w3.org/2005/xpath-functions/array",
+	"math":  "http://www.w3.org/2005/xpath-functions/math",
 	"err":   "http://www.w3.org/2005/xqt-errors",
 }
 
@@ -215,7 +220,7 @@ func (c *Compiler) compileReservedPrefix() (Expr, error) {
 	case kwSome, kwEvery:
 		return c.compileQuantified(c.getCurrentLiteral() == kwEvery)
 	default:
-		return nil, c.unexpectedError(c.getCurrentLiteral())
+		return c.compileName()
 	}
 }
 

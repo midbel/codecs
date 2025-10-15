@@ -55,8 +55,10 @@ type registeredBuiltin struct {
 }
 
 func registerFunc(name, space string, fn BuiltinFunc) registeredBuiltin {
+	qn := xml.QualifiedName(name, space)
+	qn.Uri = defaultNS[space]
 	return registeredBuiltin{
-		QName: xml.QualifiedName(name, space),
+		QName: qn,
 		Func:  fn,
 	}
 }
@@ -116,124 +118,102 @@ func (f *funcset) enableFuncSet(set []registeredBuiltin) {
 }
 
 var builtins = []registeredBuiltin{
-	registerFunc("namespace-uri", "", callNamespaceUri),
 	registerFunc("namespace-uri", "fn", callNamespaceUri),
-	registerFunc("uri-collection", "", callUriCollection),
 	registerFunc("uri-collection", "fn", callUriCollection),
-	registerFunc("collection", "", callCollection),
 	registerFunc("collection", "fn", callCollection),
-	registerFunc("true", "", callTrue),
 	registerFunc("true", "fn", callTrue),
-	registerFunc("false", "", callFalse),
 	registerFunc("false", "fn", callFalse),
-	registerFunc("boolean", "", callBoolean),
 	registerFunc("boolean", "fn", callBoolean),
-	registerFunc("not", "", callNot),
 	registerFunc("not", "fn", callNot),
-	registerFunc("name", "", callName),
 	registerFunc("name", "fn", callName),
-	registerFunc("local-name", "", callLocalName),
 	registerFunc("local-name", "fn", callLocalName),
-	registerFunc("root", "", callRoot),
 	registerFunc("root", "fn", callRoot),
-	registerFunc("path", "", callPath),
 	registerFunc("path", "fn", callPath),
-	registerFunc("has-children", "", callHasChildren),
 	registerFunc("has-children", "fn", callHasChildren),
-	registerFunc("innermost", "", callInnermost),
 	registerFunc("innermost", "fn", callInnermost),
-	registerFunc("outermost", "", callOutermost),
 	registerFunc("outermost", "fn", callOutermost),
-	registerFunc("string", "", callString),
 	registerFunc("string", "fn", callString),
-	registerFunc("compare", "", callCompare),
 	registerFunc("compare", "fn", callCompare),
-	registerFunc("concat", "", callConcat),
 	registerFunc("concat", "fn", callConcat),
-	registerFunc("string-join", "", callStringJoin),
 	registerFunc("string-join", "fn", callStringJoin),
-	registerFunc("substring", "", callSubstring),
 	registerFunc("substring", "fn", callSubstring),
-	registerFunc("string-length", "", callStringLength),
 	registerFunc("string-length", "fn", callStringLength),
-	registerFunc("normalize-space", "", callNormalizeSpace),
 	registerFunc("normalize-space", "fn", callNormalizeSpace),
-	registerFunc("upper-case", "", callUppercase),
 	registerFunc("upper-case", "fn", callUppercase),
-	registerFunc("lower-case", "", callLowercase),
 	registerFunc("lower-case", "fn", callLowercase),
-	registerFunc("translate", "", callTranslate),
 	registerFunc("translate", "fn", callTranslate),
-	registerFunc("contains", "", callContains),
 	registerFunc("contains", "fn", callContains),
-	registerFunc("starts-with", "", callStartsWith),
 	registerFunc("starts-with", "fn", callStartsWith),
-	registerFunc("ends-with", "", callEndsWith),
 	registerFunc("ends-with", "fn", callEndsWith),
-	registerFunc("substring-before", "", callSubstringBefore),
 	registerFunc("substring-before", "fn", callSubstringBefore),
-	registerFunc("substring-after", "", callSubstringAfter),
 	registerFunc("substring-after", "fn", callSubstringAfter),
-	registerFunc("replace", "", callXYZ),
 	registerFunc("replace", "fn", callXYZ),
-	registerFunc("matches", "", callMatches),
 	registerFunc("matches", "fn", callMatches),
-	registerFunc("tokenize", "", callTokenize),
 	registerFunc("tokenize", "fn", callTokenize),
-	registerFunc("sum", "", callSum),
 	registerFunc("sum", "fn", callSum),
-	registerFunc("count", "", callCount),
 	registerFunc("count", "fn", callCount),
-	registerFunc("avg", "", callAvg),
 	registerFunc("avg", "fn", callAvg),
-	registerFunc("min", "", callMin),
 	registerFunc("min", "fn", callMin),
-	registerFunc("max", "", callMax),
 	registerFunc("max", "fn", callMax),
-	registerFunc("zero-or-one", "", callZeroOrOne),
 	registerFunc("zero-or-one", "fn", callZeroOrOne),
-	registerFunc("one-or-more", "", callOneOrMore),
 	registerFunc("one-or-more", "fn", callOneOrMore),
-	registerFunc("exactly-one", "", callExactlyOne),
 	registerFunc("exactly-one", "fn", callExactlyOne),
-	registerFunc("position", "", callPosition),
 	registerFunc("position", "fn", callPosition),
-	registerFunc("last", "", callLast),
 	registerFunc("last", "fn", callLast),
-	registerFunc("current-date", "", callCurrentDate),
 	registerFunc("current-date", "fn", callCurrentDate),
-	registerFunc("current-dateTime", "", callCurrentDatetime),
 	registerFunc("current-dateTime", "fn", callCurrentDatetime),
-	registerFunc("exists", "", callExists),
 	registerFunc("exists", "fn", callExists),
-	registerFunc("empty", "", callEmpty),
 	registerFunc("empty", "fn", callEmpty),
-	registerFunc("distinct-values", "", callDistinctValues),
 	registerFunc("distinct-values", "fn", callDistinctValues),
-	registerFunc("tail", "", callTail),
 	registerFunc("tail", "fn", callTail),
-	registerFunc("head", "", callHead),
 	registerFunc("head", "fn", callHead),
-	registerFunc("reverse", "", callReverse),
 	registerFunc("reverse", "fn", callReverse),
-	registerFunc("round", "", callRound),
 	registerFunc("round", "fn", callRound),
-	registerFunc("floor", "", callFloor),
 	registerFunc("floor", "fn", callFloor),
-	registerFunc("ceiling", "", callCeil),
 	registerFunc("ceiling", "fn", callCeil),
-	registerFunc("number", "", callNumber),
 	registerFunc("number", "fn", callNumber),
-	registerFunc("abs", "", callAbs),
 	registerFunc("abs", "fn", callAbs),
-	registerFunc("format-number", "", callFormatNumber),
 	registerFunc("format-number", "fn", callFormatNumber),
-	registerFunc("date", "", callDate),
+	registerFunc("format-integer", "fn", callFormatInteger),
 	registerFunc("date", "xs", callDate),
-	registerFunc("decimal", "", callDecimal),
+	registerFunc("format-date", "fn", callFormatDate),
+	registerFunc("format-dateTime", "fn", callFormatDateTime),
 	registerFunc("decimal", "xs", callDecimal),
 	registerFunc("doc", "fn", callDoc),
-	registerFunc("doc", "", callDoc),
+	registerFunc("function-arity", "fn", callXYZ),
+	registerFunc("function-name", "fn", callXYZ),
+	registerFunc("function-lookup", "fn", callXYZ),
+	// array functions
+	registerFunc("append", "array", callXYZ),
+	registerFunc("filter", "array", callXYZ),
+	registerFunc("flatten", "array", callXYZ),
+	registerFunc("fold-left", "array", callXYZ),
+	registerFunc("fold-right", "array", callXYZ),
+	registerFunc("for-each", "array", callXYZ),
+	registerFunc("for-each-pair", "array", callXYZ),
+	registerFunc("get", "array", callXYZ),
+	registerFunc("head", "array", callXYZ),
+	registerFunc("insert-before", "array", callXYZ),
+	registerFunc("insert-after", "array", callXYZ),
+	registerFunc("join", "array", callXYZ),
+	registerFunc("put", "array", callXYZ),
+	registerFunc("remove", "array", callXYZ),
+	registerFunc("reverse", "array", callXYZ),
+	registerFunc("size", "array", callXYZ),
+	registerFunc("sort", "array", callXYZ),
+	registerFunc("subarray", "array", callXYZ),
+	registerFunc("tail", "array", callXYZ),
+	// map functions
+	registerFunc("contains", "map", callXYZ),
+	registerFunc("entry", "map", callXYZ),
+	registerFunc("find", "map", callXYZ),
+	registerFunc("for-each", "map", callXYZ),
+	registerFunc("get", "map", callXYZ),
+	registerFunc("keys", "map", callXYZ),
+	registerFunc("merge", "map", callXYZ),
+	registerFunc("put", "map", callXYZ),
+	registerFunc("remove", "map", callXYZ),
+	registerFunc("size", "map", callXYZ),
 }
 
 var fileFuncs = []registeredBuiltin{
@@ -607,6 +587,10 @@ func callFormatNumber(ctx Context, args []Expr) (Sequence, error) {
 	return nil, nil
 }
 
+func callFormatInteger(ctx Context, args []Expr) (Sequence, error) {
+	return nil, nil
+}
+
 func callNumber(ctx Context, args []Expr) (Sequence, error) {
 	var (
 		str string
@@ -859,6 +843,14 @@ func callDate(ctx Context, args []Expr) (Sequence, error) {
 		return nil, ErrCast
 	}
 	return Singleton(v), nil
+}
+
+func callFormatDate(ctx Context, args []Expr) (Sequence, error) {
+	return nil, nil
+}
+
+func callFormatDateTime(ctx Context, args []Expr) (Sequence, error) {
+	return nil, nil
 }
 
 func callString(ctx Context, args []Expr) (Sequence, error) {

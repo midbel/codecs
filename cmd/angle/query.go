@@ -112,7 +112,7 @@ func (q *QueryCmd) configure(file string) error {
 
 const (
 	queryEnforceNS  = "/angle/namespaces/@enforce"
-	queryNamespace  = "/angle/namespaces/namespace[not(@target) and @prefix]"
+	queryNamespace  = "/angle/namespaces/namespace[@prefix]"
 	queryElementNS  = "/angle/namespaces/namespace[@target=\"element\"]"
 	queryTypeNS     = "/angle/namespaces/namespace[@target=\"type\"]"
 	queryFuncNS     = "/angle/namespaces/namespace[@target=\"function\"]"

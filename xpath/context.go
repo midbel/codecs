@@ -30,6 +30,8 @@ func createStatic() *static {
 	return &static{
 		namespaces: ns,
 		variables:  vs,
+		funcNS:     functionNS,
+		typeNS:     schemaNS,
 	}
 }
 
