@@ -107,7 +107,7 @@ func namedMode(name string) *Mode {
 	return &Mode{
 		Name:       name,
 		NoMatch:    NoMatchFail,
-		MultiMatch: MultiMatchFail,
+		MultiMatch: MultiMatchLast,
 	}
 }
 
@@ -186,7 +186,7 @@ func (m *Mode) matchTemplate(node xml.Node, env *Env) (Executer, error) {
 		results = append(results, &match)
 	}
 	if len(results) > 0 {
-		if len(results) > 1 && m.MultiMatch == MultiMatchFail {
+		if n := len(results); n > 1 && m.MultiMatch == MultiMatchFail {
 			return nil, fmt.Errorf("%s: more than one template match", node.QualifiedName())
 		}
 		if m.MultiMatch == MultiMatchLast {
@@ -341,7 +341,7 @@ type FunctionArg struct {
 type Function struct {
 	xml.QName
 	Return xml.QName
-	sheet *Stylesheet
+	sheet  *Stylesheet
 
 	Args []FunctionArg
 	Body []xml.Node
@@ -351,28 +351,23 @@ func (f *Function) Call(xtc xpath.Context, args []xpath.Expr) (xpath.Sequence, e
 	if len(args) != len(f.Args) {
 		return nil, fmt.Errorf("%s: invalid number of arguments given", f.QualifiedName())
 	}
-	ctx := Context{
-		ContextNode: xtc.Node,
-		XslNode:     xtc.Node,
-		Env:         Enclosed(f.sheet.Env),
-		Stylesheet: f.sheet,
-	}
+	ctx := f.sheet.createContext(xtc.Node)
 	for i, a := range f.Args {
 		ctx.Env.Define(a.Name, args[i])
 	}
-	var res xpath.Sequence
+	var seq xpath.Sequence
 	for _, n := range f.Body {
 		c := cloneNode(n)
 		if c == nil {
 			continue
 		}
-		others, err := transformNode(ctx.WithXsl(c))
+		res, err := transformNode(ctx.WithXsl(c))
 		if err != nil {
 			return nil, err
 		}
-		res.Concat(others)
+		seq.Concat(res)
 	}
-	return res, nil
+	return seq, nil
 }
 
 type Stylesheet struct {
@@ -736,39 +731,9 @@ func (s *Stylesheet) makeIdent() string {
 }
 
 func (s *Stylesheet) defineBuiltins() {
-	s.static.Builtins.Define("system-property", s.getSystemProperty)
-}
-
-func (s *Stylesheet) getSystemProperty(ctx xpath.Context, args []xpath.Expr) (xpath.Sequence, error) {
-	if len(args) > 1 {
-		return nil, fmt.Errorf("invalid number of arguments")
-	}
-	items, err := args[0].Find(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if items.Empty() {
-		return items, nil
-	}
-	str, ok := items[0].Value().(string)
-	if !ok {
-		return nil, nil
-	}
-	switch str {
-	case s.getQualifiedName("version"):
-		str = XslVersion
-	case s.getQualifiedName("vendor"):
-		str = XslVendor
-	case s.getQualifiedName("vendor-url"):
-		str = XslVendorUrl
-	case s.getQualifiedName("product-name"):
-		str = XslProduct
-	case s.getQualifiedName("product-version"):
-		str = XslProductVersion
-	default:
-		return nil, fmt.Errorf("%s: unknown system property", str)
-	}
-	return xpath.Singleton(str), nil
+	s.static.Builtins.Define("system-property", callSystemProperty)
+	s.Env.Builtins.Define("current", callCurrent)
+	s.Env.Builtins.Define("fn:current", callCurrent)
 }
 
 func (s *Stylesheet) useWhen(node *xml.Element) (bool, error) {

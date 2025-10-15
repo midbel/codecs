@@ -595,7 +595,7 @@ func (n name) getQName(node xml.Node) xml.QName {
 		qn = x.QName
 	default:
 	}
-	return qn	
+	return qn
 }
 
 type sequence struct {

@@ -267,6 +267,10 @@ func (e *Env) Resolve(ident string) (xpath.Expr, error) {
 func (e *Env) ResolveFunc(ident string) (xpath.Callable, error) {
 	fn, err := e.Funcs.Resolve(ident)
 	if err != nil {
+		b, err := e.Builtins.Resolve(ident)
+		if err == nil {
+			return b, nil
+		}
 		if e.other != nil {
 			return e.other.ResolveFunc(ident)
 		}

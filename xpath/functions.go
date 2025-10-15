@@ -31,6 +31,10 @@ func init() {
 
 type BuiltinFunc func(Context, []Expr) (Sequence, error)
 
+func (fn BuiltinFunc) Call(ctx Context, args []Expr) (Sequence, error) {
+	return fn(ctx, args)
+}
+
 var builtinEnv environ.Environ[BuiltinFunc]
 
 func DefaultBuiltin() environ.Environ[BuiltinFunc] {
@@ -112,6 +116,8 @@ func (f *funcset) enableFuncSet(set []registeredBuiltin) {
 }
 
 var builtins = []registeredBuiltin{
+	registerFunc("namespace-uri", "", callNamespaceUri),
+	registerFunc("namespace-uri", "fn", callNamespaceUri),
 	registerFunc("uri-collection", "", callUriCollection),
 	registerFunc("uri-collection", "fn", callUriCollection),
 	registerFunc("collection", "", callCollection),
@@ -220,6 +226,8 @@ var builtins = []registeredBuiltin{
 	registerFunc("number", "fn", callNumber),
 	registerFunc("abs", "", callAbs),
 	registerFunc("abs", "fn", callAbs),
+	registerFunc("format-number", "", callFormatNumber),
+	registerFunc("format-number", "fn", callFormatNumber),
 	registerFunc("date", "", callDate),
 	registerFunc("date", "xs", callDate),
 	registerFunc("decimal", "", callDecimal),
@@ -514,6 +522,28 @@ func callListDir(ctx Context, args []Expr) (Sequence, error) {
 	return list, nil
 }
 
+func callNamespaceUri(ctx Context, args []Expr) (Sequence, error) {
+	if len(args) == 0 {
+		a := NewValueFromNode(ctx.Node)
+		return callNamespaceUri(ctx, []Expr{a})
+	}
+	if len(args) != 1 {
+		return nil, ErrArgument
+	}
+	items, err := expandArgs(ctx, args)
+	if err != nil {
+		return nil, err
+	}
+	if items.Len() == 0 {
+		return Singleton(""), nil
+	}
+	n, ok := items[0].Node().(*xml.Element)
+	if !ok {
+		return nil, nil
+	}
+	return Singleton(n.QName.Uri), nil
+}
+
 func callUriCollection(ctx Context, args []Expr) (Sequence, error) {
 	if len(args) == 0 {
 		return ctx.DefaultUriCollection(), nil
@@ -571,6 +601,10 @@ func callAbs(ctx Context, args []Expr) (Sequence, error) {
 		return nil, err
 	}
 	return Singleton(math.Abs(val)), nil
+}
+
+func callFormatNumber(ctx Context, args []Expr) (Sequence, error) {
+	return nil, nil
 }
 
 func callNumber(ctx Context, args []Expr) (Sequence, error) {
@@ -801,10 +835,7 @@ func callPosition(ctx Context, args []Expr) (Sequence, error) {
 }
 
 func callLast(ctx Context, args []Expr) (Sequence, error) {
-	if ctx.Index != ctx.Size {
-		return nil, nil
-	}
-	return Singleton(ctx.Node), nil
+	return Singleton(float64(ctx.Size)), nil
 }
 
 func callCurrentDate(ctx Context, args []Expr) (Sequence, error) {
