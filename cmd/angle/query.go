@@ -147,14 +147,10 @@ func (q *QueryCmd) configureEnforceNS(doc *xml.Document) error {
 		return err
 	}
 	if !ns.Singleton() {
-		return fmt.Errorf("only one namespaces with \"enfore\" attribute expected")
+		return fmt.Errorf("only one namespaces with \"enforce\" attribute expected")
 	}
-	el, ok := ns[0].Node().(*xml.Element)
-	if !ok {
-		return nil
-	}
-	attr := el.GetAttribute(enforceAttrName)
-	if attr.Value() == "true" {
+	attr, ok := ns[0].Node().(*xml.Attribute)
+	if ok && attr.LocalName() == enforceAttrName && attr.Value() == "true" {
 		q.Options = append(q.Options, xpath.WithEnforceNS())
 	}
 	return nil
