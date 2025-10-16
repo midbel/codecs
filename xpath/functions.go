@@ -584,10 +584,20 @@ func callAbs(ctx Context, args []Expr) (Sequence, error) {
 }
 
 func callFormatNumber(ctx Context, args []Expr) (Sequence, error) {
-	return nil, nil
+	if len(args) != 2 {
+		return nil, ErrArgument
+	}
+	val, err := getFloatFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	return Singleton(val), nil
 }
 
 func callFormatInteger(ctx Context, args []Expr) (Sequence, error) {
+	if len(args) != 2 {
+		return nil, ErrArgument
+	}
 	return nil, nil
 }
 
