@@ -817,7 +817,7 @@ func (c call) find(ctx Context) (Sequence, error) {
 	if c.QName.Uri == "" {
 		c.QName.Uri = ctx.funcNS
 	}
-	fn, err := ctx.Builtins.Resolve(c.QualifiedName())
+	fn, err := ctx.Builtins.Resolve(c.ExpandedName())
 	if err != nil {
 		return c.callUserDefinedFunction(ctx)
 	}

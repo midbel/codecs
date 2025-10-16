@@ -113,7 +113,7 @@ func (f *funcset) EnableAngle() {
 
 func (f *funcset) enableFuncSet(set []registeredBuiltin) {
 	for _, b := range set {
-		f.Define(b.QualifiedName(), b.Func)
+		f.Define(b.ExpandedName(), b.Func)
 	}
 }
 
