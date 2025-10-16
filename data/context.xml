@@ -3,6 +3,12 @@
 <angle type="query" version="1">
 	<base-uri>http://midbel.org</base-uri>
 
+	<extensions>
+		<extension>file</extension>
+		<extension>http</extension>
+		<extension>hash</extension>
+	</extensions>
+
 	<namespaces enforce="true">
 		<namespace target="element"></namespace>
 		<namespace target="type"></namespace>

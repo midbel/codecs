@@ -25,10 +25,10 @@ var (
 func init() {
 	nest := func(exec ExecuteFunc) ExecuteFunc {
 		fn := func(ctx *Context) (xpath.Sequence, error) {
-			// if ctx.Tracer != nil {
-			// 	ctx.Enter(ctx)
-			// 	defer ctx.Leave(ctx)
-			// }
+			if ctx.Tracer != nil {
+				ctx.Enter(ctx)
+				defer ctx.Leave(ctx)
+			}
 			if el, err := getElementFromNode(ctx.XslNode); err == nil {
 				if ns, err := getAttribute(el, ctx.getQualifiedName("xpath-default-namespace")); err == nil {
 					x := ctx.GetXpathNamespace()
@@ -46,10 +46,10 @@ func init() {
 	}
 	trace := func(exec ExecuteFunc) ExecuteFunc {
 		fn := func(ctx *Context) (xpath.Sequence, error) {
-			// if ctx.Tracer != nil {
-			// 	defer ctx.Leave(ctx)
-			// 	ctx.Enter(ctx)
-			// }
+			if ctx.Tracer != nil {
+				defer ctx.Leave(ctx)
+				ctx.Enter(ctx)
+			}
 			if el, err := getElementFromNode(ctx.XslNode); err == nil {
 				if ns, err := getAttribute(el, ctx.getQualifiedName("xpath-default-namespace")); err == nil {
 					x := ctx.GetXpathNamespace()
@@ -980,7 +980,26 @@ func executeMessage(ctx *Context) (xpath.Sequence, error) {
 }
 
 func executeEvaluate(ctx *Context) (xpath.Sequence, error) {
-	return nil, errImplemented
+	elem, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
+	query, err := getAttribute(elem, "xpath")
+	if err != nil {
+		return nil, err
+	}
+	sub := ctx.Nest()
+	for _, n := range elem.Nodes {
+		if n.QualifiedName() != ctx.getQualifiedName("with-param") {
+			err := fmt.Errorf("%s: unexpected element - want xsl:with-param", n.QualifiedName())
+			return nil, ctx.errorWithContext(err)
+		}
+		_, err := transformNode(sub.WithXsl(n))
+		if err != nil {
+			return nil, err
+		}
+	}
+	return sub.ExecuteQuery(query, sub.ContextNode)
 }
 
 func getMatchingElements(ctx *Context, elem *xml.Element) (xml.Node, xml.Node, error) {
