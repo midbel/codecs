@@ -989,7 +989,31 @@ func executeEvaluate(ctx *Context) (xpath.Sequence, error) {
 		return nil, err
 	}
 	sub := ctx.Nest()
-	for _, n := range elem.Nodes {
+	if q, err := getAttribute(elem, "context-item"); err == nil {
+		seq, err := sub.ExecuteQuery(q, ctx.ContextNode)
+		if err != nil {
+			return nil, err
+		}
+		if !seq.Singleton() && !seq.Empty() {
+			err := fmt.Errorf("expected singleton sequence for context item")
+			return nil, ctx.errorWithContext(err)
+		}
+		if seq.Empty() {
+			sub = sub.WithXpath(nil)
+		} else {
+			sub = sub.WithXpath(seq[0].Node())
+		}
+	}
+	var (
+		nodes = elem.Nodes
+		fallback xml.Node
+	)
+	_ = fallback // check if evaluate is disabled
+	if nodes[len(nodes)-1].QualifiedName() == ctx.getQualifiedName("fallback") {
+		fallback = nodes[len(nodes)-1]
+		nodes = nodes[:len(nodes)-1]
+	}
+	for _, n := range nodes {
 		if n.QualifiedName() != ctx.getQualifiedName("with-param") {
 			err := fmt.Errorf("%s: unexpected element - want xsl:with-param", n.QualifiedName())
 			return nil, ctx.errorWithContext(err)
