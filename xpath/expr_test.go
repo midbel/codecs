@@ -219,6 +219,14 @@ func TestPathWithNS(t *testing.T) {
 			Want:  []string{"foo", "bar"},
 		},
 		{
+			Query: "/root/*:item",
+			Want:  []string{"foo", "bar"},
+		},
+		{
+			Query: "/root/ang:*",
+			Want:  []string{"foo", "bar"},
+		},
+		{
 			Query: "/root/item",
 			Want:  []string{},
 		},
@@ -309,6 +317,56 @@ func TestPath(t *testing.T) {
 		{
 			Query: "//group/*",
 			Want:  []string{"qux"},
+		},
+	}
+	runTests(t, docBase, tests)
+}
+
+func TestFunctions(t *testing.T) {
+	tests := []TestCase{
+		{
+			Query: "true()",
+			Want: []string{"true"},
+		},
+		{
+			Query: "false()",
+			Want: []string{"false"},
+		},
+		{
+			Query: "boolean(/root/item)",
+			Want: []string{"true"},
+		},
+		{
+			Query: "boolean(/test)",
+			Want: []string{"false"},
+		},
+		{
+			Query: "not(boolean(/root/item))",
+			Want: []string{"false"},
+		},
+		{
+			Query: "not(boolean(/test))",
+			Want: []string{"true"},
+		},
+		{
+			Query: "name(/root)",
+			Want: []string{"root"},
+		},
+		{
+			Query: "fn:local-name(/root)",
+			Want: []string{"root"},
+		},
+		{
+			Query: "local-name(root())",
+			Want: []string{"root"},
+		},
+		{
+			Query: "local-name(root(/root/item))",
+			Want: []string{"root"},
+		},
+		{
+			Query: "path(/root)",
+			Want: []string{"/"},
 		},
 	}
 	runTests(t, docBase, tests)
