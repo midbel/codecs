@@ -71,39 +71,40 @@ func init() {
 		xsltQualifiedName("break"):          trace(executeBreak),
 	}
 	executers = map[xml.QName]ExecuteFunc{
-		xsltQualifiedName("for-each"):        nest(executeForeach),
-		xsltQualifiedName("iterate"):         nest(executeIterate),
-		xsltQualifiedName("value-of"):        trace(executeValueOf),
-		xsltQualifiedName("call-template"):   nest(executeCallTemplate),
-		xsltQualifiedName("apply-templates"): nest(executeApplyTemplates),
-		xsltQualifiedName("apply-imports"):   nest(executeApplyImport),
-		xsltQualifiedName("if"):              nest(executeIf),
-		xsltQualifiedName("choose"):          nest(executeChoose),
-		xsltQualifiedName("when"):            trace(executeWhen),
-		xsltQualifiedName("otherwise"):       trace(executeOtherwise),
-		xsltQualifiedName("where-populated"): trace(executeWherePopulated),
-		xsltQualifiedName("on-empty"):        trace(executeOnEmpty),
-		xsltQualifiedName("on-not-empty"):    trace(executeOnNotEmpty),
-		xsltQualifiedName("try"):             nest(executeTry),
-		xsltQualifiedName("catch"):           trace(executeCatch),
-		xsltQualifiedName("variable"):        trace(executeVariable),
-		xsltQualifiedName("result-document"): trace(executeResultDocument),
-		xsltQualifiedName("source-document"): nest(executeSourceDocument),
-		xsltQualifiedName("with-param"):      trace(executeWithParam),
-		xsltQualifiedName("copy"):            trace(executeCopy),
-		xsltQualifiedName("copy-of"):         trace(executeCopyOf),
-		xsltQualifiedName("sequence"):        trace(executeSequence),
-		xsltQualifiedName("document"):        trace(executeDocument),
-		xsltQualifiedName("element"):         trace(executeElement),
-		xsltQualifiedName("attribute"):       trace(executeAttribute),
-		xsltQualifiedName("text"):            trace(executeText),
-		xsltQualifiedName("comment"):         trace(executeComment),
-		xsltQualifiedName("message"):         trace(executeMessage),
-		xsltQualifiedName("fallback"):        trace(executeFallback),
-		xsltQualifiedName("merge"):           trace(executeMerge),
-		xsltQualifiedName("for-each-group"):  trace(executeForeachGroup),
-		xsltQualifiedName("assert"):          trace(executeAssert),
-		xsltQualifiedName("evaluate"):        trace(executeEvaluate),
+		xsltQualifiedName("for-each"):               nest(executeForeach),
+		xsltQualifiedName("iterate"):                nest(executeIterate),
+		xsltQualifiedName("value-of"):               trace(executeValueOf),
+		xsltQualifiedName("call-template"):          nest(executeCallTemplate),
+		xsltQualifiedName("apply-templates"):        nest(executeApplyTemplates),
+		xsltQualifiedName("apply-imports"):          nest(executeApplyImport),
+		xsltQualifiedName("if"):                     nest(executeIf),
+		xsltQualifiedName("choose"):                 nest(executeChoose),
+		xsltQualifiedName("when"):                   trace(executeWhen),
+		xsltQualifiedName("otherwise"):              trace(executeOtherwise),
+		xsltQualifiedName("where-populated"):        trace(executeWherePopulated),
+		xsltQualifiedName("on-empty"):               trace(executeOnEmpty),
+		xsltQualifiedName("on-not-empty"):           trace(executeOnNotEmpty),
+		xsltQualifiedName("try"):                    nest(executeTry),
+		xsltQualifiedName("catch"):                  trace(executeCatch),
+		xsltQualifiedName("variable"):               trace(executeVariable),
+		xsltQualifiedName("result-document"):        trace(executeResultDocument),
+		xsltQualifiedName("source-document"):        nest(executeSourceDocument),
+		xsltQualifiedName("with-param"):             trace(executeWithParam),
+		xsltQualifiedName("copy"):                   trace(executeCopy),
+		xsltQualifiedName("copy-of"):                trace(executeCopyOf),
+		xsltQualifiedName("sequence"):               trace(executeSequence),
+		xsltQualifiedName("document"):               trace(executeDocument),
+		xsltQualifiedName("processing-instruction"): trace(executePI),
+		xsltQualifiedName("element"):                trace(executeElement),
+		xsltQualifiedName("attribute"):              trace(executeAttribute),
+		xsltQualifiedName("text"):                   trace(executeText),
+		xsltQualifiedName("comment"):                trace(executeComment),
+		xsltQualifiedName("message"):                trace(executeMessage),
+		xsltQualifiedName("fallback"):               trace(executeFallback),
+		xsltQualifiedName("merge"):                  trace(executeMerge),
+		xsltQualifiedName("for-each-group"):         trace(executeForeachGroup),
+		xsltQualifiedName("assert"):                 trace(executeAssert),
+		xsltQualifiedName("evaluate"):               trace(executeEvaluate),
 	}
 }
 
@@ -1005,7 +1006,7 @@ func executeEvaluate(ctx *Context) (xpath.Sequence, error) {
 		}
 	}
 	var (
-		nodes = elem.Nodes
+		nodes    = elem.Nodes
 		fallback xml.Node
 	)
 	_ = fallback // check if evaluate is disabled
@@ -1217,8 +1218,57 @@ func executeSelect(ctx *Context, elem *xml.Element) (xpath.Sequence, error) {
 	return nil, err
 }
 
+func executePI(ctx *Context) (xpath.Sequence, error) {
+	el, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return nil, err
+	}
+	ident, err := getAttribute(el, "name")
+	if err != nil {
+		return nil, err
+	}
+	qn, err := xml.ParseName(ident)
+	if err != nil {
+		return nil, ctx.errorWithContext(err)
+	}
+	var seq xpath.Sequence
+	if query, err := getAttribute(el, "select"); err == nil {
+		if len(el.Nodes) != 0 {
+			return nil, fmt.Errorf("select attribute can not be used with children")
+		}
+		seq, err = ctx.ExecuteQuery(query, ctx.ContextNode)
+	} else {
+		seq, err = executeConstructor(ctx, el.Nodes, 0)		
+	}
+	if err != nil {
+		return nil, err
+	}
+	pi := xml.NewInstruction(qn)
+	for _, i := range seq {
+		a, ok := i.Node().(*xml.Attribute)
+		if !ok {
+			err := fmt.Errorf("expected attribute")
+			return nil, ctx.errorWithContext(err)
+		}
+		pi.SetAttribute(*a)
+	}
+	return xpath.Singleton(pi), nil
+}
+
 func executeDocument(ctx *Context) (xpath.Sequence, error) {
-	return nil, errImplemented
+	el, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return nil, err
+	}
+	items, err := executeConstructor(ctx, el.Nodes, 0)
+	if err != nil {
+		return nil, err
+	}
+	doc := xml.EmptyDocument()
+	for _, i := range items {
+		doc.Nodes = append(doc.Nodes, i.Node())
+	}
+	return xpath.Singleton(doc), nil
 }
 
 func executeElement(ctx *Context) (xpath.Sequence, error) {

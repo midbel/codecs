@@ -133,11 +133,16 @@ type Document struct {
 }
 
 func NewDocument(root Node) *Document {
+	doc := EmptyDocument()
+	doc.Nodes = append(doc.Nodes, root)
+	return doc
+}
+
+func EmptyDocument() *Document {
 	doc := Document{
 		Version:  SupportedVersion,
 		Encoding: SupportedEncoding,
 	}
-	doc.Nodes = append(doc.Nodes, root)
 	return &doc
 }
 
