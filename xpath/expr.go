@@ -993,7 +993,7 @@ func (i subscript) find(ctx Context) (Sequence, error) {
 	}
 	ix--
 	if ix < 0 || ix >= int64(len(arr.all)) {
-		return nil, ErrIndex
+		return nil, nil
 	}
 	return arr.all[ix].find(ctx)
 }

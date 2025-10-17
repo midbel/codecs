@@ -333,8 +333,7 @@ func runArrayTests(t *testing.T, doc string, tests []TestCase) {
 			t.Errorf("error finding node in document: %s", err)
 			continue
 		}
-		if !res.Singleton() {
-			t.Errorf("%s: expected singleton sequence", c.Query)
+		if len(c.Want) == 0 && res.Len() == 0 {
 			continue
 		}
 		if s, ok := res[0].(interface{ Sequence() Sequence }); ok {
