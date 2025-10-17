@@ -1263,6 +1263,9 @@ func (q quantified) find(ctx Context) (Sequence, error) {
 		}
 		res, err := q.test.find(nest)
 		if err != nil {
+			if items.Len() != len(q.binds) {
+				return Singleton(false), nil
+			}
 			return nil, err
 		}
 		if !res.True() && q.every {
