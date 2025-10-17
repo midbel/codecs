@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -309,6 +310,19 @@ func (w *Writer) writeAttributeAsNode(attr *Attribute, depth int) error {
 }
 
 func (w *Writer) writeAttributes(attrs []Attribute, depth int) error {
+	slices.SortFunc(attrs, func(a, b Attribute) int {
+		if a.Space == "xmlns" && b.Space == "xmlns" {
+			c := strings.Compare(a.Name, b.Name)
+			if c == 0 {
+				c = strings.Compare(a.Datum, b.Datum)
+			}
+			return c
+		}
+		if a.Space == "xmlns" || b.Space == "xmlns" {
+			return -1
+		}
+		return 0
+	})
 	prefix := w.getIndent(depth)
 	for i, a := range attrs {
 		if w.NoNamespace() && (a.Space == "xmlns" || a.Name == "xmlns") && a.Value() != "" {

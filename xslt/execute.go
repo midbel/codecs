@@ -99,6 +99,7 @@ func init() {
 		xsltQualifiedName("attribute"):              trace(executeAttribute),
 		xsltQualifiedName("text"):                   trace(executeText),
 		xsltQualifiedName("comment"):                trace(executeComment),
+		xsltQualifiedName("namespace"):              trace(executeNamespace),
 		xsltQualifiedName("message"):                trace(executeMessage),
 		xsltQualifiedName("fallback"):               trace(executeFallback),
 		xsltQualifiedName("merge"):                  trace(executeMerge),
@@ -1242,7 +1243,7 @@ func executePI(ctx *Context) (xpath.Sequence, error) {
 		}
 		seq, err = ctx.ExecuteQuery(query, ctx.ContextNode)
 	} else {
-		seq, err = executeConstructor(ctx, el.Nodes, 0)		
+		seq, err = executeConstructor(ctx, el.Nodes, 0)
 	}
 	if err != nil || seq.Empty() {
 		return nil, err
@@ -1275,7 +1276,7 @@ func executeNamespace(ctx *Context) (xpath.Sequence, error) {
 		}
 		seq, err = ctx.ExecuteQuery(query, ctx.ContextNode)
 	} else {
-		seq, err = executeConstructor(ctx, el.Nodes, 0)		
+		seq, err = executeConstructor(ctx, el.Nodes, 0)
 	}
 	if err != nil || seq.Empty() {
 		return nil, err
@@ -1285,7 +1286,7 @@ func executeNamespace(ctx *Context) (xpath.Sequence, error) {
 		return nil, err
 	}
 	a := xml.NewAttribute(xml.QualifiedName(ident, "xmlns"), strings.Join(str, " "))
-	return xpath.Singleton(a), nil
+	return xpath.Singleton(&a), nil
 }
 
 func executeDocument(ctx *Context) (xpath.Sequence, error) {
