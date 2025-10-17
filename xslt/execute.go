@@ -1244,7 +1244,7 @@ func executePI(ctx *Context) (xpath.Sequence, error) {
 	} else {
 		seq, err = executeConstructor(ctx, el.Nodes, 0)		
 	}
-	if err != nil {
+	if err != nil || seq.Empty() {
 		return nil, err
 	}
 	pi := xml.NewInstruction(qn)
@@ -1257,6 +1257,35 @@ func executePI(ctx *Context) (xpath.Sequence, error) {
 		pi.SetAttribute(*a)
 	}
 	return xpath.Singleton(pi), nil
+}
+
+func executeNamespace(ctx *Context) (xpath.Sequence, error) {
+	el, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
+		return nil, err
+	}
+	ident, err := getAttribute(el, "name")
+	if err != nil {
+		return nil, err
+	}
+	var seq xpath.Sequence
+	if query, err := getAttribute(el, "select"); err == nil {
+		if len(el.Nodes) != 0 {
+			return nil, fmt.Errorf("select attribute can not be used with children")
+		}
+		seq, err = ctx.ExecuteQuery(query, ctx.ContextNode)
+	} else {
+		seq, err = executeConstructor(ctx, el.Nodes, 0)		
+	}
+	if err != nil || seq.Empty() {
+		return nil, err
+	}
+	str, err := seq.Atomize()
+	if err != nil {
+		return nil, err
+	}
+	a := xml.NewAttribute(xml.QualifiedName(ident, "xmlns"), strings.Join(str, " "))
+	return xpath.Singleton(a), nil
 }
 
 func executeDocument(ctx *Context) (xpath.Sequence, error) {

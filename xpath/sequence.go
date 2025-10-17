@@ -74,6 +74,18 @@ func (s *Sequence) String() string {
 	return ""
 }
 
+func (s *Sequence) Atomize() ([]string, error) {
+	var list []string
+	for _, i := range *s {
+		s, err := toString(i.Value())
+		if err != nil {
+			return nil, err
+		}
+		list = append(list, s)
+	}
+	return list, nil
+}
+
 func (s *Sequence) Every(test func(i Item) bool) bool {
 	for i := range *s {
 		if !test((*s)[i]) {
