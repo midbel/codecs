@@ -1231,7 +1231,7 @@ func executePI(ctx *Context) (xpath.Sequence, error) {
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
 	}
-	if qn.Local == "xml" {
+	if qn.LocalName() == "xml" {
 		err := fmt.Errorf("processing-instruction can not have 'xml' name")
 		return nil, ctx.errorWithContext(err)
 	}
