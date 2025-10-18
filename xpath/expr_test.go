@@ -463,7 +463,52 @@ func testNumberFunctions(t *testing.T) {
 }
 
 func testStringFunctions(t *testing.T) {
-	tests := []TestCase{}
+	tests := []TestCase{
+		{
+			Query: "string('test')",
+			Want: []string{"test"},
+		},
+		{
+			Query: "string(/root/item[1])",
+			Want: []string{"foo"},
+		},
+		{
+			Query: "string-length(/root/item[1])",
+			Want: []string{"3"},
+		},
+		{
+			Query: "normalize-space('  foobar  ')",
+			Want: []string{"foobar"},
+		},
+		{
+			Query: "normalize-space(/root/item[1])",
+			Want: []string{"foo"},
+		},
+		{
+			Query: "upper-case(/root/item[1])",
+			Want: []string{"FOO"},
+		},
+		{
+			Query: "lower-case(/root/item[1])",
+			Want: []string{"foo"},
+		},
+		{
+			Query: "starts-with(/root/item[1], 'f')",
+			Want: []string{"true"},
+		},
+		{
+			Query: "starts-with(/root/item[1], 'b')",
+			Want: []string{"false"},
+		},
+		{
+			Query: "ends-with(/root/item[1], 'oo')",
+			Want: []string{"true"},
+		},
+		{
+			Query: "ends-with(/root/item[1], 'ar')",
+			Want: []string{"false"},
+		},
+	}
 	runTests(t, docBase, tests)
 }
 
