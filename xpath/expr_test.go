@@ -20,6 +20,20 @@ const docBase = `<?xml version="1.0" encoding="utf-8"?>
 </root>
 `
 
+const docNumbers = `<?xml version="1.0" encoding="utf-8"?>
+
+<root>
+	<item>
+		<label>foo</label>
+		<star>10</star>
+	</item>
+	<item>
+		<label>foo</label>
+		<star>20</star>
+	</item>
+</root>
+`
+
 const docSpace = `<?xml version="1.0" encoding="utf-8"?>
 <root xmlns="http://midbel.org/ns"
 	xmlns:ang="http://midbel.org/angle">
@@ -322,54 +336,142 @@ func TestPath(t *testing.T) {
 	runTests(t, docBase, tests)
 }
 
-func TestFunctions(t *testing.T) {
+func testBooleanFunctions(t *testing.T) {
 	tests := []TestCase{
 		{
 			Query: "true()",
-			Want: []string{"true"},
+			Want:  []string{"true"},
 		},
 		{
 			Query: "false()",
-			Want: []string{"false"},
+			Want:  []string{"false"},
 		},
 		{
 			Query: "boolean(/root/item)",
-			Want: []string{"true"},
+			Want:  []string{"true"},
 		},
 		{
 			Query: "boolean(/test)",
-			Want: []string{"false"},
+			Want:  []string{"false"},
 		},
 		{
 			Query: "not(boolean(/root/item))",
-			Want: []string{"false"},
+			Want:  []string{"false"},
 		},
 		{
 			Query: "not(boolean(/test))",
-			Want: []string{"true"},
-		},
-		{
-			Query: "name(/root)",
-			Want: []string{"root"},
-		},
-		{
-			Query: "fn:local-name(/root)",
-			Want: []string{"root"},
-		},
-		{
-			Query: "local-name(root())",
-			Want: []string{"root"},
-		},
-		{
-			Query: "local-name(root(/root/item))",
-			Want: []string{"root"},
-		},
-		{
-			Query: "path(/root)",
-			Want: []string{"/"},
+			Want:  []string{"true"},
 		},
 	}
 	runTests(t, docBase, tests)
+}
+
+func testNodeFunctions(t *testing.T) {
+	tests := []TestCase{
+		{
+			Query: "name(/root)",
+			Want:  []string{"root"},
+		},
+		{
+			Query: "fn:local-name(/root)",
+			Want:  []string{"root"},
+		},
+		{
+			Query: "local-name(root())",
+			Want:  []string{"root"},
+		},
+		{
+			Query: "local-name(root(/root/item))",
+			Want:  []string{"root"},
+		},
+		{
+			Query: "path(/root)",
+			Want:  []string{"/"},
+		},
+		{
+			Query: "has-children('/root')",
+			Want:  []string{"true"},
+		},
+		{
+			Query: "has-children('/root/group/item')",
+			Want:  []string{"false"},
+		},
+	}
+	runTests(t, docBase, tests)
+}
+
+func testNumberFunctions(t *testing.T) {
+	tests := []TestCase{
+		{
+			Query: "sum(/root/item/star)",
+			Want:  []string{"30"},
+		},
+		{
+			Query: "sum(/root/item)",
+			Want:  []string{"2"},
+		},
+		{
+			Query: "avg(/root/item/star)",
+			Want:  []string{"15"},
+		},
+		{
+			Query: "min(/root/item/star)",
+			Want:  []string{"10"},
+		},
+		{
+			Query: "max(/root/item/star)",
+			Want:  []string{"20"},
+		},
+		{
+			Query: "round(2.5)",
+			Want:  []string{"3"},
+		},
+		{
+			Query: "round(2.4999)",
+			Want:  []string{"2"},
+		},
+		{
+			Query: "floor(10.5)",
+			Want:  []string{"10"},
+		},
+		{
+			Query: "floor(-10.5)",
+			Want:  []string{"-11"},
+		},
+		{
+			Query: "ceiling(10.5)",
+			Want:  []string{"11"},
+		},
+		{
+			Query: "ceiling(-10.5)",
+			Want:  []string{"-10"},
+		},
+		{
+			Query: "abs(1)",
+			Want:  []string{"1"},
+		},
+		{
+			Query: "number(/root/item[1]/star)",
+			Want:  []string{"10"},
+		},
+		{
+			Query: "xs:decimal(/root/item[1]/star)",
+			Want:  []string{"10"},
+		},
+	}
+	runTests(t, docNumbers, tests)
+}
+
+func testStringFunctions(t *testing.T) {
+	tests := []TestCase{}
+	runTests(t, docBase, tests)
+}
+
+func TestFunctions(t *testing.T) {
+	t.Run("boolean", testBooleanFunctions)
+	t.Run("node", testNodeFunctions)
+	t.Run("number", testNumberFunctions)
+	t.Run("string", testStringFunctions)
 }
 
 func runArrayTests(t *testing.T, doc string, tests []TestCase) {

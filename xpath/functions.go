@@ -120,11 +120,7 @@ func (f *funcset) enableFuncSet(set []registeredBuiltin) {
 var builtins = []registeredBuiltin{
 	registerFunc("namespace-uri", "fn", callNamespaceUri),
 	registerFunc("uri-collection", "fn", callUriCollection),
-	registerFunc("collection", "fn", callCollection),
-	registerFunc("true", "fn", callTrue),
-	registerFunc("false", "fn", callFalse),
-	registerFunc("boolean", "fn", callBoolean),
-	registerFunc("not", "fn", callNot),
+	// node and document functiosn
 	registerFunc("name", "fn", callName),
 	registerFunc("local-name", "fn", callLocalName),
 	registerFunc("root", "fn", callRoot),
@@ -132,6 +128,19 @@ var builtins = []registeredBuiltin{
 	registerFunc("has-children", "fn", callHasChildren),
 	registerFunc("innermost", "fn", callInnermost),
 	registerFunc("outermost", "fn", callOutermost),
+	registerFunc("doc", "fn", callDoc),
+	registerFunc("collection", "fn", callCollection),
+	registerFunc("zero-or-one", "fn", callZeroOrOne),
+	registerFunc("one-or-more", "fn", callOneOrMore),
+	registerFunc("exactly-one", "fn", callExactlyOne),
+	registerFunc("position", "fn", callPosition),
+	registerFunc("last", "fn", callLast),
+	registerFunc("exists", "fn", callExists),
+	registerFunc("empty", "fn", callEmpty),
+	registerFunc("distinct-values", "fn", callDistinctValues),
+	registerFunc("tail", "fn", callTail),
+	registerFunc("head", "fn", callHead),
+	// string functions
 	registerFunc("string", "fn", callString),
 	registerFunc("compare", "fn", callCompare),
 	registerFunc("concat", "fn", callConcat),
@@ -150,36 +159,33 @@ var builtins = []registeredBuiltin{
 	registerFunc("replace", "fn", callXYZ),
 	registerFunc("matches", "fn", callMatches),
 	registerFunc("tokenize", "fn", callTokenize),
+	registerFunc("reverse", "fn", callReverse),
+	// boolean functions
+	registerFunc("true", "fn", callTrue),
+	registerFunc("false", "fn", callFalse),
+	registerFunc("boolean", "fn", callBoolean),
+	registerFunc("not", "fn", callNot),
+	// number + aggregate functions
+	registerFunc("decimal", "xs", callDecimal),
+	registerFunc("number", "fn", callNumber),
+	registerFunc("round", "fn", callRound),
+	registerFunc("floor", "fn", callFloor),
+	registerFunc("ceiling", "fn", callCeil),
+	registerFunc("abs", "fn", callAbs),
 	registerFunc("sum", "fn", callSum),
 	registerFunc("count", "fn", callCount),
 	registerFunc("avg", "fn", callAvg),
 	registerFunc("min", "fn", callMin),
 	registerFunc("max", "fn", callMax),
-	registerFunc("zero-or-one", "fn", callZeroOrOne),
-	registerFunc("one-or-more", "fn", callOneOrMore),
-	registerFunc("exactly-one", "fn", callExactlyOne),
-	registerFunc("position", "fn", callPosition),
-	registerFunc("last", "fn", callLast),
-	registerFunc("current-date", "fn", callCurrentDate),
-	registerFunc("current-dateTime", "fn", callCurrentDatetime),
-	registerFunc("exists", "fn", callExists),
-	registerFunc("empty", "fn", callEmpty),
-	registerFunc("distinct-values", "fn", callDistinctValues),
-	registerFunc("tail", "fn", callTail),
-	registerFunc("head", "fn", callHead),
-	registerFunc("reverse", "fn", callReverse),
-	registerFunc("round", "fn", callRound),
-	registerFunc("floor", "fn", callFloor),
-	registerFunc("ceiling", "fn", callCeil),
-	registerFunc("number", "fn", callNumber),
-	registerFunc("abs", "fn", callAbs),
 	registerFunc("format-number", "fn", callFormatNumber),
 	registerFunc("format-integer", "fn", callFormatInteger),
+	// date functions
 	registerFunc("date", "xs", callDate),
 	registerFunc("format-date", "fn", callFormatDate),
 	registerFunc("format-dateTime", "fn", callFormatDateTime),
-	registerFunc("decimal", "xs", callDecimal),
-	registerFunc("doc", "fn", callDoc),
+	registerFunc("current-date", "fn", callCurrentDate),
+	registerFunc("current-dateTime", "fn", callCurrentDatetime),
+	// function related functions
 	registerFunc("function-arity", "fn", callXYZ),
 	registerFunc("function-name", "fn", callXYZ),
 	registerFunc("function-lookup", "fn", callXYZ),
@@ -880,18 +886,9 @@ func callString(ctx Context, args []Expr) (Sequence, error) {
 		ctx.Index = 1
 		return callString(ctx, nil)
 	}
-	var str string
-	switch v := items[0].Value().(type) {
-	case bool:
-		str = strconv.FormatBool(v)
-	case float64:
-		str = strconv.FormatFloat(v, 'f', -1, 64)
-	case int64:
-		str = strconv.FormatInt(v, 64)
-	case string:
-		str = v
-	default:
-		return nil, ErrType
+	str, err := toString(items[0].Value())
+	if err != nil {
+		return nil, err
 	}
 	return Singleton(str), nil
 }
