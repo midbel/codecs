@@ -604,7 +604,16 @@ func callFormatInteger(ctx Context, args []Expr) (Sequence, error) {
 	if len(args) != 2 {
 		return nil, ErrArgument
 	}
-	return nil, nil
+	val, err := getIntFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	picture, err := getStringFromExpr(args[1], ctx)
+	if err != nil {
+		return nil, err
+	}
+	res, err := formatInteger(val, picture)
+	return Singleton(res), err
 }
 
 func callNumber(ctx Context, args []Expr) (Sequence, error) {
@@ -1412,13 +1421,18 @@ func callDoc(ctx Context, args []Expr) (Sequence, error) {
 
 func getFloatFromExpr(expr Expr, ctx Context) (float64, error) {
 	items, err := expr.find(ctx)
-	if err != nil || len(items) != 1 {
+	if err != nil || !items.Singleton() {
 		return math.NaN(), err
 	}
-	if !items[0].Atomic() {
-		return toFloat(items[0].Value())
-	}
 	return toFloat(items[0].Value())
+}
+
+func getIntFromExpr(expr Expr, ctx Context) (int64, error) {
+	items, err := expr.find(ctx)
+	if err != nil || !items.Singleton() {
+		return 0, err
+	}
+	return toInt(items[0].Value())
 }
 
 func getStringFromExpr(expr Expr, ctx Context) (string, error) {

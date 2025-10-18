@@ -20,6 +20,9 @@ type static struct {
 	typeNS     string
 	funcNS     string
 	enforceNS  bool
+
+	ThousandSep rune
+	DecimalSep  rune
 }
 
 func createStatic() *static {
@@ -28,10 +31,12 @@ func createStatic() *static {
 		vs = environ.Empty[Expr]()
 	)
 	return &static{
-		namespaces: ns,
-		variables:  vs,
-		funcNS:     functionNS,
-		typeNS:     schemaNS,
+		namespaces:  ns,
+		variables:   vs,
+		funcNS:      functionNS,
+		typeNS:      schemaNS,
+		ThousandSep: comma,
+		DecimalSep:  dot,
 	}
 }
 
