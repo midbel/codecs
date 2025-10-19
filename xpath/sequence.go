@@ -183,6 +183,8 @@ func EffectiveBooleanValue(seq Sequence) bool {
 			return x != ""
 		case float64:
 			return x != 0 && !math.IsNaN(x)
+		case int64:
+			return x != 0
 		case bool:
 			return x
 		default:

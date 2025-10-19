@@ -1038,31 +1038,6 @@ func (i subscript) getArrayFromExpr(ctx Context) (array, error) {
 	}
 }
 
-type index struct {
-	expr Expr
-	pos  int
-}
-
-func (i index) Find(node xml.Node) (Sequence, error) {
-	return i.find(defaultContext(node))
-}
-
-func (i index) MatchPriority() int {
-	return getPriority(prioHigh, i.expr)
-}
-
-func (i index) find(ctx Context) (Sequence, error) {
-	seq, err := i.expr.find(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if i.pos < 1 || i.pos > seq.Len() {
-		var s Sequence
-		return s, nil
-	}
-	return Singleton(seq[i.pos-1].Node()), nil
-}
-
 type filter struct {
 	expr  Expr
 	check Expr
@@ -1090,11 +1065,22 @@ func (f filter) find(ctx Context) (Sequence, error) {
 		if err != nil {
 			continue
 		}
-		ebf := EffectiveBooleanValue(res)
-		if !ebf {
-			continue
+		var ok bool
+		switch f.check.(type) {
+		case number, call:
+			if res.Singleton() {
+				x, err := toInt(res[0].Value())
+				if err != nil {
+					return nil, err
+				}
+				ok = ctx.Index == int(x)
+			}
+		default:
+			ok = EffectiveBooleanValue(res)
 		}
-		ret.Append(n)
+		if ok {
+			ret.Append(n)
+		}
 	}
 	return ret, nil
 }

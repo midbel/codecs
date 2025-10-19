@@ -124,13 +124,6 @@ func debugExpr(w io.Writer, expr Expr) {
 		io.WriteString(w, "(")
 		io.WriteString(w, v.ident)
 		io.WriteString(w, ")")
-	case index:
-		io.WriteString(w, "index")
-		io.WriteString(w, "(")
-		debugExpr(w, v.expr)
-		io.WriteString(w, ", ")
-		io.WriteString(w, strconv.Itoa(v.pos))
-		io.WriteString(w, ")")
 	case filter:
 		io.WriteString(w, "filter")
 		io.WriteString(w, "(")
