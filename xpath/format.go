@@ -5,32 +5,57 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 )
 
 func formatInteger(value int64, picture string) (string, error) {
+	radix := 10
+	if rx, rest, ok := strings.Cut(picture, "^"); ok {
+		picture = rest
+		switch rx {
+		case "8", "10", "16":
+			radix, _ = strconv.Atoi(rx)
+		default:
+			return "", fmt.Errorf("unsupported radix")
+		}
+	}
 	var (
-		str   = strconv.FormatInt(value, 10)
+		str   = strconv.FormatInt(value, radix)
 		chars = []byte(str)
 		out   bytes.Buffer
+		ptr   int
+		grp   byte
 	)
 	slices.Reverse(chars)
-	for i, j := len(picture)-1, 0; i >= 0; i-- {
-		fmt.Println("i", i, j)
+	for i := len(picture) - 1; i >= 0; i-- {
 		switch picture[i] {
 		case '0', '#':
-			if j >= len(chars) {
+			if ptr >= len(chars) {
 				out.WriteByte('0')
 			} else {
-				out.WriteByte(chars[j])
+				out.WriteByte(chars[ptr])
 			}
-			j++
+			ptr++
 		case '.', ',':
-			if out.Len()%3 != 0 {
+			if grp != 0 && picture[i] != grp {
+				return "", fmt.Errorf("inconsistent use of thousand separator")
+			}
+			grp = picture[i]
+			if ptr%3 != 0 {
 				return "", fmt.Errorf("wrong position for thousand separator")
 			}
 			out.WriteByte(picture[i])
 		default:
 			return "", fmt.Errorf("unexpected character in picture")
+		}
+	}
+	if ptr < len(chars) {
+		for _, c := range chars[ptr:] {
+			if grp != 0 && ptr%3 == 0 {
+				out.WriteByte(grp)
+			}
+			out.WriteByte(c)
+			ptr++
 		}
 	}
 	chars = out.Bytes()
