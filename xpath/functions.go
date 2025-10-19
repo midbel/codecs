@@ -156,9 +156,10 @@ var builtins = []registeredBuiltin{
 	registerFunc("ends-with", "fn", callEndsWith),
 	registerFunc("substring-before", "fn", callSubstringBefore),
 	registerFunc("substring-after", "fn", callSubstringAfter),
-	registerFunc("replace", "fn", callXYZ),
+	registerFunc("replace", "fn", callReplace),
 	registerFunc("matches", "fn", callMatches),
 	registerFunc("tokenize", "fn", callTokenize),
+	// sequence function
 	registerFunc("reverse", "fn", callReverse),
 	// boolean functions
 	registerFunc("true", "fn", callTrue),
@@ -970,7 +971,7 @@ func callSubstring(ctx Context, args []Expr) (Sequence, error) {
 		return nil, err
 	}
 	if str == "" {
-		return nil, nil
+		return Singleton(""), nil
 	}
 	beg, err := getFloatFromExpr(args[1], ctx)
 	if err != nil {
@@ -1074,6 +1075,26 @@ func callLowercase(ctx Context, args []Expr) (Sequence, error) {
 	return Singleton(strings.ToLower(str)), nil
 }
 
+func callReplace(ctx Context, args []Expr) (Sequence, error) {
+	if len(args) != 3 {
+		return nil, ErrArgument
+	}
+	str, err := getStringFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	src, err := getStringFromExpr(args[1], ctx)
+	if err != nil {
+		return nil, err
+	}
+	dst, err := getStringFromExpr(args[2], ctx)
+	if err != nil {
+		return nil, err
+	}
+	str = strings.ReplaceAll(str, src, dst)
+	return Singleton(str), nil
+}
+
 func callTranslate(ctx Context, args []Expr) (Sequence, error) {
 	if len(args) != 3 {
 		return nil, ErrArgument
@@ -1096,12 +1117,12 @@ func callTranslate(ctx Context, args []Expr) (Sequence, error) {
 		if ix < 0 {
 			return r
 		}
-		if len(set) < ix {
+		if ix < len(set) {
 			return set[ix]
 		}
 		return -1
 	}, str)
-	return Singleton(str), ErrImplemented
+	return Singleton(str), nil
 }
 
 func callContains(ctx Context, args []Expr) (Sequence, error) {
@@ -1169,16 +1190,19 @@ func callEndsWith(ctx Context, args []Expr) (Sequence, error) {
 }
 
 func callTokenize(ctx Context, args []Expr) (Sequence, error) {
-	if len(args) != 2 {
+	if len(args) > 2 {
 		return nil, ErrArgument
 	}
 	fst, err := getStringFromExpr(args[0], ctx)
 	if err != nil {
 		return nil, err
 	}
-	snd, err := getStringFromExpr(args[1], ctx)
-	if err != nil {
-		return nil, err
+	snd := " "
+	if len(args) == 2 {
+		snd, err = getStringFromExpr(args[1], ctx)
+		if err != nil {
+			return nil, err
+		}
 	}
 	re, err := regexp.Compile(snd)
 	if err != nil {

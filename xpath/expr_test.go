@@ -508,6 +508,90 @@ func testStringFunctions(t *testing.T) {
 			Query: "ends-with(/root/item[1], 'ar')",
 			Want:  []string{"false"},
 		},
+		{
+			Query: "compare('foo', 'foo')",
+			Want:  []string{"0"},
+		},
+		{
+			Query: "compare('foo', 'bar')",
+			Want:  []string{"1"},
+		},
+		{
+			Query: "compare('bar', 'foo')",
+			Want:  []string{"-1"},
+		},
+		{
+			Query: "concat('foo', 'bar')",
+			Want:  []string{"foobar"},
+		},
+		{
+			Query: "substring('foobar', 4)",
+			Want:  []string{"bar"},
+		},
+		{
+			Query: "substring('', 4)",
+			Want:  []string{""},
+		},
+		{
+			Query: "substring('foobar', 1, 3)",
+			Want:  []string{"foo"},
+		},
+		{
+			Query: "substring('foobar', 4, 3)",
+			Want:  []string{"bar"},
+		},
+		{
+			Query: "substring-before('foobar', 'bar')",
+			Want:  []string{"foo"},
+		},
+		{
+			Query: "substring-after('foobar', 'foo')",
+			Want:  []string{"bar"},
+		},
+		{
+			Query: "string-join(('foo', 'bar'), '-')",
+			Want:  []string{"foo-bar"},
+		},
+		{
+			Query: "contains('foobar', 'bar')",
+			Want:  []string{"true"},
+		},
+		{
+			Query: "contains('foobar', 'test')",
+			Want:  []string{"false"},
+		},
+		{
+			Query: "replace('foobar', 'bar', '')",
+			Want:  []string{"foo"},
+		},
+		{
+			Query: "translate('foobar', 'fobar', 'FOBAR')",
+			Want:  []string{"FOOBAR"},
+		},
+		{
+			Query: "translate('foobar', 'fbr', 'FBR')",
+			Want:  []string{"FooBaR"},
+		},
+		{
+			Query: "translate('foobar', 'FBR', 'fbr')",
+			Want:  []string{"foobar"},
+		},
+		{
+			Query: "matches('foobar', '^f.+$')",
+			Want: []string{"true"},
+		},
+		{
+			Query: "matches('foobar', '^t.+t$')",
+			Want: []string{"false"},
+		},
+		{
+			Query: "tokenize('foo bar')",
+			Want: []string{"foo", "bar"},
+		},
+		{
+			Query: "tokenize('foo-bar', '-')",
+			Want: []string{"foo", "bar"},
+		},
 	}
 	runTests(t, docBase, tests)
 }
