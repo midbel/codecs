@@ -1487,11 +1487,7 @@ func (c cast) find(ctx Context) (Sequence, error) {
 		return nil, err
 	}
 	for i := range is {
-		item, err := atomicItem(is[i])
-		if err != nil {
-			return nil, ErrType
-		}
-		is[i], err = c.kind.Cast(item.Value())
+		is[i], err = c.kind.Cast(is[i].Value())
 		if err != nil {
 			return nil, err
 		}

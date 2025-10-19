@@ -598,6 +598,11 @@ func callFormatNumber(ctx Context, args []Expr) (Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
+	// picture, err := getStringFromExpr(args[1], ctx)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// res, err := formatNumber(val, picture)
 	return Singleton(val), nil
 }
 

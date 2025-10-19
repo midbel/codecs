@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func formatInteger(value int64, picture string) (string, error) {
@@ -30,7 +31,7 @@ func formatInteger(value int64, picture string) (string, error) {
 	for i := len(picture) - 1; i >= 0; i-- {
 		switch picture[i] {
 		case '0', '#':
-			if ptr >= len(chars) {
+			if ptr >= len(chars) && pictures[i] != '#' {
 				out.WriteByte('0')
 			} else {
 				out.WriteByte(chars[ptr])
@@ -64,5 +65,13 @@ func formatInteger(value int64, picture string) (string, error) {
 }
 
 func formatNumber(value float64, picture string) (string, error) {
+	return "", nil
+}
+
+func formatDate(value time.Time, picture string) (string, error) {
+	return "", nil
+}
+
+func formatDateTime(value time.Time, picture string) (string, error) {
 	return "", nil
 }
