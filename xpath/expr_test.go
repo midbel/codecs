@@ -407,7 +407,7 @@ func testNumberFunctions(t *testing.T) {
 			Want:  []string{"30"},
 		},
 		{
-			Query: "sum(/root/item)",
+			Query: "count(/root/item)",
 			Want:  []string{"2"},
 		},
 		{
