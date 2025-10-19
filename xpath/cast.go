@@ -24,18 +24,7 @@ func toString(value any) (string, error) {
 }
 
 func toInt(value any) (int64, error) {
-	switch v := value.(type) {
-	case int64:
-		return v, nil
-	case float64:
-		return int64(v), nil
-	case string:
-		return strconv.ParseInt(v, 0, 64)
-	case time.Time:
-		return v.Unix(), nil
-	default:
-		return 0, nil
-	}
+	return castToInt(value)
 }
 
 func toFloat(value any) (float64, error) {
@@ -79,6 +68,21 @@ func castToTime(val any) (time.Time, error) {
 		err = ErrCast
 	}
 	return w, err
+}
+
+func castToInt(val any) (int64, error) {
+	switch v := val.(type) {
+	case int64:
+		return v, nil
+	case float64:
+		return int64(v), nil
+	case string:
+		return strconv.ParseInt(v, 0, 64)
+	case time.Time:
+		return v.Unix(), nil
+	default:
+		return 0, nil
+	}
 }
 
 func castToFloat(val any) (float64, error) {

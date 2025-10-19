@@ -99,6 +99,7 @@ const (
 	opConcat
 	opBefore
 	opAfter
+	opQuestion
 	opAdd
 	opSub
 	opMul
@@ -169,6 +170,8 @@ func (t Token) String() string {
 		return "<begin-curly>"
 	case endCurl:
 		return "<end-curly>"
+	case opQuestion:
+		return "<question>"
 	case opAdd:
 		return "<add>"
 	case opSub:
@@ -280,6 +283,8 @@ func (s *Scanner) Scan() Token {
 
 func (s *Scanner) scanOperator(tok *Token) {
 	switch k := s.peek(); s.char {
+	case question:
+		tok.Type = opQuestion
 	case plus:
 		tok.Type = opAdd
 	case dash:
@@ -613,7 +618,7 @@ func isDelimiter(c rune) bool {
 }
 
 func isOperator(c rune) bool {
-	return c == plus || c == dash || c == star || c == percent ||
+	return c == question || c == plus || c == dash || c == star || c == percent ||
 		c == equal || c == bang || c == langle || c == rangle ||
 		c == lparen || c == rparen
 }

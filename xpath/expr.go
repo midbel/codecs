@@ -1392,6 +1392,8 @@ func (t Type) Cast(in any) (Item, error) {
 	switch t.QualifiedName() {
 	case "xs:date", "date":
 		val, err = castToTime(in)
+	case "xs:integer", "integer":
+		val, err = castToInt(in)
 	case "xs:decimal", "decimal":
 		val, err = castToFloat(in)
 	case "xs:boolean", "boolean":
@@ -1405,9 +1407,18 @@ func (t Type) Cast(in any) (Item, error) {
 	return createLiteral(val), nil
 }
 
+type OccurrenceType int8
+
+const (
+	ZeroOrOneOccurrence OccurrenceType = 1 << iota
+	ZeroOrMoreOccurrence
+	OneOrMoreOccurrence
+)
+
 type instanceof struct {
-	expr Expr
-	kind Type
+	expr       Expr
+	kind       Type
+	occurrence OccurrenceType
 }
 
 func (i instanceof) Find(node xml.Node) (Sequence, error) {
@@ -1419,7 +1430,29 @@ func (i instanceof) MatchPriority() int {
 }
 
 func (i instanceof) find(ctx Context) (Sequence, error) {
-	return nil, ErrImplemented
+	res, err := i.expr.find(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var success int
+	for _, r := range res {
+		_, err := i.kind.Cast(r.Value())
+		if err == nil {
+			success++
+		}
+	}
+	var ok bool
+	switch i.occurrence {
+	case ZeroOrOneOccurrence:
+		ok = success <= 1
+	case ZeroOrMoreOccurrence:
+		ok = true
+	case OneOrMoreOccurrence:
+		ok = success >= 1
+	default:
+		ok = success == 1
+	}
+	return Singleton(ok), nil
 }
 
 type cast struct {

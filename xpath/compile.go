@@ -530,6 +530,18 @@ func (c *Compiler) compileInstanceOf(left Expr) (Expr, error) {
 		expr: left,
 		kind: t,
 	}
+	switch {
+	case c.is(opQuestion):
+		expr.occurrence = ZeroOrOneOccurrence
+	case c.is(opAdd):
+		expr.occurrence = OneOrMoreOccurrence
+	case c.is(opMul):
+		expr.occurrence = ZeroOrMoreOccurrence
+	default:
+	}
+	if expr.occurrence != 0 {
+		c.next()
+	}
 	return expr, nil
 }
 

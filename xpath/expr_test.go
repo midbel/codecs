@@ -578,19 +578,19 @@ func testStringFunctions(t *testing.T) {
 		},
 		{
 			Query: "matches('foobar', '^f.+$')",
-			Want: []string{"true"},
+			Want:  []string{"true"},
 		},
 		{
 			Query: "matches('foobar', '^t.+t$')",
-			Want: []string{"false"},
+			Want:  []string{"false"},
 		},
 		{
 			Query: "tokenize('foo bar')",
-			Want: []string{"foo", "bar"},
+			Want:  []string{"foo", "bar"},
 		},
 		{
 			Query: "tokenize('foo-bar', '-')",
-			Want: []string{"foo", "bar"},
+			Want:  []string{"foo", "bar"},
 		},
 	}
 	runTests(t, docBase, tests)
