@@ -46,6 +46,13 @@ func Singleton(value any) Sequence {
 	return seq
 }
 
+func (s *Sequence) First() Item {
+	if s.Empty() {
+		return nil
+	}
+	return (*s)[0]
+}
+
 func (s *Sequence) Len() int {
 	return len(*s)
 }
@@ -68,10 +75,6 @@ func (s *Sequence) Empty() bool {
 
 func (s *Sequence) Singleton() bool {
 	return len(*s) == 1
-}
-
-func (s *Sequence) String() string {
-	return ""
 }
 
 func (s *Sequence) Atomize() ([]string, error) {

@@ -222,7 +222,11 @@ func (m *Mode) noMatch(node xml.Node) (Executer, error) {
 	case NoMatchFail:
 		return nil, fmt.Errorf("%s: no template match", node.QualifiedName())
 	default:
-		return nil, fmt.Errorf("%s: no template match", node.QualifiedName())
+		name := node.QualifiedName()
+		if e, ok := node.(interface{ ExpandedName() string }); ok {
+			name = e.ExpandedName()
+		}
+		return nil, fmt.Errorf("%s: no template match", name)
 	}
 	return exec, nil
 }

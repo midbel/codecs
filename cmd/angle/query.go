@@ -161,6 +161,9 @@ func (q *QueryCmd) configureElementNS(doc *xml.Document) error {
 	if err != nil {
 		return err
 	}
+	if ns.Empty() {
+		return nil
+	}
 	if !ns.Singleton() {
 		return fmt.Errorf("only one namespace with target \"element\" expected")
 	}
@@ -177,6 +180,9 @@ func (q *QueryCmd) configureTypeNS(doc *xml.Document) error {
 	if err != nil {
 		return err
 	}
+	if ns.Empty() {
+		return nil
+	}
 	if !ns.Singleton() {
 		return fmt.Errorf("only one namespace with target \"type\" expected")
 	}
@@ -192,6 +198,9 @@ func (q *QueryCmd) configureFuncNS(doc *xml.Document) error {
 	ns, err := xpath.Find(doc, queryFuncNS)
 	if err != nil {
 		return err
+	}
+	if ns.Empty() {
+		return nil
 	}
 	if !ns.Singleton() {
 		return fmt.Errorf("only one namespace with target \"function\" expected")

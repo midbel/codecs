@@ -258,6 +258,24 @@ func TestPathWithNS(t *testing.T) {
 	runTests(t, docSpace, tests)
 }
 
+func TestFilterPath(t *testing.T) {
+	tests := []TestCase{
+		{
+			Query: "/root/item[1]",
+			Want: []string{"foo"},
+		},
+		{
+			Query: "/root/item[last()]",
+			Want: []string{"bar"},
+		},
+		{
+			Query: "/root[starts-with(normalize-space(./item[1]), 'foo')]/item",
+			Want: []string{"foo", "bar"},
+		},
+	}
+	runTests(t, docBase, tests)
+}
+
 func TestPath(t *testing.T) {
 	tests := []TestCase{
 		{

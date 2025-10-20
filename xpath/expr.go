@@ -1062,21 +1062,20 @@ func (f filter) find(ctx Context) (Sequence, error) {
 		ctx.Node = n.Node()
 		ctx.Index = j + 1
 		res, err := f.check.find(ctx)
-		if err != nil {
+		if err != nil || res.Empty() {
 			continue
 		}
-		var ok bool
-		switch f.check.(type) {
-		case number, call:
-			if res.Singleton() {
-				x, err := toInt(res[0].Value())
-				if err != nil {
-					return nil, err
-				}
-				ok = ctx.Index == int(x)
-			}
+		var (
+			it = res.First()
+			ok bool
+		)
+		switch x := it.Value().(type) {
+		case float64:
+			ok = ctx.Index == int(x)
+		case int64:
+			ok = ctx.Index == int(x)
 		default:
-			ok = EffectiveBooleanValue(res)
+			ok = EffectiveBooleanValue(res) 
 		}
 		if ok {
 			ret.Append(n)
