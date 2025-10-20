@@ -1075,7 +1075,7 @@ func (f filter) find(ctx Context) (Sequence, error) {
 		case int64:
 			ok = ctx.Index == int(x)
 		default:
-			ok = EffectiveBooleanValue(res) 
+			ok = EffectiveBooleanValue(res)
 		}
 		if ok {
 			ret.Append(n)

@@ -262,15 +262,53 @@ func TestFilterPath(t *testing.T) {
 	tests := []TestCase{
 		{
 			Query: "/root/item[1]",
-			Want: []string{"foo"},
+			Want:  []string{"foo"},
 		},
 		{
 			Query: "/root/item[last()]",
-			Want: []string{"bar"},
+			Want:  []string{"bar"},
 		},
 		{
 			Query: "/root[starts-with(normalize-space(./item[1]), 'foo')]/item",
-			Want: []string{"foo", "bar"},
+			Want:  []string{"foo", "bar"},
+		},
+	}
+	runTests(t, docBase, tests)
+}
+
+func TestInstanceOf(t *testing.T) {
+	tests := []TestCase{
+		{
+			Query: "1 instance of xs:integer",
+			Want:  []string{"true"},
+		},
+		{
+			Query: "(1, 2) instance of xs:integer",
+			Want:  []string{"false"},
+		},
+		{
+			Query: "'test' instance of xs:integer",
+			Want:  []string{"false"},
+		},
+		{
+			Query: "'test' instance of xs:integer?",
+			Want:  []string{"true"},
+		},
+		{
+			Query: "'test' instance of xs:integer*",
+			Want:  []string{"true"},
+		},
+		{
+			Query: "(1, 'test') instance of xs:integer*",
+			Want:  []string{"true"},
+		},
+		{
+			Query: "'test' instance of xs:integer+",
+			Want:  []string{"false"},
+		},
+		{
+			Query: "(1, 'test') instance of xs:integer+",
+			Want:  []string{"true"},
 		},
 	}
 	runTests(t, docBase, tests)
