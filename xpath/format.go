@@ -31,8 +31,10 @@ func formatInteger(value int64, picture string) (string, error) {
 	for i := len(picture) - 1; i >= 0; i-- {
 		switch picture[i] {
 		case '0', '#':
-			if ptr >= len(chars) && picture[i] != '#' {
-				out.WriteByte('0')
+			if ptr >= len(chars) {
+				if picture[i] != '#' {
+					out.WriteByte('0')
+				}
 			} else {
 				out.WriteByte(chars[ptr])
 			}
