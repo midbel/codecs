@@ -652,11 +652,78 @@ func testStringFunctions(t *testing.T) {
 	runTests(t, docBase, tests)
 }
 
+func testSequenceFunctions(t *testing.T) {
+	tests := []TestCase{
+		{
+			Query: "reverse(/root//item)",
+			Want:  []string{"qux", "bar", "foo"},
+		},
+		{
+			Query: "empty(())",
+			Want:  []string{"true"},
+		},
+		{
+			Query: "empty(/root/test)",
+			Want:  []string{"true"},
+		},
+		{
+			Query: "empty(/root/item)",
+			Want:  []string{"false"},
+		},
+		{
+			Query: "exists(())",
+			Want:  []string{"false"},
+		},
+		{
+			Query: "exists(/root/test)",
+			Want:  []string{"false"},
+		},
+		{
+			Query: "exists(/root/item)",
+			Want:  []string{"true"},
+		},
+		{
+			Query: "head(/root/item)",
+			Want:  []string{"foo"},
+		},
+		{
+			Query: "head((1))",
+			Want:  []string{"1"},
+		},
+		{
+			Query: "tail(/root/item)",
+			Want:  []string{"bar"},
+		},
+		{
+			Query: "tail(1 to 5)",
+			Want:  []string{"2", "3", "4", "5"},
+		},
+		{
+			Query: "zero-or-one(())",
+			Want:  []string{},
+		},
+		{
+			Query: "zero-or-one(/root/group/item)",
+			Want:  []string{"qux"},
+		},
+		{
+			Query: "one-or-more(/root/item)",
+			Want:  []string{"foo", "bar"},
+		},
+		{
+			Query: "exactly-one(/root/group/item)",
+			Want:  []string{"qux"},
+		},
+	}
+	runTests(t, docBase, tests)
+}
+
 func TestFunctions(t *testing.T) {
 	t.Run("boolean", testBooleanFunctions)
 	t.Run("node", testNodeFunctions)
 	t.Run("number", testNumberFunctions)
 	t.Run("string", testStringFunctions)
+	t.Run("sequence", testSequenceFunctions)
 }
 
 func runArrayTests(t *testing.T, doc string, tests []TestCase) {
