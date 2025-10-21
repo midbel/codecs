@@ -29,6 +29,22 @@ func init() {
 	builtinEnv = defaultFuncset()
 }
 
+// type FunctionArg struct {
+// 	xml.QName
+// 	Required bool
+// }
+
+// type Function struct {
+// 	xml.QName
+// 	Args   []FunctionArg
+// 	Return xml.QName
+// 	Body   BuiltinFunc
+// }
+
+// func (f Function) Call(ctx Context, args []Expr) (Sequence, error) {
+// 	return nil, ErrImplemented
+// }
+
 type BuiltinFunc func(Context, []Expr) (Sequence, error)
 
 func (fn BuiltinFunc) Call(ctx Context, args []Expr) (Sequence, error) {
