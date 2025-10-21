@@ -186,6 +186,16 @@ var builtins = []registeredBuiltin{
 	registerFunc("format-integer", "fn", callFormatInteger),
 	// date functions
 	registerFunc("date", "xs", callDate),
+	registerFunc("dateTime", "fn", callDateTime),
+	registerFunc("year-from-dateTime", "fn", callYearFromDateTime),
+	registerFunc("year-from-date", "fn", callYearFromDate),
+	registerFunc("month-from-dateTime", "fn", callMonthFromDateTime),
+	registerFunc("month-from-date", "fn", callMonthFromDate),
+	registerFunc("day-from-dateTime", "fn", callDayFromDateTime),
+	registerFunc("day-from-date", "fn", callDayFromDate),
+	registerFunc("hours-from-dateTime", "fn", callHoursFromDateTime),
+	registerFunc("minutes-from-dateTime", "fn", callMinutesFromDateTime),
+	registerFunc("seconds-from-dateTime", "fn", callSecondsFromDateTime),
 	registerFunc("format-date", "fn", callFormatDate),
 	registerFunc("format-dateTime", "fn", callFormatDateTime),
 	registerFunc("current-date", "fn", callCurrentDate),
@@ -878,6 +888,46 @@ func callDate(ctx Context, args []Expr) (Sequence, error) {
 		return nil, ErrCast
 	}
 	return Singleton(v), nil
+}
+
+func callDateTime(ctx Context, args []Expr) (Sequence, error) {
+	return nil, ErrImplemented
+}
+
+func callYearFromDateTime(ctx Context, args []Expr) (Sequence, error) {
+	return nil, ErrImplemented
+}
+
+func callYearFromDate(ctx Context, args []Expr) (Sequence, error) {
+	return nil, ErrImplemented
+}
+
+func callMonthFromDateTime(ctx Context, args []Expr) (Sequence, error) {
+	return nil, ErrImplemented
+}
+
+func callMonthFromDate(ctx Context, args []Expr) (Sequence, error) {
+	return nil, ErrImplemented
+}
+
+func callDayFromDateTime(ctx Context, args []Expr) (Sequence, error) {
+	return nil, ErrImplemented
+}
+
+func callDayFromDate(ctx Context, args []Expr) (Sequence, error) {
+	return nil, ErrImplemented
+}
+
+func callHoursFromDateTime(ctx Context, args []Expr) (Sequence, error) {
+	return nil, ErrImplemented
+}
+
+func callMinutesFromDateTime(ctx Context, args []Expr) (Sequence, error) {
+	return nil, ErrImplemented
+}
+
+func callSecondsFromDateTime(ctx Context, args []Expr) (Sequence, error) {
+	return nil, ErrImplemented
 }
 
 func callFormatDate(ctx Context, args []Expr) (Sequence, error) {

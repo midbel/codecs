@@ -516,35 +516,35 @@ func testNumberFunctions(t *testing.T) {
 		},
 		{
 			Query: "format-integer(42, '00')",
-			Want: []string{"42"},
+			Want:  []string{"42"},
 		},
 		{
 			Query: "format-integer(42, '##')",
-			Want: []string{"42"},
+			Want:  []string{"42"},
 		},
 		{
 			Query: "format-integer(42, '00000')",
-			Want: []string{"00042"},
+			Want:  []string{"00042"},
 		},
 		{
 			Query: "format-integer(42, '#####')",
-			Want: []string{"42"},
+			Want:  []string{"42"},
 		},
 		{
 			Query: "format-integer(1234, '#,###')",
-			Want: []string{"1,234"},
+			Want:  []string{"1,234"},
 		},
 		{
 			Query: "format-integer(1234, '0.000')",
-			Want: []string{"1.234"},
+			Want:  []string{"1.234"},
 		},
 		{
 			Query: "format-integer(1479632, '0000')",
-			Want: []string{"1479632"},
+			Want:  []string{"1479632"},
 		},
 		{
 			Query: "format-integer(1479632, '0.000')",
-			Want: []string{"1.479.632"},
+			Want:  []string{"1.479.632"},
 		},
 	}
 	runTests(t, docNumbers, tests)
