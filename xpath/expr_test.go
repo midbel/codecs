@@ -684,6 +684,31 @@ func testStringFunctions(t *testing.T) {
 	runTests(t, docBase, tests)
 }
 
+func testAngleStringFunctions(t *testing.T) {
+	if fs, ok := builtinEnv.(*funcset); ok {
+		fs.EnableAngle()
+	}
+	tests := []TestCase{
+		{
+			Query: "aglstr:string-reverse('foo')",
+			Want:  []string{"oof"},
+		},
+		{
+			Query: "aglstr:string-reverse(/root/item[2])",
+			Want: []string{"rab"},
+		},
+		{
+			Query: "aglstr:string-indexof('foo', 'bar')",
+			Want: []string{"0"},
+		},
+		{
+			Query: "aglstr:string-indexof('foo', 'foo')",
+			Want: []string{"1"},
+		},
+	}
+	runTests(t, docBase, tests)
+}
+
 func testSequenceFunctions(t *testing.T) {
 	tests := []TestCase{
 		{
@@ -756,6 +781,7 @@ func TestFunctions(t *testing.T) {
 	t.Run("number", testNumberFunctions)
 	t.Run("string", testStringFunctions)
 	t.Run("sequence", testSequenceFunctions)
+	t.Run("angle-string", testAngleStringFunctions)
 }
 
 func runArrayTests(t *testing.T, doc string, tests []TestCase) {

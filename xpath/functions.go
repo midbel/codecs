@@ -72,7 +72,12 @@ type registeredBuiltin struct {
 
 func registerFunc(name, space string, fn BuiltinFunc) registeredBuiltin {
 	qn := xml.QualifiedName(name, space)
-	qn.Uri = defaultNS[space]
+	if uri, ok := defaultNS[space]; ok {
+		qn.Uri = uri
+	} else {
+		qn.Uri = angleNS[space]
+	}
+
 	return registeredBuiltin{
 		QName: qn,
 		Func:  fn,
@@ -125,6 +130,7 @@ func (f *funcset) EnableCrypto() {
 
 func (f *funcset) EnableAngle() {
 	f.enableFuncSet(angleFuncs)
+	f.enableFuncSet(angleStringFuncs)
 }
 
 func (f *funcset) enableFuncSet(set []registeredBuiltin) {
@@ -266,8 +272,8 @@ var angleFuncs = []registeredBuiltin{
 }
 
 var angleStringFuncs = []registeredBuiltin{
-	registerFunc("string-indexof", "aglstr", callXYZ),
-	registerFunc("string-reverse", "aglstr", callXYZ),
+	registerFunc("string-indexof", "aglstr", callStringIndexOf),
+	registerFunc("string-reverse", "aglstr", callStringReverse),
 }
 
 var envFuncs = []registeredBuiltin{
@@ -957,6 +963,37 @@ func callFormatDate(ctx Context, args []Expr) (Sequence, error) {
 
 func callFormatDateTime(ctx Context, args []Expr) (Sequence, error) {
 	return nil, nil
+}
+
+func callStringReverse(ctx Context, args []Expr) (Sequence, error) {
+	if len(args) == 0 {
+		args = append(args, NewValueFromNode(ctx.Node))
+		return callStringReverse(ctx, args)
+	}
+	str, err := getStringFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	chars := []rune(str)
+	slices.Reverse(chars)
+	return Singleton(string(chars)), nil
+}
+
+func callStringIndexOf(ctx Context, args []Expr) (Sequence, error) {
+	if len(args) < 2 {
+		args = append([]Expr{NewValueFromNode(ctx.Node)}, args...)
+		return callStringIndexOf(ctx, args)
+	}
+	str, err := getStringFromExpr(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	needle, err := getStringFromExpr(args[1], ctx)
+	if err != nil {
+		return nil, err
+	}
+	ix := strings.Index(str, needle) + 1
+	return Singleton(float64(ix)), nil
 }
 
 func callString(ctx Context, args []Expr) (Sequence, error) {

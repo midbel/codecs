@@ -62,6 +62,11 @@ const (
 	schemaNS   = "http://www.w3.org/2001/XMLSchema"
 )
 
+var angleNS = map[string]string{
+	"agl":    "http://midbel.org/angle",
+	"aglstr": "http://midbel.org/angle-string",
+}
+
 var defaultNS = map[string]string{
 	"xs":    schemaNS,
 	"fn":    functionNS,
@@ -164,6 +169,9 @@ func createCompiler(r io.Reader) *Compiler {
 	}
 
 	for prefix, ns := range defaultNS {
+		cp.DefineNS(prefix, ns)
+	}
+	for prefix, ns := range angleNS {
 		cp.DefineNS(prefix, ns)
 	}
 
