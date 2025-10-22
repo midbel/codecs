@@ -530,13 +530,35 @@ func (c *Compiler) compileInstanceOf(left Expr) (Expr, error) {
 	defer c.Leave("instanceof")
 	c.next()
 
-	t, err := c.compileType()
-	if err != nil {
-		return nil, err
-	}
 	expr := instanceof{
 		expr: left,
-		kind: t,
+	}
+	if c.is(begGrp) {
+		c.next()
+		for !c.done() && !c.is(endGrp) {
+			t, err := c.compileType()
+			if err != nil {
+				return nil, err
+			}
+			expr.types = append(expr.types, t)
+			switch {
+			case c.is(opUnion):
+				c.next()
+			case c.is(endGrp):
+			default:
+				return nil, c.syntaxError("instance of", "expected '|' or ')'")
+			}
+		}
+		if !c.is(endGrp) {
+			return nil, c.syntaxError("instance of", "expected ')'")
+		}
+		c.next()
+	} else {
+		t, err := c.compileType()
+		if err != nil {
+			return nil, err
+		}
+		expr.types = append(expr.types, t)
 	}
 	switch {
 	case c.is(opQuestion):

@@ -1416,7 +1416,7 @@ const (
 
 type instanceof struct {
 	expr       Expr
-	kind       Type
+	types      []Type
 	occurrence OccurrenceType
 }
 
@@ -1434,10 +1434,17 @@ func (i instanceof) find(ctx Context) (Sequence, error) {
 		return nil, err
 	}
 	var success int
-	for _, r := range res {
-		_, err := i.kind.Cast(r.Value())
-		if err == nil {
-			success++
+	for _, t := range i.types {
+		var ok bool
+		for _, r := range res {
+			_, err := t.Cast(r.Value())
+			if err == nil {
+				success++
+				ok = true
+			}
+		}
+		if ok {
+			break
 		}
 	}
 	var ok bool
