@@ -121,6 +121,7 @@ type Env struct {
 
 	xpathNamespace string
 	namespaces     environ.Environ[string]
+	aliases        environ.Environ[string]
 	other          *Env
 }
 
@@ -136,6 +137,7 @@ func Enclosed(other *Env) *Env {
 		Builtins:   xpath.DefaultBuiltin(),
 		Funcs:      environ.Empty[*Function](),
 		namespaces: environ.Empty[string](),
+		aliases:    environ.Empty[string](),
 	}
 }
 
@@ -164,6 +166,7 @@ func (e *Env) Sub() *Env {
 		Builtins:       e.Builtins,
 		Depth:          e.Depth + 1,
 		namespaces:     environ.Enclosed[string](e.namespaces),
+		aliases:        e.aliases,
 		xpathNamespace: e.xpathNamespace,
 	}
 }
@@ -177,6 +180,7 @@ func (e *Env) Unwrap() *Env {
 		Funcs:          e.Funcs,
 		Depth:          e.Depth,
 		namespaces:     e.namespaces,
+		aliases:        e.aliases,
 		xpathNamespace: e.xpathNamespace,
 	}
 	if u, ok := x.Vars.(interface {

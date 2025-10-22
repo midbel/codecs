@@ -616,6 +616,8 @@ func (s *Stylesheet) staticContext(node xml.Node) *Context {
 }
 
 func (s *Stylesheet) createContext(node xml.Node) *Context {
+	s.Env.aliases = environ.ReadOnly(s.Env.aliases)
+
 	ctx := &Context{
 		ContextNode: node,
 		Mode:        s.Mode,
@@ -796,6 +798,19 @@ func (s *Stylesheet) loadNamespacesFromRoot(root *xml.Element) error {
 }
 
 func (s *Stylesheet) loadNamespaceAlias(node xml.Node) error {
+	el, err := getElementFromNode(node)
+	if err != nil {
+		return err
+	}
+	source, err := getAttribute(el, "stylesheet-prefix")
+	if err != nil {
+		return err
+	}
+	target, err := getAttribute(el, "result-prefix")
+	if err != nil {
+		return err
+	}
+	s.aliases.Define(source, target)
 	return nil
 }
 
