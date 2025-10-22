@@ -780,10 +780,6 @@ func (s *Stylesheet) importSheet(node xml.Node) error {
 
 func (s *Stylesheet) loadNamespacesFromRoot(root *xml.Element) error {
 	for _, qn := range root.Namespaces() {
-		if qn.Uri == xsltNamespaceUri {
-			s.xsltNamespace = qn.Prefix
-			continue
-		}
 		s.Env.registerNS(qn.Prefix, qn.Uri)
 	}
 	if s.xsltNamespace == xsltNamespacePrefix {
@@ -810,6 +806,7 @@ func (s *Stylesheet) loadNamespaceAlias(node xml.Node) error {
 	if err != nil {
 		return err
 	}
+	fmt.Println("define aliases", source, target)
 	s.aliases.Define(source, target)
 	return nil
 }

@@ -166,7 +166,6 @@ func (e *Env) Sub() *Env {
 		Builtins:       e.Builtins,
 		Depth:          e.Depth + 1,
 		namespaces:     environ.Enclosed[string](e.namespaces),
-		aliases:        e.aliases,
 		xpathNamespace: e.xpathNamespace,
 	}
 }
@@ -180,7 +179,6 @@ func (e *Env) Unwrap() *Env {
 		Funcs:          e.Funcs,
 		Depth:          e.Depth,
 		namespaces:     e.namespaces,
-		aliases:        e.aliases,
 		xpathNamespace: e.xpathNamespace,
 	}
 	if u, ok := x.Vars.(interface {
@@ -266,6 +264,22 @@ func (e *Env) Resolve(ident string) (xpath.Expr, error) {
 		return e.other.Resolve(ident)
 	}
 	return nil, err
+}
+
+func (e *Env) ResolveAliasNS(ident string) (xml.NS, error) {
+	var (
+		ns  xml.NS
+		err error
+	)
+	ns.Prefix, err = e.other.aliases.Resolve(ident)
+	if err != nil {
+		return ns, err
+	}
+	ns.Uri, err = e.other.namespaces.Resolve(ns.Prefix)
+	if err != nil {
+		return ns, err
+	}
+	return ns, nil
 }
 
 func (e *Env) ResolveFunc(ident string) (xpath.Callable, error) {
