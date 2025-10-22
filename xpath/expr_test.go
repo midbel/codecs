@@ -310,6 +310,14 @@ func TestInstanceOf(t *testing.T) {
 			Query: "(1, 'test') instance of xs:integer+",
 			Want:  []string{"true"},
 		},
+		{
+			Query: "(1, 2) instance of (xs:integer | xs:string)*",
+			Want:  []string{"true"},
+		},
+		{
+			Query: "(1, 2) instance of (xs:boolean | xs:string)*",
+			Want:  []string{"false"},
+		},
 	}
 	runTests(t, docBase, tests)
 }
@@ -695,15 +703,15 @@ func testAngleStringFunctions(t *testing.T) {
 		},
 		{
 			Query: "aglstr:string-reverse(/root/item[2])",
-			Want: []string{"rab"},
+			Want:  []string{"rab"},
 		},
 		{
 			Query: "aglstr:string-indexof('foo', 'bar')",
-			Want: []string{"0"},
+			Want:  []string{"0"},
 		},
 		{
 			Query: "aglstr:string-indexof('foo', 'foo')",
-			Want: []string{"1"},
+			Want:  []string{"1"},
 		},
 	}
 	runTests(t, docBase, tests)
