@@ -806,7 +806,6 @@ func (s *Stylesheet) loadNamespaceAlias(node xml.Node) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("define aliases", source, target)
 	s.aliases.Define(source, target)
 	return nil
 }

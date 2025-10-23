@@ -267,15 +267,18 @@ func (e *Env) Resolve(ident string) (xpath.Expr, error) {
 }
 
 func (e *Env) ResolveAliasNS(ident string) (xml.NS, error) {
+	if e.other != nil {
+		return e.other.ResolveAliasNS(ident)
+	}
 	var (
 		ns  xml.NS
 		err error
 	)
-	ns.Prefix, err = e.other.aliases.Resolve(ident)
+	ns.Prefix, err = e.aliases.Resolve(ident)
 	if err != nil {
 		return ns, err
 	}
-	ns.Uri, err = e.other.namespaces.Resolve(ns.Prefix)
+	ns.Uri, err = e.namespaces.Resolve(ns.Prefix)
 	if err != nil {
 		return ns, err
 	}
