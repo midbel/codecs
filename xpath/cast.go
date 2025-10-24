@@ -43,86 +43,235 @@ var (
 	}
 )
 
+func instanceOf(expr Expr, typ XdmType) bool {
+	if t, ok := expr.(TypedExpr); ok {
+		y := t.Type()
+		for y != nil {
+			if y == typ {
+				return true
+			}
+			d, ok := y.(interface{ Derived() XdmType })
+			if !ok {
+				break
+			}
+			y = d.Derived()
+		}
+		return false
+	}
+	return false
+}
+
 type untypedType struct {
 	parent XdmType
 }
 
-func (*untypedType) Name() xml.QName        { return xml.QualifiedName("untyped", schemaNS) }
-func (*untypedType) InstanceOf(e Expr) bool { return true }
-func (*untypedType) Cast(e Expr) Expr       { return e }
-func (*untypedType) Castable(e Expr) bool   { return true }
+func (*untypedType) Name() xml.QName {
+	return xml.QualifiedName("untyped", schemaNS)
+}
+
+func (*untypedType) InstanceOf(e Expr) bool {
+	return true
+}
+
+func (*untypedType) Cast(e Expr) Expr {
+	return e
+}
+
+func (*untypedType) Castable(e Expr) bool {
+	return true
+}
 
 type anyType struct {
 	parent XdmType
 }
 
-func (*anyType) Name() xml.QName        { return xml.QualifiedName("any", schemaNS) }
-func (*anyType) InstanceOf(e Expr) bool { return true }
-func (*anyType) Cast(e Expr) Expr       { return e }
-func (*anyType) Castable(e Expr) bool   { return true }
+func (*anyType) Name() xml.QName {
+	return xml.QualifiedName("any", schemaNS)
+}
+
+func (t *anyType) Derived() XdmType {
+	return t.parent
+}
+
+func (t *anyType) InstanceOf(e Expr) bool {
+	return instanceOf(e, t)
+}
+
+func (*anyType) Cast(e Expr) Expr {
+	return e
+}
+
+func (*anyType) Castable(e Expr) bool {
+	return true
+}
 
 type anyAtomicType struct {
 	parent XdmType
 }
 
-func (*anyAtomicType) Name() xml.QName        { return xml.QualifiedName("anyAtomic", schemaNS) }
-func (*anyAtomicType) InstanceOf(e Expr) bool { return true }
-func (*anyAtomicType) Cast(e Expr) Expr       { return e }
-func (*anyAtomicType) Castable(e Expr) bool   { return true }
+func (*anyAtomicType) Name() xml.QName {
+	return xml.QualifiedName("anyAtomic", schemaNS)
+}
+
+func (t *anyAtomicType) Derived() XdmType {
+	return t.parent
+}
+
+func (t *anyAtomicType) InstanceOf(e Expr) bool {
+	return instanceOf(e, t)
+}
+
+func (*anyAtomicType) Cast(e Expr) Expr {
+	return e
+}
+
+func (*anyAtomicType) Castable(e Expr) bool {
+	return true
+}
 
 type stringType struct {
 	parent XdmType
 }
 
-func (*stringType) Name() xml.QName        { return xml.QualifiedName("string", schemaNS) }
-func (*stringType) InstanceOf(e Expr) bool { return false }
-func (*stringType) Cast(e Expr) Expr       { return e }
-func (*stringType) Castable(e Expr) bool   { return false }
+func (*stringType) Name() xml.QName {
+	return xml.QualifiedName("string", schemaNS)
+}
+
+func (t *stringType) Derived() XdmType {
+	return t.parent
+}
+
+func (t *stringType) InstanceOf(e Expr) bool {
+	return instanceOf(e, t)
+}
+
+func (*stringType) Cast(e Expr) Expr {
+	return e
+}
+
+func (*stringType) Castable(e Expr) bool {
+	return false
+}
 
 type decimalType struct {
 	parent XdmType
 }
 
-func (*decimalType) Name() xml.QName        { return xml.QualifiedName("decimal", schemaNS) }
-func (*decimalType) InstanceOf(e Expr) bool { return false }
-func (*decimalType) Cast(e Expr) Expr       { return e }
-func (*decimalType) Castable(e Expr) bool   { return false }
+func (*decimalType) Name() xml.QName {
+	return xml.QualifiedName("decimal", schemaNS)
+}
+
+func (t *decimalType) Derived() XdmType {
+	return t.parent
+}
+
+func (t *decimalType) InstanceOf(e Expr) bool {
+	return instanceOf(e, t)
+}
+
+func (*decimalType) Cast(e Expr) Expr {
+	return e
+}
+
+func (*decimalType) Castable(e Expr) bool {
+	return false
+}
 
 type integerType struct {
 	parent XdmType
 }
 
-func (*integerType) Name() xml.QName        { return xml.QualifiedName("integer", schemaNS) }
-func (*integerType) InstanceOf(e Expr) bool { return false }
-func (*integerType) Cast(e Expr) Expr       { return e }
-func (*integerType) Castable(e Expr) bool   { return false }
+func (*integerType) Name() xml.QName {
+	return xml.QualifiedName("integer", schemaNS)
+}
+
+func (t *integerType) Derived() XdmType {
+	return t.parent
+}
+
+func (t *integerType) InstanceOf(e Expr) bool {
+	return instanceOf(e, t)
+}
+
+func (*integerType) Cast(e Expr) Expr {
+	return e
+}
+
+func (*integerType) Castable(e Expr) bool {
+	return false
+}
 
 type booleanType struct {
 	parent XdmType
 }
 
-func (*booleanType) Name() xml.QName        { return xml.QualifiedName("boolean", schemaNS) }
-func (*booleanType) InstanceOf(e Expr) bool { return false }
-func (*booleanType) Cast(e Expr) Expr       { return e }
-func (*booleanType) Castable(e Expr) bool   { return false }
+func (*booleanType) Name() xml.QName {
+	return xml.QualifiedName("boolean", schemaNS)
+}
+
+func (t *booleanType) Derived() XdmType {
+	return t.parent
+}
+
+func (t *booleanType) InstanceOf(e Expr) bool {
+	return instanceOf(e, t)
+}
+
+func (*booleanType) Cast(e Expr) Expr {
+	return e
+}
+
+func (*booleanType) Castable(e Expr) bool {
+	return false
+}
 
 type datetimeType struct {
 	parent XdmType
 }
 
-func (*datetimeType) Name() xml.QName        { return xml.QualifiedName("dateTime", schemaNS) }
-func (*datetimeType) InstanceOf(e Expr) bool { return false }
-func (*datetimeType) Cast(e Expr) Expr       { return e }
-func (*datetimeType) Castable(e Expr) bool   { return false }
+func (*datetimeType) Name() xml.QName {
+	return xml.QualifiedName("dateTime", schemaNS)
+}
+
+func (t *datetimeType) Derived() XdmType {
+	return t.parent
+}
+
+func (t *datetimeType) InstanceOf(e Expr) bool {
+	return instanceOf(e, t)
+}
+
+func (*datetimeType) Cast(e Expr) Expr {
+	return e
+}
+
+func (*datetimeType) Castable(e Expr) bool {
+	return false
+}
 
 type dateType struct {
 	parent XdmType
 }
 
-func (*dateType) Name() xml.QName        { return xml.QualifiedName("date", schemaNS) }
-func (*dateType) InstanceOf(e Expr) bool { return false }
-func (*dateType) Cast(e Expr) Expr       { return e }
-func (*dateType) Castable(e Expr) bool   { return false }
+func (*dateType) Name() xml.QName {
+	return xml.QualifiedName("date", schemaNS)
+}
+
+func (t *dateType) Derived() XdmType {
+	return t.parent
+}
+
+func (t *dateType) InstanceOf(e Expr) bool {
+	return instanceOf(e, t)
+}
+
+func (*dateType) Cast(e Expr) Expr {
+	return e
+}
+
+func (*dateType) Castable(e Expr) bool {
+	return false
+}
 
 func toString(value any) (string, error) {
 	switch v := value.(type) {
