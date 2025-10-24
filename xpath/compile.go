@@ -612,6 +612,7 @@ func (c *Compiler) compileType() (Type, error) {
 	if !c.is(Name) {
 		return t, c.unexpectedError("type")
 	}
+	t.Uri = schemaNS
 	t.Name = c.getCurrentLiteral()
 	c.next()
 	if c.is(Namespace) {

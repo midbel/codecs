@@ -29,22 +29,6 @@ func init() {
 	builtinEnv = defaultFuncset()
 }
 
-// type FunctionArg struct {
-// 	xml.QName
-// 	Required bool
-// }
-
-// type Function struct {
-// 	xml.QName
-// 	Args   []FunctionArg
-// 	Return xml.QName
-// 	Body   BuiltinFunc
-// }
-
-// func (f Function) Call(ctx Context, args []Expr) (Sequence, error) {
-// 	return nil, ErrImplemented
-// }
-
 type BuiltinFunc func(Context, []Expr) (Sequence, error)
 
 func (fn BuiltinFunc) Call(ctx Context, args []Expr) (Sequence, error) {
@@ -193,7 +177,6 @@ var builtins = []registeredBuiltin{
 	registerFunc("boolean", "fn", callBoolean),
 	registerFunc("not", "fn", callNot),
 	// number + aggregate functions
-	registerFunc("decimal", "xs", callDecimal),
 	registerFunc("number", "fn", callNumber),
 	registerFunc("round", "fn", callRound),
 	registerFunc("floor", "fn", callFloor),
@@ -207,7 +190,6 @@ var builtins = []registeredBuiltin{
 	registerFunc("format-number", "fn", callFormatNumber),
 	registerFunc("format-integer", "fn", callFormatInteger),
 	// date functions
-	registerFunc("date", "xs", callDate),
 	registerFunc("dateTime", "fn", callDateTime),
 	registerFunc("year-from-dateTime", "fn", callYearFromDateTime),
 	registerFunc("year-from-date", "fn", callYearFromDate),
@@ -257,6 +239,13 @@ var builtins = []registeredBuiltin{
 	registerFunc("put", "map", callXYZ),
 	registerFunc("remove", "map", callXYZ),
 	registerFunc("size", "map", callXYZ),
+	// constructor functions
+	registerFunc("string", schemaNS, callXYZ),
+	registerFunc("decimal", schemaNS, callDecimal),
+	registerFunc("integer", schemaNS, callXYZ),
+	registerFunc("boolean", schemaNS, callXYZ),
+	registerFunc("dateTime", schemaNS, callXYZ),
+	registerFunc("date", schemaNS, callXYZ),
 }
 
 var fileFuncs = []registeredBuiltin{

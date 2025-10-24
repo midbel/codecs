@@ -97,6 +97,11 @@ type Expr interface {
 	MatchPriority() int
 }
 
+type TypedExpr interface {
+	Expr
+	Type() XdmType
+}
+
 type Callable interface {
 	Call(Context, []Expr) (Sequence, error)
 }
@@ -748,6 +753,10 @@ func (i literal) find(_ Context) (Sequence, error) {
 	return Singleton(i.expr), nil
 }
 
+func (i literal) Type() XdmType {
+	return xsString
+}
+
 type number struct {
 	expr float64
 }
@@ -762,6 +771,30 @@ func (n number) MatchPriority() int {
 
 func (n number) find(_ Context) (Sequence, error) {
 	return Singleton(n.expr), nil
+}
+
+func (n number) Type() XdmType {
+	return xsDecimal
+}
+
+type boolean struct {
+	expr bool
+}
+
+func (b boolean) Find(node xml.Node) (Sequence, error) {
+	return b.find(defaultContext(node))
+}
+
+func (b boolean) MatchPriority() int {
+	return prioLow
+}
+
+func (b boolean) find(_ Context) (Sequence, error) {
+	return Singleton(b.expr), nil
+}
+
+func (b boolean) Type() XdmType {
+	return xsBool
 }
 
 func isKind(str string) bool {
@@ -1338,6 +1371,10 @@ func (v value) find(ctx Context) (Sequence, error) {
 	return slices.Clone(v.seq), nil
 }
 
+func (v value) Type() XdmType {
+	return xsUntyped
+}
+
 type array struct {
 	all []Expr
 }
@@ -1389,13 +1426,13 @@ func (t Type) Cast(in any) (Item, error) {
 		err error
 	)
 	switch t.QualifiedName() {
-	case "xs:date", "date":
+	case "xs:date":
 		val, err = castToTime(in)
-	case "xs:integer", "integer":
+	case "xs:integer":
 		val, err = castToInt(in)
-	case "xs:decimal", "decimal":
+	case "xs:decimal":
 		val, err = castToFloat(in)
-	case "xs:boolean", "boolean":
+	case "xs:boolean":
 		val, err = castToBool(in)
 	default:
 		return nil, ErrCast
