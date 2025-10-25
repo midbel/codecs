@@ -240,12 +240,12 @@ var builtins = []registeredBuiltin{
 	registerFunc("remove", "map", callXYZ),
 	registerFunc("size", "map", callXYZ),
 	// constructor functions
-	registerFunc("string", schemaNS, callXYZ),
-	registerFunc("decimal", schemaNS, callDecimal),
-	registerFunc("integer", schemaNS, callXYZ),
-	registerFunc("boolean", schemaNS, callXYZ),
-	registerFunc("dateTime", schemaNS, callXYZ),
-	registerFunc("date", schemaNS, callXYZ),
+	registerFunc("string", "xs", callConstructor(xsString)),
+	registerFunc("decimal", "xs", callConstructor(xsDecimal)),
+	registerFunc("integer", "xs", callConstructor(xsInteger)),
+	registerFunc("boolean", "xs", callConstructor(xsBool)),
+	registerFunc("dateTime", "xs", callConstructor(xsDateTime)),
+	registerFunc("date", "xs", callConstructor(xsDate)),
 }
 
 var fileFuncs = []registeredBuiltin{
@@ -736,17 +736,6 @@ func callReverse(ctx Context, args []Expr) (Sequence, error) {
 	}
 	slices.Reverse(items)
 	return items, nil
-}
-
-func callDecimal(ctx Context, args []Expr) (Sequence, error) {
-	if len(args) != 1 {
-		return nil, ErrArgument
-	}
-	val, err := getFloatFromExpr(args[0], ctx)
-	if err != nil {
-		return nil, err
-	}
-	return Singleton(val), nil
 }
 
 func callSum(ctx Context, args []Expr) (Sequence, error) {
@@ -1547,6 +1536,15 @@ func callDoc(ctx Context, args []Expr) (Sequence, error) {
 		return nil, err
 	}
 	return Singleton(n), nil
+}
+
+func callConstructor(xt XdmType) BuiltinFunc {
+	return func(ctx Context, args []Expr) (Sequence, error) {
+		if len(args) != 1 {
+			return nil, ErrArgument
+		}
+		return xt.Cast(args[0])
+	}
 }
 
 func getFloatFromExpr(expr Expr, ctx Context) (float64, error) {

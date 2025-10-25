@@ -1473,10 +1473,11 @@ func (i instanceof) find(ctx Context) (Sequence, error) {
 	}
 	var success int
 	for _, item := range seq {
-		var (
-			ok  bool
-			sub = NewValue(item)
-		)
+		sub, err := exprFromItem(item)
+		if err != nil {
+			return nil, err
+		}
+		var ok bool
 		for _, t := range i.types {
 			ok = t.InstanceOf(sub)
 			if ok {
@@ -1538,4 +1539,29 @@ func getPriority(base int, values ...Expr) int {
 		base += values[i].MatchPriority()
 	}
 	return base
+}
+
+func exprFromItem(it Item) (Expr, error) {
+	var e Expr
+	switch v := it.Value().(type) {
+	case int64:
+		e = number{
+			expr: float64(v),
+		}
+	case float64:
+		e = number{
+			expr: v,
+		}
+	case string:
+		e = literal{
+			expr: v,
+		}
+	case bool:
+		e = boolean{
+			expr: v,
+		}
+	default:
+		return nil, fmt.Errorf("item can not be converted to expr")
+	}
+	return e, nil
 }

@@ -2,7 +2,6 @@ package xpath
 
 import (
 	"errors"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -12,7 +11,7 @@ import (
 type XdmType interface {
 	Name() xml.QName
 	InstanceOf(Expr) bool
-	Cast(Expr) Expr
+	Cast(Expr) (Sequence, error)
 	Castable(Expr) bool
 
 	setParent(XdmType)
@@ -72,8 +71,8 @@ func (*untypedType) InstanceOf(e Expr) bool {
 	return true
 }
 
-func (*untypedType) Cast(e Expr) Expr {
-	return e
+func (*untypedType) Cast(e Expr) (Sequence, error) {
+	return nil, ErrImplemented
 }
 
 func (*untypedType) Castable(e Expr) bool {
@@ -106,8 +105,8 @@ func (t *anyType) InstanceOf(e Expr) bool {
 	return instanceOf(e, t)
 }
 
-func (*anyType) Cast(e Expr) Expr {
-	return e
+func (*anyType) Cast(e Expr) (Sequence, error) {
+	return nil, ErrImplemented
 }
 
 func (*anyType) Castable(e Expr) bool {
@@ -144,8 +143,8 @@ func (t *anyAtomicType) InstanceOf(e Expr) bool {
 	return instanceOf(e, t)
 }
 
-func (*anyAtomicType) Cast(e Expr) Expr {
-	return e
+func (*anyAtomicType) Cast(e Expr) (Sequence, error) {
+	return nil, ErrImplemented
 }
 
 func (*anyAtomicType) Castable(e Expr) bool {
@@ -181,8 +180,8 @@ func (t *stringType) InstanceOf(e Expr) bool {
 	return instanceOf(e, t)
 }
 
-func (*stringType) Cast(e Expr) Expr {
-	return e
+func (*stringType) Cast(e Expr) (Sequence, error) {
+	return nil, ErrImplemented
 }
 
 func (*stringType) Castable(e Expr) bool {
@@ -214,8 +213,8 @@ func (t *decimalType) InstanceOf(e Expr) bool {
 	return instanceOf(e, t)
 }
 
-func (*decimalType) Cast(e Expr) Expr {
-	return e
+func (*decimalType) Cast(e Expr) (Sequence, error) {
+	return nil, ErrImplemented
 }
 
 func (*decimalType) Castable(e Expr) bool {
@@ -251,8 +250,8 @@ func (t *integerType) InstanceOf(e Expr) bool {
 	return instanceOf(e, t)
 }
 
-func (*integerType) Cast(e Expr) Expr {
-	return e
+func (*integerType) Cast(e Expr) (Sequence, error) {
+	return nil, ErrImplemented
 }
 
 func (*integerType) Castable(e Expr) bool {
@@ -283,8 +282,8 @@ func (t *booleanType) InstanceOf(e Expr) bool {
 	return instanceOf(e, t)
 }
 
-func (*booleanType) Cast(e Expr) Expr {
-	return e
+func (*booleanType) Cast(e Expr) (Sequence, error) {
+	return nil, ErrImplemented
 }
 
 func (*booleanType) Castable(e Expr) bool {
@@ -316,8 +315,8 @@ func (t *datetimeType) InstanceOf(e Expr) bool {
 	return instanceOf(e, t)
 }
 
-func (*datetimeType) Cast(e Expr) Expr {
-	return e
+func (*datetimeType) Cast(e Expr) (Sequence, error) {
+	return nil, ErrImplemented
 }
 
 func (*datetimeType) Castable(e Expr) bool {
@@ -357,8 +356,8 @@ func (t *dateType) InstanceOf(e Expr) bool {
 	return instanceOf(e, t)
 }
 
-func (*dateType) Cast(e Expr) Expr {
-	return e
+func (*dateType) Cast(e Expr) (Sequence, error) {
+	return nil, ErrImplemented
 }
 
 func (*dateType) Castable(e Expr) bool {
@@ -378,7 +377,6 @@ func instanceOf(expr Expr, typ XdmType) bool {
 	if !ok {
 		return false
 	}
-	fmt.Println(t.Type().Name(), typ.Name())
 	return isInstanceOf(t.Type(), typ)
 }
 
