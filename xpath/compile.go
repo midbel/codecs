@@ -607,25 +607,26 @@ func (c *Compiler) compileCastable(left Expr) (Expr, error) {
 	return expr, nil
 }
 
-func (c *Compiler) compileType() (Type, error) {
-	var t Type
+func (c *Compiler) compileType() (XdmType, error) {
 	if !c.is(Name) {
-		return t, c.unexpectedError("type")
+		return nil, c.unexpectedError("type")
 	}
-	t.Uri = schemaNS
-	t.Name = c.getCurrentLiteral()
+	var qn xml.QName
+	qn.Name = c.getCurrentLiteral()
 	c.next()
 	if c.is(Namespace) {
 		c.next()
-		if !c.is(Name) {
-			return t, c.unexpectedError("type")
-		}
-		t.Space = t.Name
-		t.Name = c.getCurrentLiteral()
+		qn.Space = qn.Name
+		qn.Name = c.getCurrentLiteral()
 		c.next()
 	}
-	t.Uri, _ = c.isDefined(t.QName)
-	return t, nil
+	qn.Uri, _ = c.isDefined(qn)
+	xt, ok := supportedTypes[qn]
+	if !ok {
+		xt = xsUntyped
+		fmt.Println("untype", qn)
+	}
+	return xt, nil
 }
 
 func (c *Compiler) compileFilter(left Expr) (Expr, error) {

@@ -2,6 +2,7 @@ package xpath
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -13,60 +14,58 @@ type XdmType interface {
 	InstanceOf(Expr) bool
 	Cast(Expr) Expr
 	Castable(Expr) bool
+
+	setParent(XdmType)
+	append(XdmType)
 }
 
 var (
-	xsUntyped = &untypedType{}
-	xsAnyType = &anyType{
-		parent: xsUntyped,
-	}
-	xsAny = &anyAtomicType{
-		parent: xsAnyType,
-	}
-	xsString = &stringType{
-		parent: xsAnyType,
-	}
-	xsBool = &booleanType{
-		parent: xsAnyType,
-	}
-	xsDecimal = &decimalType{
-		parent: xsAnyType,
-	}
-	xsInteger = &integerType{
-		parent: xsDecimal,
-	}
-	xsDateTime = &datetimeType{
-		parent: xsAnyType,
-	}
-	xsDate = &dateType{
-		parent: xsDateTime,
-	}
+	xsUntyped  = &untypedType{}
+	xsAny      = &anyType{}
+	xsAtomic   = &anyAtomicType{}
+	xsString   = &stringType{}
+	xsBool     = &booleanType{}
+	xsDecimal  = &decimalType{}
+	xsInteger  = &integerType{}
+	xsDateTime = &datetimeType{}
+	xsDate     = &dateType{}
 )
 
-func instanceOf(expr Expr, typ XdmType) bool {
-	if t, ok := expr.(TypedExpr); ok {
-		y := t.Type()
-		for y != nil {
-			if y == typ {
-				return true
-			}
-			d, ok := y.(interface{ Derived() XdmType })
-			if !ok {
-				break
-			}
-			y = d.Derived()
-		}
-		return false
+var supportedTypes = map[xml.QName]XdmType{
+	xsUntyped.Name():  xsUntyped,
+	xsAny.Name():      xsAny,
+	xsAtomic.Name():   xsAtomic,
+	xsString.Name():   xsString,
+	xsBool.Name():     xsBool,
+	xsDecimal.Name():  xsDecimal,
+	xsInteger.Name():  xsInteger,
+	xsDateTime.Name(): xsDateTime,
+	xsDate.Name():     xsDate,
+}
+
+func init() {
+	for k, t := range supportedTypes {
+		delete(supportedTypes, k)
+		k.Uri = schemaNS
+		supportedTypes[k] = t
 	}
-	return false
+
+	xsUntyped.append(xsAny)
+	xsAny.append(xsAtomic)
+	xsAtomic.append(xsBool)
+	xsAtomic.append(xsString)
+	xsAtomic.append(xsDecimal)
+	xsAtomic.append(xsDateTime)
+	xsDecimal.append(xsInteger)
+	xsDateTime.append(xsDate)
 }
 
 type untypedType struct {
-	parent XdmType
+	sub []XdmType
 }
 
 func (*untypedType) Name() xml.QName {
-	return xml.QualifiedName("untyped", schemaNS)
+	return xml.QualifiedName("untyped", "xs")
 }
 
 func (*untypedType) InstanceOf(e Expr) bool {
@@ -81,16 +80,26 @@ func (*untypedType) Castable(e Expr) bool {
 	return true
 }
 
+func (t *untypedType) subTypes() []XdmType {
+	return t.sub
+}
+
+func (t *untypedType) setParent(parent XdmType) {
+	// pass
+}
+
+func (t *untypedType) append(xt XdmType) {
+	xt.setParent(t)
+	t.sub = append(t.sub, xt)
+}
+
 type anyType struct {
 	parent XdmType
+	sub    []XdmType
 }
 
 func (*anyType) Name() xml.QName {
-	return xml.QualifiedName("any", schemaNS)
-}
-
-func (t *anyType) Derived() XdmType {
-	return t.parent
+	return xml.QualifiedName("any", "xs")
 }
 
 func (t *anyType) InstanceOf(e Expr) bool {
@@ -105,16 +114,30 @@ func (*anyType) Castable(e Expr) bool {
 	return true
 }
 
+func (t *anyType) derived() XdmType {
+	return t.parent
+}
+
+func (t *anyType) subTypes() []XdmType {
+	return t.sub
+}
+
+func (t *anyType) setParent(parent XdmType) {
+	t.parent = parent
+}
+
+func (t *anyType) append(xt XdmType) {
+	xt.setParent(t)
+	t.sub = append(t.sub, xt)
+}
+
 type anyAtomicType struct {
 	parent XdmType
+	sub    []XdmType
 }
 
 func (*anyAtomicType) Name() xml.QName {
-	return xml.QualifiedName("anyAtomic", schemaNS)
-}
-
-func (t *anyAtomicType) Derived() XdmType {
-	return t.parent
+	return xml.QualifiedName("anyAtomic", "xs")
 }
 
 func (t *anyAtomicType) InstanceOf(e Expr) bool {
@@ -129,16 +152,29 @@ func (*anyAtomicType) Castable(e Expr) bool {
 	return true
 }
 
+func (t *anyAtomicType) derived() XdmType {
+	return t.parent
+}
+
+func (t *anyAtomicType) subTypes() []XdmType {
+	return t.sub
+}
+
+func (t *anyAtomicType) setParent(parent XdmType) {
+	t.parent = parent
+}
+
+func (t *anyAtomicType) append(xt XdmType) {
+	xt.setParent(t)
+	t.sub = append(t.sub, xt)
+}
+
 type stringType struct {
 	parent XdmType
 }
 
 func (*stringType) Name() xml.QName {
-	return xml.QualifiedName("string", schemaNS)
-}
-
-func (t *stringType) Derived() XdmType {
-	return t.parent
+	return xml.QualifiedName("string", "xs")
 }
 
 func (t *stringType) InstanceOf(e Expr) bool {
@@ -153,16 +189,25 @@ func (*stringType) Castable(e Expr) bool {
 	return false
 }
 
+func (t *stringType) derived() XdmType {
+	return t.parent
+}
+
+func (t *stringType) setParent(parent XdmType) {
+	t.parent = parent
+}
+
+func (t *stringType) append(xt XdmType) {
+	// pass
+}
+
 type decimalType struct {
 	parent XdmType
+	sub    []XdmType
 }
 
 func (*decimalType) Name() xml.QName {
-	return xml.QualifiedName("decimal", schemaNS)
-}
-
-func (t *decimalType) Derived() XdmType {
-	return t.parent
+	return xml.QualifiedName("decimal", "xs")
 }
 
 func (t *decimalType) InstanceOf(e Expr) bool {
@@ -177,16 +222,29 @@ func (*decimalType) Castable(e Expr) bool {
 	return false
 }
 
+func (t *decimalType) subTypes() []XdmType {
+	return t.sub
+}
+
+func (t *decimalType) derived() XdmType {
+	return t.parent
+}
+
+func (t *decimalType) setParent(parent XdmType) {
+	t.parent = parent
+}
+
+func (t *decimalType) append(xt XdmType) {
+	xt.setParent(t)
+	t.sub = append(t.sub, xt)
+}
+
 type integerType struct {
 	parent XdmType
 }
 
 func (*integerType) Name() xml.QName {
-	return xml.QualifiedName("integer", schemaNS)
-}
-
-func (t *integerType) Derived() XdmType {
-	return t.parent
+	return xml.QualifiedName("integer", "xs")
 }
 
 func (t *integerType) InstanceOf(e Expr) bool {
@@ -201,16 +259,24 @@ func (*integerType) Castable(e Expr) bool {
 	return false
 }
 
+func (t *integerType) derived() XdmType {
+	return t.parent
+}
+
+func (t *integerType) setParent(parent XdmType) {
+	t.parent = parent
+}
+
+func (t *integerType) append(xt XdmType) {
+	// pass
+}
+
 type booleanType struct {
 	parent XdmType
 }
 
 func (*booleanType) Name() xml.QName {
-	return xml.QualifiedName("boolean", schemaNS)
-}
-
-func (t *booleanType) Derived() XdmType {
-	return t.parent
+	return xml.QualifiedName("boolean", "xs")
 }
 
 func (t *booleanType) InstanceOf(e Expr) bool {
@@ -225,16 +291,25 @@ func (*booleanType) Castable(e Expr) bool {
 	return false
 }
 
+func (t *booleanType) derived() XdmType {
+	return t.parent
+}
+
+func (t *booleanType) setParent(xt XdmType) {
+	t.parent = xt
+}
+
+func (t *booleanType) append(xt XdmType) {
+	// pass
+}
+
 type datetimeType struct {
 	parent XdmType
+	sub    []XdmType
 }
 
 func (*datetimeType) Name() xml.QName {
-	return xml.QualifiedName("dateTime", schemaNS)
-}
-
-func (t *datetimeType) Derived() XdmType {
-	return t.parent
+	return xml.QualifiedName("dateTime", "xs")
 }
 
 func (t *datetimeType) InstanceOf(e Expr) bool {
@@ -249,15 +324,32 @@ func (*datetimeType) Castable(e Expr) bool {
 	return false
 }
 
+func (t *datetimeType) derived() XdmType {
+	return t.parent
+}
+
+func (t *datetimeType) subTypes() []XdmType {
+	return t.sub
+}
+
+func (t *datetimeType) setParent(parent XdmType) {
+	t.parent = parent
+}
+
+func (t *datetimeType) append(xt XdmType) {
+	xt.setParent(t)
+	t.sub = append(t.sub, xt)
+}
+
 type dateType struct {
 	parent XdmType
 }
 
 func (*dateType) Name() xml.QName {
-	return xml.QualifiedName("date", schemaNS)
+	return xml.QualifiedName("date", "xs")
 }
 
-func (t *dateType) Derived() XdmType {
+func (t *dateType) derived() XdmType {
 	return t.parent
 }
 
@@ -270,6 +362,39 @@ func (*dateType) Cast(e Expr) Expr {
 }
 
 func (*dateType) Castable(e Expr) bool {
+	return false
+}
+
+func (t *dateType) setParent(parent XdmType) {
+	t.parent = parent
+}
+
+func (t *dateType) append(xt XdmType) {
+	// pass
+}
+
+func instanceOf(expr Expr, typ XdmType) bool {
+	t, ok := expr.(TypedExpr)
+	if !ok {
+		return false
+	}
+	fmt.Println(t.Type().Name(), typ.Name())
+	return isInstanceOf(t.Type(), typ)
+}
+
+func isInstanceOf(source, target XdmType) bool {
+	if source == target {
+		return true
+	}
+	s, ok := target.(interface{ subTypes() []XdmType })
+	if !ok {
+		return false
+	}
+	for _, x := range s.subTypes() {
+		if ok = isInstanceOf(source, x); ok {
+			return ok
+		}
+	}
 	return false
 }
 

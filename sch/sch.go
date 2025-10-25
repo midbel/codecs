@@ -63,8 +63,7 @@ func (f Function) Call(ctx xpath.Context, args []xpath.Expr) (xpath.Sequence, er
 	}()
 	ctx.Environ = environ.Enclosed[xpath.Expr](ctx.Environ)
 	for i := range f.args {
-		e := xpath.As(args[i], f.args[i].as)
-		ctx.Environ.Define(f.args[i].name, e)
+		ctx.Environ.Define(f.args[i].name, args[i])
 	}
 	is, err := xpath.Call(ctx, f.body)
 	if err != nil {

@@ -1372,6 +1372,7 @@ func (v value) find(ctx Context) (Sequence, error) {
 }
 
 func (v value) Type() XdmType {
+	fmt.Printf("%+v: %[1]T\n", v.seq[0])
 	return xsUntyped
 }
 
@@ -1453,7 +1454,7 @@ const (
 
 type instanceof struct {
 	expr       Expr
-	types      []Type
+	types      []XdmType
 	occurrence OccurrenceType
 }
 
@@ -1466,22 +1467,22 @@ func (i instanceof) MatchPriority() int {
 }
 
 func (i instanceof) find(ctx Context) (Sequence, error) {
-	res, err := i.expr.find(ctx)
+	seq, err := i.expr.find(ctx)
 	if err != nil {
 		return nil, err
 	}
 	var success int
-	for _, t := range i.types {
-		var ok bool
-		for _, r := range res {
-			_, err := t.Cast(r.Value())
-			if err == nil {
+	for _, item := range seq {
+		var (
+			ok  bool
+			sub = NewValue(item)
+		)
+		for _, t := range i.types {
+			ok = t.InstanceOf(sub)
+			if ok {
 				success++
-				ok = true
+				break
 			}
-		}
-		if ok {
-			break
 		}
 	}
 	var ok bool
@@ -1500,20 +1501,7 @@ func (i instanceof) find(ctx Context) (Sequence, error) {
 
 type cast struct {
 	expr Expr
-	kind Type
-}
-
-func As(expr Expr, name xml.QName) Expr {
-	if name.Zero() {
-		return expr
-	}
-	t := Type{
-		QName: name,
-	}
-	return cast{
-		expr: expr,
-		kind: t,
-	}
+	kind XdmType
 }
 
 func (c cast) Find(node xml.Node) (Sequence, error) {
@@ -1525,22 +1513,12 @@ func (c cast) MatchPriority() int {
 }
 
 func (c cast) find(ctx Context) (Sequence, error) {
-	is, err := c.expr.find(ctx)
-	if err != nil {
-		return nil, err
-	}
-	for i := range is {
-		is[i], err = c.kind.Cast(is[i].Value())
-		if err != nil {
-			return nil, err
-		}
-	}
-	return is, nil
+	return nil, ErrImplemented
 }
 
 type castable struct {
 	expr Expr
-	kind Type
+	kind XdmType
 }
 
 func (c castable) Find(node xml.Node) (Sequence, error) {
@@ -1552,17 +1530,7 @@ func (c castable) MatchPriority() int {
 }
 
 func (c castable) find(ctx Context) (Sequence, error) {
-	is, err := c.expr.find(ctx)
-	if err != nil {
-		return nil, err
-	}
-	for i := range is {
-		if !is[i].Atomic() {
-			return nil, ErrType
-		}
-		is[i] = c.kind.IsCastable(is[i].Value())
-	}
-	return is, nil
+	return nil, ErrImplemented
 }
 
 func getPriority(base int, values ...Expr) int {
