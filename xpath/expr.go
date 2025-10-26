@@ -1462,9 +1462,9 @@ func (i instanceof) find(ctx Context) (Sequence, error) {
 }
 
 type cast struct {
-	expr      Expr
-	kind      XdmType
-	occurence OccurrenceType
+	expr          Expr
+	kind          XdmType
+	allowEmptySeq bool
 }
 
 func (c cast) Find(node xml.Node) (Sequence, error) {
@@ -1481,7 +1481,7 @@ func (c cast) find(ctx Context) (Sequence, error) {
 		return nil, err
 	}
 	if seq.Empty() {
-		if c.occurence == ZeroOrOneOccurrence {
+		if c.allowEmptySeq {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("empty sequence can not be cast to target type")
@@ -1493,8 +1493,9 @@ func (c cast) find(ctx Context) (Sequence, error) {
 }
 
 type castable struct {
-	expr Expr
-	kind XdmType
+	expr          Expr
+	kind          XdmType
+	allowEmptySeq bool
 }
 
 func (c castable) Find(node xml.Node) (Sequence, error) {
@@ -1511,7 +1512,7 @@ func (c castable) find(ctx Context) (Sequence, error) {
 		return nil, err
 	}
 	if seq.Empty() {
-		if c.occurence == ZeroOrOneOccurrence {
+		if c.allowEmptySeq {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("empty sequence can not be cast to target type")

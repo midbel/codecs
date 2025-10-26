@@ -585,8 +585,12 @@ func (c *Compiler) compileCast(left Expr) (Expr, error) {
 		return nil, err
 	}
 	expr := cast{
-		expr: left,
-		kind: t,
+		expr:          left,
+		kind:          t,
+		allowEmptySeq: c.is(opQuestion),
+	}
+	if c.is(opQuestion) {
+		c.next()
 	}
 	return expr, nil
 }
@@ -601,8 +605,12 @@ func (c *Compiler) compileCastable(left Expr) (Expr, error) {
 		return nil, err
 	}
 	expr := castable{
-		expr: left,
-		kind: t,
+		expr:          left,
+		kind:          t,
+		allowEmptySeq: c.is(opQuestion),
+	}
+	if c.is(opQuestion) {
+		c.next()
 	}
 	return expr, nil
 }
