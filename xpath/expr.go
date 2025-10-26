@@ -1405,45 +1405,6 @@ func (a array) find(ctx Context) (Sequence, error) {
 	return Singleton(list), nil
 }
 
-type Type struct {
-	xml.QName
-}
-
-func (t Type) IsCastable(value any) Item {
-	str, ok := value.(string)
-	if !ok {
-		return createLiteral(ok)
-	}
-	_, err := t.Cast(str)
-	if err == nil {
-		return createLiteral(true)
-	}
-	return createLiteral(false)
-}
-
-func (t Type) Cast(in any) (Item, error) {
-	var (
-		val any
-		err error
-	)
-	switch t.QualifiedName() {
-	case "xs:date":
-		val, err = castToTime(in)
-	case "xs:integer":
-		val, err = castToInt(in)
-	case "xs:decimal":
-		val, err = castToFloat(in)
-	case "xs:boolean":
-		val, err = castToBool(in)
-	default:
-		return nil, ErrCast
-	}
-	if err != nil {
-		return nil, err
-	}
-	return createLiteral(val), nil
-}
-
 type OccurrenceType int8
 
 const (
@@ -1503,6 +1464,7 @@ func (i instanceof) find(ctx Context) (Sequence, error) {
 type cast struct {
 	expr Expr
 	kind XdmType
+	occurence OccurrenceType
 }
 
 func (c cast) Find(node xml.Node) (Sequence, error) {
@@ -1514,6 +1476,19 @@ func (c cast) MatchPriority() int {
 }
 
 func (c cast) find(ctx Context) (Sequence, error) {
+	seq, err := c.expr.find(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if seq.Empty() {
+		if c.occurence == ZeroOrOneOccurrence {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("empty sequence can not be cast to target type")
+	}
+	if !seq.Singleton() {
+		return nil, fmt.Errorf("expected only one value to be casted")
+	}
 	return nil, ErrImplemented
 }
 
