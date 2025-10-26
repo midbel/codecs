@@ -1506,7 +1506,21 @@ func (c castable) MatchPriority() int {
 }
 
 func (c castable) find(ctx Context) (Sequence, error) {
-	return nil, ErrImplemented
+	seq, err := c.expr.find(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if seq.Empty() {
+		if c.occurence == ZeroOrOneOccurrence {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("empty sequence can not be cast to target type")
+	}
+	if !seq.Singleton() {
+		return nil, fmt.Errorf("expected only one value to be casted")
+	}
+	ok := c.kind.Castable(seq.First().Value())
+	return Singleton(ok), nil
 }
 
 func getPriority(base int, values ...Expr) int {
