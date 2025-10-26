@@ -631,23 +631,6 @@ func (s sequence) find(ctx Context) (Sequence, error) {
 	return list, nil
 }
 
-type arrow struct {
-	left  Expr
-	right Expr
-}
-
-func (a arrow) Find(node xml.Node) (Sequence, error) {
-	return a.find(defaultContext(node))
-}
-
-func (a arrow) MatchPriority() int {
-	return getPriority(prioMed, a.left, a.right)
-}
-
-func (a arrow) find(ctx Context) (Sequence, error) {
-	return nil, nil
-}
-
 type binary struct {
 	left  Expr
 	right Expr

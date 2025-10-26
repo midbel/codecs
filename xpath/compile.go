@@ -752,16 +752,20 @@ func (c *Compiler) compileArrow(left Expr) (Expr, error) {
 		op  = c.curr.Type
 		pow = bindings[op]
 	)
-	c.next()
-	next, err := c.compileExpr(pow)
-	if err != nil {
-		return nil, err
+	for !c.done() && c.is(opArrow) {
+		c.next()
+		next, err := c.compileExpr(pow)
+		if err != nil {
+			return nil, err
+		}
+		c, ok := next.(call)
+		if !ok {
+			return nil, fmt.Errorf("call expected")
+		}
+		c.args = append([]Expr{left}, c.args...)
+		left = c
 	}
-	a := arrow{
-		left:  left,
-		right: next,
-	}
-	return a, nil
+	return left, nil
 }
 
 func (c *Compiler) compileBinary(left Expr) (Expr, error) {
@@ -1276,6 +1280,7 @@ const (
 	powMul
 	powPrefix
 	powStep // step
+	powArrow
 	powPred
 	powCall
 	powHighest
@@ -1309,6 +1314,7 @@ var bindings = map[rune]int{
 	opDiv:        powMul,
 	opMod:        powMul,
 	opRange:      powRange,
+	opArrow:      powArrow,
 	begGrp:       powCall,
 	begPred:      powPred,
 }
