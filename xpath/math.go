@@ -236,7 +236,7 @@ func isEqual(left, right Sequence) (bool, error) {
 			y, err := toString(right.Value())
 			return x == y, err
 		case bool:
-			return x == toBool(right.Value()), nil
+			return toBool(right.Value())
 		case time.Time:
 			y, err := toTime(right.Value())
 			return x.Equal(y), err

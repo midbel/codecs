@@ -8,6 +8,8 @@ import (
 	"github.com/midbel/codecs/xml"
 )
 
+var ErrCast = errors.New("value can not be cast to target type")
+
 type XdmType interface {
 	Name() xml.QName
 	InstanceOf(Expr) bool
@@ -57,6 +59,26 @@ func init() {
 	xsAtomic.append(xsDateTime)
 	xsDecimal.append(xsInteger)
 	xsDateTime.append(xsDate)
+}
+
+func toString(value any) (string, error) {
+	return xsString.To(value)
+}
+
+func toFloat(value any) (float64, error) {
+	return xsDecimal.To(value)
+}
+
+func toInt(value any) (int64, error) {
+	return xsInteger.To(value)
+}
+
+func toBool(value any) (bool, error) {
+	return xsBool.To(value)
+}
+
+func toTime(value any) (time.Time, error) {
+	return xsDateTime.To(value)
 }
 
 type untypedType struct {
@@ -143,13 +165,21 @@ func (t *anyAtomicType) InstanceOf(e Expr) bool {
 	return instanceOf(e, t)
 }
 
-func (*anyAtomicType) Cast(v any) (Sequence, error) {
+func (*anyAtomicType) To(v any) (any, error) {
 	switch v.(type) {
 	case int64, float64, bool, string, time.Time:
-		return Singleton(v), nil
+		return v, nil
 	default:
 		return nil, ErrCast
 	}
+}
+
+func (t *anyAtomicType) Cast(v any) (Sequence, error) {
+	v, err := t.To(v)
+	if err == nil {
+		return Singleton(v), nil
+	}
+	return nil, err
 }
 
 func (t *anyAtomicType) Castable(v any) bool {
@@ -186,7 +216,7 @@ func (t *stringType) InstanceOf(e Expr) bool {
 	return instanceOf(e, t)
 }
 
-func (*stringType) Cast(v any) (Sequence, error) {
+func (*stringType) To(v any) (string, error) {
 	var str string
 	switch v := v.(type) {
 	case int64:
@@ -200,9 +230,17 @@ func (*stringType) Cast(v any) (Sequence, error) {
 	case time.Time:
 		str = v.Format(time.RFC3339)
 	default:
-		return nil, ErrCast
+		return str, ErrCast
 	}
-	return Singleton(str), nil
+	return str, nil
+}
+
+func (t *stringType) Cast(v any) (Sequence, error) {
+	x, err := t.To(v)
+	if err == nil {
+		return Singleton(x), nil
+	}
+	return nil, err
 }
 
 func (t *stringType) Castable(v any) bool {
@@ -235,29 +273,37 @@ func (t *decimalType) InstanceOf(e Expr) bool {
 	return instanceOf(e, t)
 }
 
-func (*decimalType) Cast(v any) (Sequence, error) {
-	var dec float64
+func (*decimalType) To(v any) (float64, error) {
+	var res float64
 	switch v := v.(type) {
 	case int64:
-		dec = float64(v)
+		res = float64(v)
 	case float64:
-		dec = v
+		res = v
 	case bool:
 		if v {
-			dec += 1
+			res += 1
 		}
 	case string:
 		d, err := strconv.ParseFloat(v, 64)
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
-		dec = d
+		res = d
 	case time.Time:
-		dec = float64(v.Unix())
+		res = float64(v.Unix())
 	default:
-		return nil, ErrCast
+		return 0, ErrCast
 	}
-	return Singleton(dec), nil
+	return res, nil
+}
+
+func (t *decimalType) Cast(v any) (Sequence, error) {
+	x, err := t.To(v)
+	if err == nil {
+		return Singleton(x), nil
+	}
+	return nil, err
 }
 
 func (t *decimalType) Castable(v any) bool {
@@ -294,29 +340,37 @@ func (t *integerType) InstanceOf(e Expr) bool {
 	return instanceOf(e, t)
 }
 
-func (*integerType) Cast(v any) (Sequence, error) {
-	var dec int64
+func (*integerType) To(v any) (int64, error) {
+	var res int64
 	switch v := v.(type) {
 	case int64:
-		dec = v
+		res = v
 	case float64:
-		dec = int64(v)
+		res = int64(v)
 	case bool:
 		if v {
-			dec += 1
+			res++
 		}
 	case string:
 		d, err := strconv.ParseInt(v, 0, 64)
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
-		dec = d
+		res = d
 	case time.Time:
-		dec = v.Unix()
+		res = v.Unix()
 	default:
-		return nil, ErrCast
+		return 0, ErrCast
 	}
-	return Singleton(dec), nil
+	return res, nil
+}
+
+func (t *integerType) Cast(v any) (Sequence, error) {
+	x, err := t.To(v)
+	if err == nil {
+		return Singleton(x), nil
+	}
+	return nil, err
 }
 
 func (t *integerType) Castable(v any) bool {
@@ -348,7 +402,7 @@ func (t *booleanType) InstanceOf(e Expr) bool {
 	return instanceOf(e, t)
 }
 
-func (*booleanType) Cast(v any) (Sequence, error) {
+func (*booleanType) To(v any) (bool, error) {
 	var res bool
 	switch v := v.(type) {
 	case int64:
@@ -362,9 +416,17 @@ func (*booleanType) Cast(v any) (Sequence, error) {
 	case time.Time:
 		res = !v.IsZero()
 	default:
-		return nil, ErrCast
+		return false, ErrCast
 	}
-	return Singleton(res), nil
+	return res, nil
+}
+
+func (t *booleanType) Cast(v any) (Sequence, error) {
+	x, err := t.To(v)
+	if err == nil {
+		return Singleton(x), nil
+	}
+	return nil, err
 }
 
 func (t *booleanType) Castable(v any) bool {
@@ -397,12 +459,38 @@ func (t *datetimeType) InstanceOf(e Expr) bool {
 	return instanceOf(e, t)
 }
 
-func (*datetimeType) Cast(any) (Sequence, error) {
-	return nil, ErrImplemented
+func (*datetimeType) To(v any) (time.Time, error) {
+	var res time.Time
+	switch v := v.(type) {
+	case int64:
+		res = time.Unix(v, 0)
+	case float64:
+		res = time.Unix(int64(v), 0)
+	case string:
+		x, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			return res, err
+		}
+		res = x
+	case time.Time:
+		res = v
+	default:
+		return res, ErrCast
+	}
+	return res, nil
 }
 
-func (*datetimeType) Castable(any) bool {
-	return false
+func (t *datetimeType) Cast(v any) (Sequence, error) {
+	x, err := t.To(v)
+	if err == nil {
+		return Singleton(x), nil
+	}
+	return nil, err
+}
+
+func (t *datetimeType) Castable(v any) bool {
+	_, err := t.Cast(v)
+	return err == nil
 }
 
 func (t *datetimeType) derived() XdmType {
@@ -438,12 +526,20 @@ func (t *dateType) InstanceOf(e Expr) bool {
 	return instanceOf(e, t)
 }
 
-func (*dateType) Cast(any) (Sequence, error) {
-	return nil, ErrImplemented
+func (t *dateType) To(v any) (time.Time, error) {
+	if t, ok := t.parent.(interface{ To(any) (time.Time, error) }); ok {
+		return t.To(v)
+	}
+	var ret time.Time
+	return ret, ErrCast
 }
 
-func (*dateType) Castable(any) bool {
-	return false
+func (t *dateType) Cast(v any) (Sequence, error) {
+	return t.parent.Cast(v)
+}
+
+func (t *dateType) Castable(v any) bool {
+	return t.parent.Castable(v)
 }
 
 func (t *dateType) setParent(parent XdmType) {
@@ -476,116 +572,4 @@ func isInstanceOf(source, target XdmType) bool {
 		}
 	}
 	return false
-}
-
-func toString(value any) (string, error) {
-	switch v := value.(type) {
-	case string:
-		return v, nil
-	case []byte:
-		return string(v), nil
-	case float64:
-		return strconv.FormatFloat(v, 'f', -1, 64), nil
-	case bool:
-		return strconv.FormatBool(v), nil
-	case time.Time:
-		return v.Format("2006-01-02"), nil
-	default:
-		return "", ErrType
-	}
-}
-
-func toInt(value any) (int64, error) {
-	return castToInt(value)
-}
-
-func toFloat(value any) (float64, error) {
-	return castToFloat(value)
-}
-
-func toBool(v any) bool {
-	switch v := v.(type) {
-	case bool:
-		return v
-	case float64:
-		return v != 0
-	case string:
-		return len(v) > 0
-	case time.Time:
-		return !v.IsZero()
-	default:
-		return false
-	}
-}
-
-func toTime(value any) (time.Time, error) {
-	return castToTime(value)
-}
-
-var ErrCast = errors.New("value can not be cast to target type")
-
-func castToTime(val any) (time.Time, error) {
-	if t, ok := val.(time.Time); ok {
-		return t, nil
-	}
-	if f, ok := val.(float64); ok {
-		return time.UnixMilli(int64(f)), nil
-	}
-	str, ok := val.(string)
-	if !ok {
-		return time.Time{}, ErrCast
-	}
-	w, err := time.Parse("2006-01-02", str)
-	if err != nil {
-		err = ErrCast
-	}
-	return w, err
-}
-
-func castToInt(val any) (int64, error) {
-	switch v := val.(type) {
-	case int64:
-		return v, nil
-	case float64:
-		return int64(v), nil
-	case string:
-		return strconv.ParseInt(v, 0, 64)
-	case time.Time:
-		return v.Unix(), nil
-	default:
-		return 0, nil
-	}
-}
-
-func castToFloat(val any) (float64, error) {
-	if f, ok := val.(float64); ok {
-		return f, nil
-	}
-	if t, ok := val.(time.Time); ok {
-		return float64(t.Unix()), nil
-	}
-	str, ok := val.(string)
-	if !ok {
-		return 0, ErrCast
-	}
-	f, err := strconv.ParseFloat(str, 64)
-	if err != nil {
-		err = ErrCast
-	}
-	return f, err
-}
-
-func castToBool(val any) (bool, error) {
-	if b, ok := val.(bool); ok {
-		return b, nil
-	}
-	str, ok := val.(string)
-	if !ok {
-		return false, ErrCast
-	}
-	b, err := strconv.ParseBool(str)
-	if err != nil {
-		err = ErrCast
-	}
-	return b, err
 }
