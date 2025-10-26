@@ -11,8 +11,8 @@ import (
 type XdmType interface {
 	Name() xml.QName
 	InstanceOf(Expr) bool
-	Cast(Expr) (Sequence, error)
-	Castable(Expr) bool
+	Cast(any) (Sequence, error)
+	Castable(any) bool
 
 	setParent(XdmType)
 	append(XdmType)
@@ -71,11 +71,11 @@ func (*untypedType) InstanceOf(e Expr) bool {
 	return true
 }
 
-func (*untypedType) Cast(e Expr) (Sequence, error) {
+func (*untypedType) Cast(any) (Sequence, error) {
 	return nil, ErrImplemented
 }
 
-func (*untypedType) Castable(e Expr) bool {
+func (*untypedType) Castable(any) bool {
 	return true
 }
 
@@ -105,11 +105,11 @@ func (t *anyType) InstanceOf(e Expr) bool {
 	return instanceOf(e, t)
 }
 
-func (*anyType) Cast(e Expr) (Sequence, error) {
-	return nil, ErrImplemented
+func (*anyType) Cast(v any) (Sequence, error) {
+	return Singleton(v), nil
 }
 
-func (*anyType) Castable(e Expr) bool {
+func (*anyType) Castable(any) bool {
 	return true
 }
 
@@ -143,12 +143,18 @@ func (t *anyAtomicType) InstanceOf(e Expr) bool {
 	return instanceOf(e, t)
 }
 
-func (*anyAtomicType) Cast(e Expr) (Sequence, error) {
-	return nil, ErrImplemented
+func (*anyAtomicType) Cast(v any) (Sequence, error) {
+	switch v.(type) {
+	case int64, float64, bool, string, time.Time:
+		return Singleton(v), nil
+	default:
+		return nil, ErrCast
+	}
 }
 
-func (*anyAtomicType) Castable(e Expr) bool {
-	return true
+func (t *anyAtomicType) Castable(v any) bool {
+	_, err := t.Cast(v)
+	return err == nil
 }
 
 func (t *anyAtomicType) derived() XdmType {
@@ -180,12 +186,28 @@ func (t *stringType) InstanceOf(e Expr) bool {
 	return instanceOf(e, t)
 }
 
-func (*stringType) Cast(e Expr) (Sequence, error) {
-	return nil, ErrImplemented
+func (*stringType) Cast(v any) (Sequence, error) {
+	var str string
+	switch v := v.(type) {
+	case int64:
+		str = strconv.FormatInt(v, 64)
+	case float64:
+		str = strconv.FormatFloat(v, 'f', -1, 64)
+	case bool:
+		str = strconv.FormatBool(v)
+	case string:
+		str = v
+	case time.Time:
+		str = v.Format(time.RFC3339)
+	default:
+		return nil, ErrCast
+	}
+	return Singleton(str), nil
 }
 
-func (*stringType) Castable(e Expr) bool {
-	return false
+func (t *stringType) Castable(v any) bool {
+	_, err := t.Cast(v)
+	return err == nil
 }
 
 func (t *stringType) derived() XdmType {
@@ -213,12 +235,34 @@ func (t *decimalType) InstanceOf(e Expr) bool {
 	return instanceOf(e, t)
 }
 
-func (*decimalType) Cast(e Expr) (Sequence, error) {
-	return nil, ErrImplemented
+func (*decimalType) Cast(v any) (Sequence, error) {
+	var dec float64
+	switch v := v.(type) {
+	case int64:
+		dec = float64(v)
+	case float64:
+		dec = v
+	case bool:
+		if v {
+			dec += 1
+		}
+	case string:
+		d, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			return nil, err
+		}
+		dec = d
+	case time.Time:
+		dec = float64(v.Unix())
+	default:
+		return nil, ErrCast
+	}
+	return Singleton(dec), nil
 }
 
-func (*decimalType) Castable(e Expr) bool {
-	return false
+func (t *decimalType) Castable(v any) bool {
+	_, err := t.Cast(v)
+	return err == nil
 }
 
 func (t *decimalType) subTypes() []XdmType {
@@ -250,12 +294,34 @@ func (t *integerType) InstanceOf(e Expr) bool {
 	return instanceOf(e, t)
 }
 
-func (*integerType) Cast(e Expr) (Sequence, error) {
-	return nil, ErrImplemented
+func (*integerType) Cast(v any) (Sequence, error) {
+	var dec int64
+	switch v := v.(type) {
+	case int64:
+		dec = v
+	case float64:
+		dec = int64(v)
+	case bool:
+		if v {
+			dec += 1
+		}
+	case string:
+		d, err := strconv.ParseInt(v, 0, 64)
+		if err != nil {
+			return nil, err
+		}
+		dec = d
+	case time.Time:
+		dec = v.Unix()
+	default:
+		return nil, ErrCast
+	}
+	return Singleton(dec), nil
 }
 
-func (*integerType) Castable(e Expr) bool {
-	return false
+func (t *integerType) Castable(v any) bool {
+	_, err := t.Cast(v)
+	return err == nil
 }
 
 func (t *integerType) derived() XdmType {
@@ -282,12 +348,28 @@ func (t *booleanType) InstanceOf(e Expr) bool {
 	return instanceOf(e, t)
 }
 
-func (*booleanType) Cast(e Expr) (Sequence, error) {
-	return nil, ErrImplemented
+func (*booleanType) Cast(v any) (Sequence, error) {
+	var res bool
+	switch v := v.(type) {
+	case int64:
+		res = v != 0
+	case float64:
+		res = v != 0
+	case bool:
+		res = v
+	case string:
+		res = v != ""
+	case time.Time:
+		res = !v.IsZero()
+	default:
+		return nil, ErrCast
+	}
+	return Singleton(res), nil
 }
 
-func (*booleanType) Castable(e Expr) bool {
-	return false
+func (t *booleanType) Castable(v any) bool {
+	_, err := t.Cast(v)
+	return err == nil
 }
 
 func (t *booleanType) derived() XdmType {
@@ -315,11 +397,11 @@ func (t *datetimeType) InstanceOf(e Expr) bool {
 	return instanceOf(e, t)
 }
 
-func (*datetimeType) Cast(e Expr) (Sequence, error) {
+func (*datetimeType) Cast(any) (Sequence, error) {
 	return nil, ErrImplemented
 }
 
-func (*datetimeType) Castable(e Expr) bool {
+func (*datetimeType) Castable(any) bool {
 	return false
 }
 
@@ -356,11 +438,11 @@ func (t *dateType) InstanceOf(e Expr) bool {
 	return instanceOf(e, t)
 }
 
-func (*dateType) Cast(e Expr) (Sequence, error) {
+func (*dateType) Cast(any) (Sequence, error) {
 	return nil, ErrImplemented
 }
 
-func (*dateType) Castable(e Expr) bool {
+func (*dateType) Castable(any) bool {
 	return false
 }
 

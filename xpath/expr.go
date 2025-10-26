@@ -1489,7 +1489,7 @@ func (c cast) find(ctx Context) (Sequence, error) {
 	if !seq.Singleton() {
 		return nil, fmt.Errorf("expected only one value to be casted")
 	}
-	return nil, ErrImplemented
+	return c.kind.Cast(seq.First().Value())
 }
 
 type castable struct {
