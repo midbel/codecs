@@ -1462,8 +1462,8 @@ func (i instanceof) find(ctx Context) (Sequence, error) {
 }
 
 type cast struct {
-	expr Expr
-	kind XdmType
+	expr      Expr
+	kind      XdmType
 	occurence OccurrenceType
 }
 

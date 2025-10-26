@@ -624,7 +624,6 @@ func (c *Compiler) compileType() (XdmType, error) {
 	xt, ok := supportedTypes[qn]
 	if !ok {
 		xt = xsUntyped
-		fmt.Println("untype", qn)
 	}
 	return xt, nil
 }
