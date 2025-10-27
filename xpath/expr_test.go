@@ -258,24 +258,6 @@ func TestPathWithNS(t *testing.T) {
 	runTests(t, docSpace, tests)
 }
 
-func TestFilterPath(t *testing.T) {
-	tests := []TestCase{
-		{
-			Query: "/root/item[1]",
-			Want:  []string{"foo"},
-		},
-		{
-			Query: "/root/item[last()]",
-			Want:  []string{"bar"},
-		},
-		{
-			Query: "/root[starts-with(normalize-space(./item[1]), 'foo')]/item",
-			Want:  []string{"foo", "bar"},
-		},
-	}
-	runTests(t, docBase, tests)
-}
-
 func TestInstanceOf(t *testing.T) {
 	tests := []TestCase{
 		{
@@ -323,6 +305,56 @@ func TestInstanceOf(t *testing.T) {
 }
 
 func TestPath(t *testing.T) {
+	t.Run("basic", testPathBasic)
+	t.Run("combine", testPathCombine)
+	t.Run("filter", testPathFilter)
+	t.Run("axis", testPathAxis)
+	t.Run("type", testPathType)
+}
+
+func testPathAxis(t *testing.T) {
+	tests := []TestCase{
+		{
+			Query: "/root/child::item",
+			Want:  []string{"foo", "bar"},
+		},
+		{
+			Query: "/root/descendant::item",
+			Want:  []string{"foo", "bar", "qux"},
+		},
+		{
+			Query: "local-name(/root/group/item/parent::*)",
+			Want:  []string{"group"},
+		},
+		{
+			Query: "/root/item[@id='fst']/following-sibling::item",
+			Want:  []string{"bar"},
+		},
+		{
+			Query: "/root/item[@id='snd']/preceding-sibling::item",
+			Want:  []string{"foo"},
+		},
+		{
+			Query: "/root/item[@id='fst']/attribute::lang",
+			Want:  []string{"en"},
+		},
+		{
+			Query: "/root/item[@id='fst']/following::item",
+			Want:  []string{"bar", "qux"},
+		},
+		{
+			Query: "/root/group/item/preceding::item",
+			Want:  []string{"foo", "bar"},
+		},
+	}
+	runTests(t, docBase, tests)
+}
+
+func testPathType(t *testing.T) {
+	t.SkipNow()
+}
+
+func testPathBasic(t *testing.T) {
 	tests := []TestCase{
 		{
 			Query: "/root",
@@ -335,10 +367,6 @@ func TestPath(t *testing.T) {
 		{
 			Query: "/root/item",
 			Want:  []string{"foo", "bar"},
-		},
-		{
-			Query: "/root/item[1], /root/group/item",
-			Want:  []string{"foo", "qux"},
 		},
 		{
 			Query: "//item",
@@ -359,6 +387,28 @@ func TestPath(t *testing.T) {
 		{
 			Query: "/root/item/@id",
 			Want:  []string{"fst", "snd"},
+		},
+		{
+			Query: "//@id",
+			Want:  []string{"fst", "snd", "nest"},
+		},
+		{
+			Query: "//group//item",
+			Want:  []string{"qux"},
+		},
+		{
+			Query: "//group/*",
+			Want:  []string{"qux"},
+		},
+	}
+	runTests(t, docBase, tests)
+}
+
+func testPathCombine(t *testing.T) {
+	tests := []TestCase{
+		{
+			Query: "/root/item[1], /root/group/item",
+			Want:  []string{"foo", "qux"},
 		},
 		{
 			Query: "/root/item[1] | /root/item[2]",
@@ -392,6 +442,24 @@ func TestPath(t *testing.T) {
 			Query: "/root/item[@lang='en'] except /root/item",
 			Want:  []string{},
 		},
+	}
+	runTests(t, docBase, tests)
+}
+
+func testPathFilter(t *testing.T) {
+	tests := []TestCase{
+		{
+			Query: "/root/item[1]",
+			Want:  []string{"foo"},
+		},
+		{
+			Query: "/root/item[last()]",
+			Want:  []string{"bar"},
+		},
+		{
+			Query: "/root[starts-with(normalize-space(./item[1]), 'foo')]/item",
+			Want:  []string{"foo", "bar"},
+		},
 		{
 			Query: "/root/item[@id = \"fst\"]",
 			Want:  []string{"foo"},
@@ -415,18 +483,6 @@ func TestPath(t *testing.T) {
 		{
 			Query: "//item[. != \"bar\"]",
 			Want:  []string{"foo", "qux"},
-		},
-		{
-			Query: "//@id",
-			Want:  []string{"fst", "snd", "nest"},
-		},
-		{
-			Query: "//group//item",
-			Want:  []string{"qux"},
-		},
-		{
-			Query: "//group/*",
-			Want:  []string{"qux"},
 		},
 	}
 	runTests(t, docBase, tests)
@@ -841,11 +897,11 @@ func testArrows(t *testing.T) {
 	tests := []TestCase{
 		{
 			Query: "/root/item[1] => upper-case()",
-			Want: []string{"FOO"},
+			Want:  []string{"FOO"},
 		},
 		{
 			Query: "'foobar' => upper-case() => replace('BAR', /root/group/item[1])",
-			Want: []string{"FOOqux"},
+			Want:  []string{"FOOqux"},
 		},
 	}
 	runTests(t, docBase, tests)

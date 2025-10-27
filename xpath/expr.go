@@ -438,33 +438,87 @@ func (a axis) find(ctx Context) (Sequence, error) {
 			list.Concat(others)
 		}
 	case prevAxis:
+		return a.preceding(ctx)
 	case prevSiblingAxis:
-		nodes := getNodes(ctx.Parent())
-		ctx.Size = len(nodes)
-		for i := ctx.Node.Position() - 1; i >= 0; i-- {
-			ctx.Node = nodes[i]
-			ctx.Index = i
-			others, err := a.next.find(ctx)
-			if err == nil {
-				list.Concat(others)
-			}
-		}
+		return a.precedingSibling(ctx)
 	case nextAxis:
+		return a.following(ctx)
 	case nextSiblingAxis:
-		nodes := getNodes(ctx.Parent())
-		ctx.Size = len(nodes)
-		for i := ctx.Node.Position() + 1; i < len(nodes); i++ {
-			ctx.Node = nodes[i]
-			ctx.Index = i
-			others, err := a.next.find(ctx)
-			if err == nil {
-				list.Concat(others)
-			}
-		}
+		return a.followingSiblings(ctx)
 	case attributeAxis:
 		return a.attribute(ctx)
 	default:
 		return nil, ErrImplemented
+	}
+	return list, nil
+}
+
+func (a axis) preceding(ctx Context) (Sequence, error) {
+	return nil, nil
+}
+
+func (a axis) precedingSibling(ctx Context) (Sequence, error) {
+	var (
+		list  Sequence
+		nodes = getNodes(ctx.Parent())
+	)
+	ctx.Size = len(nodes)
+	for i := ctx.Node.Position() - 1; i >= 0; i-- {
+		ctx.Node = nodes[i]
+		ctx.Index = i
+		others, err := a.next.find(ctx)
+		if err == nil {
+			list.Concat(others)
+		}
+	}
+	return list, nil
+}
+
+func (a axis) following(ctx Context) (Sequence, error) {
+	var (
+		list   Sequence
+		parent = ctx.Parent()
+		nodes  = getNodes(parent)
+	)
+	ctx.Size = len(nodes)
+	for i := ctx.Node.Position() + 1; i < len(nodes); i++ {
+		ctx.Node = nodes[i]
+		ctx.Index = i
+		others, err := a.next.find(ctx)
+		if err == nil {
+			list.Concat(others)
+		}
+		if others, err = a.descendant(ctx); err == nil {
+			list.Concat(others)
+		}
+	}
+	top := parent.Parent()
+	if top == nil {
+		return list, nil
+	}
+	ctx.Node = parent
+	ctx.Size = 1
+	ctx.Index = 1
+	others, err := a.following(ctx)
+	if err == nil {
+		list.Concat(others)
+	}
+	return list, nil
+}
+
+func (a axis) followingSiblings(ctx Context) (Sequence, error) {
+	var (
+		list  Sequence
+		nodes = getNodes(ctx.Parent())
+	)
+	ctx.Size = len(nodes)
+	for i := ctx.Node.Position() + 1; i < len(nodes); i++ {
+		ctx.Node = nodes[i]
+		ctx.Index = i
+		others, err := a.next.find(ctx)
+		if err == nil {
+			list.Concat(others)
+		}
 	}
 	return list, nil
 }

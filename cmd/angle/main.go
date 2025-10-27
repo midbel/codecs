@@ -28,7 +28,7 @@ func main() {
 
 	cmd, ok := allCommands[flag.Arg(0)]
 	if !ok {
-		fmt.Fprintf(os.Stderr, "%s: unknown command", cmd)
+		fmt.Fprintf(os.Stderr, "%s: unknown command", flag.Arg(0))
 		fmt.Fprintln(os.Stderr)
 		os.Exit(2)
 	}
