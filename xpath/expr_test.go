@@ -834,6 +834,21 @@ func TestFunctions(t *testing.T) {
 	t.Run("string", testStringFunctions)
 	t.Run("sequence", testSequenceFunctions)
 	t.Run("angle-string", testAngleStringFunctions)
+	t.Run("arrows", testArrows)
+}
+
+func testArrows(t *testing.T) {
+	tests := []TestCase{
+		{
+			Query: "/root/item[1] => upper-case()",
+			Want: []string{"FOO"},
+		},
+		{
+			Query: "'foobar' => upper-case() => replace('BAR', /root/group/item[1])",
+			Want: []string{"FOOqux"},
+		},
+	}
+	runTests(t, docBase, tests)
 }
 
 func runArrayTests(t *testing.T, doc string, tests []TestCase) {
