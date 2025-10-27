@@ -975,7 +975,7 @@ func (u union) find(ctx Context) (Sequence, error) {
 		return nil, err
 	}
 	left.Concat(right)
-	return left, nil
+	return left.Unique(), nil
 }
 
 type subscript struct {

@@ -337,6 +337,10 @@ func TestPath(t *testing.T) {
 			Want:  []string{"foo", "bar"},
 		},
 		{
+			Query: "/root/item[1], /root/group/item",
+			Want:  []string{"foo", "qux"},
+		},
+		{
 			Query: "//item",
 			Want:  []string{"foo", "bar", "qux"},
 		},
@@ -359,6 +363,34 @@ func TestPath(t *testing.T) {
 		{
 			Query: "/root/item[1] | /root/item[2]",
 			Want:  []string{"foo", "bar"},
+		},
+		{
+			Query: "/root/item[1] | /root/item[1]",
+			Want:  []string{"foo"},
+		},
+		{
+			Query: "/root/item[1] union /root/item[1]",
+			Want:  []string{"foo"},
+		},
+		{
+			Query: "/root/item[@lang='en'] intersect /root/item[@id='fst']",
+			Want:  []string{"foo"},
+		},
+		{
+			Query: "/root/item[1] intersect /root/group/item",
+			Want:  []string{},
+		},
+		{
+			Query: "/root/item[@lang='en'] except /root/item[@id='fst']",
+			Want:  []string{"bar"},
+		},
+		{
+			Query: "/root/group/item except /root/item",
+			Want:  []string{"qux"},
+		},
+		{
+			Query: "/root/item[@lang='en'] except /root/item",
+			Want:  []string{},
 		},
 		{
 			Query: "/root/item[@id = \"fst\"]",
@@ -658,15 +690,15 @@ func testStringFunctions(t *testing.T) {
 		},
 		{
 			Query: "contains(/root/item[1], 'foo')",
-			Want: []string{"true"},
+			Want:  []string{"true"},
 		},
 		{
 			Query: "contains('foobar', /root/item[1])",
-			Want: []string{"true"},
+			Want:  []string{"true"},
 		},
 		{
 			Query: "contains(/root/item[1], 'bar')",
-			Want: []string{"false"},
+			Want:  []string{"false"},
 		},
 		{
 			Query: "replace('foobar', 'bar', '')",

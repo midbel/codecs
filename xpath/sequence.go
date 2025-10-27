@@ -77,6 +77,22 @@ func (s *Sequence) Singleton() bool {
 	return len(*s) == 1
 }
 
+func (s *Sequence) Unique() Sequence {
+	var (
+		seq  Sequence
+		seen = make(map[string]struct{})
+	)
+	for _, i := range *s {
+		id := i.Node().Identity()
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		seq.Append(i)
+	}
+	return seq
+}
+
 func (s *Sequence) Atomize() ([]string, error) {
 	var list []string
 	for _, i := range *s {
