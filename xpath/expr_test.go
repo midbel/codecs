@@ -657,6 +657,18 @@ func testStringFunctions(t *testing.T) {
 			Want:  []string{"false"},
 		},
 		{
+			Query: "contains(/root/item[1], 'foo')",
+			Want: []string{"true"},
+		},
+		{
+			Query: "contains('foobar', /root/item[1])",
+			Want: []string{"true"},
+		},
+		{
+			Query: "contains(/root/item[1], 'bar')",
+			Want: []string{"false"},
+		},
+		{
 			Query: "replace('foobar', 'bar', '')",
 			Want:  []string{"foo"},
 		},

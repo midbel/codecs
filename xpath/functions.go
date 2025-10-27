@@ -1568,10 +1568,11 @@ func getStringFromExpr(expr Expr, ctx Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if len(items) != 1 {
+	if items.Empty() {
 		return "", nil
 	}
-	switch v := items[0].(type) {
+
+	switch v := items.First().(type) {
 	case literalItem:
 		str, ok := v.Value().(string)
 		if !ok {
