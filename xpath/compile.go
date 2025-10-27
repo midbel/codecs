@@ -1106,9 +1106,6 @@ func (c *Compiler) compileStep(left Expr) (Expr, error) {
 	defer c.Leave("step")
 
 	c.next()
-	if c.is(begGrp) {
-		return c.compileStepmap(left)
-	}
 	next, err := c.compileExpr(powStep)
 	if err != nil {
 		return nil, err
@@ -1118,26 +1115,6 @@ func (c *Compiler) compileStep(left Expr) (Expr, error) {
 		next: next,
 	}
 	return expr, nil
-}
-
-func (c *Compiler) compileStepmap(left Expr) (Expr, error) {
-	c.next()
-	expr, err := c.compileExpr(powLowest)
-	if err != nil {
-		return nil, err
-	}
-	if !c.is(endGrp) {
-		return nil, c.syntaxError("step", "expected ')'")
-	}
-	c.next()
-	if !c.is(opSeq) && !c.is(endPred) && !c.done() {
-		return nil, c.syntaxError("step", "erroneous expression")
-	}
-	ctx := stepmap{
-		step: left,
-		expr: expr,
-	}
-	return ctx, nil
 }
 
 func (c *Compiler) compileDescendantStep(left Expr) (Expr, error) {

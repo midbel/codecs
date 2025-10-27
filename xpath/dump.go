@@ -59,13 +59,6 @@ func debugExpr(w io.Writer, expr Expr) {
 		io.WriteString(w, ", ")
 		debugExpr(w, v.next)
 		io.WriteString(w, ")")
-	case stepmap:
-		io.WriteString(w, "map")
-		io.WriteString(w, "(")
-		debugExpr(w, v.step)
-		io.WriteString(w, ", ")
-		debugExpr(w, v.expr)
-		io.WriteString(w, ")")
 	case union:
 		io.WriteString(w, "union")
 		io.WriteString(w, "(")

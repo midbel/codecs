@@ -271,42 +271,6 @@ func (_ current) find(ctx Context) (Sequence, error) {
 	return Singleton(ctx.Node), nil
 }
 
-type stepmap struct {
-	step Expr
-	expr Expr
-}
-
-func (s stepmap) Find(node xml.Node) (Sequence, error) {
-	return s.find(defaultContext(node))
-}
-
-func (s stepmap) MatchPriority() int {
-	return getPriority(prioMed, s.step, s.expr)
-}
-
-func (s stepmap) find(ctx Context) (Sequence, error) {
-	items, err := s.step.find(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if items.Empty() {
-		return items, nil
-	}
-	ctx.Size = items.Len()
-
-	var seq Sequence
-	for j, n := range items {
-		ctx.Node = n.Node()
-		ctx.Index = j + 1
-		others, err := s.expr.find(ctx)
-		if err != nil {
-			return nil, err
-		}
-		seq.Concat(others)
-	}
-	return seq, nil
-}
-
 type step struct {
 	curr Expr
 	next Expr
