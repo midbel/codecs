@@ -418,7 +418,40 @@ func (a axis) find(ctx Context) (Sequence, error) {
 }
 
 func (a axis) preceding(ctx Context) (Sequence, error) {
-	return nil, nil
+	parent := ctx.Parent()
+	if parent == nil {
+		return nil, nil
+	}
+	var (
+		list  Sequence
+		nodes = getNodes(parent)
+	)
+	ctx.Size = len(nodes)
+	for i := ctx.Node.Position() -1; i >= 0; i-- {
+		ctx.Node = nodes[i]
+		ctx.Index = i
+		ctx.Size = 1
+
+		others, err := a.descendantReverse(ctx)
+		if err == nil {
+			list.Concat(others)
+		}
+		if others, err = a.next.find(ctx); err == nil {
+			list.Concat(others)
+		}
+	}
+	top := parent.Parent()
+	if top == nil {
+		return list, nil
+	}
+	ctx.Node = parent
+	ctx.Size = 1
+	ctx.Index = 1
+	others, err := a.preceding(ctx)
+	if err == nil {
+		list.Concat(others)
+	}
+	return list, nil
 }
 
 func (a axis) precedingSibling(ctx Context) (Sequence, error) {
@@ -439,15 +472,20 @@ func (a axis) precedingSibling(ctx Context) (Sequence, error) {
 }
 
 func (a axis) following(ctx Context) (Sequence, error) {
+	parent := ctx.Parent()
+	if parent == nil {
+		return nil, nil
+	}
 	var (
-		list   Sequence
-		parent = ctx.Parent()
-		nodes  = getNodes(parent)
+		list  Sequence
+		nodes = getNodes(parent)
 	)
 	ctx.Size = len(nodes)
 	for i := ctx.Node.Position() + 1; i < len(nodes); i++ {
 		ctx.Node = nodes[i]
 		ctx.Index = i
+		ctx.Size = 1
+
 		others, err := a.next.find(ctx)
 		if err == nil {
 			list.Concat(others)
@@ -459,6 +497,15 @@ func (a axis) following(ctx Context) (Sequence, error) {
 	top := parent.Parent()
 	if top == nil {
 		return list, nil
+	}
+	next, ok := top.(interface{ NextSibling() xml.Node })
+	if !ok {
+		return list, nil
+	}
+	if next := next.NextSibling(); next == nil {
+		parent = top
+	} else {
+		parent = next
 	}
 	ctx.Node = parent
 	ctx.Size = 1
@@ -506,6 +553,32 @@ func (a axis) attribute(ctx Context) (Sequence, error) {
 		seq.Concat(matches)
 	}
 	return seq, nil
+}
+
+func (a axis) descendantReverse(ctx Context) (Sequence, error) {
+	var (
+		list  Sequence
+		nodes = getNodes(ctx.Node)
+	)
+	slices.Reverse(nodes)
+
+	ctx.Size = len(nodes)
+	for i, n := range nodes {
+		ctx.Node = n
+		ctx.Index = i
+		matches, err := a.next.find(ctx)
+		if err != nil {
+			return nil, err
+		}
+		list.Concat(matches)
+
+		matches, err = a.descendantReverse(ctx)
+		if err != nil {
+			return nil, err
+		}
+		list.Concat(matches)
+	}
+	return list, nil	
 }
 
 func (a axis) descendant(ctx Context) (Sequence, error) {

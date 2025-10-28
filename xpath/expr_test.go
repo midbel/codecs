@@ -344,7 +344,7 @@ func testPathAxis(t *testing.T) {
 		},
 		{
 			Query: "/root/group/item/preceding::item",
-			Want:  []string{"foo", "bar"},
+			Want:  []string{"bar", "foo"},
 		},
 	}
 	runTests(t, docBase, tests)

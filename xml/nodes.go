@@ -691,6 +691,30 @@ func (e *Element) Insert(node Node, index int) {
 	e.Nodes = slices.Insert(e.Nodes, index, node)
 }
 
+func (e *Element) NextSibling() Node {
+	parent, _ := e.Parent().(*Element)
+	if parent == nil {
+		return nil
+	}
+	pos := e.Position() + 1
+	if pos >= len(parent.Nodes) {
+		return nil
+	}
+	return parent.Nodes[pos]
+}
+
+func (e *Element) PrevSibling() Node {
+	parent, _ := e.Parent().(*Element)
+	if parent == nil {
+		return nil
+	}
+	pos := e.Position() - 1
+	if pos <= 0 {
+		return nil
+	}
+	return parent.Nodes[pos]
+}
+
 func (e *Element) Len() int {
 	return len(e.Nodes)
 }
