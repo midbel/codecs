@@ -236,9 +236,6 @@ func (w wildcard) MatchPriority() int {
 }
 
 func (w wildcard) find(ctx Context) (Sequence, error) {
-	if ctx.Type() != xml.TypeElement {
-		return nil, nil
-	}
 	return Singleton(ctx.Node), nil
 }
 
@@ -879,6 +876,7 @@ func isKind(str string) bool {
 	case "comment":
 	case "document-node":
 	case "processing-instruction":
+	case "attribute":
 	default:
 		return false
 	}

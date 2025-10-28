@@ -1075,13 +1075,16 @@ func (c *Compiler) compileName() (Expr, error) {
 	if c.peek.Type == opAxis {
 		return c.compileAxis()
 	}
-	expr, err := c.compileNameTest()
+	name, err := c.compileNameTest()
 	if err != nil {
 		return nil, err
 	}
-	expr = axis{
+	expr := axis{
 		kind: childAxis,
-		next: expr,
+		next: name,
+	}
+	if _, ok := name.(typeAttribute); ok {
+		expr.kind = attributeAxis
 	}
 	return expr, nil
 }
