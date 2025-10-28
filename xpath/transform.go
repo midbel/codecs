@@ -110,12 +110,9 @@ func fromBase(expr, base Expr) Expr {
 }
 
 func transform(expr Expr, base Expr) Expr {
-	c := kind{
-		kind: 0,
-	}
 	a := axis{
 		kind: descendantSelfAxis,
-		next: c,
+		next: typeNode{},
 	}
 	expr = step{
 		curr: base,

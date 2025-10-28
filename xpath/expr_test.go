@@ -319,8 +319,20 @@ func testPathAxis(t *testing.T) {
 			Want:  []string{"foo", "bar"},
 		},
 		{
+			Query: "/root/item[2]/self::item",
+			Want:  []string{"bar"},
+		},
+		{
 			Query: "/root/descendant::item",
 			Want:  []string{"foo", "bar", "qux"},
+		},
+		{
+			Query: "/root/item[1]/descendant-or-self::node()",
+			Want:  []string{"foo", "foo"},
+		},
+		{
+			Query: "/root/descendant-or-self::node()",
+			Want:  []string{"foobarqux", "foo", "foo", "bar", "bar", "qux", "qux", "qux"},
 		},
 		{
 			Query: "local-name(/root/group/item/parent::*)",
@@ -351,7 +363,17 @@ func testPathAxis(t *testing.T) {
 }
 
 func testPathType(t *testing.T) {
-	t.SkipNow()
+	tests := []TestCase{
+		{
+			Query: "/root/item[1]/attribute(id)",
+			Want:  []string{"fst"},
+		},
+		{
+			Query: "/root/item[1]/attribute(*)",
+			Want:  []string{"fst", "en"},
+		},
+	}
+	runTests(t, docBase, tests)
 }
 
 func testPathBasic(t *testing.T) {

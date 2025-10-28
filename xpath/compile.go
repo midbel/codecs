@@ -964,49 +964,91 @@ func (c *Compiler) compileVariable() (Expr, error) {
 func (c *Compiler) compileKind() (Expr, error) {
 	c.Enter("kind")
 	defer c.Leave("kind")
-	var expr kind
+
+	noarg := func() error {
+		c.next()
+		if !c.is(begGrp) {
+			return ErrSyntax
+		}
+		c.next()
+		if !c.is(endGrp) {
+			return c.syntaxError("kind", "expected ')'")
+		}
+		c.next()
+		return nil
+	}
+	qnarg := func(allowNoArg bool) (Expr, error) {
+		c.next()
+		if !c.is(begGrp) {
+			return nil, ErrSyntax
+		}
+		c.next()
+		if c.is(endGrp) {
+			if !allowNoArg {
+				return nil, ErrSyntax
+			}
+			c.next()
+			return nil, nil
+		}
+		var (
+			expr Expr
+			err  error
+		)
+		if c.is(opMul) {
+			expr = wildcard{}
+			c.next()
+		} else {
+			expr, err = c.compileQName()
+		}
+		if err != nil {
+			return nil, err
+		}
+		if !c.is(endGrp) {
+			return nil, c.syntaxError("kind", "expected ')'")
+		}
+		c.next()
+		return expr, nil
+	}
+
+	var (
+		expr Expr
+		err  error
+	)
 	switch c.getCurrentLiteral() {
 	case "node":
-		expr.kind = xml.TypeNode
+		expr = typeNode{}
+		err = noarg()
 	case "element":
-		expr.kind = xml.TypeElement
+		var el typeElement
+		el.name, err = qnarg(true)
+		if err == nil {
+			expr = el
+		}
 	case "text":
-		expr.kind = xml.TypeText
+		expr = typeText{}
+		err = noarg()
 	case "comment":
-		expr.kind = xml.TypeComment
+		expr = typeComment{}
+		err = noarg()
 	case "attribute":
-		expr.kind = xml.TypeAttribute
+		var el typeAttribute
+		el.name, err = qnarg(false)
+		if err == nil {
+			expr = el
+		}
 	case "processing-instruction":
-		expr.kind = xml.TypeInstruction
+		var el typeInstruction
+		el.name, err = qnarg(true)
+		if err == nil {
+			expr = el
+		}
 	case "document-node":
-		expr.kind = xml.TypeDocument
+		expr = typeDocument{}
+		err = noarg()
 	default:
 		return nil, fmt.Errorf("kind test not supported")
 	}
-	c.next()
-	if !c.is(begGrp) {
-		return nil, ErrSyntax
-	}
-	c.next()
-	if expr.kind == xml.TypeElement || expr.kind == xml.TypeAttribute {
-		if !c.is(Name) {
-			return nil, c.syntaxError("kind", "expected name")
-		}
-		expr.localName = c.getCurrentLiteral()
-		c.next()
-		if c.is(opSeq) {
-			c.next()
-			if !c.is(Name) {
-				return nil, c.syntaxError("kind", "expected type")
-			}
-			c.next()
-		}
-	}
-	if !c.is(endGrp) {
-		return nil, c.syntaxError("kind", "expected ')'")
-	}
-	c.next()
-	return expr, nil
+	return expr, err
 }
 
 func (c *Compiler) compileAxis() (Expr, error) {
@@ -1091,12 +1133,9 @@ func (c *Compiler) compileParent() (Expr, error) {
 	c.Enter("parent")
 	defer c.Leave("parent")
 	c.next()
-	next := kind{
-		kind: xml.TypeElement,
-	}
 	expr := axis{
 		kind: parentAxis,
-		next: next,
+		next: typeElement{},
 	}
 	return expr, nil
 }
@@ -1132,9 +1171,7 @@ func (c *Compiler) compileDescendantStep(left Expr) (Expr, error) {
 		next: step{
 			curr: axis{
 				kind: descendantSelfAxis,
-				next: kind{
-					kind: xml.TypeNode,
-				},
+				next: typeNode{},
 			},
 			next: next,
 		},
@@ -1176,9 +1213,7 @@ func (c *Compiler) compileDescendantRoot() (Expr, error) {
 		next: step{
 			curr: axis{
 				kind: descendantSelfAxis,
-				next: kind{
-					kind: xml.TypeNode,
-				},
+				next: typeNode{},
 			},
 			next: next,
 		},

@@ -427,7 +427,7 @@ func (a axis) preceding(ctx Context) (Sequence, error) {
 		nodes = getNodes(parent)
 	)
 	ctx.Size = len(nodes)
-	for i := ctx.Node.Position() -1; i >= 0; i-- {
+	for i := ctx.Node.Position() - 1; i >= 0; i-- {
 		ctx.Node = nodes[i]
 		ctx.Index = i
 		ctx.Size = 1
@@ -578,7 +578,7 @@ func (a axis) descendantReverse(ctx Context) (Sequence, error) {
 		}
 		list.Concat(matches)
 	}
-	return list, nil	
+	return list, nil
 }
 
 func (a axis) descendant(ctx Context) (Sequence, error) {
@@ -885,26 +885,173 @@ func isKind(str string) bool {
 	return true
 }
 
-type kind struct {
-	kind xml.NodeType
+type typeText struct{}
 
-	localName string
-	localType string
-}
-
-func (k kind) Find(node xml.Node) (Sequence, error) {
+func (k typeText) Find(node xml.Node) (Sequence, error) {
 	return k.find(defaultContext(node))
 }
 
-func (k kind) MatchPriority() int {
+func (typeText) MatchPriority() int {
 	return prioLow
 }
 
-func (k kind) find(ctx Context) (Sequence, error) {
-	if k.kind == 0 || k.kind == xml.TypeNode || ctx.Type() == k.kind {
-		return Singleton(ctx.Node), nil
+func (typeText) find(ctx Context) (Sequence, error) {
+	var seq Sequence
+	if ctx.Type() == xml.TypeText {
+		seq = Singleton(ctx.Node)
 	}
-	return nil, nil
+	return seq, nil
+}
+
+type typeComment struct{}
+
+func (k typeComment) Find(node xml.Node) (Sequence, error) {
+	return k.find(defaultContext(node))
+}
+
+func (typeComment) MatchPriority() int {
+	return prioLow
+}
+
+func (typeComment) find(ctx Context) (Sequence, error) {
+	var seq Sequence
+	if ctx.Type() == xml.TypeComment {
+		seq = Singleton(ctx.Node)
+	}
+	return seq, nil
+}
+
+type typeNode struct{}
+
+func (k typeNode) Find(node xml.Node) (Sequence, error) {
+	return k.find(defaultContext(node))
+}
+
+func (typeNode) MatchPriority() int {
+	return prioLow
+}
+
+func (typeNode) find(ctx Context) (Sequence, error) {
+	return Singleton(ctx.Node), nil
+}
+
+type typeDocument struct{}
+
+func (k typeDocument) Find(node xml.Node) (Sequence, error) {
+	return k.find(defaultContext(node))
+}
+
+func (typeDocument) MatchPriority() int {
+	return prioLow
+}
+
+func (typeDocument) find(ctx Context) (Sequence, error) {
+	var seq Sequence
+	if ctx.Type() == xml.TypeDocument {
+		seq = Singleton(ctx.Node)
+	}
+	return seq, nil
+}
+
+type typeInstruction struct {
+	name Expr
+}
+
+func (k typeInstruction) Find(node xml.Node) (Sequence, error) {
+	return k.find(defaultContext(node))
+}
+
+func (typeInstruction) MatchPriority() int {
+	return prioLow
+}
+
+func (t typeInstruction) find(ctx Context) (Sequence, error) {
+	if ctx.Type() != xml.TypeInstruction {
+		return nil, nil
+	}
+	if t.name != nil {
+		res, err := t.name.find(ctx)
+		if err != nil || res.Empty() {
+			return nil, nil
+		}
+	}
+	seq := Singleton(ctx.Node)
+	return seq, nil
+}
+
+type typeAttribute struct {
+	name Expr
+}
+
+func (k typeAttribute) Find(node xml.Node) (Sequence, error) {
+	return k.find(defaultContext(node))
+}
+
+func (typeAttribute) MatchPriority() int {
+	return prioLow
+}
+
+func (t typeAttribute) find(ctx Context) (Sequence, error) {
+	switch ctx.Type() {
+	case xml.TypeAttribute:
+		return t.name.find(ctx)
+	case xml.TypeElement:
+		var (
+			el  = ctx.Node.(*xml.Element)
+			seq Sequence
+		)
+		for _, a := range el.Attributes() {
+			ctx.Size = 1
+			ctx.Index = 1
+			ctx.Node = &a
+			if res, err := t.name.find(ctx); err == nil {
+				seq.Concat(res)
+			}
+		}
+		return seq, nil
+	case xml.TypeInstruction:
+		var (
+			el  = ctx.Node.(*xml.Instruction)
+			seq Sequence
+		)
+		for _, a := range el.Attributes() {
+			ctx.Size = 1
+			ctx.Index = 1
+			ctx.Node = &a
+			if res, err := t.name.find(ctx); err == nil {
+				seq.Concat(res)
+			}
+		}
+		return seq, nil
+	default:
+		return nil, nil
+	}
+}
+
+type typeElement struct {
+	name Expr
+}
+
+func (k typeElement) Find(node xml.Node) (Sequence, error) {
+	return k.find(defaultContext(node))
+}
+
+func (typeElement) MatchPriority() int {
+	return prioLow
+}
+
+func (t typeElement) find(ctx Context) (Sequence, error) {
+	if ctx.Type() != xml.TypeElement {
+		return nil, nil
+	}
+	if t.name != nil {
+		res, err := t.name.find(ctx)
+		if err != nil || res.Empty() {
+			return nil, nil
+		}
+	}
+	seq := Singleton(ctx.Node)
+	return seq, nil
 }
 
 type call struct {
@@ -1446,7 +1593,6 @@ func (v value) find(ctx Context) (Sequence, error) {
 }
 
 func (v value) Type() XdmType {
-	fmt.Printf("%+v: %[1]T\n", v.seq[0])
 	return xsUntyped
 }
 

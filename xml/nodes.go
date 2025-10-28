@@ -462,6 +462,17 @@ func (e *Element) Namespaces() []NS {
 	return ns
 }
 
+func (e *Element) Attributes() []Attribute {
+	var as []Attribute
+	for _, a := range e.Attrs {
+		if a.Name == "xmlns" || a.Space == "xmlns" {
+			continue
+		}
+		as = append(as, a)
+	}
+	return as
+}
+
 func (e *Element) Copy() Node {
 	c := &Element{
 		QName:    e.QName,
@@ -816,6 +827,34 @@ func NewInstruction(name QName) *Instruction {
 	return &Instruction{
 		QName: name,
 	}
+}
+
+func (i *Instruction) Namespaces() []NS {
+	var ns []NS
+	for _, a := range i.Attrs {
+		if a.Name == "xmlns" || a.Space == "xmlns" {
+			n := NS{
+				Prefix: a.Name,
+				Uri:    a.Value(),
+			}
+			if n.Prefix == "xmlns" {
+				n.Prefix = ""
+			}
+			ns = append(ns, n)
+		}
+	}
+	return ns
+}
+
+func (i *Instruction) Attributes() []Attribute {
+	var as []Attribute
+	for _, a := range i.Attrs {
+		if a.Name == "xmlns" || a.Space == "xmlns" {
+			continue
+		}
+		as = append(as, a)
+	}
+	return as
 }
 
 func (_ *Instruction) Type() NodeType {
