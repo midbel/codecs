@@ -261,8 +261,8 @@ var angleFuncs = []registeredBuiltin{
 }
 
 var angleStringFuncs = []registeredBuiltin{
-	registerFunc("string-indexof", "aglstr", callStringIndexOf),
-	registerFunc("string-reverse", "aglstr", callStringReverse),
+	registerFunc("string-indexof", "agl", callStringIndexOf),
+	registerFunc("string-reverse", "agl", callStringReverse),
 }
 
 var envFuncs = []registeredBuiltin{

@@ -372,6 +372,22 @@ func testPathType(t *testing.T) {
 			Query: "/root/item[1]/attribute(*)",
 			Want:  []string{"fst", "en"},
 		},
+		{
+			Query: "/root/element()",
+			Want: []string{"foo", "bar", "qux"},
+		},
+		{
+			Query: "/root/element(*)",
+			Want: []string{"foo", "bar", "qux"},
+		},
+		{
+			Query: "/root/element(item)",
+			Want: []string{"foo", "bar", "qux"},
+		},
+		{
+			Query: "/root/group/node()",
+			Want: []string{"qux"},
+		},
 	}
 	runTests(t, docBase, tests)
 }
@@ -820,19 +836,19 @@ func testAngleStringFunctions(t *testing.T) {
 	}
 	tests := []TestCase{
 		{
-			Query: "aglstr:string-reverse('foo')",
+			Query: "agl:string-reverse('foo')",
 			Want:  []string{"oof"},
 		},
 		{
-			Query: "aglstr:string-reverse(/root/item[2])",
+			Query: "agl:string-reverse(/root/item[2])",
 			Want:  []string{"rab"},
 		},
 		{
-			Query: "aglstr:string-indexof('foo', 'bar')",
+			Query: "agl:string-indexof('foo', 'bar')",
 			Want:  []string{"0"},
 		},
 		{
-			Query: "aglstr:string-indexof('foo', 'foo')",
+			Query: "agl:string-indexof('foo', 'foo')",
 			Want:  []string{"1"},
 		},
 	}
