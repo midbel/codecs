@@ -374,19 +374,27 @@ func testPathType(t *testing.T) {
 		},
 		{
 			Query: "/root/element()",
-			Want: []string{"foo", "bar", "qux"},
+			Want:  []string{"foo", "bar", "qux"},
 		},
 		{
 			Query: "/root/element(*)",
-			Want: []string{"foo", "bar", "qux"},
+			Want:  []string{"foo", "bar", "qux"},
 		},
 		{
 			Query: "/root/element(item)",
-			Want: []string{"foo", "bar", "qux"},
+			Want:  []string{"foo", "bar"},
 		},
 		{
 			Query: "/root/group/node()",
-			Want: []string{"qux"},
+			Want:  []string{"qux"},
+		},
+		{
+			Query: "//comment()",
+			Want:  []string{},
+		},
+		{
+			Query: "//text()",
+			Want:  []string{"foo", "bar", "qux"},
 		},
 	}
 	runTests(t, docBase, tests)

@@ -63,7 +63,7 @@ const (
 )
 
 var angleNS = map[string]string{
-	"agl":    "http://midbel.org/angle",
+	"agl": "http://midbel.org/angle",
 }
 
 var defaultNS = map[string]string{
