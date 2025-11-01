@@ -1,6 +1,7 @@
 package xpath
 
 import (
+	"fmt"
 	"math"
 	"time"
 
@@ -26,6 +27,16 @@ var binaryOp = map[rune]BinaryFunc{
 	opLe:     doLessEq,
 	opGt:     doGreater,
 	opGe:     doGreatEq,
+	opValEq:  doOups,
+	opValNe:  doOups,
+	opValLt:  doOups,
+	opValLe:  doOups,
+	opValGt:  doOups,
+	opValGe:  doOups,
+}
+
+func doOups(_, _ Sequence) (Sequence, error) {
+	return nil, fmt.Errorf("not yet supported")
 }
 
 func doAdd(left, right Sequence) (Sequence, error) {

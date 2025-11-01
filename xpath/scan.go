@@ -105,6 +105,12 @@ const (
 	opMul
 	opDiv
 	opMod
+	opValEq
+	opValNe
+	opValGt
+	opValGe
+	opValLt
+	opValLe
 	opEq
 	opNe
 	opGt
@@ -188,6 +194,18 @@ func (t Token) String() string {
 		return "<arrow>"
 	case opRange:
 		return "<range>"
+	case opValEq:
+		return "<value-eq>"
+	case opValNe:
+		return "<value-ne>"
+	case opValGt:
+		return "<value-gt>"
+	case opValGe:
+		return "<value-ge>"
+	case opValLt:
+		return "<value-lt>"
+	case opValLe:
+		return "<value-le>"
 	case opEq:
 		return "<equal>"
 	case opNe:
@@ -479,17 +497,17 @@ func (s *Scanner) scanIdent(tok *Token) {
 	case kwMod:
 		tok.Type = opMod
 	case kwEq:
-		tok.Type = opEq
+		tok.Type = opValEq
 	case kwNe:
-		tok.Type = opNe
+		tok.Type = opValNe
 	case kwLt:
-		tok.Type = opLt
+		tok.Type = opValLt
 	case kwLe:
-		tok.Type = opLe
+		tok.Type = opValLe
 	case kwGt:
-		tok.Type = opGt
+		tok.Type = opValGt
 	case kwGe:
-		tok.Type = opGe
+		tok.Type = opValGe
 	case kwCast:
 		tok.Type = Name
 		ok := s.lookForward("as")

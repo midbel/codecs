@@ -488,6 +488,10 @@ func testPathCombine(t *testing.T) {
 			Query: "/root/item[@lang='en'] except /root/item",
 			Want:  []string{},
 		},
+		{
+			Query: "/root/(item|group/item)",
+			Want:  []string{"foo", "bar", "qux"},
+		},
 	}
 	runTests(t, docBase, tests)
 }

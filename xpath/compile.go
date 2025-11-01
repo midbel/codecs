@@ -128,6 +128,12 @@ func createCompiler(r io.Reader) *Compiler {
 		opMul:        cp.compileBinary,
 		opDiv:        cp.compileBinary,
 		opMod:        cp.compileBinary,
+		opValEq:      cp.compileBinary,
+		opValNe:      cp.compileBinary,
+		opValGt:      cp.compileBinary,
+		opValGe:      cp.compileBinary,
+		opValLt:      cp.compileBinary,
+		opValLe:      cp.compileBinary,
 		opEq:         cp.compileBinary,
 		opNe:         cp.compileBinary,
 		opGt:         cp.compileBinary,
@@ -1286,6 +1292,7 @@ const (
 	powInstanceOf
 	powIdentity
 	powRange
+	powEqual
 	powCmp
 	powConcat
 	powIntersect
@@ -1312,8 +1319,14 @@ var bindings = map[rune]int{
 	opConcat:     powConcat,
 	opAssign:     powAssign,
 	opIs:         powIdentity,
-	opEq:         powCmp,
-	opNe:         powCmp,
+	opValEq:      powEqual,
+	opValNe:      powEqual,
+	opValGt:      powCmp,
+	opValGe:      powCmp,
+	opValLt:      powCmp,
+	opValLe:      powCmp,
+	opEq:         powEqual,
+	opNe:         powEqual,
 	opGt:         powCmp,
 	opGe:         powCmp,
 	opLt:         powCmp,
