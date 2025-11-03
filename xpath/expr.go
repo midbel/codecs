@@ -164,6 +164,34 @@ func Build(query string) (*Query, error) {
 	return BuildWith(query)
 }
 
+func (q *Query) FromRoot() *Query {
+	if q.expr == nil {
+		return q
+	}
+	switch q.expr.(type) {
+	case root:
+	case current:
+	case step:
+	default:
+		q.expr = step{
+			curr: root{},
+			next: step{
+				curr: axis{
+					kind: descendantSelfAxis,
+					next: typeNode{},
+				},
+				next: q.expr,
+			},
+		}
+	}
+	q.expr = fromRoot(q.expr)
+	return q
+}
+
+func (q *Query) FromCurrent() *Query {
+	return q
+}
+
 func (q *Query) Find(node xml.Node) (Sequence, error) {
 	ctx := createContext(node, 1, 1)
 	ctx.static = q.static.Readonly()
@@ -177,13 +205,6 @@ func (q *Query) Find(node xml.Node) (Sequence, error) {
 		ctx.Environ = environ.Empty[Expr]()
 	}
 	return q.find(ctx)
-}
-
-func (q *Query) UseNamespace(ns string) {
-	if q.expr == nil {
-		return
-	}
-	q.expr = updateNS(q.expr, ns)
 }
 
 func (q *Query) MatchPriority() int {

@@ -100,6 +100,15 @@ type Node interface {
 	path() []int
 }
 
+type TraversableNode interface {
+	Node
+
+	FirstChild() Node
+	LastChild() Node
+	NextSibling() Node
+	PrevSibling() Node
+}
+
 type NS struct {
 	Prefix string
 	Uri    string
@@ -256,11 +265,12 @@ func (d *Document) Root() Node {
 	if len(d.Nodes) == 0 {
 		return nil
 	}
-	root := d.Nodes[len(d.Nodes)-1]
-	if root.Type() != TypeElement {
-		return nil
+	for i := range d.Nodes {
+		if d.Nodes[i].Type() == TypeElement {
+			return d.Nodes[i]
+		}
 	}
-	return root
+	return nil
 }
 
 func (d *Document) Type() NodeType {

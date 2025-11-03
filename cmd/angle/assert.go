@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"github.com/midbel/codecs/sch"
@@ -17,7 +16,7 @@ import (
 
 type AssertCmd struct {
 	reportType string
-	options    sch.ReportOptions
+	ParserOptions
 }
 
 func (a *AssertCmd) Run(args []string) error {
@@ -29,27 +28,24 @@ func (a *AssertCmd) Run(args []string) error {
 	if err != nil {
 		return err
 	}
-	if set.NArg() <= 1 {
-		return fmt.Errorf("no enough files given")
+	for i := 1; i < set.NArg(); i++ {
+		doc, err := parseDocument(set.Arg(i), a.ParserOptions)
+		if err != nil {
+			return err
+		}
+		results, err := schema.Run(doc)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+		}
+		printResults(results)
 	}
+	return nil
+}
 
-	var re sch.Reporter
-	switch a.reportType {
-	case "html":
-		re, err = sch.HtmlReport(a.options)
-	case "stdout", "":
-		re, err = sch.StdoutReport(a.options)
-	case "csv":
-	case "xml":
-	default:
-		fmt.Fprintln(os.Stderr, "%s: unsupported report type")
+func printResults(results []sch.Result) {
+	for _, r := range results {
+		fmt.Printf("%+v\n", r)
 	}
-	if err != nil {
-		return err
-	}
-	args = set.Args()
-	it := getFiles(args[1:])
-	return re.Run(schema, slices.Collect(it))
 }
 
 func getFiles(files []string) iter.Seq[string] {
@@ -94,5 +90,5 @@ func parseSchemaFile(file string) (*sch.Schema, error) {
 		io.Copy(&str, res.Body)
 		return nil, fmt.Errorf(str.String())
 	}
-	return sch.Parse(res.Body)
+	return sch.New(res.Body)
 }

@@ -11,24 +11,6 @@ import (
 	"github.com/midbel/codecs/xml"
 )
 
-type StepMode int8
-
-func IsXsl(mode StepMode) bool {
-	return mode == ModeXsl2 || mode == ModeXsl3
-}
-
-const (
-	ModeXpath3 StepMode = 1 << iota
-	ModeXsl2
-	ModeXsl3
-)
-
-const (
-	ModeDefault = ModeXpath3
-	ModeXpath   = ModeXpath3
-	ModeXsl     = ModeXsl3
-)
-
 const (
 	CodeInvalidSyntax = "XPST0003"
 	CodeUndefinedVar  = "XPST0017"
@@ -82,7 +64,6 @@ type Compiler struct {
 	lastStep rune
 
 	Tracer
-	mode StepMode
 
 	namespaces environ.Environ[string]
 
@@ -96,12 +77,7 @@ func CompileString(q string) (Expr, error) {
 }
 
 func Compile(r io.Reader) (Expr, error) {
-	return CompileMode(r, ModeDefault)
-}
-
-func CompileMode(r io.Reader, mode StepMode) (Expr, error) {
 	cp := NewCompiler(r)
-	cp.mode = mode
 	return cp.Compile()
 }
 
@@ -114,7 +90,6 @@ func createCompiler(r io.Reader) *Compiler {
 		scan:       Scan(r),
 		Tracer:     discardTracer{},
 		namespaces: environ.Empty[string](),
-		mode:       ModeDefault,
 	}
 
 	cp.infix = map[rune]func(Expr) (Expr, error){
@@ -189,10 +164,6 @@ func (c *Compiler) Compile() (Expr, error) {
 	expr, err := c.compile()
 	if err != nil {
 		return nil, err
-	}
-	if IsXsl(c.mode) {
-		var base current
-		expr = fromBase(expr, base)
 	}
 	q := query{
 		expr: expr,

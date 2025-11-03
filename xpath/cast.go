@@ -2,6 +2,7 @@ package xpath
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"time"
 
