@@ -783,6 +783,7 @@ func (s *Scanner) scanName(tok *Token) {
 	if s.char == equal {
 		tok.Type = Attr
 		s.read()
+		s.skipBlank()
 	} else if s.char == colon {
 		tok.Type = Namespace
 		s.read()
