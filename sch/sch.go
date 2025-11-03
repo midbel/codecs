@@ -63,7 +63,10 @@ func (s *Schema) Run(node xml.Node) ([]Result, error) {
 	return s.runPhases(node, nil)
 }
 
-func (s *Schema) RunPhase(node xml.Node, phase string) ([]Result, error) {
+func (s *Schema) RunPhase(phase string, node xml.Node) ([]Result, error) {
+	if phase == "" {
+		return s.Run(node)
+	}
 	phases, ok := s.phases[phase]
 	if !ok {
 		return nil, nil
@@ -78,7 +81,7 @@ func (s *Schema) runPhases(node xml.Node, phases []string) ([]Result, error) {
 		if !ok && len(phases) > 0 {
 			continue
 		}
-		res, err := p.Run(node, s.spaces)
+		res, err := p.Run(node)
 		if err != nil {
 			return nil, err
 		}
@@ -87,15 +90,25 @@ func (s *Schema) runPhases(node xml.Node, phases []string) ([]Result, error) {
 	return list, nil
 }
 
+func (s *Schema) getOptions() []xpath.Option {
+	var options []xpath.Option
+	options = append(options, xpath.WithEnforceNS())
+	for _, n := range s.spaces.Names() {
+		uri, _ := s.spaces.Resolve(n)
+		options = append(options, xpath.WithNamespace(n, uri))
+	}
+	return options
+}
+
 type Pattern struct {
 	Ident string
 	Rules []*Rule
 }
 
-func (p *Pattern) Run(node xml.Node, ns environ.Environ[string]) ([]Result, error) {
+func (p *Pattern) Run(node xml.Node) ([]Result, error) {
 	var list []Result
 	for _, r := range p.Rules {
-		res, err := r.Run(node, ns)
+		res, err := r.Run(node)
 		if err != nil {
 			return nil, err
 		}
@@ -105,35 +118,25 @@ func (p *Pattern) Run(node xml.Node, ns environ.Environ[string]) ([]Result, erro
 }
 
 type Rule struct {
-	Context string
-	Tests   []*Assert
+	Query xpath.Expr
+	Tests []*Assert
 }
 
-func (r *Rule) Run(node xml.Node, ns environ.Environ[string]) ([]Result, error) {
-	var (
-		options []xpath.Option
-		list    []Result
-	)
-	for _, n := range ns.Names() {
-		uri, _ := ns.Resolve(n)
-		options = append(options, xpath.WithNamespace(n, uri))
-	}
-	q, err := xpath.BuildWith(r.Context, options...)
-	if err != nil {
-		return nil, err
-	}
-	seq, err := q.FromRoot().Find(node)
+func (r *Rule) Run(node xml.Node) ([]Result, error) {
+	seq, err := r.Query.Find(node)
 	if err != nil || seq.Empty() {
 		return nil, err
 	}
+	var list []Result
 	for _, t := range r.Tests {
 		res := Result{
-			Ident:  t.Ident,
-			Severe: t.Flag == LevelFatal,
-			Total:  seq.Len(),
+			Ident:   t.Ident,
+			Severe:  t.Flag == LevelFatal,
+			Total:   seq.Len(),
+			Message: t.Message,
 		}
 		for i := range seq {
-			err := t.Run(seq[i].Node(), ns)
+			err := t.Run(seq[i].Node())
 			if err != nil && !errors.Is(err, ErrAssert) {
 				return nil, err
 			}
@@ -143,9 +146,6 @@ func (r *Rule) Run(node xml.Node, ns environ.Environ[string]) ([]Result, error) 
 				res.Fail++
 			}
 		}
-		if res.Fail > 0 {
-			res.Message = t.Message
-		}
 		list = append(list, res)
 	}
 	return list, nil
@@ -154,21 +154,12 @@ func (r *Rule) Run(node xml.Node, ns environ.Environ[string]) ([]Result, error) 
 type Assert struct {
 	Ident   string
 	Flag    string
-	Test    string
+	Test    xpath.Expr
 	Message string
 }
 
-func (r *Assert) Run(node xml.Node, ns environ.Environ[string]) error {
-	var options []xpath.Option
-	for _, n := range ns.Names() {
-		uri, _ := ns.Resolve(n)
-		options = append(options, xpath.WithNamespace(n, uri))
-	}
-	q, err := xpath.BuildWith(r.Test, options...)
-	if err != nil {
-		return err
-	}
-	seq, err := q.Find(node)
+func (r *Assert) Run(node xml.Node) error {
+	seq, err := r.Test.Find(node)
 	if err != nil {
 		return err
 	}
@@ -241,7 +232,7 @@ func loadPatternFromElement(sch *Schema, el *xml.Element) error {
 		if err != nil {
 			return err
 		}
-		rule, err := loadRuleFromElement(sub)
+		rule, err := loadRuleFromElement(sub, sch)
 		if err != nil {
 			return err
 		}
@@ -251,13 +242,18 @@ func loadPatternFromElement(sch *Schema, el *xml.Element) error {
 	return nil
 }
 
-func loadRuleFromElement(el *xml.Element) (*Rule, error) {
+func loadRuleFromElement(el *xml.Element, sch *Schema) (*Rule, error) {
 	context, err := getAttribute(el, "context")
 	if err != nil {
 		return nil, err
 	}
+	query, err := xpath.BuildWith(context, sch.getOptions()...)
+	if err != nil {
+		return nil, err
+	}
+
 	rule := Rule{
-		Context: context,
+		Query: query.FromRoot(),
 	}
 	for _, n := range el.Nodes {
 		if n.LocalName() != "assert" {
@@ -267,7 +263,7 @@ func loadRuleFromElement(el *xml.Element) (*Rule, error) {
 		if err != nil {
 			return nil, err
 		}
-		ass, err := loadAssertFromElement(sub)
+		ass, err := loadAssertFromElement(sub, sch)
 		if err != nil {
 			return nil, err
 		}
@@ -276,7 +272,7 @@ func loadRuleFromElement(el *xml.Element) (*Rule, error) {
 	return &rule, nil
 }
 
-func loadAssertFromElement(el *xml.Element) (*Assert, error) {
+func loadAssertFromElement(el *xml.Element, sch *Schema) (*Assert, error) {
 	var (
 		ass Assert
 		err error
@@ -284,7 +280,12 @@ func loadAssertFromElement(el *xml.Element) (*Assert, error) {
 	if ass.Ident, err = getAttribute(el, "id"); err != nil {
 		return nil, err
 	}
-	if ass.Test, err = getAttribute(el, "test"); err != nil {
+	query, err := getAttribute(el, "test")
+	if err != nil {
+		return nil, err
+	}
+	ass.Test, err = xpath.BuildWith(query, sch.getOptions()...)
+	if err != nil {
 		return nil, err
 	}
 	if ass.Flag, err = getAttribute(el, "flag"); err != nil {

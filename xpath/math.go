@@ -27,12 +27,12 @@ var binaryOp = map[rune]BinaryFunc{
 	opLe:     doLessEq,
 	opGt:     doGreater,
 	opGe:     doGreatEq,
-	opValEq:  doOups,
-	opValNe:  doOups,
-	opValLt:  doOups,
-	opValLe:  doOups,
-	opValGt:  doOups,
-	opValGe:  doOups,
+	opValEq:  doEqual,
+	opValNe:  doNotEqual,
+	opValLt:  doLesser,
+	opValLe:  doLessEq,
+	opValGt:  doGreater,
+	opValGe:  doGreatEq,
 }
 
 func doOups(_, _ Sequence) (Sequence, error) {

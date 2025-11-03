@@ -10,17 +10,21 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/midbel/codecs/sch"
 )
 
 type AssertCmd struct {
-	reportType string
+	phase string
+	quiet bool
 	ParserOptions
 }
 
 func (a *AssertCmd) Run(args []string) error {
 	set := flag.NewFlagSet("assert", flag.ExitOnError)
+	set.StringVar(&a.phase, "p", "", "phase")
+	set.BoolVar(&a.quiet, "q", false, "quiet")
 	if err := set.Parse(args); err != nil {
 		return err
 	}
@@ -28,26 +32,44 @@ func (a *AssertCmd) Run(args []string) error {
 	if err != nil {
 		return err
 	}
+	var w io.Writer = os.Stdout
+	if a.quiet {
+		w = io.Discard
+	}
 	for i := 1; i < set.NArg(); i++ {
 		doc, err := parseDocument(set.Arg(i), a.ParserOptions)
 		if err != nil {
 			return err
 		}
-		results, err := schema.Run(doc)
+		var (
+			now     = time.Now()
+			results []sch.Result
+		)
+		results, err = schema.RunPhase(a.phase, doc)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			continue
 		}
-		printResults(results)
+		var (
+			elapsed  = time.Since(now)
+			failures = printResults(w, results)
+		)
+		fmt.Printf("%s: %d failure(s) on %d assertion(s) (elapsed time: %s)", set.Arg(i), failures, len(results), elapsed)
+		fmt.Println()
 	}
 	return nil
 }
 
-func printResults(results []sch.Result) {
+func printResults(w io.Writer, results []sch.Result) int {
+	var failures int
 	for _, r := range results {
-		fmt.Printf("%-16s | %8d | %8d | %8d | %-s", r.Ident, r.Total, r.Pass, r.Fail, r.Message)
-		fmt.Println()
+		if r.Fail > 0 {
+			failures++
+		}
+		fmt.Fprintf(w, "%-16s | %8d | %8d | %8d | %-s", r.Ident, r.Total, r.Pass, r.Fail, r.Message)
+		fmt.Fprintln(w)
 	}
+	return failures
 }
 
 func getFiles(files []string) iter.Seq[string] {
