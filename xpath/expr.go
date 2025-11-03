@@ -188,10 +188,6 @@ func (q *Query) FromRoot() *Query {
 	return q
 }
 
-func (q *Query) FromCurrent() *Query {
-	return q
-}
-
 func (q *Query) Find(node xml.Node) (Sequence, error) {
 	ctx := createContext(node, 1, 1)
 	ctx.static = q.static.Readonly()

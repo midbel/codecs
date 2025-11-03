@@ -1543,7 +1543,14 @@ func callConstructor(xt XdmType) BuiltinFunc {
 		if len(args) != 1 {
 			return nil, ErrArgument
 		}
-		return xt.Cast(args[0])
+		seq, err := args[0].find(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if !seq.Singleton() {
+			return nil, nil
+		}
+		return xt.Cast(seq.First().Value())
 	}
 }
 

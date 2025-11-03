@@ -36,6 +36,7 @@ func (a *AssertCmd) Run(args []string) error {
 		results, err := schema.Run(doc)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
+			continue
 		}
 		printResults(results)
 	}
@@ -44,7 +45,8 @@ func (a *AssertCmd) Run(args []string) error {
 
 func printResults(results []sch.Result) {
 	for _, r := range results {
-		fmt.Printf("%+v\n", r)
+		fmt.Printf("%-16s | %8d | %8d | %8d | %-s", r.Ident, r.Total, r.Pass, r.Fail, r.Message)
+		fmt.Println()
 	}
 }
 

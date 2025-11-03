@@ -134,7 +134,7 @@ func (r *Rule) Run(node xml.Node, ns environ.Environ[string]) ([]Result, error) 
 		}
 		for i := range seq {
 			err := t.Run(seq[i].Node(), ns)
-			if !errors.Is(err, ErrAssert) {
+			if err != nil && !errors.Is(err, ErrAssert) {
 				return nil, err
 			}
 			if err == nil {
