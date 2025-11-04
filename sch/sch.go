@@ -275,7 +275,6 @@ func loadRuleFromElement(el *xml.Element, sch *Schema) (*Rule, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	rule := Rule{
 		Query: query,
 	}

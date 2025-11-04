@@ -29,6 +29,6 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
-	str := xpath.Debug(expr)
+	str := xpath.Debug(xpath.FromRoot(expr))
 	fmt.Println(str)
 }
