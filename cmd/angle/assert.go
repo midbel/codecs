@@ -18,6 +18,7 @@ import (
 type AssertCmd struct {
 	phase string
 	quiet bool
+	erronly bool
 	ParserOptions
 }
 
@@ -25,6 +26,7 @@ func (a *AssertCmd) Run(args []string) error {
 	set := flag.NewFlagSet("assert", flag.ExitOnError)
 	set.StringVar(&a.phase, "p", "", "phase")
 	set.BoolVar(&a.quiet, "q", false, "quiet")
+	set.BoolVar(&a.erronly, "e", false, "print only errors")
 	if err := set.Parse(args); err != nil {
 		return err
 	}
@@ -52,7 +54,7 @@ func (a *AssertCmd) Run(args []string) error {
 		}
 		var (
 			elapsed  = time.Since(now)
-			failures = printResults(w, results)
+			failures = printResults(w, results, a.erronly)
 		)
 		fmt.Printf("%s: %d failure(s) on %d assertion(s) (elapsed time: %s)", set.Arg(i), failures, len(results), elapsed)
 		fmt.Println()
@@ -60,9 +62,12 @@ func (a *AssertCmd) Run(args []string) error {
 	return nil
 }
 
-func printResults(w io.Writer, results []sch.Result) int {
+func printResults(w io.Writer, results []sch.Result, errOnly bool) int {
 	var failures int
 	for _, r := range results {
+		if r.Fail == 0 && errOnly {
+			continue
+		}
 		if r.Fail > 0 {
 			failures++
 		}
