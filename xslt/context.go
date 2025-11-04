@@ -2,6 +2,7 @@ package xslt
 
 import (
 	"fmt"
+	"iter"
 	"slices"
 
 	"github.com/midbel/codecs/environ"
@@ -212,21 +213,21 @@ func (e *Env) ExecuteQuery(query string, node xml.Node) (xpath.Sequence, error) 
 }
 
 func (e *Env) CompileQuery(query string) (xpath.Expr, error) {
-	options := []xpath.Option{
-		xpath.WithEnforceNS(),
-		xpath.WithElementNS(e.xpathNamespace),
-	}
-	if e.other != nil {
-		options = slices.Concat(options, e.other.getNamespacesForQuery())
-	}
-	options = slices.Concat(options, e.getNamespacesForQuery())
+	eval := xpath.NewEvaluator()
+	eval.SetElemNS(e.xpathNamespace)
 
-	q, err := xpath.BuildWith(query, options...)
+	if e.other != nil {
+		for prefix, uri := range e.other.getNamespaces() {
+			eval.RegisterNS(prefix, uri)
+		}
+	}
+	for prefix, uri := range e.other.getNamespaces() {
+		eval.RegisterNS(prefix, uri)
+	}
+	q, err := eval.Create(query)
 	if err != nil {
 		return nil, err
 	}
-	q.Environ = e
-	q.Builtins = e.Builtins
 	return q, nil
 }
 
@@ -348,17 +349,19 @@ func (e *Env) registerNS(prefix, uri string) {
 	e.namespaces.Define(prefix, uri)
 }
 
-func (e *Env) getNamespacesForQuery() []xpath.Option {
-	var options []xpath.Option
-	for _, n := range e.namespaces.Names() {
-		u, err := e.namespaces.Resolve(n)
-		if err != nil {
-			continue
+func (e *Env) getNamespaces() iter.Seq2[string, string] {
+	fn := func(yield func(string, string) bool) {
+		for _, n := range e.namespaces.Names() {
+			uri, err := e.namespaces.Resolve(n)
+			if err != nil {
+				continue
+			}
+			if !yield(n, uri) {
+				break
+			}
 		}
-		o := xpath.WithNamespace(n, u)
-		options = append(options, o)
 	}
-	return options
+	return fn
 }
 
 func errorWithContext(ctx string, err error) error {

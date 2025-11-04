@@ -965,8 +965,9 @@ func runArrayTests(t *testing.T, doc string, tests []TestCase) {
 		t.Errorf("fail to parse xml document: %s", err)
 		return
 	}
+	eval := NewEvaluator()
 	for _, c := range tests {
-		q, err := BuildWith(c.Query, c.Options...)
+		q, err := eval.Create(c.Query)
 		if err != nil {
 			t.Errorf("fail to build xpath query: %s", err)
 			continue
@@ -997,8 +998,9 @@ func runTests(t *testing.T, doc string, tests []TestCase) {
 		t.Errorf("fail to parse xml document: %s", err)
 		return
 	}
+	eval := NewEvaluator()
 	for _, c := range tests {
-		q, err := BuildWith(c.Query, c.Options...)
+		q, err := eval.Create(c.Query)
 		if err != nil {
 			t.Errorf("fail to build xpath query: %s", err)
 			continue

@@ -30,67 +30,6 @@ const (
 	prioHigh = 1
 )
 
-type Option func(q *Query) error
-
-func WithEnforceNS() Option {
-	return func(q *Query) error {
-		q.enforceNS = true
-		return nil
-	}
-}
-
-func WithBaseUri(uri string) Option {
-	return func(q *Query) error {
-		if uri != "" {
-			q.baseURI = uri
-		}
-		return nil
-	}
-}
-
-func WithNamespace(prefix, uri string) Option {
-	return func(q *Query) error {
-		if uri != "" && prefix != "" {
-			q.namespaces.Define(prefix, uri)
-		}
-		return nil
-	}
-}
-
-func WithElementNS(uri string) Option {
-	return func(q *Query) error {
-		if uri != "" {
-			q.static.elementNS = uri
-		}
-		return nil
-	}
-}
-
-func WithTypeNS(uri string) Option {
-	return func(q *Query) error {
-		if uri != "" {
-			q.typeNS = uri
-		}
-		return nil
-	}
-}
-
-func WithFuncNS(uri string) Option {
-	return func(q *Query) error {
-		if uri != "" {
-			q.funcNS = uri
-		}
-		return nil
-	}
-}
-
-func WithVariable(ident, value string) Option {
-	return func(q *Query) error {
-		q.Define(ident, NewValueFromLiteral(value))
-		return nil
-	}
-}
-
 type Expr interface {
 	Find(xml.Node) (Sequence, error)
 	find(Context) (Sequence, error)
@@ -100,6 +39,83 @@ type Expr interface {
 type TypedExpr interface {
 	Expr
 	Type() XdmType
+}
+
+type Evaluator struct {
+	namespaces environ.Environ[string]
+	variables  environ.Environ[Expr]
+	baseURI    string
+	elemNS     string
+	typeNS     string
+	funcNS     string
+
+	thousandSep rune
+	decimalSep  rune
+}
+
+func NewEvaluator() *Evaluator {
+	e := Evaluator{
+		namespaces:  environ.Empty[string](),
+		variables:   environ.Empty[Expr](),
+		elemNS:      "",
+		typeNS:      schemaNS,
+		funcNS:      functionNS,
+		thousandSep: ',',
+		decimalSep:  '.',
+	}
+	return &e
+}
+
+func (e *Evaluator) Create(query string) (Expr, error) {
+	var (
+		cp  = NewCompiler(strings.NewReader(query))
+		err error
+	)
+	cp.elemNS = e.elemNS
+	cp.typeNS = e.typeNS
+	cp.funcNS = e.funcNS
+
+	for _, n := range e.namespaces.Names() {
+		uri, _ := e.namespaces.Resolve(n)
+		cp.RegisterNS(n, uri)
+	}
+	expr, err := cp.Compile()
+	if err != nil {
+		return nil, err
+	}
+	return expr, nil
+}
+
+func (e *Evaluator) Find(query string, node xml.Node) (Sequence, error) {
+	expr, err := e.Create(query)
+	if err != nil {
+		return nil, err
+	}
+	ctx := createContext(node, 1, 1)
+	ctx.Builtins = DefaultBuiltin()
+	ctx.Environ = e.variables
+
+	return expr.find(ctx)
+}
+
+func (e *Evaluator) RegisterNS(prefix, uri string) {
+	e.namespaces.Define(prefix, uri)
+}
+
+func (e *Evaluator) Define(ident, value string) {
+	e.variables.Define(ident, NewValueFromLiteral(value))
+}
+
+func (e *Evaluator) SetElemNS(ns string) {
+	e.elemNS = ns
+}
+
+func (e *Evaluator) SetFuncNS(ns string) {
+	e.funcNS = ns
+}
+
+func (e *Evaluator) SetTypeNS(ns string) {
+	e.typeNS = ns
 }
 
 type Callable interface {
@@ -120,111 +136,8 @@ func Call(ctx Context, body []Expr) (Sequence, error) {
 	return is, err
 }
 
-type Query struct {
-	expr Expr
-	environ.Environ[Expr]
-	Builtins environ.Environ[BuiltinFunc]
-
-	*static
-}
-
-func Find(node xml.Node, query string) (Sequence, error) {
-	q, err := Build(query)
-	if err != nil {
-		return nil, err
-	}
-	return q.Find(node)
-}
-
-func BuildWith(query string, options ...Option) (*Query, error) {
-	q := Query{
-		static:  createStatic(),
-		Environ: environ.Empty[Expr](),
-	}
-	for _, o := range options {
-		if err := o(&q); err != nil {
-			return nil, err
-		}
-	}
-	var (
-		cp  = NewCompiler(strings.NewReader(query))
-		err error
-	)
-	for _, n := range q.namespaces.Names() {
-		uri, _ := q.namespaces.Resolve(n)
-		cp.DefineNS(n, uri)
-	}
-	if q.expr, err = cp.Compile(); err != nil {
-		return nil, err
-	}
-	return &q, nil
-}
-
-func Build(query string) (*Query, error) {
-	return BuildWith(query)
-}
-
-func (q *Query) FromRoot() *Query {
-	if q.expr == nil {
-		return q
-	}
-	switch q.expr.(type) {
-	case root:
-	case current:
-	case step:
-	default:
-		q.expr = step{
-			curr: root{},
-			next: step{
-				curr: axis{
-					kind: descendantSelfAxis,
-					next: typeNode{},
-				},
-				next: q.expr,
-			},
-		}
-	}
-	q.expr = fromRoot(q.expr)
-	return q
-}
-
-func (q *Query) Find(node xml.Node) (Sequence, error) {
-	ctx := createContext(node, 1, 1)
-	ctx.static = q.static.Readonly()
-	ctx.Builtins = q.Builtins
-	ctx.Environ = q.Environ
-
-	if ctx.Builtins == nil {
-		ctx.Builtins = DefaultBuiltin()
-	}
-	if ctx.Environ == nil {
-		ctx.Environ = environ.Empty[Expr]()
-	}
-	return q.find(ctx)
-}
-
-func (q *Query) MatchPriority() int {
-	if q.expr == nil {
-		return prioLow
-	}
-	return q.expr.MatchPriority()
-}
-
-func (q *Query) find(ctx Context) (Sequence, error) {
-	if q.expr == nil {
-		return nil, fmt.Errorf("no query can be executed")
-	}
-	return q.expr.find(ctx)
-}
-
 type query struct {
 	expr Expr
-}
-
-func (q query) FindWithEnv(node xml.Node, env environ.Environ[Expr]) (Sequence, error) {
-	ctx := createContext(node, 1, 1)
-	ctx.Environ = env
-	return q.find(ctx)
 }
 
 func (q query) Find(node xml.Node) (Sequence, error) {
@@ -674,18 +587,6 @@ func (n name) find(ctx Context) (Sequence, error) {
 		return Singleton(ctx.Node), nil
 	}
 	qn := n.getQName(ctx.Node)
-	if !ctx.enforceNS {
-		if n.Name == "*" && n.Space == qn.Space {
-			return Singleton(ctx.Node), nil
-		}
-		if ctx.QualifiedName() != n.QualifiedName() {
-			return nil, nil
-		}
-		return Singleton(ctx.Node), nil
-	}
-	if n.Uri == "" {
-		n.Uri = ctx.elementNS
-	}
 	if n.Name == "*" && n.Uri == qn.Uri {
 		return Singleton(ctx.Node), nil
 	}
@@ -1083,9 +984,6 @@ func (c call) MatchPriority() int {
 }
 
 func (c call) find(ctx Context) (Sequence, error) {
-	if c.QName.Uri == "" {
-		c.QName.Uri = ctx.funcNS
-	}
 	fn, err := ctx.Builtins.Resolve(c.ExpandedName())
 	if err != nil {
 		return c.callUserDefinedFunction(ctx)

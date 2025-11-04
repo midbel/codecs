@@ -8,7 +8,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/midbel/codecs/environ"
 	"github.com/midbel/codecs/xml"
 	"github.com/midbel/codecs/xpath"
 )
@@ -31,20 +30,19 @@ const (
 )
 
 type Schema struct {
-	Title     string
-	variables environ.Environ[xpath.Expr]
-	spaces    environ.Environ[string]
+	Title string
 
 	phases   map[string][]string
 	patterns []*Pattern
 	mode     string
+
+	eval *xpath.Evaluator
 }
 
 func Default() *Schema {
 	s := Schema{
-		variables: environ.Empty[xpath.Expr](),
-		spaces:    environ.Empty[string](),
-		phases:    make(map[string][]string),
+		phases: make(map[string][]string),
+		eval:   xpath.NewEvaluator(),
 	}
 	return &s
 }
@@ -97,21 +95,10 @@ func (s *Schema) xslMode() bool {
 	return strings.HasPrefix(s.mode, "xslt")
 }
 
-func (s *Schema) getOptions() []xpath.Option {
-	var options []xpath.Option
-	options = append(options, xpath.WithEnforceNS())
-	for _, n := range s.spaces.Names() {
-		uri, _ := s.spaces.Resolve(n)
-		options = append(options, xpath.WithNamespace(n, uri))
-	}
-	return options
-}
-
 type Pattern struct {
-	Ident     string
-	Title     string
-	variables environ.Environ[xpath.Expr]
-	Rules     []*Rule
+	Ident string
+	Title string
+	Rules []*Rule
 }
 
 func (p *Pattern) Run(node xml.Node) ([]Result, error) {
@@ -130,8 +117,6 @@ func (p *Pattern) Run(node xml.Node) ([]Result, error) {
 }
 
 type Rule struct {
-	variables environ.Environ[xpath.Expr]
-
 	Query xpath.Expr
 	Tests []*Assert
 }
@@ -242,7 +227,7 @@ func loadValueFromElement(sch *Schema, el *xml.Element) (string, xpath.Expr, err
 	if err != nil {
 		return "", nil, err
 	}
-	expr, err := xpath.BuildWith(query, sch.getOptions()...)
+	expr, err := sch.eval.Create(query)
 	return ident, expr, err
 }
 
@@ -252,34 +237,12 @@ func loadPatternFromElement(sch *Schema, el *xml.Element) error {
 		return err
 	}
 	pat := Pattern{
-		Ident:     ident,
-		variables: environ.Empty[xpath.Expr](),
+		Ident: ident,
 	}
 
 	var ix int
 	if el.Nodes[ix].LocalName() == "title" {
 		ix++
-	}
-	for ; ix < len(el.Nodes); ix++ {
-		if el.Nodes[ix].Type() == xml.TypeComment {
-			continue
-		}
-		if el.Nodes[ix].LocalName() == "rule" {
-			break
-		}
-		if el.Nodes[ix].LocalName() != "let" {
-			return fmt.Errorf("expect let element instead of %s", el.Nodes[ix].LocalName())
-		}
-		n, err := getElementFromNode(el.Nodes[ix])
-		if err != nil {
-			return err
-		}
-		id, expr, err := loadValueFromElement(sch, n)
-		if err != nil {
-			return err
-		}
-		pat.variables.Define(id, expr)
-
 	}
 	for ; ix < len(el.Nodes); ix++ {
 		n := el.Nodes[ix]
@@ -308,17 +271,16 @@ func loadRuleFromElement(el *xml.Element, sch *Schema) (*Rule, error) {
 	if err != nil {
 		return nil, err
 	}
-	query, err := xpath.BuildWith(context, sch.getOptions()...)
+	query, err := sch.eval.Create(context)
 	if err != nil {
 		return nil, err
 	}
 
 	rule := Rule{
-		Query:     query,
-		variables: environ.Empty[xpath.Expr](),
+		Query: query,
 	}
 	if sch.xslMode() {
-		rule.Query = query.FromRoot()
+		// rule.Query = query.FromRoot()
 	}
 	for _, n := range el.Nodes {
 		if n.Type() == xml.TypeComment {
@@ -352,7 +314,7 @@ func loadAssertFromElement(el *xml.Element, sch *Schema) (*Assert, error) {
 	if err != nil {
 		return nil, err
 	}
-	ass.Test, err = xpath.BuildWith(query, sch.getOptions()...)
+	ass.Test, err = sch.eval.Create(query)
 	if err != nil {
 		return nil, err
 	}
@@ -372,7 +334,7 @@ func loadNsFromElement(sch *Schema, el *xml.Element) error {
 	if err != nil {
 		return err
 	}
-	sch.spaces.Define(prefix, uri)
+	sch.eval.RegisterNS(prefix, uri)
 	return nil
 }
 

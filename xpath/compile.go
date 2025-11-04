@@ -58,14 +58,16 @@ var defaultNS = map[string]string{
 }
 
 type Compiler struct {
-	scan     *Scanner
-	curr     Token
-	peek     Token
-	lastStep rune
+	scan *Scanner
+	curr Token
+	peek Token
 
 	Tracer
 
 	namespaces environ.Environ[string]
+	elemNS     string
+	funcNS     string
+	typeNS     string
 
 	infix   map[rune]func(Expr) (Expr, error)
 	postfix map[rune]func(Expr) (Expr, error)
@@ -149,10 +151,10 @@ func createCompiler(r io.Reader) *Compiler {
 	}
 
 	for prefix, ns := range defaultNS {
-		cp.DefineNS(prefix, ns)
+		cp.RegisterNS(prefix, ns)
 	}
 	for prefix, ns := range angleNS {
-		cp.DefineNS(prefix, ns)
+		cp.RegisterNS(prefix, ns)
 	}
 
 	cp.next()
@@ -171,7 +173,7 @@ func (c *Compiler) Compile() (Expr, error) {
 	return q, err
 }
 
-func (c *Compiler) DefineNS(prefix, uri string) {
+func (c *Compiler) RegisterNS(prefix, uri string) {
 	c.namespaces.Define(prefix, uri)
 }
 
@@ -604,7 +606,10 @@ func (c *Compiler) compileType() (XdmType, error) {
 		qn.Name = c.getCurrentLiteral()
 		c.next()
 	}
-	qn.Uri, _ = c.isDefined(qn)
+	qn.Uri, _ = c.resolveNS(qn)
+	if qn.Uri == "" {
+		qn.Uri = c.typeNS
+	}
 	xt, ok := supportedTypes[qn]
 	if !ok {
 		xt = xsUntyped
@@ -838,6 +843,9 @@ func (c *Compiler) compileFunctionCall(left Expr) (Expr, error) {
 		n, ok := left.(name)
 		if !ok {
 			return call{}, c.syntaxError("call", "expected identifier")
+		}
+		if c.funcNS != "" {
+			n.QName.Uri = c.funcNS
 		}
 		fn := call{
 			QName: n.QName,
@@ -1097,7 +1105,10 @@ func (c *Compiler) compileQName() (Expr, error) {
 	n := name{
 		QName: qn,
 	}
-	n.Uri, _ = c.isDefined(n.QName)
+	n.Uri, _ = c.resolveNS(n.QName)
+	if n.Uri == "" {
+		n.Uri = c.elemNS
+	}
 	return n, nil
 }
 
@@ -1200,7 +1211,7 @@ func (c *Compiler) compileDescendantRoot() (Expr, error) {
 	return expr, nil
 }
 
-func (c *Compiler) isDefined(qn xml.QName) (string, error) {
+func (c *Compiler) resolveNS(qn xml.QName) (string, error) {
 	if qn.Name == "" {
 		return "", nil
 	}
