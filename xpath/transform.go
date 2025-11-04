@@ -16,25 +16,43 @@ func fromRoot(expr Expr) Expr {
 	switch e := expr.(type) {
 	case root:
 	case current:
+	case union:
+		for i := range e.all {
+			e.all[i] = fromRoot(e.all[i])
+		}
+		expr = e
+	case intersect:
+		for i := range e.all {
+			e.all[i] = fromRoot(e.all[i])
+		}
+		expr = e
+	case except:
+		for i := range e.all {
+			e.all[i] = fromRoot(e.all[i])
+		}
+		expr = e
 	case step:
-		_, ok := e.curr.(root)
-		if !ok {
-			break
+		if !isRoot(e.curr) {
+			return transform(expr)
 		}
 		s, ok := e.next.(step)
 		if !ok {
-			break
+			return expr
 		}
 		a, ok := s.curr.(axis)
 		if !ok {
-			break
+			return transform(expr)
 		}
-		if a.kind == descendantSelfAxis {
-			break
+		if a.kind != descendantSelfAxis {
+			return transform(expr)
 		}
-		expr = transform(e)
 	default:
 		expr = transform(e)
 	}
 	return expr
+}
+
+func isRoot(expr Expr) bool {
+	_, ok := expr.(root)
+	return ok
 }
