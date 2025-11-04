@@ -844,9 +844,6 @@ func (c *Compiler) compileFunctionCall(left Expr) (Expr, error) {
 		if !ok {
 			return call{}, c.syntaxError("call", "expected identifier")
 		}
-		if c.funcNS != "" {
-			n.QName.Uri = c.funcNS
-		}
 		fn := call{
 			QName: n.QName,
 		}

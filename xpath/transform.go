@@ -1,5 +1,9 @@
 package xpath
 
+func FromRoot(expr Expr) Expr {
+	return fromRoot(expr)
+}
+
 func fromRoot(expr Expr) Expr {
 	transform := func(expr Expr) Expr {
 		return step{

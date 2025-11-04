@@ -43,9 +43,8 @@ const docSpace = `<?xml version="1.0" encoding="utf-8"?>
 `
 
 type TestCase struct {
-	Query   string
-	Want    []string
-	Options []Option
+	Query string
+	Want  []string
 }
 
 func TestIf(t *testing.T) {
@@ -219,9 +218,15 @@ func TestSequence(t *testing.T) {
 }
 
 func TestPathWithNS(t *testing.T) {
-	options := []Option{
-		WithNamespace("", "http://midbel.org/ns"),
-		WithNamespace("ang", "http://midbel.org/angle"),
+	spaces := []xml.NS{
+		{
+			Prefix: "",
+			Uri:    "http://midbel.org/ns",
+		},
+		{
+			Prefix: "ang",
+			Uri:    "http://midbel.org/angle",
+		},
 	}
 	tests := []TestCase{
 		{
@@ -245,17 +250,15 @@ func TestPathWithNS(t *testing.T) {
 			Want:  []string{},
 		},
 		{
-			Query:   "/root/*:item",
-			Want:    []string{"foo", "bar"},
-			Options: options,
+			Query: "/root/*:item",
+			Want:  []string{"foo", "bar"},
 		},
 		{
-			Query:   "/root/ang:item",
-			Want:    []string{"foo", "bar"},
-			Options: options,
+			Query: "/root/ang:item",
+			Want:  []string{"foo", "bar"},
 		},
 	}
-	runTests(t, docSpace, tests)
+	runTestsNS(t, docSpace, tests, spaces)
 }
 
 func TestInstanceOf(t *testing.T) {
@@ -982,6 +985,40 @@ func runArrayTests(t *testing.T, doc string, tests []TestCase) {
 		}
 		if s, ok := res[0].(interface{ Sequence() Sequence }); ok {
 			res = s.Sequence()
+		}
+		got := getValuesFromSequence(res)
+		if !slices.Equal(got, c.Want) {
+			t.Errorf("%s: nodes mismatched! want %s, got %s", c.Query, c.Want, got)
+		}
+	}
+}
+
+func runTestsNS(t *testing.T, doc string, tests []TestCase, spaces []xml.NS) {
+	t.Helper()
+
+	root, err := xml.ParseString(doc)
+	if err != nil {
+		t.Errorf("fail to parse xml document: %s", err)
+		return
+	}
+	eval := NewEvaluator()
+	for _, n := range spaces {
+		eval.RegisterNS(n.Prefix, n.Uri)
+	}
+	for _, c := range tests {
+		q, err := eval.Create(c.Query)
+		if err != nil {
+			t.Errorf("fail to build xpath query: %s", err)
+			continue
+		}
+		res, err := q.Find(root)
+		if err != nil {
+			t.Errorf("error finding node in document: %s", err)
+			continue
+		}
+		if res.Len() != len(c.Want) {
+			t.Errorf("%s: want %d results, got %d", c.Query, len(c.Want), res.Len())
+			continue
 		}
 		got := getValuesFromSequence(res)
 		if !slices.Equal(got, c.Want) {

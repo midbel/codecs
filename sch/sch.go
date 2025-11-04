@@ -280,7 +280,7 @@ func loadRuleFromElement(el *xml.Element, sch *Schema) (*Rule, error) {
 		Query: query,
 	}
 	if sch.xslMode() {
-		// rule.Query = query.FromRoot()
+		rule.Query = xpath.FromRoot(rule.Query)
 	}
 	for _, n := range el.Nodes {
 		if n.Type() == xml.TypeComment {
