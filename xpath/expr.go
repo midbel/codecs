@@ -473,7 +473,7 @@ func (a axis) attribute(ctx Context) (Sequence, error) {
 	for i := range el.Attrs {
 		ctx.Node = &el.Attrs[i]
 		ctx.Index = i + 1
-		matches, err := a.next.Find(ctx)
+		matches, err := a.next.find(ctx)
 		if err != nil {
 			return nil, err
 		}

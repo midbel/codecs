@@ -844,6 +844,9 @@ func (c *Compiler) compileFunctionCall(left Expr) (Expr, error) {
 		if !ok {
 			return call{}, c.syntaxError("call", "expected identifier")
 		}
+		if n.Uri == "" {
+			n.Uri = c.funcNS
+		}
 		fn := call{
 			QName: n.QName,
 		}
@@ -1102,9 +1105,11 @@ func (c *Compiler) compileQName() (Expr, error) {
 	n := name{
 		QName: qn,
 	}
-	n.Uri, _ = c.resolveNS(n.QName)
-	if n.Uri == "" {
-		n.Uri = c.elemNS
+	if c.peek.Type != begGrp {
+		n.Uri, _ = c.resolveNS(n.QName)
+		if n.Uri == "" {
+			n.Uri = c.elemNS
+		}
 	}
 	return n, nil
 }
