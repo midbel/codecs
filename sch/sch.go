@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"slices"
+	"strings"
 
 	"github.com/midbel/codecs/environ"
 	"github.com/midbel/codecs/xml"
@@ -15,6 +16,7 @@ import (
 var ErrAssert = errors.New("assertion error")
 
 type Result struct {
+	Pattern string
 	Ident   string
 	Message string
 	Severe  bool
@@ -29,19 +31,20 @@ const (
 )
 
 type Schema struct {
-	Title  string
-	params environ.Environ[xpath.Expr]
-	spaces environ.Environ[string]
+	Title     string
+	variables environ.Environ[xpath.Expr]
+	spaces    environ.Environ[string]
 
 	phases   map[string][]string
 	patterns []*Pattern
+	mode     string
 }
 
 func Default() *Schema {
 	s := Schema{
-		params: environ.Empty[xpath.Expr](),
-		spaces: environ.Empty[string](),
-		phases: make(map[string][]string),
+		variables: environ.Empty[xpath.Expr](),
+		spaces:    environ.Empty[string](),
+		phases:    make(map[string][]string),
 	}
 	return &s
 }
@@ -90,6 +93,10 @@ func (s *Schema) runPhases(node xml.Node, phases []string) ([]Result, error) {
 	return list, nil
 }
 
+func (s *Schema) xslMode() bool {
+	return strings.HasPrefix(s.mode, "xslt")
+}
+
 func (s *Schema) getOptions() []xpath.Option {
 	var options []xpath.Option
 	options = append(options, xpath.WithEnforceNS())
@@ -101,8 +108,10 @@ func (s *Schema) getOptions() []xpath.Option {
 }
 
 type Pattern struct {
-	Ident string
-	Rules []*Rule
+	Ident     string
+	Title     string
+	variables environ.Environ[xpath.Expr]
+	Rules     []*Rule
 }
 
 func (p *Pattern) Run(node xml.Node) ([]Result, error) {
@@ -112,12 +121,17 @@ func (p *Pattern) Run(node xml.Node) ([]Result, error) {
 		if err != nil {
 			return nil, err
 		}
+		for i := range res {
+			res[i].Pattern = p.Ident
+		}
 		list = slices.Concat(list, res)
 	}
 	return list, nil
 }
 
 type Rule struct {
+	variables environ.Environ[xpath.Expr]
+
 	Query xpath.Expr
 	Tests []*Assert
 }
@@ -189,6 +203,9 @@ func createSchemaFromDocument(doc *xml.Document) (*Schema, error) {
 	if err != nil {
 		return nil, err
 	}
+	if mode, err := getAttribute(el, "queryBinding"); err == nil {
+		sch.mode = mode
+	}
 	for _, n := range el.Nodes {
 		sub, err := getElementFromNode(n)
 		if err != nil {
@@ -216,15 +233,59 @@ func createSchemaFromDocument(doc *xml.Document) (*Schema, error) {
 	return sch, nil
 }
 
+func loadValueFromElement(sch *Schema, el *xml.Element) (string, xpath.Expr, error) {
+	ident, err := getAttribute(el, "name")
+	if err != nil {
+		return "", nil, err
+	}
+	query, err := getAttribute(el, "value")
+	if err != nil {
+		return "", nil, err
+	}
+	expr, err := xpath.BuildWith(query, sch.getOptions()...)
+	return ident, expr, err
+}
+
 func loadPatternFromElement(sch *Schema, el *xml.Element) error {
 	ident, err := getAttribute(el, "id")
 	if err != nil {
 		return err
 	}
 	pat := Pattern{
-		Ident: ident,
+		Ident:     ident,
+		variables: environ.Empty[xpath.Expr](),
 	}
-	for _, n := range el.Nodes {
+
+	var ix int
+	if el.Nodes[ix].LocalName() == "title" {
+		ix++
+	}
+	for ; ix < len(el.Nodes); ix++ {
+		if el.Nodes[ix].Type() == xml.TypeComment {
+			continue
+		}
+		if el.Nodes[ix].LocalName() == "rule" {
+			break
+		}
+		if el.Nodes[ix].LocalName() != "let" {
+			return fmt.Errorf("expect let element instead of %s", el.Nodes[ix].LocalName())
+		}
+		n, err := getElementFromNode(el.Nodes[ix])
+		if err != nil {
+			return err
+		}
+		id, expr, err := loadValueFromElement(sch, n)
+		if err != nil {
+			return err
+		}
+		pat.variables.Define(id, expr)
+
+	}
+	for ; ix < len(el.Nodes); ix++ {
+		n := el.Nodes[ix]
+		if n.Type() == xml.TypeComment {
+			continue
+		}
 		if n.LocalName() != "rule" {
 			return fmt.Errorf("expected rule element instead of %s", n.LocalName())
 		}
@@ -253,9 +314,16 @@ func loadRuleFromElement(el *xml.Element, sch *Schema) (*Rule, error) {
 	}
 
 	rule := Rule{
-		Query: query.FromRoot(),
+		Query:     query,
+		variables: environ.Empty[xpath.Expr](),
+	}
+	if sch.xslMode() {
+		rule.Query = query.FromRoot()
 	}
 	for _, n := range el.Nodes {
+		if n.Type() == xml.TypeComment {
+			continue
+		}
 		if n.LocalName() != "assert" {
 			return nil, fmt.Errorf("expected assert element instead of %s", n.LocalName())
 		}

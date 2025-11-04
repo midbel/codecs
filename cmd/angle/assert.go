@@ -66,7 +66,21 @@ func printResults(w io.Writer, results []sch.Result) int {
 		if r.Fail > 0 {
 			failures++
 		}
-		fmt.Fprintf(w, "%-16s | %8d | %8d | %8d | %-s", r.Ident, r.Total, r.Pass, r.Fail, r.Message)
+		if len(r.Message) > 64 {
+			var (
+				parts = strings.Fields(r.Message)
+				size  int
+			)
+			for i := range parts {
+				size += len(parts[i])
+				if size >= 64 {
+					r.Message = strings.Join(parts[:i], " ") + "..."
+					break
+				}
+			}
+
+		}
+		fmt.Fprintf(w, "%-16s | %-16s | %8d | %8d | %8d | %-s", r.Pattern, r.Ident, r.Total, r.Pass, r.Fail, r.Message)
 		fmt.Fprintln(w)
 	}
 	return failures
