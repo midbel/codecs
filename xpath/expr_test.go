@@ -71,10 +71,43 @@ type TestCase struct {
 	Want  []string
 }
 
-type ContextTextCase struct {
+type ContextTestCase struct {
 	Context string
+	Rooted bool
 	Query   string
 	Want    []string
+}
+
+func TestWithContext(t *testing.T) {
+	tests := []ContextTestCase{
+		{
+			Context: "cac:Line",
+			Rooted: true,
+			Query: "not(normalize-space(cac:Total))",
+			Want: []string{"true"},
+		},
+		{
+			Context: "/in:Invoice/cac:Line",
+			Rooted: true,
+			Query: "(cbc:Quantity != 0)",
+			Want: []string{"true"},
+		},
+	}
+	xmlSpaces := []xml.NS{
+		{
+			Prefix: "in",
+			Uri:    "http://invoice.org/invoice",
+		},
+		{
+			Prefix: "cbc",
+			Uri:    "http://invoice.org/commons",
+		},
+		{
+			Prefix: "cac",
+			Uri:    "http://invoice.org/aggregate",
+		},
+	}
+	runTestsWithContext(t, docInvoice, tests, xmlSpaces)
 }
 
 func TestGroupingAndLogic(t *testing.T) {
@@ -100,8 +133,8 @@ func TestGroupingAndLogic(t *testing.T) {
 			Want:  []string{"380"},
 		},
 		{
-			Query: "xs:decimal(/in:Invoice/cac:Total/cbc:Total)",
-			Want:  []string{"40"},
+			Query: "/in:Invoice/cac:Total/cbc:Total * 10 * 10 div 100 = sum(/in:Invoice/cac:Line/cbc:Total * 10 * 10 div 100)",
+			Want:  []string{"true"},
 		},
 	}
 	xmlSpaces := []xml.NS{
@@ -1063,6 +1096,50 @@ func runArrayTests(t *testing.T, doc string, tests []TestCase) {
 		got := getValuesFromSequence(res)
 		if !slices.Equal(got, c.Want) {
 			t.Errorf("%s: nodes mismatched! want %s, got %s", c.Query, c.Want, got)
+		}
+	}
+}
+
+func runTestsWithContext(t *testing.T, doc string, tests []ContextTestCase, spaces []xml.NS) {
+	t.Helper()
+
+	root, err := xml.ParseString(doc)
+	if err != nil {
+		t.Errorf("fail to parse xml document: %s", err)
+		return
+	}
+	for _, c := range tests {
+		eval := NewEvaluator()
+		for _, n := range spaces {
+			eval.RegisterNS(n.Prefix, n.Uri)
+		}
+		q, err := eval.Create(c.Context)
+		if err != nil {
+			t.Errorf("fail to build xpath query: %s", err)
+			continue			
+		}
+		if c.Rooted {
+			q = FromRoot(q)
+		}
+		seq, err := q.Find(root)
+		if err != nil {
+				t.Errorf("error finding node in document: %s", err)
+				continue
+		}
+		for i := range seq {
+			res, err := eval.Find(c.Query, seq[i].Node())
+			if err != nil {
+				t.Errorf("error finding node in context: %s", err)
+				continue
+			}
+			if res.Len() != len(c.Want) {
+				t.Errorf("%s: want %d results, got %d", c.Query, len(c.Want), res.Len())
+				continue
+			}
+			got := getValuesFromSequence(res)
+			if !slices.Equal(got, c.Want) {
+				t.Errorf("%s: nodes mismatched! want %s, got %s", c.Query, c.Want, got)
+			}
 		}
 	}
 }
