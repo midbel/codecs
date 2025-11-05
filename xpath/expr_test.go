@@ -36,7 +36,7 @@ const docNumbers = `<?xml version="1.0" encoding="utf-8"?>
 
 const docSpace = `<?xml version="1.0" encoding="utf-8"?>
 <root xmlns="http://midbel.org/ns"
-	xmlns:ang="http://midbel.org/angle">
+	xmlns:ang="http://midbel.org/ang">
 	<ang:item id="fst" lang="en">foo</ang:item>
 	<ang:item id="snd" lang="en">bar</ang:item>
 </root>
@@ -73,7 +73,7 @@ type TestCase struct {
 
 type ContextTestCase struct {
 	Context string
-	Rooted bool
+	Rooted  bool
 	Query   string
 	Want    []string
 }
@@ -82,15 +82,15 @@ func TestWithContext(t *testing.T) {
 	tests := []ContextTestCase{
 		{
 			Context: "cac:Line",
-			Rooted: true,
-			Query: "not(normalize-space(cac:Total))",
-			Want: []string{"true"},
+			Rooted:  true,
+			Query:   "not(normalize-space(cac:Total))",
+			Want:    []string{"true"},
 		},
 		{
 			Context: "/in:Invoice/cac:Line",
-			Rooted: true,
-			Query: "(cbc:Quantity != 0)",
-			Want: []string{"true"},
+			Rooted:  true,
+			Query:   "(cbc:Quantity != 0)",
+			Want:    []string{"true"},
 		},
 	}
 	xmlSpaces := []xml.NS{
@@ -1116,15 +1116,15 @@ func runTestsWithContext(t *testing.T, doc string, tests []ContextTestCase, spac
 		q, err := eval.Create(c.Context)
 		if err != nil {
 			t.Errorf("fail to build xpath query: %s", err)
-			continue			
+			continue
 		}
 		if c.Rooted {
 			q = FromRoot(q)
 		}
 		seq, err := q.Find(root)
 		if err != nil {
-				t.Errorf("error finding node in document: %s", err)
-				continue
+			t.Errorf("error finding node in document: %s", err)
+			continue
 		}
 		for i := range seq {
 			res, err := eval.Find(c.Query, seq[i].Node())
