@@ -30,6 +30,9 @@ func (a *AssertCmd) Run(args []string) error {
 	if err := set.Parse(args); err != nil {
 		return err
 	}
+	if set.Arg(0) == "info" {
+		return a.schemaInfo(set.Arg(1))
+	}
 	schema, err := parseSchemaFile(set.Arg(0))
 	if err != nil {
 		return err
@@ -57,6 +60,18 @@ func (a *AssertCmd) Run(args []string) error {
 			failures = printResults(w, results, a.erronly)
 		)
 		fmt.Printf("%s: %d failure(s) on %d assertion(s) (elapsed time: %s)", set.Arg(i), failures, len(results), elapsed)
+		fmt.Println()
+	}
+	return nil
+}
+
+func (a *AssertCmd) schemaInfo(file string) error {
+	schema, err := parseSchemaFile(file)
+	if err != nil {
+		return err
+	}
+	for _, i := range schema.Patterns() {
+		fmt.Printf("%-18s (%s): %d rule(s)", i.Ident, strings.Join(i.Phases, ", "), i.Rules)
 		fmt.Println()
 	}
 	return nil

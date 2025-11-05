@@ -24,6 +24,12 @@ type Result struct {
 	Total   int
 }
 
+type PatternInfo struct {
+	Ident string
+	Phases []string
+	Rules int
+}
+
 const (
 	LevelFatal = "fatal"
 	LevelWarn  = "warning"
@@ -58,6 +64,24 @@ func Open(file string) (*Schema, error) {
 
 func New(r io.Reader) (*Schema, error) {
 	return parseSchema(r)
+}
+
+func (s *Schema) Patterns() []PatternInfo {
+	var list []PatternInfo
+	for i := range s.patterns {
+		p := PatternInfo {
+			Ident: s.patterns[i].Ident,
+			Rules: len(s.patterns[i].Rules),
+		}
+		for n, ps := range s.phases {
+			ok := slices.Contains(ps, s.patterns[i].Ident)
+			if ok {
+				p.Phases = append(p.Phases, n)
+			}
+		}
+		list = append(list, p)
+	}
+	return list
 }
 
 func (s *Schema) Run(node xml.Node) ([]Result, error) {
