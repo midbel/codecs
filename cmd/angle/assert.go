@@ -30,6 +30,13 @@ func (a *AssertCmd) Run(args []string) error {
 	if err := set.Parse(args); err != nil {
 		return err
 	}
+	switch set.Arg(0) {
+	case "info":
+		return a.schemaInfo(set.Arg(1))
+	case "compile":
+		return a.compileSchema(set.Arg(1))
+	default:
+	}
 	if set.Arg(0) == "info" {
 		return a.schemaInfo(set.Arg(1))
 	}
@@ -62,6 +69,10 @@ func (a *AssertCmd) Run(args []string) error {
 		fmt.Printf("%s: %d failure(s) on %d assertion(s) (elapsed time: %s)", set.Arg(i), failures, len(results), elapsed)
 		fmt.Println()
 	}
+	return nil
+}
+
+func (a *AssertCmd) compileSchema(file string) error {
 	return nil
 }
 
