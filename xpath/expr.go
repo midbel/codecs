@@ -41,6 +41,10 @@ type TypedExpr interface {
 	Type() XdmType
 }
 
+type Callable interface {
+	Call(Context, []Expr) (Sequence, error)
+}
+
 type Evaluator struct {
 	namespaces environ.Environ[string]
 	variables  environ.Environ[Expr]
@@ -116,10 +120,6 @@ func (e *Evaluator) SetFuncNS(ns string) {
 
 func (e *Evaluator) SetTypeNS(ns string) {
 	e.typeNS = ns
-}
-
-type Callable interface {
-	Call(Context, []Expr) (Sequence, error)
 }
 
 func Call(ctx Context, body []Expr) (Sequence, error) {

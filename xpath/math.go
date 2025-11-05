@@ -92,7 +92,10 @@ func doAnd(left, right Sequence) (Sequence, error) {
 }
 
 func doOr(left, right Sequence) (Sequence, error) {
-	ok := left.True() || right.True()
+	ok := left.True()
+	if !ok {
+		ok = right.True()
+	}
 	return Singleton(ok), nil
 }
 

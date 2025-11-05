@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/midbel/codecs/xml"
@@ -11,10 +12,12 @@ import (
 )
 
 type QueryCmd struct {
-	Quiet bool
-	Limit int
-	Depth int
-	Text  bool
+	Quiet     bool
+	Limit     int
+	Depth     int
+	Text      bool
+	CopyNS    bool
+	XmlSpaces []xml.NS
 	ParserOptions
 
 	query string
@@ -53,6 +56,9 @@ func (q *QueryCmd) run() (xpath.Sequence, error) {
 		eval = xpath.NewEvaluator()
 		res  xpath.Sequence
 	)
+	for _, n := range q.XmlSpaces {
+		eval.RegisterNS(n.Prefix, n.Uri)
+	}
 	query, err := eval.Create(q.query)
 	if err != nil {
 		return nil, err
@@ -77,11 +83,28 @@ func (q *QueryCmd) run() (xpath.Sequence, error) {
 func (q *QueryCmd) parseArgs(args []string) error {
 	set := flag.NewFlagSet("query", flag.ContinueOnError)
 	set.BoolVar(&q.Quiet, "quiet", false, "suppress output")
-	set.BoolVar(&q.StrictNS, "strict-ns", false, "strict namespace checking")
+	set.BoolVar(&q.StrictNS, "strict-namespace", false, "strict namespace checking")
 	set.BoolVar(&q.OmitProlog, "omit-prolog", false, "omit xml prolog")
 	set.IntVar(&q.Limit, "limit", 0, "limit number of results returned by query")
 	set.IntVar(&q.Depth, "level", 0, "print n level of matching node")
+	set.IntVar(&q.Depth, "depth", 0, "print n level of matching node")
 	set.BoolVar(&q.Text, "text", false, "print only the value of matching node")
+	set.BoolVar(&q.CopyNS, "copy-namespace", false, "copy namespaces from document to xpath engine")
+	set.Func("var", "declare variable", func(str string) error {
+		return nil
+	})
+	set.Func("xml-namespace", "declare namespace", func(str string) error {
+		prefix, uri, ok := strings.Cut(str, ":")
+		if !ok {
+			return fmt.Errorf("not a valid namespace")
+		}
+		ns := xml.NS{
+			Prefix: prefix,
+			Uri:    uri,
+		}
+		q.XmlSpaces = append(q.XmlSpaces, ns)
+		return nil
+	})
 	// set.Func("config", "context configuration", q.configure)
 	err := set.Parse(args)
 	if err == nil {

@@ -16,8 +16,8 @@ import (
 )
 
 type AssertCmd struct {
-	phase string
-	quiet bool
+	phase   string
+	quiet   bool
 	erronly bool
 	ParserOptions
 }

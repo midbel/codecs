@@ -167,32 +167,6 @@ func (d *Document) WriteString() (string, error) {
 	return buf.String(), err
 }
 
-func (d *Document) SetRootName(name string) {
-	if name == "" {
-		return
-	}
-	root := d.Root()
-	if root == nil {
-		return
-	}
-	if el, ok := root.(*Element); ok {
-		el.Name = name
-	}
-}
-
-func (d *Document) SetRootNamespace(name string) {
-	if name == "" {
-		return
-	}
-	root := d.Root()
-	if root == nil {
-		return
-	}
-	if el, ok := root.(*Element); ok {
-		el.Space = name
-	}
-}
-
 func (d *Document) GetNodesCount() int {
 	root := d.Root()
 	if root == nil {
@@ -271,6 +245,18 @@ func (d *Document) Root() Node {
 		}
 	}
 	return nil
+}
+
+func (d *Document) Namespaces() []NS {
+	root := d.Root()
+	if root == nil {
+		return nil
+	}
+	el, ok := root.(*Element)
+	if !ok {
+		return nil
+	}
+	return el.Namespaces()
 }
 
 func (d *Document) Type() NodeType {
