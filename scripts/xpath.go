@@ -10,7 +10,10 @@ import (
 )
 
 func main() {
-	trace := flag.Bool("t", false, "trace")
+	var (
+		trace  = flag.Bool("t", false, "trace")
+		rooted = flag.Bool("r", false, "from root")
+	)
 	flag.Parse()
 	scanner := xpath.Scan(strings.NewReader(flag.Arg(0)))
 	for {
@@ -29,6 +32,9 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
-	str := xpath.Debug(xpath.FromRoot(expr))
+	if *rooted {
+		expr = xpath.FromRoot(expr)
+	}
+	str := xpath.Debug(expr)
 	fmt.Println(str)
 }

@@ -844,6 +844,7 @@ func (c *Compiler) compileFunctionCall(left Expr) (Expr, error) {
 		if !ok {
 			return call{}, c.syntaxError("call", "expected identifier")
 		}
+		n.Uri, _ = c.resolveNS(n.QName)
 		if n.Uri == "" {
 			n.Uri = c.funcNS
 		}
@@ -1100,16 +1101,16 @@ func (c *Compiler) compileQName() (Expr, error) {
 		if c.is(opMul) {
 			qn.Name = "*"
 		}
+		if c.peek.Type != begGrp {
+			qn.Uri, _ = c.resolveNS(qn)
+			if qn.Uri == "" {
+				qn.Uri = c.elemNS
+			}
+		}
 		c.next()
 	}
 	n := name{
 		QName: qn,
-	}
-	if c.peek.Type != begGrp {
-		n.Uri, _ = c.resolveNS(n.QName)
-		if n.Uri == "" {
-			n.Uri = c.elemNS
-		}
 	}
 	return n, nil
 }
