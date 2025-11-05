@@ -42,9 +42,83 @@ const docSpace = `<?xml version="1.0" encoding="utf-8"?>
 </root>
 `
 
+const docInvoice = `<?xml version="1.0" encoding="utf-8"?>
+<in:Invoice xmlns:in="http://invoice.org/invoice" xmlns:cbc="http://invoice.org/commons" xmlns:cac="http://invoice.org/aggregate">
+	<cbc:IssueDate>2025-11-05</cbc:IssueDate>
+	<cbc:InvoiceType>380</cbc:InvoiceType>
+	<cac:Total>
+		<cbc:Total currencyID="eur">40</cbc:Total>
+	</cac:Total>
+	<cac:Line>
+		<cbc:Quantity>3</cbc:Quantity>
+		<cbc:Total currencyID="eur">15</cbc:Total>
+		<cac:Item>
+			<cbc:ID>foo</cbc:ID>
+		</cac:Item>
+	</cac:Line>
+	<cac:Line>
+		<cbc:Quantity>5</cbc:Quantity>
+		<cbc:Total currencyID="eur">25</cbc:Total>
+		<cac:Item>
+			<cbc:ID>bar</cbc:ID>
+		</cac:Item>
+	</cac:Line>
+</in:Invoice>
+`
+
 type TestCase struct {
 	Query string
 	Want  []string
+}
+
+type ContextTextCase struct {
+	Context string
+	Query   string
+	Want    []string
+}
+
+func TestGroupingAndLogic(t *testing.T) {
+	tests := []TestCase{
+		{
+			Query: "/in:Invoice/cbc:InvoiceType[self::cbc:InvoiceType and contains(., '380')]",
+			Want:  []string{"380"},
+		},
+		{
+			Query: "/in:Invoice/cbc:InvoiceType[not(contains(normalize-space(.), ' '))]",
+			Want:  []string{"380"},
+		},
+		{
+			Query: "/in:Invoice/cbc:InvoiceType[not(contains(normalize-space(.), ' ')) and contains(concat('_', ., '_'), '_380_')]",
+			Want:  []string{"380"},
+		},
+		{
+			Query: "/in:Invoice/cbc:InvoiceType[(not(contains(normalize-space(.), ' ')) and contains(concat('_', ., '_'), '_380_'))]",
+			Want:  []string{"380"},
+		},
+		{
+			Query: "/in:Invoice/cbc:InvoiceType[self::cbc:InvoiceType and (not(contains(normalize-space(.), ' ')) and contains('_380_240_80_', concat('_', ., '_')))]",
+			Want:  []string{"380"},
+		},
+		{
+			Query: "xs:decimal(/in:Invoice/cac:Total/cbc:Total)",
+			Want:  []string{"40"},
+		},
+	}
+	xmlSpaces := []xml.NS{
+		{
+			Prefix: "in",
+			Uri:    "http://invoice.org/invoice",
+		},
+		{
+			Prefix: "cbc",
+			Uri:    "http://invoice.org/commons",
+		},
+		{
+			Prefix: "cac",
+			Uri:    "http://invoice.org/aggregate",
+		},
+	}
+	runTestsNS(t, docInvoice, tests, xmlSpaces)
 }
 
 func TestIf(t *testing.T) {
