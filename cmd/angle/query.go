@@ -11,6 +11,31 @@ import (
 	"github.com/midbel/codecs/xpath"
 )
 
+type DebugCmd struct{}
+
+func (q *DebugCmd) Run(args []string) error {
+	var (
+		set    = flag.NewFlagSet("debug", flag.ExitOnError)
+		rooted = flag.Bool("r", false, "from root")
+	)
+	if err := set.Parse(args); err != nil {
+		return err
+	}
+	cp := xpath.NewCompiler(strings.NewReader(set.Arg(0)))
+
+	expr, err := cp.Compile()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+	if *rooted {
+		expr = xpath.FromRoot(expr)
+	}
+	str := xpath.Debug(expr)
+	fmt.Println(str)
+	return nil
+}
+
 type QueryCmd struct {
 	Quiet     bool
 	Limit     int

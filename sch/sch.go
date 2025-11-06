@@ -25,9 +25,9 @@ type Result struct {
 }
 
 type PatternInfo struct {
-	Ident string
+	Ident  string
 	Phases []string
-	Rules int
+	Rules  int
 }
 
 const (
@@ -69,7 +69,7 @@ func New(r io.Reader) (*Schema, error) {
 func (s *Schema) Patterns() []PatternInfo {
 	var list []PatternInfo
 	for i := range s.patterns {
-		p := PatternInfo {
+		p := PatternInfo{
 			Ident: s.patterns[i].Ident,
 			Rules: len(s.patterns[i].Rules),
 		}

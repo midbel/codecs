@@ -221,7 +221,7 @@ func (e *Env) CompileQuery(query string) (xpath.Expr, error) {
 			eval.RegisterNS(prefix, uri)
 		}
 	}
-	for prefix, uri := range e.other.getNamespaces() {
+	for prefix, uri := range e.getNamespaces() {
 		eval.RegisterNS(prefix, uri)
 	}
 	q, err := eval.Create(query)

@@ -1087,7 +1087,7 @@ func (c *Compiler) compileNameTest() (Expr, error) {
 
 func (c *Compiler) compileQName() (Expr, error) {
 	var (
-		qn = xml.LocalName(c.getCurrentLiteral())
+		qn        = xml.LocalName(c.getCurrentLiteral())
 		resolveNS = true
 	)
 	if c.is(opMul) {

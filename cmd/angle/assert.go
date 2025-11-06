@@ -15,31 +15,48 @@ import (
 	"github.com/midbel/codecs/sch"
 )
 
-type AssertCmd struct {
+type SchCompileCmd struct{}
+
+func (a SchCompileCmd) Run(args []string) error {
+	set := flag.NewFlagSet("compile", flag.ExitOnError)
+	if err := set.Parse(args); err != nil {
+		return err
+	}
+	return nil
+}
+
+type SchInfoCmd struct{}
+
+func (a SchInfoCmd) Run(args []string) error {
+	set := flag.NewFlagSet("info", flag.ExitOnError)
+	if err := set.Parse(args); err != nil {
+		return err
+	}
+	schema, err := parseSchemaFile(set.Arg(0))
+	if err != nil {
+		return err
+	}
+	for _, i := range schema.Patterns() {
+		fmt.Printf("%-18s (%s): %d rule(s)", i.Ident, strings.Join(i.Phases, ", "), i.Rules)
+		fmt.Println()
+	}
+	return nil
+}
+
+type SchAssertCmd struct {
 	phase   string
 	quiet   bool
 	erronly bool
 	ParserOptions
 }
 
-func (a *AssertCmd) Run(args []string) error {
+func (a *SchAssertCmd) Run(args []string) error {
 	set := flag.NewFlagSet("assert", flag.ExitOnError)
 	set.StringVar(&a.phase, "p", "", "phase")
 	set.BoolVar(&a.quiet, "q", false, "quiet")
 	set.BoolVar(&a.erronly, "e", false, "print only errors")
 	if err := set.Parse(args); err != nil {
 		return err
-	}
-	switch set.Arg(0) {
-	case "info":
-		return a.schemaInfo(set.Arg(1))
-	case "compile":
-		return a.compileSchema(set.Arg(1))
-	case "exec", "execute":
-	default:
-	}
-	if set.Arg(0) == "info" {
-		return a.schemaInfo(set.Arg(1))
 	}
 	schema, err := parseSchemaFile(set.Arg(0))
 	if err != nil {
@@ -68,26 +85,6 @@ func (a *AssertCmd) Run(args []string) error {
 			failures = printResults(w, results, a.erronly)
 		)
 		fmt.Printf("%s: %d failure(s) on %d assertion(s) (elapsed time: %s)", set.Arg(i), failures, len(results), elapsed)
-		fmt.Println()
-	}
-	return nil
-}
-
-func (a *AssertCmd) executeSchema() error {
-	return nil
-}
-
-func (a *AssertCmd) compileSchema(file string) error {
-	return nil
-}
-
-func (a *AssertCmd) schemaInfo(file string) error {
-	schema, err := parseSchemaFile(file)
-	if err != nil {
-		return err
-	}
-	for _, i := range schema.Patterns() {
-		fmt.Printf("%-18s (%s): %d rule(s)", i.Ident, strings.Join(i.Phases, ", "), i.Rules)
 		fmt.Println()
 	}
 	return nil
