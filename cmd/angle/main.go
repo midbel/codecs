@@ -35,25 +35,25 @@ func main() {
 func prepare() *cli.CommandTrie {
 	var (
 		root          = cli.New()
-		fmtCmd        = &FormatCmd{}
-		queryCmd      = &QueryCmd{}
-		debugCmd      = &DebugCmd{}
-		transformCmd  = &TransformCmd{}
-		assertCmd     = &SchAssertCmd{}
-		schCompileCmd = &SchCompileCmd{}
-		schInfoCmd    = &SchInfoCmd{}
+		fmtCmd        FormatCmd
+		queryCmd      QueryCmd
+		debugCmd      DebugCmd
+		transformCmd  TransformCmd
+		assertCmd     SchAssertCmd
+		schCompileCmd SchCompileCmd
+		schInfoCmd    SchInfoCmd
 	)
-	root.Register([]string{"format"}, fmtCmd)
-	root.Register([]string{"fmt"}, fmtCmd)
-	root.Register([]string{"exec"}, queryCmd)
-	root.Register([]string{"query"}, queryCmd)
-	root.Register([]string{"query", "execute"}, queryCmd)
-	root.Register([]string{"query", "debug"}, debugCmd)
-	root.Register([]string{"assert"}, assertCmd)
-	root.Register([]string{"assert", "execute"}, assertCmd)
-	root.Register([]string{"assert", "info"}, schInfoCmd)
-	root.Register([]string{"assert", "compile"}, schCompileCmd)
-	root.Register([]string{"transform"}, transformCmd)
+	root.Register([]string{"format"}, &fmtCmd)
+	root.Register([]string{"fmt"}, &fmtCmd)
+	root.Register([]string{"exec"}, &queryCmd)
+	root.Register([]string{"query"}, &queryCmd)
+	root.Register([]string{"query", "execute"}, &queryCmd)
+	root.Register([]string{"query", "debug"}, &debugCmd)
+	root.Register([]string{"assert"}, &assertCmd)
+	root.Register([]string{"assert", "execute"}, &assertCmd)
+	root.Register([]string{"assert", "info"}, &schInfoCmd)
+	root.Register([]string{"assert", "compile"}, &schCompileCmd)
+	root.Register([]string{"transform"}, &transformCmd)
 
 	return root
 }
