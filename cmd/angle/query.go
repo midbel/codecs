@@ -105,7 +105,6 @@ func (q *QueryCmd) parseArgs(args []string) error {
 		q.XmlSpaces = append(q.XmlSpaces, ns)
 		return nil
 	})
-	// set.Func("config", "context configuration", q.configure)
 	err := set.Parse(args)
 	if err == nil {
 		q.query = set.Arg(0)

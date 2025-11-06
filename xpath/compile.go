@@ -845,7 +845,7 @@ func (c *Compiler) compileFunctionCall(left Expr) (Expr, error) {
 			return call{}, c.syntaxError("call", "expected identifier")
 		}
 		n.Uri, _ = c.resolveNS(n.QName)
-		if n.Uri == "" {
+		if n.Uri == "" || n.Space == "" {
 			n.Uri = c.funcNS
 		}
 		fn := call{
@@ -1086,7 +1086,10 @@ func (c *Compiler) compileNameTest() (Expr, error) {
 }
 
 func (c *Compiler) compileQName() (Expr, error) {
-	qn := xml.LocalName(c.getCurrentLiteral())
+	var (
+		qn = xml.LocalName(c.getCurrentLiteral())
+		resolveNS = true
+	)
 	if c.is(opMul) {
 		qn.Name = "*"
 	}
@@ -1101,13 +1104,16 @@ func (c *Compiler) compileQName() (Expr, error) {
 		if c.is(opMul) {
 			qn.Name = "*"
 		}
-		if c.peek.Type != begGrp {
-			qn.Uri, _ = c.resolveNS(qn)
-			if qn.Uri == "" {
-				qn.Uri = c.elemNS
-			}
+		if c.peek.Type == begGrp {
+			resolveNS = false
 		}
 		c.next()
+	}
+	if resolveNS {
+		qn.Uri, _ = c.resolveNS(qn)
+		if qn.Uri == "" {
+			qn.Uri = c.elemNS
+		}
 	}
 	n := name{
 		QName: qn,
