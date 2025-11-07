@@ -37,21 +37,22 @@ func (q *DebugCmd) Run(args []string) error {
 }
 
 type QueryCmd struct {
-	Quiet     bool
-	Limit     int
-	Depth     int
-	Text      bool
-	CopyNS    bool
-	XmlSpaces []xml.NS
+	Quiet bool
+	Limit int
+	Depth int
+	Text  bool
 	ParserOptions
 
 	query string
 	files []string
+
+	eval *xpath.Evaluator
 }
 
 const queryInfo = "query took %s - %d nodes matching %q"
 
 func (q *QueryCmd) Run(args []string) error {
+	q.eval = xpath.NewEvaluator()
 	if err := q.parseArgs(args); err != nil {
 		return err
 	}
@@ -77,17 +78,11 @@ func (q *QueryCmd) Run(args []string) error {
 }
 
 func (q *QueryCmd) run() (xpath.Sequence, error) {
-	var (
-		eval = xpath.NewEvaluator()
-		res  xpath.Sequence
-	)
-	for _, n := range q.XmlSpaces {
-		eval.RegisterNS(n.Prefix, n.Uri)
-	}
-	query, err := eval.Create(q.query)
+	query, err := q.eval.Create(q.query)
 	if err != nil {
 		return nil, err
 	}
+	var res xpath.Sequence
 	for _, f := range q.files {
 		doc, err := parseDocument(f, q.ParserOptions)
 		if err != nil {
@@ -105,6 +100,118 @@ func (q *QueryCmd) run() (xpath.Sequence, error) {
 	return res, nil
 }
 
+func (q *QueryCmd) configure(file string) error {
+	doc, err := xml.ParseFile(file)
+	if err != nil {
+		return err
+	}
+	config := []func(*xml.Document) error{
+		q.configureNS,
+		q.configureElemNS,
+		q.configureFuncNS,
+		q.configureTypeNS,
+		q.configureVars,
+		q.enableExtensions,
+	}
+	for _, fn := range config {
+		if err := fn(doc); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (q *QueryCmd) enableExtensions(doc *xml.Document) error {
+	seq, err := q.eval.Find("/angle/extensions/extension", doc)
+	if err != nil {
+		return err
+	}
+	if seq.Empty() {
+		return nil
+	}
+	return nil
+}
+
+func (q *QueryCmd) configureNS(doc *xml.Document) error {
+	seq, err := q.eval.Find("/angle/namespaces/namespace[@prefix]", doc)
+	if err != nil {
+		return err
+	}
+	for _, n := range seq {
+		el, ok := n.Node().(*xml.Element)
+		if !ok {
+			continue
+		}
+		a := el.GetAttribute("prefix")
+		q.eval.RegisterNS(a.Value(), el.Value())
+	}
+	return nil
+}
+
+func (q *QueryCmd) configureElemNS(doc *xml.Document) error {
+	seq, err := q.eval.Find("/angle/namespaces/namespace[@target='element']", doc)
+	if err != nil {
+		return err
+	}
+	if seq.Empty() {
+		return nil
+	}
+	if !seq.Singleton() {
+		return fmt.Errorf("only one namespace with target element expected")
+	}
+	el := seq.First()
+	q.eval.SetElemNS(el.Node().Value())
+	return nil
+}
+
+func (q *QueryCmd) configureFuncNS(doc *xml.Document) error {
+	seq, err := q.eval.Find("/angle/namespaces/namespace[@target='function']", doc)
+	if err != nil {
+		return err
+	}
+	if seq.Empty() {
+		return nil
+	}
+	if !seq.Singleton() {
+		return fmt.Errorf("only one namespace with target function expected")
+	}
+	el := seq.First()
+	q.eval.SetFuncNS(el.Node().Value())
+	return nil
+}
+
+func (q *QueryCmd) configureTypeNS(doc *xml.Document) error {
+	seq, err := q.eval.Find("/angle/namespaces/namespace[@target='type']", doc)
+	if err != nil {
+		return err
+	}
+	if seq.Empty() {
+		return nil
+	}
+	if !seq.Singleton() {
+		return fmt.Errorf("only one namespace with target type expected")
+	}
+	el := seq.First()
+	q.eval.SetTypeNS(el.Node().Value())
+	return nil
+}
+
+func (q *QueryCmd) configureVars(doc *xml.Document) error {
+	seq, err := q.eval.Find("/angle/variables/variable", doc)
+	if err != nil {
+		return err
+	}
+	for _, n := range seq {
+		el, ok := n.Node().(*xml.Element)
+		if !ok {
+			continue
+		}
+		a := el.GetAttribute("name")
+		q.eval.Define(a.Value(), el.Value())
+	}
+	return nil
+}
+
 func (q *QueryCmd) parseArgs(args []string) error {
 	set := flag.NewFlagSet("query", flag.ContinueOnError)
 	set.BoolVar(&q.Quiet, "quiet", false, "suppress output")
@@ -114,7 +221,7 @@ func (q *QueryCmd) parseArgs(args []string) error {
 	set.IntVar(&q.Depth, "level", 0, "print n level of matching node")
 	set.IntVar(&q.Depth, "depth", 0, "print n level of matching node")
 	set.BoolVar(&q.Text, "text", false, "print only the value of matching node")
-	set.BoolVar(&q.CopyNS, "copy-namespace", false, "copy namespaces from document to xpath engine")
+	// set.BoolVar(&q.CopyNS, "copy-namespace", false, "copy namespaces from document to xpath engine")
 	set.Func("var", "declare variable", func(str string) error {
 		return nil
 	})
@@ -123,13 +230,10 @@ func (q *QueryCmd) parseArgs(args []string) error {
 		if !ok {
 			return fmt.Errorf("not a valid namespace")
 		}
-		ns := xml.NS{
-			Prefix: prefix,
-			Uri:    uri,
-		}
-		q.XmlSpaces = append(q.XmlSpaces, ns)
+		q.eval.RegisterNS(prefix, uri)
 		return nil
 	})
+	set.Func("config", "configuration file", q.configure)
 	err := set.Parse(args)
 	if err == nil {
 		q.query = set.Arg(0)
