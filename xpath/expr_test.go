@@ -421,12 +421,17 @@ func TestVariables(t *testing.T) {
 			Want:  []string{"foo"},
 		},
 		{
-			Query: "/root/item[@id=$foo and lang=$lang]",
+			Query: "/root/item[@id=$id and @lang=$lang]",
 			Want:  []string{"foo"},
 		},
 		{
-			Query: "/root/item[@id=$foo or lang!=$lang]",
+			Query: "/root/item[@id!=$id or @lang=$lang]",
 			Want:  []string{"foo", "bar"},
+		},
+
+		{
+			Query: "//item[@id!=$id and not(contains(., 'foo'))]",
+			Want:  []string{"bar", "qux"},
 		},
 	}
 

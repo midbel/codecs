@@ -70,9 +70,9 @@ func NewEvaluator() *Evaluator {
 	return &e
 }
 
-func (e *Evaluator) Create(query string) (Expr, error) {
+func (e *Evaluator) Create(in string) (Expr, error) {
 	var (
-		cp  = NewCompiler(strings.NewReader(query))
+		cp  = NewCompiler(strings.NewReader(in))
 		err error
 	)
 	cp.elemNS = e.elemNS
@@ -87,6 +87,11 @@ func (e *Evaluator) Create(query string) (Expr, error) {
 	if err != nil {
 		return nil, err
 	}
+	if q, ok := expr.(query); ok {
+		q.ctx = defaultContext(nil)
+		q.ctx.Environ = environ.ReadOnly(e.variables)
+		expr = q
+	}
 	return expr, nil
 }
 
@@ -95,11 +100,7 @@ func (e *Evaluator) Find(query string, node xml.Node) (Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	ctx := createContext(node, 1, 1)
-	ctx.Builtins = DefaultBuiltin()
-	ctx.Environ = e.variables
-
-	return expr.find(ctx)
+	return expr.Find(node)
 }
 
 func (e *Evaluator) RegisterNS(prefix, uri string) {
@@ -138,10 +139,12 @@ func Call(ctx Context, body []Expr) (Sequence, error) {
 
 type query struct {
 	expr Expr
+	ctx  Context
 }
 
 func (q query) Find(node xml.Node) (Sequence, error) {
-	return q.find(defaultContext(node))
+	q.ctx.Node = node
+	return q.find(q.ctx)
 }
 
 func (q query) MatchPriority() int {
