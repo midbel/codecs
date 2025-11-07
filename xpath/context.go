@@ -30,6 +30,7 @@ func createContext(node xml.Node, pos, size int) Context {
 		Node:     node,
 		Index:    pos,
 		Size:     size,
+		ENviron: 
 		Builtins: DefaultBuiltin(),
 		Now:      time.Now(),
 	}

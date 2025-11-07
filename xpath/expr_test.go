@@ -414,6 +414,53 @@ func TestInstanceOf(t *testing.T) {
 	runTests(t, docBase, tests)
 }
 
+func TestVariables(t *testing.T) {
+	tests := []TestCase{
+		{
+			Query: "/root/item[@id=$id]",
+			Want:  []string{"foo"},
+		},
+		{
+			Query: "/root/item[@id=$foo and lang=$lang]",
+			Want:  []string{"foo"},
+		},
+		{
+			Query: "/root/item[@id=$foo or lang!=$lang]",
+			Want:  []string{"foo", "bar"},
+		},
+	}
+
+	root, err := xml.ParseString(docBase)
+	if err != nil {
+		t.Errorf("fail to parse xml document: %s", err)
+		return
+	}
+
+	eval := NewEvaluator()
+	eval.Define("id", "fst")
+	eval.Define("lang", "en")
+	for _, c := range tests {
+		q, err := eval.Create(c.Query)
+		if err != nil {
+			t.Errorf("fail to build xpath query: %s", err)
+			continue
+		}
+		res, err := q.Find(root)
+		if err != nil {
+			t.Errorf("error finding node in document: %s", err)
+			continue
+		}
+		if res.Len() != len(c.Want) {
+			t.Errorf("%s: want %d results, got %d", c.Query, len(c.Want), res.Len())
+			continue
+		}
+		got := getValuesFromSequence(res)
+		if !slices.Equal(got, c.Want) {
+			t.Errorf("%s: nodes mismatched! want %s, got %s", c.Query, c.Want, got)
+		}
+	}
+}
+
 func TestPath(t *testing.T) {
 	t.Run("basic", testPathBasic)
 	t.Run("combine", testPathCombine)
