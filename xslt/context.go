@@ -220,9 +220,33 @@ func (e *Env) CompileQuery(query string) (xpath.Expr, error) {
 		for prefix, uri := range e.other.getNamespaces() {
 			eval.RegisterNS(prefix, uri)
 		}
+		for _, n := range e.other.Params.Names() {
+			v, _ := e.Params.Resolve(n)
+			eval.Set(n, v)
+		}
+		for _, n := range e.other.Vars.Names() {
+			v, _ := e.Params.Resolve(n)
+			eval.Set(n, v)
+		}
+		for _, n := range e.other.Builtins.Names() {
+			f, _ := e.Builtins.Resolve(n)
+			eval.RegisterFunc(n, f)
+		}
 	}
 	for prefix, uri := range e.getNamespaces() {
 		eval.RegisterNS(prefix, uri)
+	}
+	for _, n := range e.Params.Names() {
+		v, _ := e.Params.Resolve(n)
+		eval.Set(n, v)
+	}
+	for _, n := range e.Vars.Names() {
+		v, _ := e.Params.Resolve(n)
+		eval.Set(n, v)
+	}
+	for _, n := range e.Builtins.Names() {
+		f, _ := e.Builtins.Resolve(n)
+		eval.RegisterFunc(n, f)
 	}
 	q, err := eval.Create(query)
 	if err != nil {

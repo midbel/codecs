@@ -738,6 +738,7 @@ func (s *Stylesheet) makeIdent() string {
 
 func (s *Stylesheet) defineBuiltins() {
 	s.static.Builtins.Define("system-property", callSystemProperty)
+	s.static.Builtins.Define("fn:system-property", callSystemProperty)
 	s.Env.Builtins.Define("current", callCurrent)
 	s.Env.Builtins.Define("fn:current", callCurrent)
 }

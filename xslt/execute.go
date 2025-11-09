@@ -1521,9 +1521,9 @@ func defineForeachGroupBuiltins(nested *Context, key, items xpath.Sequence) {
 	}
 
 	nested.Builtins.Define("current-group", currentGrp)
-	nested.Builtins.Define("fn:current-group", currentGrp)
+	// nested.Builtins.Define("fn:current-group", currentGrp)
 	nested.Builtins.Define("current-grouping-key", currentKey)
-	nested.Builtins.Define("fn:current-grouping-key", currentKey)
+	// nested.Builtins.Define("fn:current-grouping-key", currentKey)
 }
 
 func defineMergeBuiltins(nested *Context, key string, all []string, items []MergedItem) {

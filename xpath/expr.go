@@ -48,6 +48,7 @@ type Callable interface {
 type Evaluator struct {
 	namespaces environ.Environ[string]
 	variables  environ.Environ[Expr]
+	builtins   environ.Environ[BuiltinFunc]
 	baseURI    string
 	elemNS     string
 	typeNS     string
@@ -61,6 +62,7 @@ func NewEvaluator() *Evaluator {
 	e := Evaluator{
 		namespaces:  environ.Empty[string](),
 		variables:   environ.Empty[Expr](),
+		builtins:    environ.Empty[BuiltinFunc](),
 		elemNS:      "",
 		typeNS:      schemaNS,
 		funcNS:      functionNS,
@@ -68,6 +70,15 @@ func NewEvaluator() *Evaluator {
 		decimalSep:  '.',
 	}
 	return &e
+}
+
+func (e *Evaluator) Sub() *Evaluator {
+	x  := *e
+	x.namespaces = environ.Enclosed[string](e.namespaces)
+	x.variables = environ.Enclosed[Expr](e.variables)
+	x.builtins = environ.Enclosed[BuiltinFunc](e.builtins)
+
+	return &x
 }
 
 func (e *Evaluator) Create(in string) (Expr, error) {
@@ -90,6 +101,10 @@ func (e *Evaluator) Create(in string) (Expr, error) {
 	if q, ok := expr.(query); ok {
 		q.ctx = defaultContext(nil)
 		q.ctx.Environ = environ.ReadOnly(e.variables)
+		for _, n := range e.builtins.Names() {
+			b, _ := e.builtins.Resolve(n)
+			q.ctx.Builtins.Define(n, b)
+		}
 		expr = q
 	}
 	return expr, nil
@@ -103,12 +118,20 @@ func (e *Evaluator) Find(query string, node xml.Node) (Sequence, error) {
 	return expr.Find(node)
 }
 
+func (e *Evaluator) RegisterFunc(ident string, fn BuiltinFunc) {
+	e.builtins.Define(ident, fn)
+}
+
 func (e *Evaluator) RegisterNS(prefix, uri string) {
 	e.namespaces.Define(prefix, uri)
 }
 
+func (e *Evaluator) Set(ident string, value Expr) {
+	e.variables.Define(ident, value)
+}
+
 func (e *Evaluator) Define(ident, value string) {
-	e.variables.Define(ident, NewValueFromLiteral(value))
+	e.Set(ident, NewValueFromLiteral(value))
 }
 
 func (e *Evaluator) SetElemNS(ns string) {
