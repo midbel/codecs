@@ -66,6 +66,7 @@ func (t *Template) Clone() *Template {
 }
 
 func (t *Template) Call(ctx *Context) ([]xml.Node, error) {
+	ctx = ctx.Last()
 	return t.Execute(ctx)
 }
 

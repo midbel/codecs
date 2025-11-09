@@ -146,6 +146,10 @@ func (e *Evaluator) Resolve(ident string) (Expr, error) {
 	return e.variables.Resolve(ident)
 }
 
+func (e *Evaluator) GetElemNS() string {
+	return e.elemNS
+}
+
 func (e *Evaluator) SetElemNS(ns string) {
 	e.elemNS = ns
 }

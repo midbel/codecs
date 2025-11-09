@@ -45,17 +45,6 @@ func (c *Context) MatchImport(node xml.Node, mode string) (Executer, error) {
 	return c.Stylesheet.MatchImport(node, c.getMode(mode))
 }
 
-func (c *Context) getMode(mode string) string {
-	switch mode {
-	case currentMode:
-		return c.Mode
-	case defaultMode:
-		return c.Stylesheet.DefaultMode
-	default:
-		return mode
-	}
-}
-
 func (c *Context) WithNodes(ctxNode, xslNode xml.Node) *Context {
 	return c.clone(xslNode, ctxNode)
 }
@@ -84,6 +73,10 @@ func (c *Context) Copy() *Context {
 	return c.clone(c.XslNode, c.ContextNode)
 }
 
+func (c *Context) Last() *Context {
+	return c
+}
+
 func (c *Context) clone(xslNode, ctxNode xml.Node) *Context {
 	child := Context{
 		XslNode:     xslNode,
@@ -105,12 +98,22 @@ func (c *Context) errorWithContext(err error) error {
 	return errorWithContext(c.XslNode.QualifiedName(), err)
 }
 
+func (c *Context) getMode(mode string) string {
+	switch mode {
+	case currentMode:
+		return c.Mode
+	case defaultMode:
+		return c.Stylesheet.DefaultMode
+	default:
+		return mode
+	}
+}
+
 type Env struct {
 	eval  *xpath.Evaluator
 	Funcs environ.Environ[*Function]
 	Depth int
 
-	xpathNamespace string
 	aliases        environ.Environ[string]
 	other          *Env
 }
@@ -129,11 +132,10 @@ func Enclosed(other *Env) *Env {
 }
 
 func (e *Env) GetXpathNamespace() string {
-	return e.xpathNamespace
+	return e.eval.GetElemNS()
 }
 
 func (e *Env) SetXpathNamespace(ns string) {
-	e.xpathNamespace = ns
 	e.eval.SetElemNS(ns)
 }
 
@@ -142,7 +144,6 @@ func (e *Env) Sub() *Env {
 		other:          e.other,
 		Funcs:          e.Funcs,
 		Depth:          e.Depth + 1,
-		xpathNamespace: e.xpathNamespace,
 		eval:           e.eval.Sub(),
 	}
 }
