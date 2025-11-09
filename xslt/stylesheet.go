@@ -388,7 +388,7 @@ type Stylesheet struct {
 
 	output []*Output
 	namer  alpha.Namer
-	static *Env
+	static *xpath.Evaluator
 	*Env
 	Tracer
 
@@ -404,7 +404,7 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 	sheet := Stylesheet{
 		Context:       contextDir,
 		xsltNamespace: xsltNamespacePrefix,
-		static:        Empty(),
+		static:        xpath.NewEvaluator(),
 		Env:           Empty(),
 		Tracer:        NoopTracer(),
 		namer:         alpha.Compose(alpha.NewLowerString(3), alpha.NewNumberString(2)),
@@ -737,8 +737,8 @@ func (s *Stylesheet) makeIdent() string {
 }
 
 func (s *Stylesheet) defineBuiltins() {
-	s.static.Builtins.Define("system-property", callSystemProperty)
-	s.static.Builtins.Define("fn:system-property", callSystemProperty)
+	s.static.RegisterFunc("system-property", callSystemProperty)
+	s.static.RegisterFunc("fn:system-property", callSystemProperty)
 	s.Env.Builtins.Define("current", callCurrent)
 	s.Env.Builtins.Define("fn:current", callCurrent)
 }
