@@ -1520,10 +1520,10 @@ func defineForeachGroupBuiltins(nested *Context, key, items xpath.Sequence) {
 		return key, nil
 	}
 
-	nested.Builtins.Define("current-group", currentGrp)
-	// nested.Builtins.Define("fn:current-group", currentGrp)
-	nested.Builtins.Define("current-grouping-key", currentKey)
-	// nested.Builtins.Define("fn:current-grouping-key", currentKey)
+	nested.RegisterFunc("current-group", currentGrp)
+	nested.RegisterFunc("fn:current-group", currentGrp)
+	nested.RegisterFunc("current-grouping-key", currentKey)
+	nested.RegisterFunc("fn:current-grouping-key", currentKey)
 }
 
 func defineMergeBuiltins(nested *Context, key string, all []string, items []MergedItem) {
@@ -1563,9 +1563,9 @@ func defineMergeBuiltins(nested *Context, key string, all []string, items []Merg
 		}
 		return seq, nil
 	}
-	nested.Builtins.Define("current-merge-group", currentGrp)
-	nested.Builtins.Define("fn:current-merge-group", currentGrp)
-	nested.Builtins.Define("current-merge-key", currentKey)
-	nested.Builtins.Define("fn:current-merge-key", currentKey)
-	nested.Builtins.Define("angle:merge-keys", mergeKeys)
+	nested.RegisterFunc("current-merge-group", currentGrp)
+	nested.RegisterFunc("fn:current-merge-group", currentGrp)
+	nested.RegisterFunc("current-merge-key", currentKey)
+	nested.RegisterFunc("fn:current-merge-key", currentKey)
+	nested.RegisterFunc("angle:merge-keys", mergeKeys)
 }

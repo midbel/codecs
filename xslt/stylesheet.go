@@ -388,7 +388,7 @@ type Stylesheet struct {
 
 	output []*Output
 	namer  alpha.Namer
-	static *xpath.Evaluator
+	static *Env
 	*Env
 	Tracer
 
@@ -404,7 +404,7 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 	sheet := Stylesheet{
 		Context:       contextDir,
 		xsltNamespace: xsltNamespacePrefix,
-		static:        xpath.NewEvaluator(),
+		static:        Empty(),
 		Env:           Empty(),
 		Tracer:        NoopTracer(),
 		namer:         alpha.Compose(alpha.NewLowerString(3), alpha.NewNumberString(2)),
@@ -739,8 +739,8 @@ func (s *Stylesheet) makeIdent() string {
 func (s *Stylesheet) defineBuiltins() {
 	s.static.RegisterFunc("system-property", callSystemProperty)
 	s.static.RegisterFunc("fn:system-property", callSystemProperty)
-	s.Env.Builtins.Define("current", callCurrent)
-	s.Env.Builtins.Define("fn:current", callCurrent)
+	s.Env.RegisterFunc("current", callCurrent)
+	s.Env.RegisterFunc("fn:current", callCurrent)
 }
 
 func (s *Stylesheet) useWhen(node *xml.Element) (bool, error) {
@@ -781,7 +781,7 @@ func (s *Stylesheet) importSheet(node xml.Node) error {
 
 func (s *Stylesheet) loadNamespacesFromRoot(root *xml.Element) error {
 	for _, qn := range root.Namespaces() {
-		s.Env.registerNS(qn.Prefix, qn.Uri)
+		s.Env.RegisterNS(qn.Prefix, qn.Uri)
 	}
 	if s.xsltNamespace == xsltNamespacePrefix {
 		return nil
@@ -1172,12 +1172,6 @@ func (t *Template) Clone() *Template {
 }
 
 func (t *Template) Call(ctx *Context) ([]xml.Node, error) {
-	ctx = ctx.Last()
-	if a, ok := ctx.Env.Params.(interface {
-		Attach(environ.Environ[xpath.Expr])
-	}); ok {
-		a.Attach(t.env)
-	}
 	return t.Execute(ctx)
 }
 

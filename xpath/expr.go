@@ -73,7 +73,7 @@ func NewEvaluator() *Evaluator {
 }
 
 func (e *Evaluator) Sub() *Evaluator {
-	x  := *e
+	x := *e
 	x.namespaces = environ.Enclosed[string](e.namespaces)
 	x.variables = environ.Enclosed[Expr](e.variables)
 	x.builtins = environ.Enclosed[BuiltinFunc](e.builtins)
@@ -122,8 +122,16 @@ func (e *Evaluator) RegisterFunc(ident string, fn BuiltinFunc) {
 	e.builtins.Define(ident, fn)
 }
 
+func (e *Evaluator) ResolveFunc(ident string) (BuiltinFunc, error) {
+	return e.builtins.Resolve(ident)
+}
+
 func (e *Evaluator) RegisterNS(prefix, uri string) {
 	e.namespaces.Define(prefix, uri)
+}
+
+func (e *Evaluator) ResolveNS(ident string) (string, error) {
+	return e.namespaces.Resolve(ident)
 }
 
 func (e *Evaluator) Set(ident string, value Expr) {
@@ -132,6 +140,10 @@ func (e *Evaluator) Set(ident string, value Expr) {
 
 func (e *Evaluator) Define(ident, value string) {
 	e.Set(ident, NewValueFromLiteral(value))
+}
+
+func (e *Evaluator) Resolve(ident string) (Expr, error) {
+	return e.variables.Resolve(ident)
 }
 
 func (e *Evaluator) SetElemNS(ns string) {
