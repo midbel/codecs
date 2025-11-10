@@ -1400,12 +1400,7 @@ func executeApply(ctx *Context, match matchFunc) (xpath.Sequence, error) {
 		if err != nil {
 			return seq, err
 		}
-		var sub *Context
-		if x, ok := tpl.(interface{ mergeContext(*Context) *Context }); ok {
-			sub = x.mergeContext(ctx.WithXpath(datum))
-		} else {
-			sub = ctx.Copy()
-		}
+		sub := ctx.WithXpath(datum)
 		if err := applyParams(sub); err != nil {
 			return nil, err
 		}
