@@ -62,7 +62,7 @@ func NewEvaluator() *Evaluator {
 	e := Evaluator{
 		namespaces:  environ.Empty[string](),
 		variables:   environ.Empty[Expr](),
-		builtins:    environ.Empty[BuiltinFunc](),
+		builtins:    DefaultBuiltin(), // environ.Empty[BuiltinFunc](),
 		elemNS:      "",
 		typeNS:      schemaNS,
 		funcNS:      functionNS,
