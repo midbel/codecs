@@ -755,7 +755,7 @@ func (s *Stylesheet) loadFunction(node xml.Node) error {
 		}
 		fn.Args = append(fn.Args, arg)
 	}
-	s.Funcs.Define(fn.QualifiedName(), &fn)
+	s.funcs.Define(fn.QualifiedName(), &fn)
 	return nil
 }
 

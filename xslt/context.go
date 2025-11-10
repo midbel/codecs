@@ -86,10 +86,6 @@ func (c *Context) Copy() *Context {
 	return c.clone(c.XslNode, c.ContextNode)
 }
 
-func (c *Context) Last() *Context {
-	return c
-}
-
 func (c *Context) clone(xslNode, ctxNode xml.Node) *Context {
 	child := Context{
 		XslNode:     xslNode,
@@ -124,8 +120,8 @@ func (c *Context) getMode(mode string) string {
 
 type Env struct {
 	eval  *xpath.Evaluator
-	Funcs environ.Environ[*Function]
-	Depth int
+	funcs environ.Environ[*Function]
+	depth int
 
 	aliases environ.Environ[string]
 	other   *Env
@@ -139,7 +135,7 @@ func Enclosed(other *Env) *Env {
 	return &Env{
 		other:   other,
 		eval:    xpath.NewEvaluator(),
-		Funcs:   environ.Empty[*Function](),
+		funcs:   environ.Empty[*Function](),
 		aliases: environ.Empty[string](),
 	}
 }
@@ -155,14 +151,24 @@ func (e *Env) SetXpathNamespace(ns string) {
 func (e *Env) Sub() *Env {
 	return &Env{
 		other: e.other,
-		Funcs: e.Funcs,
-		Depth: e.Depth + 1,
+		funcs: e.funcs,
+		depth: e.depth + 1,
 		eval:  e.eval.Sub(),
 	}
 }
 
 func (e *Env) Merge(other *Env) *Env {
-	return e
+	x := *e
+	x.eval.Merge(other.eval)
+	if m, ok := x.funcs.(interface {
+		Merge(environ.Environ[*Function])
+	}); ok {
+		m.Merge(e.funcs)
+	}
+	if m, ok := x.aliases.(interface{ Merge(environ.Environ[string]) }); ok {
+		m.Merge(e.aliases)
+	}
+	return &x
 }
 
 func (e *Env) ExecuteQuery(query string, node xml.Node) (xpath.Sequence, error) {
@@ -224,7 +230,7 @@ func (e *Env) ResolveAliasNS(ident string) (xml.NS, error) {
 }
 
 func (e *Env) ResolveFunc(ident string) (xpath.Callable, error) {
-	fn, err := e.Funcs.Resolve(ident)
+	fn, err := e.funcs.Resolve(ident)
 	if err != nil {
 		b, err := e.eval.ResolveFunc(ident)
 		if err == nil {
