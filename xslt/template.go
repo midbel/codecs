@@ -91,19 +91,6 @@ func (t *Template) Execute(ctx *Context) ([]xml.Node, error) {
 	return nodes, nil
 }
 
-func (t *Template) EmptyContext(other *Context) *Context {
-	ctx := other.Nest()
-	// re-set the template.env
-	return ctx
-}
-
-func (t *Template) mergeContext(other *Context) *Context {
-	child := other.Copy()
-	child.Env = child.Env.Sub()
-	child.Env.Merge(t.env)
-	return child
-}
-
 func (t *Template) isRoot() bool {
 	return t.Match == "/"
 }

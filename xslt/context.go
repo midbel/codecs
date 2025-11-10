@@ -114,8 +114,8 @@ type Env struct {
 	Funcs environ.Environ[*Function]
 	Depth int
 
-	aliases        environ.Environ[string]
-	other          *Env
+	aliases environ.Environ[string]
+	other   *Env
 }
 
 func Empty() *Env {
@@ -141,10 +141,10 @@ func (e *Env) SetXpathNamespace(ns string) {
 
 func (e *Env) Sub() *Env {
 	return &Env{
-		other:          e.other,
-		Funcs:          e.Funcs,
-		Depth:          e.Depth + 1,
-		eval:           e.eval.Sub(),
+		other: e.other,
+		Funcs: e.Funcs,
+		Depth: e.Depth + 1,
+		eval:  e.eval.Sub(),
 	}
 }
 

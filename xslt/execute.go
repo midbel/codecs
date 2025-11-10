@@ -32,11 +32,7 @@ func init() {
 					defer ctx.SetXpathNamespace(x)
 				}
 			}
-			seq, err := exec(ctx.Nest())
-			if err != nil {
-				ctx.Error(ctx, err)
-			}
-			return seq, err
+			return exec(ctx.Nest())
 		}
 		return fn
 	}
@@ -50,11 +46,7 @@ func init() {
 				}
 			}
 
-			seq, err := exec(ctx)
-			if err != nil {
-				ctx.Error(ctx, err)
-			}
-			return seq, err
+			return exec(ctx)
 		}
 		return fn
 	}
@@ -963,10 +955,6 @@ func executeMessage(ctx *Context) (xpath.Sequence, error) {
 	for _, n := range elem.Nodes {
 		parts = append(parts, n.Value())
 	}
-	if t, ok := ctx.Tracer.(interface{ Println(string) }); ok {
-		t.Println(strings.Join(parts, ""))
-	}
-
 	if quit, err := getAttribute(elem, "terminate"); err == nil && quit == "yes" {
 		return nil, ErrTerminate
 	}
