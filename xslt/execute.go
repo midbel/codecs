@@ -26,7 +26,7 @@ func init() {
 	nest := func(exec ExecuteFunc) ExecuteFunc {
 		fn := func(ctx *Context) (xpath.Sequence, error) {
 			ns := ctx.ResetXpathNamespace()
-			defer ctx.SetElemNS(ns)
+			defer ctx.SetXpathNamespace(ns)
 			return exec(ctx.Nest())
 		}
 		return fn
@@ -34,7 +34,7 @@ func init() {
 	trace := func(exec ExecuteFunc) ExecuteFunc {
 		fn := func(ctx *Context) (xpath.Sequence, error) {
 			ns := ctx.ResetXpathNamespace()
-			defer ctx.SetElemNS(ns)
+			defer ctx.SetXpathNamespace(ns)
 			return exec(ctx)
 		}
 		return fn

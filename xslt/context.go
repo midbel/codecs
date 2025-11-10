@@ -34,13 +34,13 @@ func (c *Context) ApplyTemplate() ([]xml.Node, error) {
 }
 
 func (c *Context) ResetXpathNamespace() string {
-	old := c.Env.GetElemNS()
+	old := c.Env.GetXpathNamespace()
 
 	el, err := getElementFromNode(c.XslNode)
 	if err == nil {
 		n, err := getAttribute(el, c.getQualifiedName("xpath-default-namespace"))
 		if err == nil {
-			c.Env.SetElemNS(n)
+			c.Env.SetXpathNamespace(n)
 		}
 	}
 	return old
