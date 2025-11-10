@@ -77,8 +77,21 @@ func (e *Evaluator) Sub() *Evaluator {
 	x.namespaces = environ.Enclosed[string](e.namespaces)
 	x.variables = environ.Enclosed[Expr](e.variables)
 	x.builtins = environ.Enclosed[BuiltinFunc](e.builtins)
-
 	return &x
+}
+
+func (e *Evaluator) Merge(other *Evaluator) {
+	if m, ok := e.namespaces.(interface{ Merge(environ.Environ[string]) }); ok {
+		m.Merge(other.namespaces)
+	}
+	if m, ok := e.variables.(interface{ Merge(environ.Environ[Expr]) }); ok {
+		m.Merge(other.variables)
+	}
+	if m, ok := e.builtins.(interface {
+		Merge(environ.Environ[BuiltinFunc])
+	}); ok {
+		m.Merge(other.builtins)
+	}
 }
 
 func (e *Evaluator) Create(in string) (Expr, error) {
@@ -101,10 +114,7 @@ func (e *Evaluator) Create(in string) (Expr, error) {
 	if q, ok := expr.(query); ok {
 		q.ctx = defaultContext(nil)
 		q.ctx.Environ = environ.ReadOnly(e.variables)
-		for _, n := range e.builtins.Names() {
-			b, _ := e.builtins.Resolve(n)
-			q.ctx.Builtins.Define(n, b)
-		}
+		q.ctx.Builtins = environ.ReadOnly(e.builtins)
 		expr = q
 	}
 	return expr, nil
