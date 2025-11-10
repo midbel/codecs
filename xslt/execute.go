@@ -25,10 +25,6 @@ var (
 func init() {
 	nest := func(exec ExecuteFunc) ExecuteFunc {
 		fn := func(ctx *Context) (xpath.Sequence, error) {
-			if ctx.Tracer != nil {
-				ctx.Enter(ctx)
-				defer ctx.Leave(ctx)
-			}
 			if el, err := getElementFromNode(ctx.XslNode); err == nil {
 				if ns, err := getAttribute(el, ctx.getQualifiedName("xpath-default-namespace")); err == nil {
 					x := ctx.GetXpathNamespace()
@@ -46,10 +42,6 @@ func init() {
 	}
 	trace := func(exec ExecuteFunc) ExecuteFunc {
 		fn := func(ctx *Context) (xpath.Sequence, error) {
-			if ctx.Tracer != nil {
-				defer ctx.Leave(ctx)
-				ctx.Enter(ctx)
-			}
 			if el, err := getElementFromNode(ctx.XslNode); err == nil {
 				if ns, err := getAttribute(el, ctx.getQualifiedName("xpath-default-namespace")); err == nil {
 					x := ctx.GetXpathNamespace()

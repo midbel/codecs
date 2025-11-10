@@ -283,7 +283,6 @@ type Stylesheet struct {
 	namer  alpha.Namer
 	static *Env
 	*Env
-	Tracer
 
 	Context string
 	Others  []*Stylesheet
