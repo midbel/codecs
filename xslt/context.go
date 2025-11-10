@@ -33,6 +33,19 @@ func (c *Context) ApplyTemplate() ([]xml.Node, error) {
 	return ex.Execute(c)
 }
 
+func (c *Context) ResetXpathNamespace() string {
+	old := c.Env.GetElemNS()
+
+	el, err := getElementFromNode(c.XslNode)
+	if err == nil {
+		n, err := getAttribute(el, c.getQualifiedName("xpath-default-namespace"))
+		if err == nil {
+			c.Env.SetElemNS(n)
+		}
+	}
+	return old
+}
+
 func (c *Context) Find(name, mode string) (Executer, error) {
 	return c.Stylesheet.Find(name, c.getMode(mode))
 }
