@@ -229,6 +229,12 @@ func executeCallTemplate(ctx *Context) (xpath.Sequence, error) {
 		return nil, err
 	}
 	sub := ctx.Nest()
+	if t, ok := tpl.(interface{ FillWithDefaults(*Context) *Context }); ok {
+		sub = t.FillWithDefaults(sub)
+	}
+	if t, ok := tpl.(*Template); ok {
+		sub.Env = sub.Env.Merge(t.env)
+	}
 	if err := applyParams(sub); err != nil {
 		return nil, ctx.errorWithContext(err)
 	}

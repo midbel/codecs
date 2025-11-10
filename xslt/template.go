@@ -65,8 +65,13 @@ func (t *Template) Clone() *Template {
 	return &tpl
 }
 
-func (t *Template) Call(ctx *Context) ([]xml.Node, error) {
+func (t *Template) FillWithDefaults(ctx *Context) *Context {
 	ctx.Env = ctx.Env.Merge(t.env)
+	return ctx
+}
+
+func (t *Template) Call(ctx *Context) ([]xml.Node, error) {
+	// ctx.Env = ctx.Env.Merge(t.env)
 	return t.Execute(ctx)
 }
 
