@@ -25,44 +25,17 @@ var (
 func init() {
 	nest := func(exec ExecuteFunc) ExecuteFunc {
 		fn := func(ctx *Context) (xpath.Sequence, error) {
-			if ctx.Tracer != nil {
-				ctx.Enter(ctx)
-				defer ctx.Leave(ctx)
-			}
-			if el, err := getElementFromNode(ctx.XslNode); err == nil {
-				if ns, err := getAttribute(el, ctx.getQualifiedName("xpath-default-namespace")); err == nil {
-					x := ctx.GetXpathNamespace()
-					ctx.SetXpathNamespace(ns)
-					defer ctx.SetXpathNamespace(x)
-				}
-			}
-			seq, err := exec(ctx.Nest())
-			if err != nil {
-				ctx.Error(ctx, err)
-			}
-			return seq, err
+			ns := ctx.ResetXpathNamespace()
+			defer ctx.SetXpathNamespace(ns)
+			return exec(ctx.Nest())
 		}
 		return fn
 	}
 	trace := func(exec ExecuteFunc) ExecuteFunc {
 		fn := func(ctx *Context) (xpath.Sequence, error) {
-			if ctx.Tracer != nil {
-				defer ctx.Leave(ctx)
-				ctx.Enter(ctx)
-			}
-			if el, err := getElementFromNode(ctx.XslNode); err == nil {
-				if ns, err := getAttribute(el, ctx.getQualifiedName("xpath-default-namespace")); err == nil {
-					x := ctx.GetXpathNamespace()
-					ctx.SetXpathNamespace(ns)
-					defer ctx.SetXpathNamespace(x)
-				}
-			}
-
-			seq, err := exec(ctx)
-			if err != nil {
-				ctx.Error(ctx, err)
-			}
-			return seq, err
+			ns := ctx.ResetXpathNamespace()
+			defer ctx.SetXpathNamespace(ns)
+			return exec(ctx)
 		}
 		return fn
 	}
@@ -256,6 +229,12 @@ func executeCallTemplate(ctx *Context) (xpath.Sequence, error) {
 		return nil, err
 	}
 	sub := ctx.Nest()
+	if t, ok := tpl.(interface{ FillWithDefaults(*Context) *Context }); ok {
+		sub = t.FillWithDefaults(sub)
+	}
+	if t, ok := tpl.(*Template); ok {
+		sub.Env = sub.Env.Merge(t.env)
+	}
 	if err := applyParams(sub); err != nil {
 		return nil, ctx.errorWithContext(err)
 	}
@@ -971,10 +950,6 @@ func executeMessage(ctx *Context) (xpath.Sequence, error) {
 	for _, n := range elem.Nodes {
 		parts = append(parts, n.Value())
 	}
-	if t, ok := ctx.Tracer.(interface{ Println(string) }); ok {
-		t.Println(strings.Join(parts, ""))
-	}
-
 	if quit, err := getAttribute(elem, "terminate"); err == nil && quit == "yes" {
 		return nil, ErrTerminate
 	}
@@ -1431,12 +1406,7 @@ func executeApply(ctx *Context, match matchFunc) (xpath.Sequence, error) {
 		if err != nil {
 			return seq, err
 		}
-		var sub *Context
-		if x, ok := tpl.(interface{ mergeContext(*Context) *Context }); ok {
-			sub = x.mergeContext(ctx.WithXpath(datum))
-		} else {
-			sub = ctx.Copy()
-		}
+		sub := ctx.WithXpath(datum)
 		if err := applyParams(sub); err != nil {
 			return nil, err
 		}
@@ -1512,7 +1482,7 @@ func getNodesForTemplate(ctx *Context) ([]xml.Node, error) {
 	return res, nil
 }
 
-func defineForeachGroupBuiltins(nested *Context, key, items xpath.Sequence) {
+func defineForeachGroupBuiltins(ctx *Context, key, items xpath.Sequence) {
 	currentGrp := func(_ xpath.Context, _ []xpath.Expr) (xpath.Sequence, error) {
 		return items, nil
 	}
@@ -1520,13 +1490,11 @@ func defineForeachGroupBuiltins(nested *Context, key, items xpath.Sequence) {
 		return key, nil
 	}
 
-	nested.Builtins.Define("current-group", currentGrp)
-	nested.Builtins.Define("fn:current-group", currentGrp)
-	nested.Builtins.Define("current-grouping-key", currentKey)
-	nested.Builtins.Define("fn:current-grouping-key", currentKey)
+	ctx.RegisterFunc("current-group", currentGrp)
+	ctx.RegisterFunc("current-grouping-key", currentKey)
 }
 
-func defineMergeBuiltins(nested *Context, key string, all []string, items []MergedItem) {
+func defineMergeBuiltins(ctx *Context, key string, all []string, items []MergedItem) {
 	currentKey := func(_ xpath.Context, _ []xpath.Expr) (xpath.Sequence, error) {
 		return xpath.Singleton(key), nil
 	}
@@ -1563,9 +1531,7 @@ func defineMergeBuiltins(nested *Context, key string, all []string, items []Merg
 		}
 		return seq, nil
 	}
-	nested.Builtins.Define("current-merge-group", currentGrp)
-	nested.Builtins.Define("fn:current-merge-group", currentGrp)
-	nested.Builtins.Define("current-merge-key", currentKey)
-	nested.Builtins.Define("fn:current-merge-key", currentKey)
-	nested.Builtins.Define("angle:merge-keys", mergeKeys)
+	ctx.RegisterFunc("current-merge-group", currentGrp)
+	ctx.RegisterFunc("current-merge-key", currentKey)
+	ctx.RegisterFunc("angle:merge-keys", mergeKeys)
 }

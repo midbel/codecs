@@ -2,8 +2,6 @@ package xslt
 
 import (
 	"fmt"
-	"iter"
-	"slices"
 
 	"github.com/midbel/codecs/environ"
 	"github.com/midbel/codecs/xml"
@@ -35,6 +33,19 @@ func (c *Context) ApplyTemplate() ([]xml.Node, error) {
 	return ex.Execute(c)
 }
 
+func (c *Context) ResetXpathNamespace() string {
+	old := c.Env.GetXpathNamespace()
+
+	el, err := getElementFromNode(c.XslNode)
+	if err == nil {
+		n, err := getAttribute(el, c.getQualifiedName("xpath-default-namespace"))
+		if err == nil {
+			c.Env.SetXpathNamespace(n)
+		}
+	}
+	return old
+}
+
 func (c *Context) Find(name, mode string) (Executer, error) {
 	return c.Stylesheet.Find(name, c.getMode(mode))
 }
@@ -45,17 +56,6 @@ func (c *Context) Match(node xml.Node, mode string) (Executer, error) {
 
 func (c *Context) MatchImport(node xml.Node, mode string) (Executer, error) {
 	return c.Stylesheet.MatchImport(node, c.getMode(mode))
-}
-
-func (c *Context) getMode(mode string) string {
-	switch mode {
-	case currentMode:
-		return c.Mode
-	case defaultMode:
-		return c.Stylesheet.DefaultMode
-	default:
-		return mode
-	}
 }
 
 func (c *Context) WithNodes(ctxNode, xslNode xml.Node) *Context {
@@ -80,12 +80,6 @@ func (c *Context) Nest() *Context {
 	child := c.clone(c.XslNode, c.ContextNode)
 	child.Env = child.Env.Sub()
 	return child
-}
-
-func (c *Context) Last() *Context {
-	x := c.Copy()
-	x.Env = x.Env.Unwrap()
-	return x
 }
 
 func (c *Context) Copy() *Context {
@@ -113,17 +107,22 @@ func (c *Context) errorWithContext(err error) error {
 	return errorWithContext(c.XslNode.QualifiedName(), err)
 }
 
-type Env struct {
-	Vars     environ.Environ[xpath.Expr]
-	Params   environ.Environ[xpath.Expr]
-	Builtins environ.Environ[xpath.BuiltinFunc]
-	Funcs    environ.Environ[*Function]
-	Depth    int
+func (c *Context) getMode(mode string) string {
+	switch mode {
+	case currentMode:
+		return c.Mode
+	case defaultMode:
+		return c.Stylesheet.DefaultMode
+	default:
+		return mode
+	}
+}
 
-	xpathNamespace string
-	namespaces     environ.Environ[string]
-	aliases        environ.Environ[string]
-	other          *Env
+type Env struct {
+	eval  *xpath.Evaluator
+	funcs environ.Environ[*Function]
+	aliases environ.Environ[string]
+	depth int
 }
 
 func Empty() *Env {
@@ -131,73 +130,46 @@ func Empty() *Env {
 }
 
 func Enclosed(other *Env) *Env {
-	return &Env{
-		other:      other,
-		Vars:       environ.Empty[xpath.Expr](),
-		Params:     environ.Empty[xpath.Expr](),
-		Builtins:   xpath.DefaultBuiltin(),
-		Funcs:      environ.Empty[*Function](),
-		namespaces: environ.Empty[string](),
-		aliases:    environ.Empty[string](),
+	e := &Env{
+		eval:    xpath.NewEvaluator(),
+		funcs:   environ.Empty[*Function](),
+		aliases: environ.Empty[string](),
 	}
+	if other != nil {
+		e.eval.Merge(other.eval)
+	}
+	return e
 }
 
 func (e *Env) GetXpathNamespace() string {
-	return e.xpathNamespace
+	return e.eval.GetElemNS()
 }
 
 func (e *Env) SetXpathNamespace(ns string) {
-	e.xpathNamespace = ns
-}
-
-func (e *Env) Len() int {
-	return e.Vars.Len() + e.Params.Len()
-}
-
-func (e *Env) Names() []string {
-	return e.localNames()
+	e.eval.SetElemNS(ns)
 }
 
 func (e *Env) Sub() *Env {
 	return &Env{
-		other:          e.other,
-		Vars:           environ.Enclosed[xpath.Expr](e.Vars),
-		Params:         environ.Enclosed[xpath.Expr](e.Params),
-		Funcs:          e.Funcs,
-		Builtins:       e.Builtins,
-		Depth:          e.Depth + 1,
-		namespaces:     environ.Enclosed[string](e.namespaces),
-		xpathNamespace: e.xpathNamespace,
+		funcs:   e.funcs,
+		aliases: e.aliases,
+		depth:   e.depth + 1,
+		eval:    e.eval.Sub(),
 	}
 }
 
-func (e *Env) Unwrap() *Env {
-	x := &Env{
-		other:          e.other,
-		Vars:           e.Vars,
-		Params:         e.Params,
-		Builtins:       e.Builtins,
-		Funcs:          e.Funcs,
-		Depth:          e.Depth,
-		namespaces:     e.namespaces,
-		xpathNamespace: e.xpathNamespace,
-	}
-	if u, ok := x.Vars.(interface {
-		Detach() environ.Environ[xpath.Expr]
+func (e *Env) Merge(other *Env) *Env {
+	x := *e
+	x.eval.Merge(other.eval)
+	if m, ok := x.funcs.(interface {
+		Merge(environ.Environ[*Function])
 	}); ok {
-		x.Vars = u.Detach()
+		m.Merge(e.funcs)
 	}
-	if u, ok := x.Params.(interface {
-		Detach() environ.Environ[xpath.Expr]
-	}); ok {
-		x.Params = u.Detach()
+	if m, ok := x.aliases.(interface{ Merge(environ.Environ[string]) }); ok {
+		m.Merge(e.aliases)
 	}
-	if u, ok := x.namespaces.(interface {
-		Detach() environ.Environ[string]
-	}); ok {
-		x.namespaces = u.Detach()
-	}
-	return x
+	return &x
 }
 
 func (e *Env) ExecuteQuery(query string, node xml.Node) (xpath.Sequence, error) {
@@ -213,18 +185,7 @@ func (e *Env) ExecuteQuery(query string, node xml.Node) (xpath.Sequence, error) 
 }
 
 func (e *Env) CompileQuery(query string) (xpath.Expr, error) {
-	eval := xpath.NewEvaluator()
-	eval.SetElemNS(e.xpathNamespace)
-
-	if e.other != nil {
-		for prefix, uri := range e.other.getNamespaces() {
-			eval.RegisterNS(prefix, uri)
-		}
-	}
-	for prefix, uri := range e.getNamespaces() {
-		eval.RegisterNS(prefix, uri)
-	}
-	q, err := eval.Create(query)
+	q, err := e.eval.Create(query)
 	if err != nil {
 		return nil, err
 	}
@@ -239,38 +200,15 @@ func (e *Env) TestNode(query string, node xml.Node) (bool, error) {
 	return seq.True(), nil
 }
 
-func (e *Env) Merge(other *Env) {
-	if m, ok := e.Vars.(interface {
-		Merge(environ.Environ[xpath.Expr])
-	}); ok && other.Vars.Len() > 0 {
-		m.Merge(other.Vars)
-	}
-	if m, ok := e.Params.(interface {
-		Merge(environ.Environ[xpath.Expr])
-	}); ok && other.Params.Len() > 0 {
-		m.Merge(other.Params)
-	}
-}
-
 func (e *Env) Resolve(ident string) (xpath.Expr, error) {
-	expr, err := e.Vars.Resolve(ident)
+	expr, err := e.eval.Resolve(ident)
 	if err == nil {
 		return expr, nil
-	}
-	expr, err = e.Params.Resolve(ident)
-	if err == nil {
-		return expr, nil
-	}
-	if e.other != nil {
-		return e.other.Resolve(ident)
 	}
 	return nil, err
 }
 
 func (e *Env) ResolveAliasNS(ident string) (xml.NS, error) {
-	if e.other != nil {
-		return e.other.ResolveAliasNS(ident)
-	}
 	var (
 		ns  xml.NS
 		err error
@@ -279,7 +217,7 @@ func (e *Env) ResolveAliasNS(ident string) (xml.NS, error) {
 	if err != nil {
 		return ns, err
 	}
-	ns.Uri, err = e.namespaces.Resolve(ns.Prefix)
+	ns.Uri, err = e.eval.ResolveNS(ns.Prefix)
 	if err != nil {
 		return ns, err
 	}
@@ -287,30 +225,24 @@ func (e *Env) ResolveAliasNS(ident string) (xml.NS, error) {
 }
 
 func (e *Env) ResolveFunc(ident string) (xpath.Callable, error) {
-	fn, err := e.Funcs.Resolve(ident)
+	fn, err := e.funcs.Resolve(ident)
 	if err != nil {
-		b, err := e.Builtins.Resolve(ident)
-		if err == nil {
-			return b, nil
-		}
-		if e.other != nil {
-			return e.other.ResolveFunc(ident)
-		}
-		return nil, err
+		b, err := e.eval.ResolveFunc(ident)
+		return b, err
 	}
 	return fn, nil
 }
 
-func (e *Env) Define(ident string, expr xpath.Expr) {
-	ok := slices.Contains(e.localNames(), ident)
-	if ok {
-		return
-	}
-	e.Vars.Define(ident, expr)
+func (e *Env) RegisterFunc(ident string, fn xpath.BuiltinFunc) {
+	e.eval.RegisterFunc(ident, fn)
 }
 
-func (e *Env) Eval(ident, query string, datum xml.Node) error {
-	items, err := e.ExecuteQuery(query, datum)
+func (e *Env) Define(ident string, expr xpath.Expr) {
+	e.eval.Set(ident, expr)
+}
+
+func (e *Env) Eval(ident, query string, node xml.Node) error {
+	items, err := e.ExecuteQuery(query, node)
 	if err == nil {
 		e.Define(ident, xpath.NewValueFromSequence(items))
 	}
@@ -325,43 +257,20 @@ func (e *Env) DefineParam(ident, value string) error {
 	return err
 }
 
-func (e *Env) EvalParam(ident, query string, datum xml.Node) error {
-	items, err := e.ExecuteQuery(query, datum)
+func (e *Env) EvalParam(ident, query string, node xml.Node) error {
+	items, err := e.ExecuteQuery(query, node)
 	if err == nil {
-		e.DefineExprParam(ident, xpath.NewValueFromSequence(items))
+		e.Define(ident, xpath.NewValueFromSequence(items))
 	}
 	return err
 }
 
 func (e *Env) DefineExprParam(ident string, expr xpath.Expr) {
-	ok := slices.Contains(e.localNames(), ident)
-	if ok {
-		// pass
-	}
-	e.Params.Define(ident, expr)
+	e.eval.Set(ident, expr)
 }
 
-func (e *Env) localNames() []string {
-	return slices.Concat(e.Vars.Names(), e.Params.Names())
-}
-
-func (e *Env) registerNS(prefix, uri string) {
-	e.namespaces.Define(prefix, uri)
-}
-
-func (e *Env) getNamespaces() iter.Seq2[string, string] {
-	fn := func(yield func(string, string) bool) {
-		for _, n := range e.namespaces.Names() {
-			uri, err := e.namespaces.Resolve(n)
-			if err != nil {
-				continue
-			}
-			if !yield(n, uri) {
-				break
-			}
-		}
-	}
-	return fn
+func (e *Env) RegisterNS(prefix, uri string) {
+	e.eval.Define(prefix, uri)
 }
 
 func errorWithContext(ctx string, err error) error {

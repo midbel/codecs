@@ -31,7 +31,6 @@ func (c *TransformCmd) Run(args []string) error {
 		params []UserDefinedParam
 		set    = flag.NewFlagSet("transform", flag.ContinueOnError)
 	)
-	set.BoolVar(&c.Trace, "t", false, "trace")
 	set.BoolVar(&c.Quiet, "q", false, "quiet")
 	set.StringVar(&c.Mode, "m", "", "default mode")
 	set.BoolVar(&c.WrapRoot, "w", false, "wrap nodes under a single root element")
@@ -68,9 +67,6 @@ func (c *TransformCmd) Run(args []string) error {
 	}
 	sheet.Mode = c.Mode
 	sheet.WrapRoot = c.WrapRoot
-	if c.Trace {
-		sheet.Tracer = xslt.Stdout()
-	}
 	for _, p := range params {
 		sheet.DefineExprParam(p.Ident, p.Value)
 	}

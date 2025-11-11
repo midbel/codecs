@@ -48,6 +48,7 @@ type Callable interface {
 type Evaluator struct {
 	namespaces environ.Environ[string]
 	variables  environ.Environ[Expr]
+	builtins   environ.Environ[BuiltinFunc]
 	baseURI    string
 	elemNS     string
 	typeNS     string
@@ -61,6 +62,7 @@ func NewEvaluator() *Evaluator {
 	e := Evaluator{
 		namespaces:  environ.Empty[string](),
 		variables:   environ.Empty[Expr](),
+		builtins:    DefaultBuiltin(), // environ.Empty[BuiltinFunc](),
 		elemNS:      "",
 		typeNS:      schemaNS,
 		funcNS:      functionNS,
@@ -68,6 +70,28 @@ func NewEvaluator() *Evaluator {
 		decimalSep:  '.',
 	}
 	return &e
+}
+
+func (e *Evaluator) Sub() *Evaluator {
+	x := *e
+	x.namespaces = environ.Enclosed[string](e.namespaces)
+	x.variables = environ.Enclosed[Expr](e.variables)
+	x.builtins = environ.Enclosed[BuiltinFunc](e.builtins)
+	return &x
+}
+
+func (e *Evaluator) Merge(other *Evaluator) {
+	if m, ok := e.namespaces.(interface{ Merge(environ.Environ[string]) }); ok {
+		m.Merge(other.namespaces)
+	}
+	if m, ok := e.variables.(interface{ Merge(environ.Environ[Expr]) }); ok {
+		m.Merge(other.variables)
+	}
+	if m, ok := e.builtins.(interface {
+		Merge(environ.Environ[BuiltinFunc])
+	}); ok {
+		m.Merge(other.builtins)
+	}
 }
 
 func (e *Evaluator) Create(in string) (Expr, error) {
@@ -90,6 +114,7 @@ func (e *Evaluator) Create(in string) (Expr, error) {
 	if q, ok := expr.(query); ok {
 		q.ctx = defaultContext(nil)
 		q.ctx.Environ = environ.ReadOnly(e.variables)
+		q.ctx.Builtins = environ.ReadOnly(e.builtins)
 		expr = q
 	}
 	return expr, nil
@@ -103,12 +128,47 @@ func (e *Evaluator) Find(query string, node xml.Node) (Sequence, error) {
 	return expr.Find(node)
 }
 
+func (e *Evaluator) RegisterFunc(ident string, fn BuiltinFunc) {
+	qn, err := xml.ParseName(ident)
+	if err == nil {
+		qn.Uri = defaultNS[qn.Space]
+		if qn.Space == "" {
+			qn.Uri = functionNS
+		}
+		ident = qn.ExpandedName()
+	} else {
+		qn.Uri = functionNS
+		ident = qn.ExpandedName()
+	}
+	e.builtins.Define(ident, fn)
+}
+
+func (e *Evaluator) ResolveFunc(ident string) (BuiltinFunc, error) {
+	return e.builtins.Resolve(ident)
+}
+
 func (e *Evaluator) RegisterNS(prefix, uri string) {
 	e.namespaces.Define(prefix, uri)
 }
 
+func (e *Evaluator) ResolveNS(ident string) (string, error) {
+	return e.namespaces.Resolve(ident)
+}
+
+func (e *Evaluator) Set(ident string, value Expr) {
+	e.variables.Define(ident, value)
+}
+
 func (e *Evaluator) Define(ident, value string) {
-	e.variables.Define(ident, NewValueFromLiteral(value))
+	e.Set(ident, NewValueFromLiteral(value))
+}
+
+func (e *Evaluator) Resolve(ident string) (Expr, error) {
+	return e.variables.Resolve(ident)
+}
+
+func (e *Evaluator) GetElemNS() string {
+	return e.elemNS
 }
 
 func (e *Evaluator) SetElemNS(ns string) {

@@ -43,9 +43,6 @@ func transformNode(ctx *Context) (xpath.Sequence, error) {
 }
 
 func processNode(ctx *Context) (xpath.Sequence, error) {
-	ctx.Enter(ctx)
-	defer ctx.Leave(ctx)
-
 	if ctx.XslNode.Type() != xml.TypeElement {
 		c := cloneNode(ctx.XslNode)
 		if c == nil {
