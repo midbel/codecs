@@ -71,7 +71,6 @@ func (t *Template) FillWithDefaults(ctx *Context) *Context {
 }
 
 func (t *Template) Call(ctx *Context) ([]xml.Node, error) {
-	// ctx.Env = ctx.Env.Merge(t.env)
 	return t.Execute(ctx)
 }
 

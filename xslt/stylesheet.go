@@ -649,7 +649,7 @@ func (s *Stylesheet) includeSheet(node xml.Node) error {
 	if ok, _ := s.useWhen(elem); !ok {
 		return nil
 	}
-	ctx := s.createContext(nil)
+	ctx := s.staticContext(nil)
 	return includeSheet(ctx.WithXsl(node))
 }
 
@@ -661,7 +661,7 @@ func (s *Stylesheet) importSheet(node xml.Node) error {
 	if ok, _ := s.useWhen(elem); !ok {
 		return nil
 	}
-	ctx := s.createContext(nil)
+	ctx := s.staticContext(nil)
 	return importSheet(ctx.WithXsl(node))
 }
 

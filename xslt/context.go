@@ -121,10 +121,8 @@ func (c *Context) getMode(mode string) string {
 type Env struct {
 	eval  *xpath.Evaluator
 	funcs environ.Environ[*Function]
-	depth int
-
 	aliases environ.Environ[string]
-	other   *Env
+	depth int
 }
 
 func Empty() *Env {
@@ -162,6 +160,7 @@ func (e *Env) Sub() *Env {
 
 func (e *Env) Merge(other *Env) *Env {
 	x := *e
+	x.eval.Merge(other.eval)
 	if m, ok := x.funcs.(interface {
 		Merge(environ.Environ[*Function])
 	}); ok {
