@@ -129,6 +129,17 @@ func (e *Evaluator) Find(query string, node xml.Node) (Sequence, error) {
 }
 
 func (e *Evaluator) RegisterFunc(ident string, fn BuiltinFunc) {
+	qn, err := xml.ParseName(ident)
+	if err == nil {
+		qn.Uri = defaultNS[qn.Space]
+		if qn.Space == ""{
+			qn.Uri = functionNS
+		}
+		ident = qn.ExpandedName()
+	} else {
+		qn.Uri = functionNS
+		ident = qn.ExpandedName()
+	}
 	e.builtins.Define(ident, fn)
 }
 

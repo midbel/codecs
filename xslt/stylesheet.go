@@ -627,9 +627,9 @@ func (s *Stylesheet) makeIdent() string {
 
 func (s *Stylesheet) defineBuiltins() {
 	s.static.RegisterFunc("system-property", callSystemProperty)
-	s.static.RegisterFunc("fn:system-property", callSystemProperty)
+	s.static.RegisterFunc("system-property", callSystemProperty)
 	s.Env.RegisterFunc("current", callCurrent)
-	s.Env.RegisterFunc("fn:current", callCurrent)
+	s.Env.RegisterFunc("current", callCurrent)
 }
 
 func (s *Stylesheet) useWhen(node *xml.Element) (bool, error) {

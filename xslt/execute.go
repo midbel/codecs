@@ -1482,7 +1482,7 @@ func getNodesForTemplate(ctx *Context) ([]xml.Node, error) {
 	return res, nil
 }
 
-func defineForeachGroupBuiltins(nested *Context, key, items xpath.Sequence) {
+func defineForeachGroupBuiltins(ctx *Context, key, items xpath.Sequence) {
 	currentGrp := func(_ xpath.Context, _ []xpath.Expr) (xpath.Sequence, error) {
 		return items, nil
 	}
@@ -1490,13 +1490,11 @@ func defineForeachGroupBuiltins(nested *Context, key, items xpath.Sequence) {
 		return key, nil
 	}
 
-	nested.RegisterFunc("current-group", currentGrp)
-	nested.RegisterFunc("fn:current-group", currentGrp)
-	nested.RegisterFunc("current-grouping-key", currentKey)
-	nested.RegisterFunc("fn:current-grouping-key", currentKey)
+	ctx.RegisterFunc("current-group", currentGrp)
+	ctx.RegisterFunc("current-grouping-key", currentKey)
 }
 
-func defineMergeBuiltins(nested *Context, key string, all []string, items []MergedItem) {
+func defineMergeBuiltins(ctx *Context, key string, all []string, items []MergedItem) {
 	currentKey := func(_ xpath.Context, _ []xpath.Expr) (xpath.Sequence, error) {
 		return xpath.Singleton(key), nil
 	}
@@ -1533,9 +1531,7 @@ func defineMergeBuiltins(nested *Context, key string, all []string, items []Merg
 		}
 		return seq, nil
 	}
-	nested.RegisterFunc("current-merge-group", currentGrp)
-	nested.RegisterFunc("fn:current-merge-group", currentGrp)
-	nested.RegisterFunc("current-merge-key", currentKey)
-	nested.RegisterFunc("fn:current-merge-key", currentKey)
-	nested.RegisterFunc("angle:merge-keys", mergeKeys)
+	ctx.RegisterFunc("current-merge-group", currentGrp)
+	ctx.RegisterFunc("current-merge-key", currentKey)
+	ctx.RegisterFunc("angle:merge-keys", mergeKeys)
 }

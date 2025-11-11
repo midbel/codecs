@@ -326,15 +326,20 @@ func ParseName(name string) (QName, error) {
 	return qn, nil
 }
 
-func LocalName(name string) QName {
-	return QualifiedName(name, "")
-}
-
-func QualifiedName(name, space string) QName {
+func ExpandedName(name, space, uri string) QName {
 	return QName{
 		Name:  name,
 		Space: space,
-	}
+		Uri: uri,
+	}	
+}
+
+func LocalName(name string) QName {
+	return ExpandedName(name, "", "")
+}
+
+func QualifiedName(name, space string) QName {
+	return ExpandedName(name, space, "")
 }
 
 func (q QName) Zero() bool {
