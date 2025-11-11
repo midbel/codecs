@@ -270,7 +270,7 @@ func (e *Env) DefineExprParam(ident string, expr xpath.Expr) {
 }
 
 func (e *Env) RegisterNS(prefix, uri string) {
-	e.eval.Define(prefix, uri)
+	e.eval.RegisterNS(prefix, uri)
 }
 
 func errorWithContext(ctx string, err error) error {

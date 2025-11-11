@@ -38,7 +38,12 @@ func (e *Env[T]) Len() int {
 }
 
 func (e *Env[T]) Names() []string {
-	return slices.Collect(maps.Keys(e.values))
+	locals := slices.Collect(maps.Keys(e.values))
+	if e.parent != nil {
+		super := e.parent.Names()
+		locals = slices.Concat(locals, super)
+	}
+	return locals
 }
 
 func (e *Env[T]) Define(ident string, expr T) {

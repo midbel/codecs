@@ -669,12 +669,10 @@ func (s *Stylesheet) loadNamespacesFromRoot(root *xml.Element) error {
 	for _, qn := range root.Namespaces() {
 		s.Env.RegisterNS(qn.Prefix, qn.Uri)
 	}
-	if s.xsltNamespace == xsltNamespacePrefix {
-		return nil
-	}
 	for e, fn := range executers {
 		delete(executers, e)
 		e.Space = s.xsltNamespace
+		e.Uri = xsltNamespaceUri
 		executers[e] = fn
 	}
 	return nil
