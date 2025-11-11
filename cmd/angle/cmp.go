@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"flag"
 )
 
 type CompareCmd struct{}
