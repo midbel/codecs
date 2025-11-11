@@ -132,12 +132,15 @@ func Empty() *Env {
 }
 
 func Enclosed(other *Env) *Env {
-	return &Env{
-		other:   other,
+	e := &Env{
 		eval:    xpath.NewEvaluator(),
 		funcs:   environ.Empty[*Function](),
 		aliases: environ.Empty[string](),
 	}
+	if other != nil {
+		e.eval.Merge(other.eval)
+	}
+	return e
 }
 
 func (e *Env) GetXpathNamespace() string {
@@ -150,16 +153,15 @@ func (e *Env) SetXpathNamespace(ns string) {
 
 func (e *Env) Sub() *Env {
 	return &Env{
-		other: e.other,
-		funcs: e.funcs,
-		depth: e.depth + 1,
-		eval:  e.eval.Sub(),
+		funcs:   e.funcs,
+		aliases: e.aliases,
+		depth:   e.depth + 1,
+		eval:    e.eval.Sub(),
 	}
 }
 
 func (e *Env) Merge(other *Env) *Env {
 	x := *e
-	x.eval.Merge(other.eval)
 	if m, ok := x.funcs.(interface {
 		Merge(environ.Environ[*Function])
 	}); ok {
@@ -204,16 +206,10 @@ func (e *Env) Resolve(ident string) (xpath.Expr, error) {
 	if err == nil {
 		return expr, nil
 	}
-	if e.other != nil {
-		return e.other.Resolve(ident)
-	}
 	return nil, err
 }
 
 func (e *Env) ResolveAliasNS(ident string) (xml.NS, error) {
-	if e.other != nil {
-		return e.other.ResolveAliasNS(ident)
-	}
 	var (
 		ns  xml.NS
 		err error
@@ -233,13 +229,7 @@ func (e *Env) ResolveFunc(ident string) (xpath.Callable, error) {
 	fn, err := e.funcs.Resolve(ident)
 	if err != nil {
 		b, err := e.eval.ResolveFunc(ident)
-		if err == nil {
-			return b, nil
-		}
-		if e.other != nil {
-			return e.other.ResolveFunc(ident)
-		}
-		return nil, err
+		return b, err
 	}
 	return fn, nil
 }

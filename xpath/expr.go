@@ -132,7 +132,7 @@ func (e *Evaluator) RegisterFunc(ident string, fn BuiltinFunc) {
 	qn, err := xml.ParseName(ident)
 	if err == nil {
 		qn.Uri = defaultNS[qn.Space]
-		if qn.Space == ""{
+		if qn.Space == "" {
 			qn.Uri = functionNS
 		}
 		ident = qn.ExpandedName()

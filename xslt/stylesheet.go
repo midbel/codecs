@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/midbel/codecs/alpha"
-	"github.com/midbel/codecs/environ"
 	"github.com/midbel/codecs/xml"
 	"github.com/midbel/codecs/xpath"
 )
@@ -505,8 +504,6 @@ func (s *Stylesheet) staticContext(node xml.Node) *Context {
 }
 
 func (s *Stylesheet) createContext(node xml.Node) *Context {
-	s.Env.aliases = environ.ReadOnly(s.Env.aliases)
-
 	ctx := &Context{
 		ContextNode: node,
 		Mode:        s.Mode,

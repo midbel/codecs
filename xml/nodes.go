@@ -330,8 +330,8 @@ func ExpandedName(name, space, uri string) QName {
 	return QName{
 		Name:  name,
 		Space: space,
-		Uri: uri,
-	}	
+		Uri:   uri,
+	}
 }
 
 func LocalName(name string) QName {
