@@ -20,7 +20,7 @@ func processAVT(ctx *Context) error {
 				str.WriteString(q)
 				continue
 			}
-			items, err := ctx.ExecuteQuery(q, ctx.ContextNode)
+			items, err := ctx.Execute(q)
 			if err != nil {
 				return err
 			}

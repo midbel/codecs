@@ -157,7 +157,7 @@ func (m *Mode) mainTemplate() (Executer, error) {
 	return nil, fmt.Errorf("main template not found")
 }
 
-func (m *Mode) matchTemplate(node xml.Node, env *Env) (Executer, error) {
+func (m *Mode) matchTemplate(node xml.Node, env *xpath.Evaluator) (Executer, error) {
 	type TemplateMatch struct {
 		*Template
 		Position int
@@ -168,7 +168,7 @@ func (m *Mode) matchTemplate(node xml.Node, env *Env) (Executer, error) {
 		if t.isRoot() || t.Name != "" || t.Match == "" {
 			continue
 		}
-		expr, err := env.CompileQuery(t.Match)
+		expr, err := env.Create(t.Match)
 		if err != nil {
 			continue
 		}
@@ -280,8 +280,8 @@ type Stylesheet struct {
 
 	output []*Output
 	namer  alpha.Namer
-	static *Env
-	*Env
+	static *xpath.Evaluator
+	env    *xpath.Evaluator
 
 	Context string
 	Others  []*Stylesheet
@@ -295,8 +295,8 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 	sheet := Stylesheet{
 		Context:       contextDir,
 		xsltNamespace: xsltNamespacePrefix,
-		static:        Empty(),
-		Env:           Empty(),
+		static:        xpath.NewEvaluator(),
+		env:           xpath.NewEvaluator(),
 		namer:         alpha.Compose(alpha.NewLowerString(3), alpha.NewNumberString(2)),
 	}
 
@@ -497,7 +497,7 @@ func (s *Stylesheet) staticContext(node xml.Node) *Context {
 		Size:        1,
 		Index:       1,
 		Stylesheet:  s,
-		Env:         s.static,
+		env:         s.static,
 	}
 	ctx.SetXpathNamespace(s.xpathNamespace)
 	return ctx
@@ -510,7 +510,7 @@ func (s *Stylesheet) createContext(node xml.Node) *Context {
 		Size:        1,
 		Index:       1,
 		Stylesheet:  s,
-		Env:         Enclosed(s.Env),
+		env:         s.env,
 	}
 	ctx.SetXpathNamespace(s.xpathNamespace)
 	return ctx

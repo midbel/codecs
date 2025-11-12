@@ -18,8 +18,7 @@ type Template struct {
 
 	Nodes []xml.Node
 
-	env    *Env
-	tunnel []string
+	env *xpath.Evaluator
 }
 
 func NewTemplate(node xml.Node) (*Template, error) {
@@ -28,9 +27,9 @@ func NewTemplate(node xml.Node) (*Template, error) {
 		return nil, fmt.Errorf("%s: xml element expected to load template", node.QualifiedName())
 	}
 	tpl := Template{
-		env: Empty(),
+		env: xpath.NewEvaluator(),
 	}
-	for _, a := range elem.Attrs {
+	for _, a := range elem.Attributes() {
 		switch attr := a.Value(); a.Name {
 		case "priority":
 			p, err := strconv.ParseFloat(attr, 64)
@@ -52,7 +51,7 @@ func NewTemplate(node xml.Node) (*Template, error) {
 			tpl.Nodes = append(tpl.Nodes, elem.Nodes[i:]...)
 			break
 		}
-		if err := tpl.defineParamFromNode(n); err != nil {
+		if err := tpl.setParam(n); err != nil {
 			return nil, err
 		}
 	}
@@ -62,11 +61,12 @@ func NewTemplate(node xml.Node) (*Template, error) {
 func (t *Template) Clone() *Template {
 	tpl := *t
 	tpl.Nodes = slices.Clone(tpl.Nodes)
+	tpl.env = t.env.Clone()
 	return &tpl
 }
 
 func (t *Template) FillWithDefaults(ctx *Context) *Context {
-	ctx.Env = ctx.Env.Merge(t.env)
+	// ctx.Env = ctx.Env.Merge(t.env)
 	return ctx
 }
 
@@ -99,7 +99,7 @@ func (t *Template) isRoot() bool {
 	return t.Match == "/"
 }
 
-func (t *Template) defineParamFromNode(node xml.Node) error {
+func (t *Template) setParam(node xml.Node) error {
 	elem, err := getElementFromNode(node)
 	if err != nil {
 		return err
@@ -112,13 +112,17 @@ func (t *Template) defineParamFromNode(node xml.Node) error {
 		if len(elem.Nodes) > 0 {
 			return fmt.Errorf("using select and children nodes is not allowed")
 		}
-		err = t.env.DefineParam(ident, query)
+		expr, err1 := t.env.Create(query)
+		if err1 == nil {
+			t.env.Set(ident, expr)
+		}
+		err = err1
 	} else {
 		var seq xpath.Sequence
 		for i := range elem.Nodes {
 			seq.Append(xpath.NewNodeItem(elem.Nodes[i]))
 		}
-		t.env.DefineExprParam(ident, xpath.NewValueFromSequence(seq))
+		t.env.Set(ident, xpath.NewValueFromSequence(seq))
 	}
 	return err
 }

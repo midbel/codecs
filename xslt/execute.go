@@ -27,11 +27,11 @@ func init() {
 		fn := func(ctx *Context) (xpath.Sequence, error) {
 			ns := ctx.ResetXpathNamespace()
 			defer ctx.SetXpathNamespace(ns)
-			return exec(ctx.Nest())
+			return exec(ctx.Sub())
 		}
 		return fn
 	}
-	trace := func(exec ExecuteFunc) ExecuteFunc {
+	single := func(exec ExecuteFunc) ExecuteFunc {
 		fn := func(ctx *Context) (xpath.Sequence, error) {
 			ns := ctx.ResetXpathNamespace()
 			defer ctx.SetXpathNamespace(ns)
@@ -40,45 +40,45 @@ func init() {
 		return fn
 	}
 	iterateExecuters = map[xml.QName]ExecuteFunc{
-		xsltQualifiedName("next-iteration"): trace(executeNextIteration),
-		xsltQualifiedName("break"):          trace(executeBreak),
+		xsltQualifiedName("next-iteration"): single(executeNextIteration),
+		xsltQualifiedName("break"):          single(executeBreak),
 	}
 	executers = map[xml.QName]ExecuteFunc{
 		xsltQualifiedName("for-each"):               nest(executeForeach),
 		xsltQualifiedName("iterate"):                nest(executeIterate),
-		xsltQualifiedName("value-of"):               trace(executeValueOf),
+		xsltQualifiedName("value-of"):               single(executeValueOf),
 		xsltQualifiedName("call-template"):          nest(executeCallTemplate),
 		xsltQualifiedName("apply-templates"):        nest(executeApplyTemplates),
 		xsltQualifiedName("apply-imports"):          nest(executeApplyImport),
 		xsltQualifiedName("if"):                     nest(executeIf),
 		xsltQualifiedName("choose"):                 nest(executeChoose),
-		xsltQualifiedName("when"):                   trace(executeWhen),
-		xsltQualifiedName("otherwise"):              trace(executeOtherwise),
-		xsltQualifiedName("where-populated"):        trace(executeWherePopulated),
-		xsltQualifiedName("on-empty"):               trace(executeOnEmpty),
-		xsltQualifiedName("on-not-empty"):           trace(executeOnNotEmpty),
+		xsltQualifiedName("when"):                   single(executeWhen),
+		xsltQualifiedName("otherwise"):              single(executeOtherwise),
+		xsltQualifiedName("where-populated"):        single(executeWherePopulated),
+		xsltQualifiedName("on-empty"):               single(executeOnEmpty),
+		xsltQualifiedName("on-not-empty"):           single(executeOnNotEmpty),
 		xsltQualifiedName("try"):                    nest(executeTry),
-		xsltQualifiedName("catch"):                  trace(executeCatch),
-		xsltQualifiedName("variable"):               trace(executeVariable),
-		xsltQualifiedName("result-document"):        trace(executeResultDocument),
+		xsltQualifiedName("catch"):                  single(executeCatch),
+		xsltQualifiedName("variable"):               single(executeVariable),
+		xsltQualifiedName("result-document"):        single(executeResultDocument),
 		xsltQualifiedName("source-document"):        nest(executeSourceDocument),
-		xsltQualifiedName("with-param"):             trace(executeWithParam),
-		xsltQualifiedName("copy"):                   trace(executeCopy),
-		xsltQualifiedName("copy-of"):                trace(executeCopyOf),
-		xsltQualifiedName("sequence"):               trace(executeSequence),
-		xsltQualifiedName("document"):               trace(executeDocument),
-		xsltQualifiedName("processing-instruction"): trace(executePI),
-		xsltQualifiedName("element"):                trace(executeElement),
-		xsltQualifiedName("attribute"):              trace(executeAttribute),
-		xsltQualifiedName("text"):                   trace(executeText),
-		xsltQualifiedName("comment"):                trace(executeComment),
-		xsltQualifiedName("namespace"):              trace(executeNamespace),
-		xsltQualifiedName("message"):                trace(executeMessage),
-		xsltQualifiedName("fallback"):               trace(executeFallback),
-		xsltQualifiedName("merge"):                  trace(executeMerge),
-		xsltQualifiedName("for-each-group"):         trace(executeForeachGroup),
-		xsltQualifiedName("assert"):                 trace(executeAssert),
-		xsltQualifiedName("evaluate"):               trace(executeEvaluate),
+		xsltQualifiedName("with-param"):             single(executeWithParam),
+		xsltQualifiedName("copy"):                   single(executeCopy),
+		xsltQualifiedName("copy-of"):                single(executeCopyOf),
+		xsltQualifiedName("sequence"):               single(executeSequence),
+		xsltQualifiedName("document"):               single(executeDocument),
+		xsltQualifiedName("processing-instruction"): single(executePI),
+		xsltQualifiedName("element"):                single(executeElement),
+		xsltQualifiedName("attribute"):              single(executeAttribute),
+		xsltQualifiedName("text"):                   single(executeText),
+		xsltQualifiedName("comment"):                single(executeComment),
+		xsltQualifiedName("namespace"):              single(executeNamespace),
+		xsltQualifiedName("message"):                single(executeMessage),
+		xsltQualifiedName("fallback"):               single(executeFallback),
+		xsltQualifiedName("merge"):                  single(executeMerge),
+		xsltQualifiedName("for-each-group"):         single(executeForeachGroup),
+		xsltQualifiedName("assert"):                 single(executeAssert),
+		xsltQualifiedName("evaluate"):               single(executeEvaluate),
 	}
 }
 
@@ -154,7 +154,7 @@ func executeVariable(ctx *Context) (xpath.Sequence, error) {
 		if len(elem.Nodes) > 0 {
 			return nil, fmt.Errorf("select attribute can not be used with children")
 		}
-		seq, err = ctx.ExecuteQuery(query, ctx.ContextNode)
+		seq, err = ctx.Execute(query)
 	} else {
 		for _, n := range slices.Clone(elem.Nodes) {
 			c := cloneNode(n)
@@ -171,7 +171,7 @@ func executeVariable(ctx *Context) (xpath.Sequence, error) {
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
 	}
-	ctx.Define(ident, xpath.NewValueFromSequence(seq))
+	ctx.Set(ident, xpath.NewValueFromSequence(seq))
 	return nil, nil
 }
 
@@ -184,23 +184,23 @@ func executeWithParam(ctx *Context) (xpath.Sequence, error) {
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
 	}
-	if query, err := getAttribute(elem, "select"); err == nil {
+	var seq xpath.Sequence
+	if query, err1 := getAttribute(elem, "select"); err1 == nil {
 		if len(elem.Nodes) != 0 {
 			return nil, fmt.Errorf("select attribute can not be used with children")
 		}
-		ctx.EvalParam(ident, query, ctx.ContextNode)
+		seq, err = ctx.Execute(query)
 	} else {
 		if len(elem.Nodes) == 0 {
 			err := fmt.Errorf("no value given to param %q", ident)
 			return nil, ctx.errorWithContext(err)
 		}
-		seq, err := executeConstructor(ctx, elem.Nodes, 0)
-		if err != nil {
-			return nil, err
-		}
-		ctx.DefineExprParam(ident, xpath.NewValueFromSequence(seq))
+		seq, err = executeConstructor(ctx, elem.Nodes, 0)
 	}
-	return nil, nil
+	if err == nil {
+		ctx.Set(ident, xpath.NewValueFromSequence(seq))
+	}
+	return nil, err
 }
 
 func executeApplyImport(ctx *Context) (xpath.Sequence, error) {
@@ -228,12 +228,9 @@ func executeCallTemplate(ctx *Context) (xpath.Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	sub := ctx.Nest()
+	sub := ctx.Sub()
 	if t, ok := tpl.(interface{ FillWithDefaults(*Context) *Context }); ok {
 		sub = t.FillWithDefaults(sub)
-	}
-	if t, ok := tpl.(*Template); ok {
-		sub.Env = sub.Env.Merge(t.env)
 	}
 	if err := applyParams(sub); err != nil {
 		return nil, ctx.errorWithContext(err)
@@ -278,7 +275,7 @@ func executeForeachGroup(ctx *Context) (xpath.Sequence, error) {
 		return nil, ctx.errorWithContext(err)
 	}
 
-	items, err := ctx.ExecuteQuery(query, ctx.ContextNode)
+	items, err := ctx.Execute(query)
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
 	}
@@ -291,7 +288,7 @@ func executeForeachGroup(ctx *Context) (xpath.Sequence, error) {
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
 	}
-	grpby, err := ctx.CompileQuery(key)
+	grpby, err := ctx.Compile(key)
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
 	}
@@ -343,7 +340,7 @@ func executeForeachGroup(ctx *Context) (xpath.Sequence, error) {
 		sit.GroupItem = gi
 		defineForeachGroupBuiltins(sub, gi.Value, gi.Items)
 		if query != "" {
-			seq, err := sub.ExecuteQuery(query, sub.ContextNode)
+			seq, err := sub.Execute(query)
 			if err != nil {
 				return nil, ctx.errorWithContext(err)
 			}
@@ -390,7 +387,7 @@ func getMergeItems(ctx *Context, elem *xml.Element) (string, xpath.Sequence, err
 		return "", nil, ctx.errorWithContext(err)
 	}
 
-	expr, err := ctx.CompileQuery(query)
+	expr, err := ctx.Compile(query)
 	if err != nil {
 		return "", nil, ctx.errorWithContext(err)
 	}
@@ -409,7 +406,7 @@ func getMergeItems(ctx *Context, elem *xml.Element) (string, xpath.Sequence, err
 		if err != nil {
 			return "", nil, err
 		}
-		items, err := ctx.ExecuteQuery(source, ctx.ContextNode)
+		items, err := ctx.Execute(source)
 		if err != nil {
 			return "", nil, err
 		}
@@ -425,7 +422,7 @@ func getMergeItems(ctx *Context, elem *xml.Element) (string, xpath.Sequence, err
 		if err != nil {
 			return "", nil, err
 		}
-		items, err := ctx.ExecuteQuery(source, ctx.ContextNode)
+		items, err := ctx.Execute(source)
 		if err != nil {
 			return "", nil, err
 		}
@@ -475,7 +472,7 @@ func getSequenceFromSource(ctx *Context, node xml.Node) (map[string][]MergedItem
 		if err != nil {
 			return nil, ctx.errorWithContext(err)
 		}
-		expr, err := ctx.CompileQuery(query)
+		expr, err := ctx.Compile(query)
 		if err != nil {
 			return nil, err
 		}
@@ -553,7 +550,7 @@ func executeMerge(ctx *Context) (xpath.Sequence, error) {
 	)
 	slices.Sort(keys)
 	for _, key := range keys {
-		nested := ctx.Nest()
+		nested := ctx.Sub()
 		defineMergeBuiltins(nested, key, keys, groups[key])
 		res, err := executeConstructor(nested, elem.Nodes, AllowOnEmpty|AllowOnNonEmpty)
 		if err != nil {
@@ -574,7 +571,7 @@ func executeBreak(ctx *Context) (xpath.Sequence, error) {
 		if len(elem.Nodes) > 0 {
 			return nil, fmt.Errorf("using select and children nodes is not allowed")
 		}
-		seq, err = ctx.ExecuteQuery(query, ctx.ContextNode)
+		seq, err = ctx.Execute(query)
 	} else {
 		seq, err = executeConstructor(ctx, elem.Nodes, 0)
 	}
@@ -607,7 +604,7 @@ func executeIterate(ctx *Context) (xpath.Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	items, err := ctx.ExecuteQuery(query, ctx.ContextNode)
+	items, err := ctx.Execute(query)
 	if err != nil {
 		return nil, err
 	}
@@ -619,7 +616,7 @@ func executeIterate(ctx *Context) (xpath.Sequence, error) {
 		onComplete = nodes[0]
 		nodes = nodes[1:]
 	}
-	nest := ctx.Nest()
+	nest := ctx.Sub()
 	for i := range nodes {
 		if nodes[i].QualifiedName() != ctx.getQualifiedName("param") {
 			nodes = nodes[i:]
@@ -637,15 +634,17 @@ func executeIterate(ctx *Context) (xpath.Sequence, error) {
 			if len(elem.Nodes) > 0 {
 				return nil, fmt.Errorf("using select and children nodes is not allowed")
 			}
-			if err := nest.DefineParam(ident, query); err != nil {
+			seq, err := nest.Execute(query)
+			if err != nil {
 				return nil, err
 			}
+			nest.Set(ident, xpath.NewValueFromSequence(seq))
 		} else {
 			seq, err := executeConstructor(nest, elem.Nodes, 0)
 			if err != nil {
 				return nil, err
 			}
-			nest.DefineExprParam(ident, xpath.NewValueFromSequence(seq))
+			nest.Set(ident, xpath.NewValueFromSequence(seq))
 		}
 	}
 
@@ -694,7 +693,7 @@ func executeForeach(ctx *Context) (xpath.Sequence, error) {
 		it    iter.Seq[xpath.Item]
 	)
 
-	items, err := ctx.ExecuteQuery(query, ctx.ContextNode)
+	items, err := ctx.Execute(query)
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
 	}
@@ -759,7 +758,7 @@ func executeTry(ctx *Context) (xpath.Sequence, error) {
 			err := fmt.Errorf("select attribute can not be used with children")
 			return nil, ctx.errorWithContext(err)
 		}
-		seq, err = ctx.ExecuteQuery(query, ctx.ContextNode)
+		seq, err = ctx.Execute(query)
 	} else {
 		if !errors.Is(err, errMissed) {
 			return nil, ctx.errorWithContext(err)
@@ -797,7 +796,7 @@ func executeIf(ctx *Context) (xpath.Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	ok, err := ctx.TestNode(test, ctx.ContextNode)
+	ok, err := ctx.Test(test)
 	if err != nil {
 		return nil, err
 	}
@@ -817,7 +816,7 @@ func executeWhen(ctx *Context) (xpath.Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	ok, err := ctx.TestNode(test, ctx.ContextNode)
+	ok, err := ctx.Test(test)
 	if err != nil {
 		return nil, err
 	}
@@ -895,7 +894,7 @@ func executeValueOf(ctx *Context) (xpath.Sequence, error) {
 			err := fmt.Errorf("select attribute can not be used with children")
 			return nil, ctx.errorWithContext(err)
 		}
-		items, err = ctx.ExecuteQuery(query, ctx.ContextNode)
+		items, err = ctx.Execute(query)
 	}
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
@@ -927,7 +926,7 @@ func executeCopyOf(ctx *Context) (xpath.Sequence, error) {
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
 	}
-	items, err := ctx.ExecuteQuery(query, ctx.ContextNode)
+	items, err := ctx.Execute(query)
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
 	}
@@ -965,9 +964,9 @@ func executeEvaluate(ctx *Context) (xpath.Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	sub := ctx.Nest()
+	sub := ctx.Sub()
 	if q, err := getAttribute(elem, "context-item"); err == nil {
-		seq, err := sub.ExecuteQuery(q, ctx.ContextNode)
+		seq, err := sub.Execute(q)
 		if err != nil {
 			return nil, err
 		}
@@ -1000,7 +999,7 @@ func executeEvaluate(ctx *Context) (xpath.Sequence, error) {
 			return nil, err
 		}
 	}
-	return sub.ExecuteQuery(query, sub.ContextNode)
+	return sub.Execute(query)
 }
 
 func getMatchingElements(ctx *Context, elem *xml.Element) (xml.Node, xml.Node, error) {
@@ -1029,22 +1028,6 @@ func getMatchingElements(ctx *Context, elem *xml.Element) (xml.Node, xml.Node, e
 }
 
 func executeAnalyzeString(ctx *Context) (xpath.Sequence, error) {
-	// elem, err := getElementFromNode(ctx.XslNode)
-	// if err != nil {
-	// 	return nil, ctx.errorWithContext(err)
-	// }
-	// query, err := getAttribute(elem, "select")
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// regex, err := getAttribute(elem, "regex")
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// match, nomatch, err := getMatchingElements(ctx, elem)
-	// if err != nil {
-	// 	return nil, err
-	// }
 	return nil, errImplemented
 }
 
@@ -1189,7 +1172,7 @@ func executeSelect(ctx *Context, elem *xml.Element) (xpath.Sequence, error) {
 		if len(elem.Nodes) != 0 {
 			return nil, fmt.Errorf("select attribute can not be used with children")
 		}
-		return ctx.ExecuteQuery(query, ctx.ContextNode)
+		return ctx.Execute(query)
 	}
 	return nil, err
 }
@@ -1216,7 +1199,7 @@ func executePI(ctx *Context) (xpath.Sequence, error) {
 		if len(el.Nodes) != 0 {
 			return nil, fmt.Errorf("select attribute can not be used with children")
 		}
-		seq, err = ctx.ExecuteQuery(query, ctx.ContextNode)
+		seq, err = ctx.Execute(query)
 	} else {
 		seq, err = executeConstructor(ctx, el.Nodes, 0)
 	}
@@ -1249,7 +1232,7 @@ func executeNamespace(ctx *Context) (xpath.Sequence, error) {
 		if len(el.Nodes) != 0 {
 			return nil, fmt.Errorf("select attribute can not be used with children")
 		}
-		seq, err = ctx.ExecuteQuery(query, ctx.ContextNode)
+		seq, err = ctx.Execute(query)
 	} else {
 		seq, err = executeConstructor(ctx, el.Nodes, 0)
 	}
@@ -1323,7 +1306,7 @@ func executeAttribute(ctx *Context) (xpath.Sequence, error) {
 		if len(elem.Nodes) != 0 {
 			return nil, fmt.Errorf("select attribute can not be used with children")
 		}
-		items, err = ctx.ExecuteQuery(query, ctx.ContextNode)
+		items, err = ctx.Execute(query)
 	} else {
 		items, err = executeConstructor(ctx, elem.Nodes, 0)
 	}
@@ -1469,7 +1452,7 @@ func getNodesForTemplate(ctx *Context) ([]xml.Node, error) {
 	}
 	var res []xml.Node
 	if query, err := getAttribute(elem, "select"); err == nil {
-		items, err := ctx.ExecuteQuery(query, ctx.ContextNode)
+		items, err := ctx.Execute(query)
 		if err != nil {
 			return nil, err
 		}

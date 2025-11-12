@@ -80,18 +80,22 @@ func (e *Evaluator) Sub() *Evaluator {
 	return &x
 }
 
-func (e *Evaluator) Merge(other *Evaluator) {
-	if m, ok := e.namespaces.(interface{ Merge(environ.Environ[string]) }); ok {
-		m.Merge(other.namespaces)
-	}
-	if m, ok := e.variables.(interface{ Merge(environ.Environ[Expr]) }); ok {
-		m.Merge(other.variables)
-	}
-	if m, ok := e.builtins.(interface {
-		Merge(environ.Environ[BuiltinFunc])
+func (e *Evaluator) Clone() *Evaluator {
+	x := *e
+	if c, ok := e.namespaces.(interface {
+		Clone() environ.Environ[string]
 	}); ok {
-		m.Merge(other.builtins)
+		x.namespaces = c.Clone()
 	}
+	if c, ok := e.variables.(interface{ Clone() environ.Environ[Expr] }); ok {
+		x.variables = c.Clone()
+	}
+	if c, ok := e.builtins.(interface {
+		Clone() environ.Environ[BuiltinFunc]
+	}); ok {
+		x.builtins = c.Clone()
+	}
+	return &x
 }
 
 func (e *Evaluator) Create(in string) (Expr, error) {
