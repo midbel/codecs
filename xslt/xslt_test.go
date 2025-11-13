@@ -33,7 +33,17 @@ func TestElement(t *testing.T) {
 			Dir:  "testdata/element-basic-attribute",
 		},
 	}
-	runTest(t, tests)
+	runTests(t, tests)
+}
+
+func TestNamespaceAlias(t *testing.T) {
+	tests := []TestCase{
+		{
+			Name: "namespaces-alias/basic",
+			Dir:  "testdata/namespaces-alias",
+		},
+	}
+	runTests(t, tests)
 }
 
 func TestApplyTemplates(t *testing.T) {
@@ -47,7 +57,7 @@ func TestApplyTemplates(t *testing.T) {
 			Dir:  "testdata/apply-templates-mode",
 		},
 	}
-	runTest(t, tests)
+	runTests(t, tests)
 }
 
 func TestCallTemplate(t *testing.T) {
@@ -92,7 +102,7 @@ func TestCallTemplate(t *testing.T) {
 			Failed: true,
 		},
 	}
-	runTest(t, tests)
+	runTests(t, tests)
 }
 
 func TestMerge(t *testing.T) {
@@ -125,7 +135,7 @@ func TestMerge(t *testing.T) {
 			Failed: true,
 		},
 	}
-	runTest(t, tests)
+	runTests(t, tests)
 }
 
 func TestConditional(t *testing.T) {
@@ -152,7 +162,7 @@ func TestConditional(t *testing.T) {
 			Dir:  "testdata/choose-otherwise",
 		},
 	}
-	runTest(t, tests)
+	runTests(t, tests)
 }
 
 func TestValueOf(t *testing.T) {
@@ -187,7 +197,7 @@ func TestValueOf(t *testing.T) {
 			Dir:  "testdata/valueof-basic-with-empty",
 		},
 	}
-	runTest(t, tests)
+	runTests(t, tests)
 }
 
 func TestForEachGroup(t *testing.T) {
@@ -213,7 +223,7 @@ func TestForEachGroup(t *testing.T) {
 			Dir:  "testdata/foreach-group-multi",
 		},
 	}
-	runTest(t, tests)
+	runTests(t, tests)
 }
 
 func TestForEach(t *testing.T) {
@@ -240,7 +250,7 @@ func TestForEach(t *testing.T) {
 			Dir:  "testdata/foreach-empty",
 		},
 	}
-	runTest(t, tests)
+	runTests(t, tests)
 }
 
 func TestVariables(t *testing.T) {
@@ -290,7 +300,7 @@ func TestVariables(t *testing.T) {
 			Dir:  "testdata/variable-static-avt",
 		},
 	}
-	runTest(t, tests)
+	runTests(t, tests)
 }
 
 func TestSequence(t *testing.T) {
@@ -308,7 +318,7 @@ func TestSequence(t *testing.T) {
 			Dir:  "testdata/sequence-foreach",
 		},
 	}
-	runTest(t, tests)
+	runTests(t, tests)
 }
 
 func TestStylesheet(t *testing.T) {
@@ -323,7 +333,7 @@ func TestStylesheet(t *testing.T) {
 			Failed: true,
 		},
 	}
-	runTest(t, tests)
+	runTests(t, tests)
 }
 
 func TestAttributesSet(t *testing.T) {
@@ -341,7 +351,7 @@ func TestAttributesSet(t *testing.T) {
 			Dir:  "testdata/attribute-set-attribute",
 		},
 	}
-	runTest(t, tests)
+	runTests(t, tests)
 }
 
 func TestIterate(t *testing.T) {
@@ -363,10 +373,10 @@ func TestIterate(t *testing.T) {
 			Dir:  "testdata/iterate-progress",
 		},
 	}
-	runTest(t, tests)
+	runTests(t, tests)
 }
 
-func runTest(t *testing.T, tests []TestCase) {
+func runTests(t *testing.T, tests []TestCase) {
 	t.Helper()
 	for _, tt := range tests {
 		if tt.Context == "" {
