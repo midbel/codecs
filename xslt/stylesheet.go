@@ -229,43 +229,6 @@ func (m *Mode) noMatch(node xml.Node) (Executer, error) {
 	return exec, nil
 }
 
-type FunctionArg struct {
-	xml.QName
-	As xml.QName
-}
-
-type Function struct {
-	xml.QName
-	Return xml.QName
-	sheet  *Stylesheet
-
-	Args []FunctionArg
-	Body []xml.Node
-}
-
-func (f *Function) Call(xtc xpath.Context, args []xpath.Expr) (xpath.Sequence, error) {
-	if len(args) != len(f.Args) {
-		return nil, fmt.Errorf("%s: invalid number of arguments given", f.QualifiedName())
-	}
-	ctx := f.sheet.createContext(xtc.Node)
-	for i, a := range f.Args {
-		ctx.Env.Define(a.Name, args[i])
-	}
-	var seq xpath.Sequence
-	for _, n := range f.Body {
-		c := cloneNode(n)
-		if c == nil {
-			continue
-		}
-		res, err := transformNode(ctx.WithXsl(c))
-		if err != nil {
-			return nil, err
-		}
-		seq.Concat(res)
-	}
-	return seq, nil
-}
-
 type Stylesheet struct {
 	DefaultMode           string
 	WrapRoot              bool
@@ -366,7 +329,7 @@ func (s *Stylesheet) Match(node xml.Node, mode string) (Executer, error) {
 		return m.Name == mode
 	})
 	if ix >= 0 {
-		tpl, err := s.Modes[ix].matchTemplate(node, s.Env)
+		tpl, err := s.Modes[ix].matchTemplate(node, s.env)
 		return tpl, err
 	}
 	return s.MatchImport(node, mode)
@@ -433,7 +396,7 @@ func (s *Stylesheet) IncludeSheet(file string) error {
 			}
 		}
 	}
-	s.Env.Merge(other.Env)
+	s.env.Merge(other.env)
 	return nil
 }
 
@@ -472,7 +435,7 @@ func (s *Stylesheet) SetAttributes(node xml.Node) error {
 }
 
 func (s *Stylesheet) SetParam(ident string, expr xpath.Expr) {
-	s.Env.DefineExprParam(ident, expr)
+	s.env.Set(ident, expr)
 }
 
 func (s *Stylesheet) GetOutput(name string) *Output {
@@ -558,8 +521,6 @@ func (s *Stylesheet) init(doc xml.Node) error {
 			err = s.loadTemplate(n)
 		case s.getQualifiedName("mode"):
 			err = s.loadMode(n)
-		case s.getQualifiedName("function"):
-			err = s.loadFunction(n)
 		case s.getQualifiedName("namespace-alias"):
 			err = s.loadNamespaceAlias(n)
 		default:
@@ -625,8 +586,8 @@ func (s *Stylesheet) makeIdent() string {
 func (s *Stylesheet) defineBuiltins() {
 	s.static.RegisterFunc("system-property", callSystemProperty)
 	s.static.RegisterFunc("system-property", callSystemProperty)
-	s.Env.RegisterFunc("current", callCurrent)
-	s.Env.RegisterFunc("current", callCurrent)
+	s.env.RegisterFunc("current", callCurrent)
+	s.env.RegisterFunc("current", callCurrent)
 }
 
 func (s *Stylesheet) useWhen(node *xml.Element) (bool, error) {
@@ -634,7 +595,7 @@ func (s *Stylesheet) useWhen(node *xml.Element) (bool, error) {
 	if err != nil {
 		return true, nil
 	}
-	items, err := s.static.ExecuteQuery(query, node)
+	items, err := s.static.Find(query, node)
 	if err != nil {
 		return false, err
 	}
@@ -667,7 +628,7 @@ func (s *Stylesheet) importSheet(node xml.Node) error {
 
 func (s *Stylesheet) loadNamespacesFromRoot(root *xml.Element) error {
 	for _, qn := range root.Namespaces() {
-		s.Env.RegisterNS(qn.Prefix, qn.Uri)
+		s.env.RegisterNS(qn.Prefix, qn.Uri)
 	}
 	for e, fn := range executers {
 		delete(executers, e)
@@ -691,66 +652,7 @@ func (s *Stylesheet) loadNamespaceAlias(node xml.Node) error {
 	if err != nil {
 		return err
 	}
-	s.aliases.Define(source, target)
-	return nil
-}
-
-func (s *Stylesheet) loadFunction(node xml.Node) error {
-	elem, err := getElementFromNode(node)
-	if err != nil {
-		return err
-	}
-	if ok, _ := s.useWhen(elem); !ok {
-		return nil
-	}
-	ident, err := getAttribute(elem, "name")
-	if err != nil {
-		return err
-	}
-	qn, err := xml.ParseName(ident)
-	if err != nil {
-		return err
-	}
-	fn := Function{
-		QName: qn,
-		sheet: s,
-	}
-	if n, err := getAttribute(elem, "as"); n != "" {
-		qn, err = xml.ParseName(n)
-		if err != nil {
-			return err
-		}
-		fn.Return = qn
-	}
-	for i, c := range elem.Nodes {
-		if c.LocalName() != "param" {
-			fn.Body = slices.Clone(elem.Nodes[i:])
-			break
-		}
-		el, err := getElementFromNode(c)
-		if err != nil {
-			return err
-		}
-		if !el.Leaf() {
-			return fmt.Errorf("function param should not have children")
-		}
-		if v, err := getAttribute(el, "select"); v != "" && err == nil {
-			return fmt.Errorf("function param should not have select attribute")
-		}
-		ident, err := getAttribute(el, "name")
-		if err != nil {
-			return err
-		}
-		qn, err := xml.ParseName(ident)
-		if err != nil {
-			return err
-		}
-		arg := FunctionArg{
-			QName: qn,
-		}
-		fn.Args = append(fn.Args, arg)
-	}
-	s.funcs.Define(fn.QualifiedName(), &fn)
+	_, _ = source, target
 	return nil
 }
 
@@ -845,19 +747,23 @@ func (s *Stylesheet) loadVariable(node xml.Node) error {
 			return fmt.Errorf("select attribute can not be used with children")
 		}
 		if static {
-			return s.static.Eval(ident, query, elem)
-		}
-		expr, err := s.CompileQuery(query)
-		if err != nil {
+			expr, err := s.static.Create(query)
+			if err == nil {
+				s.static.Set(ident, expr)
+			}
 			return err
 		}
-		s.Define(ident, expr)
+		expr, err := s.env.Create(query)
+		if err == nil {
+			s.env.Set(ident, expr)
+		}
+		return err
 	} else {
 		seq, err := executeConstructor(s.createContext(elem), elem.Nodes, 0)
 		if err != nil {
 			return err
 		}
-		s.Define(ident, xpath.NewValueFromSequence(seq))
+		s.env.Set(ident, xpath.NewValueFromSequence(seq))
 	}
 	return nil
 }
@@ -883,15 +789,23 @@ func (s *Stylesheet) loadParam(node xml.Node) error {
 			return fmt.Errorf("select attribute can not be used with children")
 		}
 		if static {
-			return s.static.EvalParam(ident, query, elem)
+			expr, err := s.static.Create(query)
+			if err == nil {
+				s.static.Set(ident, expr)
+			}
+			return err
 		}
-		return s.DefineParam(ident, query)
+		expr, err := s.env.Create(query)
+		if err == nil {
+			s.env.Set(ident, expr)
+		}
+		return err
 	} else {
 		seq, err := executeConstructor(s.createContext(elem), elem.Nodes, 0)
 		if err != nil {
 			return err
 		}
-		s.DefineExprParam(ident, xpath.NewValueFromSequence(seq))
+		s.env.Set(ident, xpath.NewValueFromSequence(seq))
 	}
 	return nil
 }
@@ -972,7 +886,7 @@ func (s *Stylesheet) writeDocument(w io.Writer, format string, doc *xml.Document
 }
 
 func (s *Stylesheet) resolve(ident string) (xpath.Expr, error) {
-	expr, err := s.Env.Resolve(ident)
+	expr, err := s.env.Resolve(ident)
 	if err == nil {
 		return expr, nil
 	}

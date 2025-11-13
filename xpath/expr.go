@@ -80,6 +80,20 @@ func (e *Evaluator) Sub() *Evaluator {
 	return &x
 }
 
+func (e *Evaluator) Merge(other *Evaluator) {
+	if m, ok := e.namespaces.(interface{ Merge(environ.Environ[string]) }); ok {
+		m.Merge(other.namespaces)
+	}
+	if m, ok := e.variables.(interface{ Merge(environ.Environ[Expr]) }); ok {
+		m.Merge(other.variables)
+	}
+	if m, ok := e.builtins.(interface {
+		Merge(environ.Environ[BuiltinFunc])
+	}); ok {
+		m.Merge(other.builtins)
+	}
+}
+
 func (e *Evaluator) Clone() *Evaluator {
 	x := *e
 	if c, ok := e.namespaces.(interface {

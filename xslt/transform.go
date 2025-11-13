@@ -83,18 +83,6 @@ func processNode(ctx *Context) (xpath.Sequence, error) {
 			elem.Append(res[i].Node())
 		}
 	}
-	if ns, err := ctx.ResolveAliasNS(elem.Space); err == nil {
-		elem.Space = ns.Prefix
-		elem.Uri = ns.Uri
-	}
-	for i, a := range elem.Attrs {
-		ns, err := ctx.ResolveAliasNS(a.Space)
-		if err == nil {
-			a.Space = ns.Prefix
-			a.Uri = ns.Uri
-			elem.Attrs[i] = a
-		}
-	}
 	return xpath.Singleton(elem), nil
 }
 

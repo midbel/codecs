@@ -3,7 +3,6 @@ package xslt
 import (
 	"fmt"
 
-	"github.com/midbel/codecs/environ"
 	"github.com/midbel/codecs/xml"
 	"github.com/midbel/codecs/xpath"
 )

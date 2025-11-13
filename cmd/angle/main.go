@@ -39,6 +39,7 @@ func prepare() *cli.CommandTrie {
 		queryCmd      QueryCmd
 		debugCmd      DebugCmd
 		cmpCmd        CompareCmd
+		sortCmd       SortCmd
 		transformCmd  TransformCmd
 		assertCmd     SchAssertCmd
 		schCompileCmd SchCompileCmd
@@ -56,6 +57,7 @@ func prepare() *cli.CommandTrie {
 	root.Register([]string{"assert", "compile"}, &schCompileCmd)
 	root.Register([]string{"transform"}, &transformCmd)
 	root.Register([]string{"compare"}, &cmpCmd)
+	root.Register([]string{"sort"}, &sortCmd)
 
 	return root
 }
