@@ -229,8 +229,8 @@ func executeCallTemplate(ctx *Context) (xpath.Sequence, error) {
 		return nil, err
 	}
 	sub := ctx.Sub()
-	if t, ok := tpl.(interface{ FillWithDefaults(*Context) *Context }); ok {
-		sub = t.FillWithDefaults(sub)
+	if t, ok := tpl.(interface{ FillWithDefaults(*Context) }); ok {
+		t.FillWithDefaults(sub)
 	}
 	if err := applyParams(sub); err != nil {
 		return nil, ctx.errorWithContext(err)
@@ -1390,6 +1390,9 @@ func executeApply(ctx *Context, match matchFunc) (xpath.Sequence, error) {
 			return seq, err
 		}
 		sub := ctx.WithXpath(datum)
+		if t, ok := tpl.(interface{ FillWithDefaults(*Context) }); ok {
+			t.FillWithDefaults(sub)
+		}
 		if err := applyParams(sub); err != nil {
 			return nil, err
 		}
