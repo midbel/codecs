@@ -25,10 +25,6 @@ type Context struct {
 	env *xpath.Evaluator
 }
 
-func (c *Context) RegisterFunc(ident string, fn xpath.BuiltinFunc) {
-	c.env.RegisterFunc(ident, fn)
-}
-
 func (c *Context) Execute(query string) (xpath.Sequence, error) {
 	return c.env.Find(query, c.ContextNode)
 }
@@ -45,16 +41,33 @@ func (c *Context) Test(query string) (bool, error) {
 	return seq.True(), nil
 }
 
-func (c *Context) Set(ident string, expr xpath.Expr) {
-	c.env.Set(ident, expr)
-}
-
 func (c *Context) ApplyTemplate() ([]xml.Node, error) {
 	ex, err := c.Match(c.ContextNode, c.Mode)
 	if err != nil {
 		return nil, err
 	}
 	return ex.Execute(c)
+}
+
+func (c *Context) RegisterFunc(ident string, fn xpath.BuiltinFunc) {
+	c.env.RegisterFunc(ident, fn)
+}
+
+func (c *Context) ResolveAliasNS(ident string) (xml.NS, error) {
+	var (
+		ns  xml.NS
+		err error
+	)
+	ns.Prefix, err = c.aliases.Resolve(ident)
+	if err != nil {
+		return ns, err
+	}
+	ns.Uri, err = c.env.ResolveNS(ns.Prefix)
+	return ns, err
+}
+
+func (c *Context) Set(ident string, expr xpath.Expr) {
+	c.env.Set(ident, expr)
 }
 
 func (c *Context) SetXpathNamespace(ns string) {

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/midbel/codecs/alpha"
+	"github.com/midbel/codecs/environ"
 	"github.com/midbel/codecs/xml"
 	"github.com/midbel/codecs/xpath"
 )
@@ -241,10 +242,11 @@ type Stylesheet struct {
 	Modes             []*Mode
 	AttrSet           []*AttributeSet
 
-	output []*Output
-	namer  alpha.Namer
-	static *xpath.Evaluator
-	env    *xpath.Evaluator
+	output  []*Output
+	namer   alpha.Namer
+	static  *xpath.Evaluator
+	env     *xpath.Evaluator
+	aliases environ.Environ[string]
 
 	Context string
 	Others  []*Stylesheet
@@ -260,6 +262,7 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 		xsltNamespace: xsltNamespacePrefix,
 		static:        xpath.NewEvaluator(),
 		env:           xpath.NewEvaluator(),
+		aliases:       environ.Empty[string](),
 		namer:         alpha.Compose(alpha.NewLowerString(3), alpha.NewNumberString(2)),
 	}
 
@@ -364,6 +367,17 @@ func (s *Stylesheet) Execute(doc xml.Node) (xml.Node, error) {
 			root = nodes[0]
 		} else {
 			root = xml.NewElement(xml.LocalName(XslProduct))
+		}
+		if el, ok := root.(*xml.Element); ok {
+			for _, n := range s.aliases.Names() {
+				pre, _ := s.aliases.Resolve(n)
+				uri, err := s.env.ResolveNS(pre)
+				if err != nil {
+					continue
+				}
+				a := xml.NewAttribute(xml.QualifiedName(pre, "xmlns"), uri)
+				el.SetAttribute(a)
+			}
 		}
 		return xml.NewDocument(root), nil
 	}
@@ -652,7 +666,7 @@ func (s *Stylesheet) loadNamespaceAlias(node xml.Node) error {
 	if err != nil {
 		return err
 	}
-	_, _ = source, target
+	s.aliases.Define(source, target)
 	return nil
 }
 

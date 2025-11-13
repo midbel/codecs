@@ -6,10 +6,10 @@
 	<xsl:output method="xml" indent="yes"/>
 	<xsl:namespace-alias stylesheet-prefix="x" result-prefix="xsl"/>
 	<xsl:template match="/">
-		<x:stylsheet version="3.0">
+		<x:stylesheet version="3.0">
 			<x:template match="/">
 				<x:value-of select="/root/item"/>
 			</x:template>
-		</x:stylsheet>
+		</x:stylesheet>
 	</xsl:template>
 </xsl:stylesheet>
