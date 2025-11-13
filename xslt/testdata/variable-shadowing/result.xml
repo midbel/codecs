@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<root>
-	<item>angle</item>
+<root id="shadow">
+	<test>foo</test>
+	<test>bar</test>
+	<test>angle</test>
+	<group>
+		<item>angle</item>
+		<item>foo</item>
+		<item>bar</item>
+	</group>
 </root>

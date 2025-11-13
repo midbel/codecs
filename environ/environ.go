@@ -74,7 +74,13 @@ func (e *Env[T]) Merge(other Environ[T]) {
 	if !ok {
 		return
 	}
-	maps.Copy(e.values, x.values)
+	for i, v := range x.values {
+		_, ok := e.values[i]
+		if !ok {
+			e.values[i] = v
+		}
+	}
+	// maps.Copy(e.values, x.values)
 }
 
 func (e *Env[T]) Clone() Environ[T] {
