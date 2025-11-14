@@ -3,6 +3,7 @@ package xslt
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 

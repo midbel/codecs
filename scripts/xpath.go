@@ -14,7 +14,7 @@ func main() {
 	var (
 		trace  = flag.Bool("t", false, "trace")
 		rooted = flag.Bool("r", false, "from root")
-		scan = flag.Bool("s", false, "scan")
+		scan   = flag.Bool("s", false, "scan")
 	)
 	flag.Parse()
 	if *scan {
