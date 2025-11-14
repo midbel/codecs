@@ -927,7 +927,7 @@ func (c *Compiler) compileCall(left Expr) (Expr, error) {
 	defer c.Leave("call")
 
 	switch left.(type) {
-	case array, identifier, subscript:
+	case array, hashmap, identifier, subscript:
 		return c.compileSubscriptCall(left)
 	default:
 		return c.compileFunctionCall(left)
