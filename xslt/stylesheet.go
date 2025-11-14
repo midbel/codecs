@@ -72,7 +72,8 @@ type Executer interface {
 type NoMatchMode int8
 
 const (
-	NoMatchDeepCopy NoMatchMode = 1 << iota
+	NoMatchBuiltins NoMatchMode = 1 << iota
+	NoMatchDeepCopy 
 	NoMatchShallowCopy
 	NoMatchDeepSkip
 	NoMatchShallowSkip
@@ -105,7 +106,7 @@ type Mode struct {
 func namedMode(name string) *Mode {
 	return &Mode{
 		Name:       name,
-		NoMatch:    NoMatchFail,
+		NoMatch:    NoMatchBuiltins,
 		MultiMatch: MultiMatchLast,
 	}
 }
@@ -211,6 +212,8 @@ func (m *Mode) noMatch(node xml.Node) (Executer, error) {
 	}
 	var exec Executer
 	switch m.NoMatch {
+	case NoMatchBuiltins:
+		exec = builtinNoMatch{}
 	case NoMatchTextOnlyCopy:
 		exec = textOnlyCopy{}
 	case NoMatchDeepCopy:

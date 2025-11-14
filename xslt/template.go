@@ -157,9 +157,15 @@ func templateMatch(expr xpath.Expr, node xml.Node) (bool, int) {
 	return false, 0
 }
 
+type builtinNoMatch struct {}
+
+func (builtinNoMatch) Execute(ctx *Context) ([]xml.Node, error) {
+	return nil, nil
+}
+
 type textOnlyCopy struct{}
 
-func (c textOnlyCopy) Execute(ctx *Context) ([]xml.Node, error) {
+func (textOnlyCopy) Execute(ctx *Context) ([]xml.Node, error) {
 	switch ctx.ContextNode.Type() {
 	case xml.TypeElement:
 		var (
@@ -197,14 +203,14 @@ func (c textOnlyCopy) Execute(ctx *Context) ([]xml.Node, error) {
 
 type deepCopy struct{}
 
-func (_ deepCopy) Execute(ctx *Context) ([]xml.Node, error) {
+func (deepCopy) Execute(ctx *Context) ([]xml.Node, error) {
 	node := cloneNode(ctx.ContextNode)
 	return []xml.Node{node}, nil
 }
 
 type shallowCopy struct{}
 
-func (_ shallowCopy) Execute(ctx *Context) ([]xml.Node, error) {
+func (shallowCopy) Execute(ctx *Context) ([]xml.Node, error) {
 	if ctx.ContextNode.Type() == xml.TypeDocument {
 		doc := ctx.ContextNode.(*xml.Document)
 		return ctx.WithXpath(doc.Root()).ApplyTemplate()
@@ -231,13 +237,13 @@ func (_ shallowCopy) Execute(ctx *Context) ([]xml.Node, error) {
 
 type deepSkip struct{}
 
-func (_ deepSkip) Execute(ctx *Context) ([]xml.Node, error) {
+func (deepSkip) Execute(ctx *Context) ([]xml.Node, error) {
 	return nil, nil
 }
 
 type shallowSkip struct{}
 
-func (_ shallowSkip) Execute(ctx *Context) ([]xml.Node, error) {
+func (shallowSkip) Execute(ctx *Context) ([]xml.Node, error) {
 	var list []xml.Node
 	switch ctx.ContextNode.Type() {
 	case xml.TypeDocument:
