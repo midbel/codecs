@@ -244,6 +244,9 @@ func (c *Compiler) compileMap() (Expr, error) {
 		switch {
 		case c.is(opSeq):
 			c.next()
+			if c.is(endCurl) {
+				return nil, c.syntaxError("map", "unexpected ',' before ']'")
+			}
 		case c.is(endCurl):
 		default:
 			return nil, c.syntaxError("map", "expected ',' or '}' after map value")
@@ -264,6 +267,7 @@ func (c *Compiler) compileArray() (Expr, error) {
 	c.next()
 	var arr array
 	for !c.done() && !c.is(endPred) {
+		c.skipBlank()
 		e, err := c.compileExpr(powLowest)
 		if err != nil {
 			return nil, err
@@ -299,6 +303,7 @@ func (c *Compiler) compileArrayFunc() (Expr, error) {
 
 	var arr array
 	for !c.done() && !c.is(endCurl) {
+		c.skipBlank()
 		e, err := c.compileExpr(powLowest)
 		if err != nil {
 			return nil, err
