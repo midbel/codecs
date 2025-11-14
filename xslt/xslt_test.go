@@ -36,6 +36,16 @@ func TestElement(t *testing.T) {
 	runTests(t, tests)
 }
 
+func TestDefaultRules(t *testing.T) {
+	tests := []TestCase{
+		{
+			Name: "default-rules/document",
+			Dir: "testdata/default-rule-document",
+		},
+	}
+	runTests(t, tests)
+}
+
 func TestNamespaceAlias(t *testing.T) {
 	tests := []TestCase{
 		{
