@@ -18,7 +18,8 @@ type Template struct {
 
 	Nodes []xml.Node
 
-	env *xpath.Evaluator
+	env    *xpath.Evaluator
+	params map[string]xpath.Expr
 }
 
 func NewTemplate(node xml.Node) (*Template, error) {
@@ -27,7 +28,8 @@ func NewTemplate(node xml.Node) (*Template, error) {
 		return nil, fmt.Errorf("%s: xml element expected to load template", node.QualifiedName())
 	}
 	tpl := Template{
-		env: xpath.NewEvaluator(),
+		env:    xpath.NewEvaluator(),
+		params: make(map[string]xpath.Expr),
 	}
 	for _, a := range elem.Attributes() {
 		switch attr := a.Value(); a.Name {
@@ -107,21 +109,24 @@ func (t *Template) setParam(node xml.Node) error {
 	if err != nil {
 		return err
 	}
-	if query, err := getAttribute(elem, "select"); err == nil {
+	var expr xpath.Expr
+	if query, err1 := getAttribute(elem, "select"); err1 == nil {
 		if len(elem.Nodes) > 0 {
 			return fmt.Errorf("using select and children nodes is not allowed")
 		}
-		expr, err1 := t.env.Create(query)
-		if err1 == nil {
-			t.env.Set(ident, expr)
-		}
-		err = err1
+		expr, err = t.env.Create(query)
 	} else {
 		var seq xpath.Sequence
 		for i := range elem.Nodes {
 			seq.Append(xpath.NewNodeItem(elem.Nodes[i]))
 		}
-		t.env.Set(ident, xpath.NewValueFromSequence(seq))
+		expr = xpath.NewValueFromSequence(seq)
+	}
+	if err == nil {
+		if _, ok := t.params[ident]; ok {
+			return fmt.Errorf("%s: param already defined", ident)
+		}
+		t.params[ident] = expr
 	}
 	return err
 }
