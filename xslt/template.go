@@ -64,6 +64,7 @@ func (t *Template) Clone() *Template {
 	tpl := *t
 	tpl.Nodes = slices.Clone(tpl.Nodes)
 	tpl.env = t.env.Clone()
+	tpl.params = maps.Clone(t.params)
 	return &tpl
 }
 
