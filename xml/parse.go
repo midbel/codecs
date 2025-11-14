@@ -142,9 +142,9 @@ func (p *Parser) Parse() (*Document, error) {
 
 func (p *Parser) parseProlog() (Node, error) {
 	if !p.is(ProcInstTag) {
-		if !p.OmitProlog {
-			return nil, p.createError("document", "xml prolog missing")
-		}
+		// if !p.OmitProlog {
+		// 	return nil, p.createError("document", "xml prolog missing")
+		// }
 		return nil, nil
 	}
 	node, err := p.parsePI()

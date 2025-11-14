@@ -1464,7 +1464,14 @@ func getNodesForTemplate(ctx *Context) ([]xml.Node, error) {
 			res = append(res, items[i].Node())
 		}
 	} else {
-		res = []xml.Node{cloneNode(ctx.ContextNode)}
+		var elem xml.Node
+		if ctx.ContextNode.Type() == xml.TypeDocument {
+			doc := ctx.ContextNode.(*xml.Document)
+			elem = doc.Root()
+		} else {
+			elem = ctx.ContextNode
+		}
+		res = []xml.Node{cloneNode(elem)}
 	}
 	return res, nil
 }

@@ -128,6 +128,7 @@ func (t *Template) setParam(node xml.Node) error {
 		if _, ok := t.params[ident]; ok {
 			return fmt.Errorf("%s: param already defined", ident)
 		}
+		t.env.Set(ident, expr)
 		t.params[ident] = expr
 	}
 	return err

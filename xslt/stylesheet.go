@@ -206,6 +206,9 @@ func (m *Mode) matchTemplate(node xml.Node, env *xpath.Evaluator) (Executer, err
 }
 
 func (m *Mode) noMatch(node xml.Node) (Executer, error) {
+	if node == nil {
+		return nil, fmt.Errorf("no node given")
+	}
 	var exec Executer
 	switch m.NoMatch {
 	case NoMatchTextOnlyCopy:
@@ -513,6 +516,9 @@ func (s *Stylesheet) init(doc xml.Node) error {
 		return err
 	}
 	for _, n := range r.Nodes {
+		if n.Type() == xml.TypeComment {
+			continue
+		}
 		ctx := s.staticContext(n)
 		if err := processAVT(ctx); err != nil {
 			return err
