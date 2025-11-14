@@ -221,6 +221,9 @@ func (c *Compiler) compileMap() (Expr, error) {
 	if !c.is(begCurl) {
 		return nil, ErrSyntax
 	}
+	expr := hashmap{
+		values: make(map[Expr]Expr),
+	}
 	c.next()
 	for !c.done() && !c.is(endCurl) {
 		c.skipBlank()
@@ -228,16 +231,12 @@ func (c *Compiler) compileMap() (Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		if c.is(blank) {
-			c.next()
-		}
+		c.skipBlank()
 		if !c.is(Namespace) {
 			return nil, c.syntaxError("map", "unexpected ':' after map key")
 		}
 		c.next()
-		if c.is(blank) {
-			c.next()
-		}
+		c.skipBlank()
 		val, err := c.compileExpr(powLowest)
 		if err != nil {
 			return nil, err
@@ -249,13 +248,13 @@ func (c *Compiler) compileMap() (Expr, error) {
 		default:
 			return nil, c.syntaxError("map", "expected ',' or '}' after map value")
 		}
-		fmt.Println(key, val)
+		expr.values[key] = val
 	}
 	if !c.is(endCurl) {
 		return nil, ErrSyntax
 	}
 	c.next()
-	return nil, nil
+	return expr, nil
 }
 
 func (c *Compiler) compileArray() (Expr, error) {

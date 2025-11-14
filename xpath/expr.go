@@ -1565,6 +1565,22 @@ func (v value) Type() XdmType {
 	return xsUntyped
 }
 
+type hashmap struct {
+	values map[Expr]Expr
+}
+
+func (a hashmap) Find(node xml.Node) (Sequence, error) {
+	return a.find(defaultContext(node))
+}
+
+func (a hashmap) MatchPriority() int {
+	return prioLow
+}
+
+func (a hashmap) find(ctx Context) (Sequence, error) {
+	return nil, nil
+}
+
 type array struct {
 	all []Expr
 }
