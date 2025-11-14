@@ -87,6 +87,7 @@ const (
 	variable
 	currLevel
 	anyLevel
+	blank
 	begPred
 	endPred
 	begGrp
@@ -138,6 +139,8 @@ type Token struct {
 
 func (t Token) String() string {
 	switch t.Type {
+	case blank:
+		return "<blank>"
 	case opCastAs:
 		return "<cast-as>"
 	case opCastableAs:
@@ -253,7 +256,8 @@ type Scanner struct {
 	str   bytes.Buffer
 
 	Position
-	old Position
+	old        Position
+	keepBlanks bool
 
 	predicate bool
 }
@@ -267,6 +271,14 @@ func Scan(r io.Reader) *Scanner {
 	return scan
 }
 
+func (s *Scanner) KeepBlanks() {
+	s.keepBlanks = true
+}
+
+func (s *Scanner) DiscardBlanks() {
+	s.keepBlanks = false
+}
+
 func (s *Scanner) Scan() Token {
 	var tok Token
 	if s.done() {
@@ -276,7 +288,9 @@ func (s *Scanner) Scan() Token {
 	}
 	s.str.Reset()
 
-	s.skipBlank()
+	if !s.keepBlanks {
+		s.skipBlank()
+	}
 	tok.Position = s.Position
 	switch {
 	case isOperator(s.char):
@@ -293,10 +307,17 @@ func (s *Scanner) Scan() Token {
 		s.scanIdent(&tok)
 	case unicode.IsDigit(s.char):
 		s.scanNumber(&tok)
+	case s.keepBlanks && isBlank(s.char):
+		s.scanBlanks(&tok)
 	default:
 		tok.Type = Invalid
 	}
 	return tok
+}
+
+func (s *Scanner) scanBlanks(tok *Token) {
+	tok.Type = blank
+	s.skipBlank()
 }
 
 func (s *Scanner) scanOperator(tok *Token) {
@@ -350,7 +371,9 @@ func (s *Scanner) scanOperator(tok *Token) {
 	}
 	if tok.Type != Invalid {
 		s.read()
-		s.skipBlank()
+		if !s.keepBlanks {
+			s.skipBlank()
+		}
 	}
 }
 
@@ -400,7 +423,9 @@ func (s *Scanner) scanDelimiter(tok *Token) {
 	}
 	if tok.Type != Invalid {
 		s.read()
-		s.skipBlank()
+		if !s.keepBlanks {
+			s.skipBlank()
+		}
 	}
 }
 
@@ -533,7 +558,9 @@ func (s *Scanner) scanIdent(tok *Token) {
 			tok.Type = Name
 		}
 	}
-	s.skipBlank()
+	if !s.keepBlanks {
+		s.skipBlank()
+	}
 }
 
 func (s *Scanner) lookForward(want string) bool {
@@ -623,7 +650,13 @@ const (
 	percent    = '%'
 	pipe       = '|'
 	dollar     = '$'
+	space      = ' '
+	tab        = '\t'
 )
+
+func isBlank(c rune) bool {
+	return c == space || c == tab
+}
 
 func isVariable(c rune) bool {
 	return c == dollar

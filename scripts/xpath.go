@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -13,9 +14,18 @@ func main() {
 	var (
 		trace  = flag.Bool("t", false, "trace")
 		rooted = flag.Bool("r", false, "from root")
+		scan = flag.Bool("s", false, "scan")
 	)
 	flag.Parse()
-	scanner := xpath.Scan(strings.NewReader(flag.Arg(0)))
+	if *scan {
+		scanQuery(strings.NewReader(flag.Arg(0)))
+	} else {
+		compileQuery(strings.NewReader(flag.Arg(0)), *rooted, *trace)
+	}
+}
+
+func scanQuery(str io.Reader) {
+	scanner := xpath.Scan(str)
 	for {
 		tok := scanner.Scan()
 		fmt.Println(tok)
@@ -23,8 +33,11 @@ func main() {
 			break
 		}
 	}
-	cp := xpath.NewCompiler(strings.NewReader(flag.Arg(0)))
-	if *trace {
+}
+
+func compileQuery(str io.Reader, rooted, trace bool) {
+	cp := xpath.NewCompiler(str)
+	if trace {
 		cp.Tracer = xpath.TraceStdout()
 	}
 	expr, err := cp.Compile()
@@ -32,9 +45,9 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
-	if *rooted {
+	if rooted {
 		expr = xpath.FromRoot(expr)
 	}
-	str := xpath.Debug(expr)
-	fmt.Println(str)
+	res := xpath.Debug(expr)
+	fmt.Println(res)
 }

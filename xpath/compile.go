@@ -214,13 +214,42 @@ func (c *Compiler) compileMap() (Expr, error) {
 	c.Enter("map")
 	defer c.Leave("map")
 
+	c.scan.KeepBlanks()
+	defer c.scan.DiscardBlanks()
+
 	c.next()
 	if !c.is(begCurl) {
 		return nil, ErrSyntax
 	}
 	c.next()
 	for !c.done() && !c.is(endCurl) {
-
+		c.skipBlank()
+		key, err := c.compileExpr(powLowest)
+		if err != nil {
+			return nil, err
+		}
+		if c.is(blank) {
+			c.next()
+		}
+		if !c.is(Namespace) {
+			return nil, c.syntaxError("map", "unexpected ':' after map key")
+		}
+		c.next()
+		if c.is(blank) {
+			c.next()
+		}
+		val, err := c.compileExpr(powLowest)
+		if err != nil {
+			return nil, err
+		}
+		switch {
+		case c.is(opSeq):
+			c.next()
+		case c.is(endCurl):
+		default:
+			return nil, c.syntaxError("map", "expected ',' or '}' after map value")
+		}
+		fmt.Println(key, val)
 	}
 	if !c.is(endCurl) {
 		return nil, ErrSyntax
@@ -1094,7 +1123,7 @@ func (c *Compiler) compileQName() (Expr, error) {
 		qn.Name = "*"
 	}
 	c.next()
-	if c.is(Namespace) {
+	if c.is(Namespace) && c.peek.Type != blank {
 		c.next()
 		qn.Space = qn.Name
 		if !c.is(Name) && !c.is(opMul) {
@@ -1258,6 +1287,12 @@ func (c *Compiler) endExpr() bool {
 
 func (c *Compiler) done() bool {
 	return c.is(EOF)
+}
+
+func (c *Compiler) skipBlank() {
+	for c.is(blank) {
+		c.next()
+	}
 }
 
 func (c *Compiler) next() {
