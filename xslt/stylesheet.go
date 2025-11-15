@@ -149,16 +149,6 @@ func (m *Mode) callTemplate(name string) (Executer, error) {
 	return m.Templates[ix].Clone(), nil
 }
 
-// func (m *Mode) mainTemplate() (Executer, error) {
-// 	ix := slices.IndexFunc(m.Templates, func(t *Template) bool {
-// 		return t.isRoot()
-// 	})
-// 	if ix >= 0 {
-// 		return m.Templates[ix], nil
-// 	}
-// 	return nil, fmt.Errorf("main template not found")
-// }
-
 func (m *Mode) matchTemplate(node xml.Node, env *xpath.Evaluator) (Executer, error) {
 	type TemplateMatch struct {
 		*Template
@@ -167,7 +157,7 @@ func (m *Mode) matchTemplate(node xml.Node, env *xpath.Evaluator) (Executer, err
 	}
 	var results []*TemplateMatch
 	for i, t := range m.Templates {
-		if t.isRoot() || t.Name != "" || t.Match == "" {
+		if t.Name != "" || t.Match == "" {
 			continue
 		}
 		expr, err := env.Create(t.Match)
@@ -230,7 +220,7 @@ func (m *Mode) noMatch() (Executer, error) {
 	default:
 		return nil, fmt.Errorf("no template match")
 	}
-	return exec, nil
+	return ApplyVirtual(exec), nil
 }
 
 type Stylesheet struct {

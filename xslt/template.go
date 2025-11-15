@@ -98,10 +98,6 @@ func (t *Template) Execute(ctx *Context) ([]xml.Node, error) {
 	return nodes, nil
 }
 
-func (t *Template) isRoot() bool {
-	return t.Match == "/"
-}
-
 func (t *Template) setParam(node xml.Node) error {
 	elem, err := getElementFromNode(node)
 	if err != nil {
@@ -134,6 +130,48 @@ func (t *Template) setParam(node xml.Node) error {
 	return err
 }
 
+type virtualApplyTemplate struct {
+	exec Executer
+}
+
+func ApplyVirtual(exec Executer) Executer {
+	return virtualApplyTemplate{
+		exec: exec,
+	}
+}
+
+func (a virtualApplyTemplate) Execute(ctx *Context) ([]xml.Node, error) {
+	nodes, err := a.exec.Execute(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var (
+		others []xml.Node
+		fake = xml.NewElement(xml.LocalName("fake"))
+	)
+	ctx = ctx.WithXsl(fake)
+	for _, n := range nodes {
+		if t := n.Type(); t != xml.TypeElement && t != xml.TypeDocument {
+			others = append(others, n)
+			continue
+		}
+		c := cloneNode(n)
+		if c == nil {
+			continue
+		}
+		exec, err := ctx.Match(c, ctx.Mode)
+		if err != nil {
+			return nil, err
+		}
+		res, err := exec.Execute(ctx.WithXpath(c))
+		if err != nil {
+			return nil, err
+		}
+		others = slices.Concat(others, res)
+	}
+	return others, nil
+}
+
 func templateMatch(expr xpath.Expr, node xml.Node) (bool, int) {
 	var (
 		depth int
@@ -160,21 +198,26 @@ func templateMatch(expr xpath.Expr, node xml.Node) (bool, int) {
 type builtinNoMatch struct{}
 
 func (builtinNoMatch) Execute(ctx *Context) ([]xml.Node, error) {
+	fmt.Println("builtinNoMatch")
 	var nodes []xml.Node
 	switch ctx.ContextNode.Type() {
 	case xml.TypeDocument:
+		fmt.Println("document")
 		doc, ok := ctx.ContextNode.(*xml.Document)
 		if ok {
 			nodes = append(nodes, doc.Root())
 		}
 	case xml.TypeElement:
+		fmt.Println("element")
 		el, ok := ctx.ContextNode.(*xml.Element)
 		if ok {
 			nodes = slices.Clone(el.Nodes)
 		}
 	case xml.TypeText:
+		fmt.Println("text")
 		nodes = append(nodes, ctx.ContextNode)
 	default:
+		fmt.Println("other???")
 	}
 	return nodes, nil
 }
