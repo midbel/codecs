@@ -11,15 +11,27 @@ import (
 
 var errFail = errors.New("fail")
 
-func main() {
-	flag.Parse()
+var (
+	summary = "angle helps to manipulate xml documents"
+	help    = ""
+)
 
+func main() {
 	var (
+		set  = cli.NewFlagSet("angle")
 		root = prepare()
-		err  = root.Execute(flag.Args())
 	)
+	root.SetSummary(summary)
+	root.SetHelp(help)
+	if err := set.Parse(os.Args[1:]); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			root.Help()
+			os.Exit(2)
+		}
+	}
+	err := root.Execute(set.Args())
 	if err != nil {
-		if s, ok := err.(cli.SuggestionError); ok {
+		if s, ok := err.(cli.SuggestionError); ok && len(s.Others) > 0 {
 			fmt.Fprintln(os.Stderr, "similar command(s)")
 			for _, n := range s.Others {
 				fmt.Fprintln(os.Stderr, "-", n)
@@ -33,30 +45,18 @@ func main() {
 }
 
 func prepare() *cli.CommandTrie {
-	var (
-		root          = cli.New()
-		fmtCmd        FormatCmd
-		queryCmd      QueryCmd
-		debugCmd      DebugCmd
-		cmpCmd        CompareCmd
-		sortCmd       SortCmd
-		transformCmd  TransformCmd
-		assertCmd     SchAssertCmd
-		schCompileCmd SchCompileCmd
-		schInfoCmd    SchInfoCmd
-	)
-	root.Register([]string{"format"}, &fmtCmd)
-	root.Register([]string{"fmt"}, &fmtCmd)
+	root := cli.New()
+	root.Register([]string{"format"}, &formatCmd)
 	root.Register([]string{"exec"}, &queryCmd)
 	root.Register([]string{"query"}, &queryCmd)
 	root.Register([]string{"query", "execute"}, &queryCmd)
 	root.Register([]string{"query", "debug"}, &debugCmd)
 	root.Register([]string{"assert"}, &assertCmd)
 	root.Register([]string{"assert", "execute"}, &assertCmd)
-	root.Register([]string{"assert", "info"}, &schInfoCmd)
-	root.Register([]string{"assert", "compile"}, &schCompileCmd)
+	root.Register([]string{"assert", "info"}, &infoSchemaCmd)
+	root.Register([]string{"assert", "compile"}, &compileCmd)
 	root.Register([]string{"transform"}, &transformCmd)
-	root.Register([]string{"compare"}, &cmpCmd)
+	root.Register([]string{"compare"}, &compareCmd)
 	root.Register([]string{"sort"}, &sortCmd)
 
 	return root

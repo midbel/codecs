@@ -1,12 +1,18 @@
 package main
 
 import (
-	"flag"
 	"io"
 	"os"
 
+	"github.com/midbel/codecs/cmd/cli"
 	"github.com/midbel/codecs/xslt"
 )
+
+var transformCmd = cli.Command{
+	Name:    "transform",
+	Summary: "apply transformation defined in xslt to xml document",
+	Handler: &TransformCmd{},
+}
 
 type TransformCmd struct {
 	Context  string
@@ -19,7 +25,7 @@ type TransformCmd struct {
 }
 
 func (c *TransformCmd) Run(args []string) error {
-	set := flag.NewFlagSet("transform", flag.ContinueOnError)
+	set := cli.NewFlagSet("transform")
 	set.BoolVar(&c.Quiet, "q", false, "quiet")
 	set.StringVar(&c.Mode, "m", "", "default mode")
 	set.BoolVar(&c.WrapRoot, "w", false, "wrap nodes under a single root element")

@@ -1,12 +1,22 @@
 package cli
 
 import (
+	"errors"
+	"flag"
 	"fmt"
+	"io"
 	"maps"
+	"os"
 	"slices"
 
 	"github.com/midbel/distance"
 )
+
+func NewFlagSet(name string) *flag.FlagSet {
+	set := flag.NewFlagSet(name, flag.ContinueOnError)
+	set.SetOutput(io.Discard)
+	return set
+}
 
 type SuggestionError struct {
 	Name   string
@@ -38,7 +48,7 @@ func (f HandlerFunc) Run(args []string) error {
 type CommandNode struct {
 	Name     string
 	Children map[string]*CommandNode
-	Handler
+	cmd      *Command
 }
 
 func createNode(name string) *CommandNode {
@@ -48,8 +58,29 @@ func createNode(name string) *CommandNode {
 	}
 }
 
+func (c CommandNode) Help() {
+	if c.cmd.Summary != "" {
+		fmt.Fprintln(os.Stderr, c.cmd.Summary)
+		fmt.Fprintln(os.Stderr)
+	}
+	if c.cmd.Help != "" {
+		fmt.Fprintln(os.Stderr, c.cmd.Help)
+		fmt.Fprintln(os.Stderr)
+	}
+	if len(c.Children) == 0 {
+		return
+	}
+	fmt.Fprintln(os.Stderr, "available commands")
+	for s, n := range c.Children {
+		fmt.Printf("- %s: %s", s, n.cmd.Summary)
+		fmt.Fprintln(os.Stderr)
+	}
+}
+
 type CommandTrie struct {
-	root *CommandNode
+	root    *CommandNode
+	summary string
+	help    string
 }
 
 func New() *CommandTrie {
@@ -59,7 +90,15 @@ func New() *CommandTrie {
 	return &trie
 }
 
-func (t *CommandTrie) Register(paths []string, handler Handler) error {
+func (t *CommandTrie) SetSummary(summary string) {
+	t.summary = summary
+}
+
+func (t *CommandTrie) SetHelp(help string) {
+	t.help = help
+}
+
+func (t *CommandTrie) Register(paths []string, cmd *Command) error {
 	node := t.root
 	for _, name := range paths {
 		if node.Children[name] == nil {
@@ -67,8 +106,27 @@ func (t *CommandTrie) Register(paths []string, handler Handler) error {
 		}
 		node = node.Children[name]
 	}
-	node.Handler = handler
+	node.cmd = cmd
 	return nil
+}
+
+func (t *CommandTrie) Help() {
+	if t.summary != "" {
+		fmt.Fprintln(os.Stderr, t.summary)
+		fmt.Fprintln(os.Stderr)
+	}
+	if t.help != "" {
+		fmt.Fprintln(os.Stderr, t.help)
+		fmt.Fprintln(os.Stderr)
+	}
+	if len(t.root.Children) == 0 {
+		return
+	}
+	fmt.Fprintln(os.Stderr, "Available commands")
+	for k, n := range t.root.Children {
+		fmt.Printf("- %s: %s", k, n.cmd.Summary)
+		fmt.Fprintln(os.Stderr)
+	}
 }
 
 func (t *CommandTrie) Execute(args []string) error {
@@ -84,11 +142,30 @@ func (t *CommandTrie) Execute(args []string) error {
 		node = child
 		ix++
 	}
-	if node.Handler == nil {
-		list := slices.Collect(maps.Keys(node.Children))
-		return t.sugget(args[ix], list)
+	if node.cmd == nil {
+		var found bool
+		for _, c := range node.Children {
+			if c.cmd == nil {
+				continue
+			}
+			found = slices.Contains(c.cmd.Alias, args[ix])
+			if found {
+				ix++
+				node = c
+				break
+			}
+		}
+		if !found {
+			list := slices.Collect(maps.Keys(node.Children))
+			return t.sugget(args[ix], list)
+		}
 	}
-	return node.Handler.Run(args[ix:])
+	err := node.cmd.Run(args[ix:])
+	if errors.Is(err, flag.ErrHelp) {
+		node.Help()
+		return nil
+	}
+	return err
 }
 
 func (t *CommandTrie) sugget(name string, others []string) error {

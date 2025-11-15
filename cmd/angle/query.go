@@ -7,9 +7,23 @@ import (
 	"strings"
 	"time"
 
+	"github.com/midbel/codecs/cmd/cli"
 	"github.com/midbel/codecs/xml"
 	"github.com/midbel/codecs/xpath"
 )
+
+var debugCmd = cli.Command{
+	Name:    "debug",
+	Summary: "print AST of xpath expression",
+	Handler: &DebugCmd{},
+}
+
+var queryCmd = cli.Command{
+	Name:    "query",
+	Alias:   []string{"exec"},
+	Summary: "search nodes into xml document",
+	Handler: &QueryCmd{},
+}
 
 type DebugCmd struct{}
 
@@ -213,7 +227,7 @@ func (q *QueryCmd) configureVars(doc *xml.Document) error {
 }
 
 func (q *QueryCmd) parseArgs(args []string) error {
-	set := flag.NewFlagSet("query", flag.ContinueOnError)
+	set := cli.NewFlagSet("query")
 	set.BoolVar(&q.Quiet, "quiet", false, "suppress output")
 	set.BoolVar(&q.StrictNS, "strict-namespace", false, "strict namespace checking")
 	set.BoolVar(&q.OmitProlog, "omit-prolog", false, "omit xml prolog")

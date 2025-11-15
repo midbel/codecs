@@ -1,25 +1,28 @@
 package main
 
 import (
-	"flag"
 	"fmt"
+
+	"github.com/midbel/codecs/cmd/cli"
 )
 
-// var compareCmd = Command {
-// 	Name: "compare",
-// 	Alias: []string{"cmp"},
-// 	Summary: "compare two xml documents",
-// }
+var compareCmd = cli.Command{
+	Name:    "compare",
+	Alias:   []string{"cmp"},
+	Summary: "compare two xml documents",
+	Handler: &CompareCmd{},
+}
 
-// var sortCmd = Command {
-// 	Name: "sort",
-// 	Summary: "sort nodes in xml documents",
-// }
+var sortCmd = cli.Command{
+	Name:    "sort",
+	Summary: "sort nodes in xml documents",
+	Handler: &SortCmd{},
+}
 
 type CompareCmd struct{}
 
-func (c CompareCmd) Run(args []string) error {
-	set := flag.NewFlagSet("compare", flag.ExitOnError)
+func (c *CompareCmd) Run(args []string) error {
+	set := cli.NewFlagSet("compare")
 	if err := set.Parse(args); err != nil {
 		return err
 	}
@@ -28,8 +31,8 @@ func (c CompareCmd) Run(args []string) error {
 
 type SortCmd struct{}
 
-func (c SortCmd) Run(args []string) error {
-	set := flag.NewFlagSet("sort", flag.ExitOnError)
+func (c *SortCmd) Run(args []string) error {
+	set := cli.NewFlagSet("sort")
 	if err := set.Parse(args); err != nil {
 		return err
 	}

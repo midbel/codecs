@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"io"
 	"iter"
@@ -12,13 +11,32 @@ import (
 	"strings"
 	"time"
 
+	"github.com/midbel/codecs/cmd/cli"
 	"github.com/midbel/codecs/sch"
 )
+
+var compileCmd = cli.Command{
+	Name:    "compile",
+	Summary: "compile a schematron document to its xslt form",
+	Handler: &SchCompileCmd{},
+}
+
+var infoSchemaCmd = cli.Command{
+	Name:    "info",
+	Summary: "give information about a schematron",
+	Handler: &SchInfoCmd{},
+}
+
+var assertCmd = cli.Command{
+	Name:    "assert",
+	Summary: "run a schematron against xml document(s)",
+	Handler: &SchAssertCmd{},
+}
 
 type SchCompileCmd struct{}
 
 func (a SchCompileCmd) Run(args []string) error {
-	set := flag.NewFlagSet("compile", flag.ExitOnError)
+	set := cli.NewFlagSet("compile")
 	if err := set.Parse(args); err != nil {
 		return err
 	}
@@ -28,7 +46,7 @@ func (a SchCompileCmd) Run(args []string) error {
 type SchInfoCmd struct{}
 
 func (a SchInfoCmd) Run(args []string) error {
-	set := flag.NewFlagSet("info", flag.ExitOnError)
+	set := cli.NewFlagSet("info")
 	if err := set.Parse(args); err != nil {
 		return err
 	}
@@ -51,7 +69,7 @@ type SchAssertCmd struct {
 }
 
 func (a *SchAssertCmd) Run(args []string) error {
-	set := flag.NewFlagSet("assert", flag.ExitOnError)
+	set := cli.NewFlagSet("assert")
 	set.StringVar(&a.phase, "p", "", "phase")
 	set.BoolVar(&a.quiet, "q", false, "quiet")
 	set.BoolVar(&a.erronly, "e", false, "print only errors")

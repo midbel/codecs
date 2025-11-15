@@ -1,8 +1,15 @@
 package main
 
 import (
-	"flag"
+	"github.com/midbel/codecs/cmd/cli"
 )
+
+var formatCmd = cli.Command{
+	Name:    "format",
+	Alias:   []string{"rewrite", "fmt"},
+	Summary: "rewrite xml document",
+	Handler: &FormatCmd{},
+}
 
 type FormatCmd struct {
 	OutFile string
@@ -11,7 +18,7 @@ type FormatCmd struct {
 }
 
 func (f *FormatCmd) Run(args []string) error {
-	set := flag.NewFlagSet("format", flag.ContinueOnError)
+	set := cli.NewFlagSet("format")
 
 	set.BoolVar(&f.NoNamespace, "no-namespace", false, "don't write xml namespace into the output document")
 	set.BoolVar(&f.NoProlog, "no-prolog", false, "don't write the xml prolog into the output document")
