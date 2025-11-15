@@ -336,7 +336,12 @@ func (s *Stylesheet) Generate(w io.Writer, doc *xml.Document) error {
 	if err != nil {
 		return err
 	}
-	return s.writeDocument(w, "", result.(*xml.Document))
+	if _, ok := result.(*xml.Document); ok {
+		err = s.writeDocument(w, "", result.(*xml.Document))
+	} else {
+		_, err = io.WriteString(w, result.Value())
+	}
+	return err
 }
 
 func (s *Stylesheet) Execute(doc xml.Node) (xml.Node, error) {
@@ -371,6 +376,8 @@ func (s *Stylesheet) Execute(doc xml.Node) (xml.Node, error) {
 				a := xml.NewAttribute(xml.QualifiedName(pre, "xmlns"), uri)
 				el.SetAttribute(a)
 			}
+		} else {
+			return root, nil
 		}
 		return xml.NewDocument(root), nil
 	}
