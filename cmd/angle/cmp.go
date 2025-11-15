@@ -5,6 +5,17 @@ import (
 	"fmt"
 )
 
+// var compareCmd = Command {
+// 	Name: "compare",
+// 	Alias: []string{"cmp"},
+// 	Summary: "compare two xml documents",
+// }
+
+// var sortCmd = Command {
+// 	Name: "sort",
+// 	Summary: "sort nodes in xml documents",
+// }
+
 type CompareCmd struct{}
 
 func (c CompareCmd) Run(args []string) error {

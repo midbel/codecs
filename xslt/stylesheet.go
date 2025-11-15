@@ -81,6 +81,27 @@ const (
 	NoMatchFail
 )
 
+func getNoMatchMode(str string) NoMatchMode {
+	var mode NoMatchMode
+	switch str {
+	case "text-only-copy":
+		mode = NoMatchTextOnlyCopy
+	case "deep-copy":
+		mode = NoMatchDeepCopy
+	case "shallow-copy":
+		mode = NoMatchShallowCopy
+	case "deep-skip":
+		mode = NoMatchDeepSkip
+	case "shallow-skip":
+		mode = NoMatchShallowSkip
+	case "":
+		mode = NoMatchBuiltins
+	default:
+		mode = NoMatchFail
+	}
+	return mode
+}
+
 type MultiMatchMode int8
 
 const (
@@ -226,6 +247,7 @@ func (m *Mode) noMatch() (Executer, error) {
 type Stylesheet struct {
 	DefaultMode           string
 	WrapRoot              bool
+	WrapName              string
 	StrictModeDeclaration bool
 
 	excludeNamespaces []string
@@ -512,6 +534,14 @@ func (s *Stylesheet) init(doc xml.Node) error {
 	if err != nil {
 		return err
 	}
+	// TODO: put attribute into namespace
+	if attr, err := getAttribute(r, "wrap-multiple-elements"); err == nil {
+		s.WrapRoot = strings.EqualFold(attr, "yes") || strings.EqualFold(attr, "true")
+	}
+	// TODO: put attribute into namespace
+	if attr, err := getAttribute(r, "wrap-root-name"); err == nil {
+		s.WrapName = attr
+	}
 	for _, n := range r.Nodes {
 		if n.Type() == xml.TypeComment {
 			continue
@@ -721,7 +751,7 @@ func (s *Stylesheet) loadMode(node xml.Node) error {
 		case "name":
 			m.Name = attr
 		case "on-no-match":
-			m.NoMatch = NoMatchFail
+			m.NoMatch = getNoMatchMode(attr)
 		case "on-multiple-match":
 			m.MultiMatch = MultiMatchFail
 		case "warning-on-no-match":

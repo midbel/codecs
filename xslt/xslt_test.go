@@ -39,8 +39,12 @@ func TestElement(t *testing.T) {
 func TestDefaultRules(t *testing.T) {
 	tests := []TestCase{
 		{
-			Name: "default-rules/document",
-			Dir:  "testdata/default-rule-document",
+			Name: "default-rules/default",
+			Dir:  "testdata/default-rule-default",
+		},
+		{
+			Name: "default-rules/text-copy-only",
+			Dir:  "testdata/default-rule-text-copy",
 		},
 	}
 	runTests(t, tests)

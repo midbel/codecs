@@ -147,7 +147,7 @@ func (a virtualApplyTemplate) Execute(ctx *Context) ([]xml.Node, error) {
 	}
 	var (
 		others []xml.Node
-		fake = xml.NewElement(xml.LocalName("fake"))
+		fake   = xml.NewElement(xml.LocalName("fake"))
 	)
 	ctx = ctx.WithXsl(fake)
 	for _, n := range nodes {
@@ -198,26 +198,21 @@ func templateMatch(expr xpath.Expr, node xml.Node) (bool, int) {
 type builtinNoMatch struct{}
 
 func (builtinNoMatch) Execute(ctx *Context) ([]xml.Node, error) {
-	fmt.Println("builtinNoMatch")
 	var nodes []xml.Node
 	switch ctx.ContextNode.Type() {
 	case xml.TypeDocument:
-		fmt.Println("document")
 		doc, ok := ctx.ContextNode.(*xml.Document)
 		if ok {
 			nodes = append(nodes, doc.Root())
 		}
 	case xml.TypeElement:
-		fmt.Println("element")
 		el, ok := ctx.ContextNode.(*xml.Element)
 		if ok {
 			nodes = slices.Clone(el.Nodes)
 		}
 	case xml.TypeText:
-		fmt.Println("text")
 		nodes = append(nodes, ctx.ContextNode)
 	default:
-		fmt.Println("other???")
 	}
 	return nodes, nil
 }
@@ -225,39 +220,20 @@ func (builtinNoMatch) Execute(ctx *Context) ([]xml.Node, error) {
 type textOnlyCopy struct{}
 
 func (textOnlyCopy) Execute(ctx *Context) ([]xml.Node, error) {
+	var nodes []xml.Node
 	switch ctx.ContextNode.Type() {
-	case xml.TypeElement:
-		var (
-			list []xml.Node
-			elem = ctx.ContextNode.(*xml.Element)
-		)
-		for i := range elem.Nodes {
-			others, err := ctx.WithXpath(elem.Nodes[i]).ApplyTemplate()
-			if err != nil {
-				return nil, err
-			}
-			list = slices.Concat(list, others)
-		}
-		return list, nil
 	case xml.TypeDocument:
-		var (
-			list []xml.Node
-			doc  = ctx.ContextNode.(*xml.Document)
-		)
-		for i := range doc.Nodes {
-			others, err := ctx.WithXpath(doc.Nodes[i]).ApplyTemplate()
-			if err != nil {
-				return nil, err
-			}
-			list = slices.Concat(list, others)
-		}
-		return list, nil
+		doc := ctx.ContextNode.(*xml.Document)
+		nodes = append(nodes, doc.Root())
+	case xml.TypeElement:
+		el := ctx.ContextNode.(*xml.Element)
+		nodes = slices.Clone(el.Nodes)
 	case xml.TypeText:
-		node := xml.NewText(ctx.ContextNode.Value())
-		return []xml.Node{node}, nil
+		nodes = append(nodes, ctx.ContextNode)
 	default:
 		return nil, nil
 	}
+	return nodes, nil
 }
 
 type deepCopy struct{}

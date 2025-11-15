@@ -17,6 +17,14 @@ func (e SuggestionError) Error() string {
 	return fmt.Sprintf("%s: unknown subcommand", e.Name)
 }
 
+type Command struct {
+	Name    string
+	Alias   []string
+	Summary string
+	Help    string
+	Handler
+}
+
 type Handler interface {
 	Run([]string) error
 }
