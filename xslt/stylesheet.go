@@ -73,7 +73,7 @@ type NoMatchMode int8
 
 const (
 	NoMatchBuiltins NoMatchMode = 1 << iota
-	NoMatchDeepCopy 
+	NoMatchDeepCopy
 	NoMatchShallowCopy
 	NoMatchDeepSkip
 	NoMatchShallowSkip
@@ -149,15 +149,15 @@ func (m *Mode) callTemplate(name string) (Executer, error) {
 	return m.Templates[ix].Clone(), nil
 }
 
-func (m *Mode) mainTemplate() (Executer, error) {
-	ix := slices.IndexFunc(m.Templates, func(t *Template) bool {
-		return t.isRoot()
-	})
-	if ix >= 0 {
-		return m.Templates[ix], nil
-	}
-	return nil, fmt.Errorf("main template not found")
-}
+// func (m *Mode) mainTemplate() (Executer, error) {
+// 	ix := slices.IndexFunc(m.Templates, func(t *Template) bool {
+// 		return t.isRoot()
+// 	})
+// 	if ix >= 0 {
+// 		return m.Templates[ix], nil
+// 	}
+// 	return nil, fmt.Errorf("main template not found")
+// }
 
 func (m *Mode) matchTemplate(node xml.Node, env *xpath.Evaluator) (Executer, error) {
 	type TemplateMatch struct {
@@ -203,13 +203,14 @@ func (m *Mode) matchTemplate(node xml.Node, env *xpath.Evaluator) (Executer, err
 		})
 		return results[0].Template.Clone(), nil
 	}
-	return m.noMatch(node)
+	exec, err := m.noMatch()
+	if err != nil {
+		err = fmt.Errorf("%s: %s", node.QualifiedName(), err)
+	}
+	return exec, err
 }
 
-func (m *Mode) noMatch(node xml.Node) (Executer, error) {
-	if node == nil {
-		return nil, fmt.Errorf("no node given")
-	}
+func (m *Mode) noMatch() (Executer, error) {
 	var exec Executer
 	switch m.NoMatch {
 	case NoMatchBuiltins:
@@ -225,13 +226,9 @@ func (m *Mode) noMatch(node xml.Node) (Executer, error) {
 	case NoMatchShallowSkip:
 		exec = shallowSkip{}
 	case NoMatchFail:
-		return nil, fmt.Errorf("%s: no template match", node.QualifiedName())
+		return nil, fmt.Errorf("no template match")
 	default:
-		name := node.QualifiedName()
-		if e, ok := node.(interface{ ExpandedName() string }); ok {
-			name = e.ExpandedName()
-		}
-		return nil, fmt.Errorf("%s: no template match", name)
+		return nil, fmt.Errorf("no template match")
 	}
 	return exec, nil
 }
@@ -353,7 +350,7 @@ func (s *Stylesheet) Generate(w io.Writer, doc *xml.Document) error {
 }
 
 func (s *Stylesheet) Execute(doc xml.Node) (xml.Node, error) {
-	tpl, err := s.getMainTemplate()
+	tpl, err := s.getMainTemplate(doc)
 	if err != nil {
 		return nil, err
 	}
@@ -927,14 +924,14 @@ func (s *Stylesheet) getQualifiedName(name string) string {
 	return qn.QualifiedName()
 }
 
-func (s *Stylesheet) getMainTemplate() (Executer, error) {
+func (s *Stylesheet) getMainTemplate(node xml.Node) (Executer, error) {
 	ix := slices.IndexFunc(s.Modes, func(m *Mode) bool {
 		return m.Name == s.Mode
 	})
 	if ix >= 0 {
-		return s.Modes[ix].mainTemplate()
+		return s.Modes[ix].matchTemplate(node, s.env)
 	}
-	return nil, fmt.Errorf("main template not found")
+	return nil, fmt.Errorf("template not found")
 }
 
 func importSheet(ctx *Context) error {

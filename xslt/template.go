@@ -157,10 +157,26 @@ func templateMatch(expr xpath.Expr, node xml.Node) (bool, int) {
 	return false, 0
 }
 
-type builtinNoMatch struct {}
+type builtinNoMatch struct{}
 
 func (builtinNoMatch) Execute(ctx *Context) ([]xml.Node, error) {
-	return nil, nil
+	var nodes []xml.Node
+	switch ctx.ContextNode.Type() {
+	case xml.TypeDocument:
+		doc, ok := ctx.ContextNode.(*xml.Document)
+		if ok {
+			nodes = append(nodes, doc.Root())
+		}
+	case xml.TypeElement:
+		el, ok := ctx.ContextNode.(*xml.Element)
+		if ok {
+			nodes = slices.Clone(el.Nodes)
+		}
+	case xml.TypeText:
+		nodes = append(nodes, ctx.ContextNode)
+	default:
+	}
+	return nodes, nil
 }
 
 type textOnlyCopy struct{}
