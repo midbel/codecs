@@ -263,7 +263,7 @@ type Stylesheet struct {
 	env     *xpath.Evaluator
 	aliases environ.Environ[string]
 
-	Context string
+	contextDir string
 	Others  []*Stylesheet
 }
 
@@ -273,7 +273,7 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 		return nil, err
 	}
 	sheet := Stylesheet{
-		Context:       contextDir,
+		contextDir:       contextDir,
 		xsltNamespace: xsltNamespacePrefix,
 		static:        xpath.NewEvaluator(),
 		env:           xpath.NewEvaluator(),
@@ -284,8 +284,8 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 	sheet.defineBuiltins()
 
 	sheet.Modes = append(sheet.Modes, unnamedMode())
-	if sheet.Context == "" {
-		sheet.Context = filepath.Dir(file)
+	if sheet.contextDir == "" {
+		sheet.contextDir = filepath.Dir(file)
 	}
 
 	root, err := getElementFromNode(doc.Root())
@@ -407,7 +407,7 @@ func (s *Stylesheet) Execute(doc xml.Node) (xml.Node, error) {
 }
 
 func (s *Stylesheet) ImportSheet(file string) error {
-	other, err := Load(filepath.Join(s.Context, file), s.Context)
+	other, err := Load(filepath.Join(s.contextDir, file), s.contextDir)
 	if err != nil {
 		return err
 	}
@@ -416,7 +416,7 @@ func (s *Stylesheet) ImportSheet(file string) error {
 }
 
 func (s *Stylesheet) IncludeSheet(file string) error {
-	other, err := Load(filepath.Join(s.Context, file), s.Context)
+	other, err := Load(filepath.Join(s.contextDir, file), s.contextDir)
 	if err != nil {
 		return err
 	}
@@ -437,7 +437,7 @@ func (s *Stylesheet) IncludeSheet(file string) error {
 }
 
 func (s *Stylesheet) LoadDocument(file string) (xml.Node, error) {
-	file = filepath.Join(s.Context, file)
+	file = filepath.Join(s.contextDir, file)
 	return loadDocument(file)
 }
 
@@ -482,10 +482,6 @@ func (s *Stylesheet) GetOutput(name string) *Output {
 		return defaultOutput()
 	}
 	return s.output[ix]
-}
-
-func (s *Stylesheet) CurrentMode() string {
-	return s.Mode
 }
 
 func (s *Stylesheet) staticContext(node xml.Node) *Context {
@@ -913,6 +909,10 @@ func (s *Stylesheet) loadTemplate(node xml.Node) error {
 		err = s.Modes[ix].Append(tpl)
 	}
 	return err
+}
+
+func (s *Stylesheet) serialize(w io.Writer, nodes []xml.Node) error {
+	return nil
 }
 
 func (s *Stylesheet) writeDocument(w io.Writer, format string, doc *xml.Document) error {
