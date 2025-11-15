@@ -264,7 +264,7 @@ type Stylesheet struct {
 	aliases environ.Environ[string]
 
 	contextDir string
-	Others  []*Stylesheet
+	Others     []*Stylesheet
 }
 
 func Load(file, contextDir string) (*Stylesheet, error) {
@@ -273,7 +273,7 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 		return nil, err
 	}
 	sheet := Stylesheet{
-		contextDir:       contextDir,
+		contextDir:    contextDir,
 		xsltNamespace: xsltNamespacePrefix,
 		static:        xpath.NewEvaluator(),
 		env:           xpath.NewEvaluator(),
@@ -474,7 +474,7 @@ func (s *Stylesheet) SetParam(ident string, expr xpath.Expr) {
 	s.env.Set(ident, expr)
 }
 
-func (s *Stylesheet) GetOutput(name string) *Output {
+func (s *Stylesheet) getOutput(name string) *Output {
 	ix := slices.IndexFunc(s.output, func(o *Output) bool {
 		return o.Name == name
 	})
@@ -911,14 +911,10 @@ func (s *Stylesheet) loadTemplate(node xml.Node) error {
 	return err
 }
 
-func (s *Stylesheet) serialize(w io.Writer, nodes []xml.Node) error {
-	return nil
-}
-
 func (s *Stylesheet) writeDocument(w io.Writer, format string, doc *xml.Document) error {
 	var (
 		writer  = xml.NewWriter(w)
-		setting = s.GetOutput(format)
+		setting = s.getOutput(format)
 	)
 	if !setting.Indent {
 		writer.WriterOptions |= xml.OptionCompact
