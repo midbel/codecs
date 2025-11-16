@@ -26,7 +26,7 @@ type Context struct {
 	env *xpath.Evaluator
 }
 
-func (c *Context) Serialize(file , format string, doc xml.Node) error {
+func (c *Context) Serialize(file, format string, doc xml.Node) error {
 	w, err := os.Create(file)
 	if err != nil {
 		return err

@@ -134,7 +134,22 @@ func (n *BaseNode) setPosition(pos int) {
 
 var ErrElement = errors.New("element expected")
 
+type DocType struct {
+	Name     string
+	PublicID string
+	SystemID string
+}
+
+func NewDocType(name, public, system string) *DocType {
+	return &DocType{
+		Name:     name,
+		PublicID: public,
+		SystemID: system,
+	}
+}
+
 type Document struct {
+	*DocType
 	Version  string
 	Encoding string
 

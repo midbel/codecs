@@ -812,7 +812,7 @@ func (s *Stylesheet) loadOutput(node xml.Node) error {
 	var (
 		out      Output
 		builders = map[string]func(*Stylesheet, xml.Node) (Serializer, error){
-			"text": newTextSerializer,
+			"text":  newTextSerializer,
 			"xml":   newXmlSerializer,
 			"html":  newHtmlSerializer,
 			"xhtml": newHtmlSerializer,

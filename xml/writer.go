@@ -90,16 +90,6 @@ func (w WriterOptions) rewriteQName(name QName) QName {
 	return name
 }
 
-type PrologWriterFunc func(w io.Writer) error
-
-func (fn PrologWriterFunc) WriteProlog(w io.Writer) error {
-	return fn(w)
-}
-
-type PrologWriter interface {
-	WriteProlog(w io.Writer) error
-}
-
 type Writer struct {
 	writer *bufio.Writer
 
@@ -107,7 +97,6 @@ type Writer struct {
 	Doctype  string
 	MaxDepth int
 	WriterOptions
-	PrologWriter
 }
 
 func WriteNode(node Node) string {
@@ -139,12 +128,41 @@ func (w *Writer) Write(doc *Document) error {
 	if err := w.writeProlog(); err != nil {
 		return err
 	}
-	w.writeNL()
+	if err := w.writeDocumentType(doc.DocType); err != nil {
+		return err
+	}
 	for _, n := range doc.Nodes {
 		if err := w.writeNode(n, -1); err != nil {
 			return err
 		}
 	}
+	return nil
+}
+
+func (w *Writer) writeDocumentType(doctype *DocType) error {
+	if doctype == nil {
+		return nil
+	}
+	w.writeNL()
+	w.writer.WriteRune(langle)
+	w.writer.WriteRune(bang)
+	w.writer.WriteString("DOCTYPE")
+	w.writer.WriteRune(' ')
+	w.writer.WriteString(doctype.Name)
+	if doctype.PublicID != "" {
+		w.writer.WriteRune(' ')
+		w.writer.WriteString("PUBLIC")
+		w.writer.WriteRune(' ')
+		w.writer.WriteString(doctype.PublicID)
+	}
+	if doctype.SystemID != "" {
+		w.writer.WriteRune(' ')
+		w.writer.WriteString("SYSTEM")
+		w.writer.WriteRune(' ')
+		w.writer.WriteString(doctype.SystemID)
+	}
+	w.writer.WriteRune(rangle)
+	w.writeNL()
 	return nil
 }
 
@@ -291,16 +309,12 @@ func (w *Writer) writeProlog() error {
 	if w.NoProlog() {
 		return nil
 	}
-	if w.PrologWriter == nil {
-		prolog := NewInstruction(LocalName("xml"))
-		prolog.Attrs = []Attribute{
-			NewAttribute(LocalName("version"), SupportedVersion),
-			NewAttribute(LocalName("encoding"), SupportedEncoding),
-		}
-		return w.writeInstruction(prolog, 0)
-	} else {
-		return w.WriteProlog(w.writer)
+	prolog := NewInstruction(LocalName("xml"))
+	prolog.Attrs = []Attribute{
+		NewAttribute(LocalName("version"), SupportedVersion),
+		NewAttribute(LocalName("encoding"), SupportedEncoding),
 	}
+	return w.writeInstruction(prolog, 0)
 }
 
 func (w *Writer) writeAttributeAsNode(attr *Attribute, depth int) error {

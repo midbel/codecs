@@ -228,7 +228,7 @@ func (textOnlyCopy) Execute(ctx *Context) ([]xml.Node, error) {
 	case xml.TypeElement:
 		el := ctx.ContextNode.(*xml.Element)
 		for i := range el.Nodes {
-			t := el.Nodes[i].Type() 
+			t := el.Nodes[i].Type()
 			if t == xml.TypeComment || t == xml.TypeInstruction {
 				continue
 			}
