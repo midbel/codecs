@@ -227,7 +227,13 @@ func (textOnlyCopy) Execute(ctx *Context) ([]xml.Node, error) {
 		nodes = append(nodes, doc.Root())
 	case xml.TypeElement:
 		el := ctx.ContextNode.(*xml.Element)
-		nodes = slices.Clone(el.Nodes)
+		for i := range el.Nodes {
+			t := el.Nodes[i].Type() 
+			if t == xml.TypeComment || t == xml.TypeInstruction {
+				continue
+			}
+			nodes = append(nodes, el.Nodes[i])
+		}
 	case xml.TypeText:
 		nodes = append(nodes, ctx.ContextNode)
 	default:

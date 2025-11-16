@@ -2,6 +2,7 @@ package xslt
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/midbel/codecs/xml"
 	"github.com/midbel/codecs/xpath"
@@ -23,6 +24,16 @@ type Context struct {
 	*Stylesheet
 
 	env *xpath.Evaluator
+}
+
+func (c *Context) Serialize(file , format string, doc xml.Node) error {
+	w, err := os.Create(file)
+	if err != nil {
+		return err
+	}
+	defer w.Close()
+	serializer := c.getOutput(format)
+	return serializer.Serialize(w, []xml.Node{doc})
 }
 
 func (c *Context) Execute(query string) (xpath.Sequence, error) {

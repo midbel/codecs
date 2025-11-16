@@ -134,7 +134,7 @@ func executeResultDocument(ctx *Context) (xpath.Sequence, error) {
 		return nil, ctx.errorWithContext(err)
 	}
 	format, _ := getAttribute(elem, "format")
-	if err := writeDocument(file, format, &doc, ctx.Stylesheet); err != nil {
+	if err := ctx.Serialize(file, format, &doc); err != nil {
 		return nil, ctx.errorWithContext(err)
 	}
 	return nil, nil

@@ -47,22 +47,9 @@ type AttributeSet struct {
 }
 
 type Output struct {
-	Name       string
-	Method     string
-	Encoding   string
-	Version    string
-	Indent     bool
-	OmitProlog bool
-}
-
-func defaultOutput() *Output {
-	out := &Output{
-		Method:   "xml",
-		Version:  xml.SupportedVersion,
-		Encoding: xml.SupportedEncoding,
-		Indent:   false,
-	}
-	return out
+	Name   string
+	Method string
+	Serializer
 }
 
 type Executer interface {
@@ -354,56 +341,20 @@ func (s *Stylesheet) Match(node xml.Node, mode string) (Executer, error) {
 }
 
 func (s *Stylesheet) Generate(w io.Writer, doc *xml.Document) error {
-	result, err := s.Execute(doc)
+	nodes, err := s.Execute(doc)
 	if err != nil {
 		return err
 	}
-	if _, ok := result.(*xml.Document); ok {
-		err = s.writeDocument(w, "", result.(*xml.Document))
-	} else {
-		_, err = io.WriteString(w, result.Value())
-	}
-	return err
+	serializer := s.getOutput("")
+	return serializer.Serialize(w, nodes)
 }
 
-func (s *Stylesheet) Execute(doc xml.Node) (xml.Node, error) {
+func (s *Stylesheet) Execute(doc xml.Node) ([]xml.Node, error) {
 	tpl, err := s.getMainTemplate(doc)
 	if err != nil {
 		return nil, err
 	}
-	nodes, err := tpl.Execute(s.createContext(doc))
-	if err == nil {
-		var root xml.Node
-		if len(nodes) > 1 {
-			if !s.WrapRoot {
-				return nil, fmt.Errorf("main template returns more than one node")
-			}
-			elem := xml.NewElement(xml.LocalName(XslProduct))
-			for i := range nodes {
-				elem.Append(nodes[i])
-			}
-			root = elem
-		} else if len(nodes) == 1 {
-			root = nodes[0]
-		} else {
-			root = xml.NewElement(xml.LocalName(XslProduct))
-		}
-		if el, ok := root.(*xml.Element); ok {
-			for _, n := range s.aliases.Names() {
-				pre, _ := s.aliases.Resolve(n)
-				uri, err := s.env.ResolveNS(pre)
-				if err != nil {
-					continue
-				}
-				a := xml.NewAttribute(xml.QualifiedName(pre, "xmlns"), uri)
-				el.SetAttribute(a)
-			}
-		} else {
-			return root, nil
-		}
-		return xml.NewDocument(root), nil
-	}
-	return nil, err
+	return tpl.Execute(s.createContext(doc))
 }
 
 func (s *Stylesheet) ImportSheet(file string) error {
@@ -474,12 +425,12 @@ func (s *Stylesheet) SetParam(ident string, expr xpath.Expr) {
 	s.env.Set(ident, expr)
 }
 
-func (s *Stylesheet) getOutput(name string) *Output {
+func (s *Stylesheet) getOutput(name string) Serializer {
 	ix := slices.IndexFunc(s.output, func(o *Output) bool {
 		return o.Name == name
 	})
 	if ix < 0 && name == "" {
-		return defaultOutput()
+		return defaultSerializer(s)
 	}
 	return s.output[ix]
 }
@@ -572,9 +523,6 @@ func (s *Stylesheet) init(doc xml.Node) error {
 		if err != nil {
 			return err
 		}
-	}
-	if len(s.output) == 0 {
-		s.output = append(s.output, defaultOutput())
 	}
 	return nil
 }
@@ -861,23 +809,27 @@ func (s *Stylesheet) loadOutput(node xml.Node) error {
 	if ok, _ := s.useWhen(elem); !ok {
 		return nil
 	}
-	var out Output
-	for _, a := range elem.Attrs {
-		switch value := a.Value(); a.Name {
-		case "name":
-			out.Name = value
-		case "method":
-			out.Method = value
-		case "version":
-			out.Version = value
-		case "encoding":
-			out.Encoding = value
-		case "indent":
-			out.Indent = value == "yes"
-		case "omit-xml-declaration":
-			out.OmitProlog = value == "yes"
-		default:
+	var (
+		out      Output
+		builders = map[string]func(*Stylesheet, xml.Node) (Serializer, error){
+			"text": newTextSerializer,
+			"xml":   newXmlSerializer,
+			"html":  newHtmlSerializer,
+			"xhtml": newHtmlSerializer,
+			"json":  newJsonSerializer,
 		}
+	)
+	out.Name, _ = getAttribute(elem, "name")
+	if out.Method, err = getAttribute(elem, "method"); err != nil {
+		return err
+	}
+	build, ok := builders[out.Method]
+	if !ok {
+		return fmt.Errorf("%s: unsupported output method", out.Method)
+	}
+	out.Serializer, err = build(s, elem)
+	if err != nil {
+		return err
 	}
 	s.output = append(s.output, &out)
 	return nil
@@ -911,22 +863,22 @@ func (s *Stylesheet) loadTemplate(node xml.Node) error {
 	return err
 }
 
-func (s *Stylesheet) writeDocument(w io.Writer, format string, doc *xml.Document) error {
-	var (
-		writer  = xml.NewWriter(w)
-		setting = s.getOutput(format)
-	)
-	if !setting.Indent {
-		writer.WriterOptions |= xml.OptionCompact
-	}
-	if setting.OmitProlog {
-		writer.WriterOptions |= xml.OptionNoProlog
-	}
-	if setting.Method == "html" && (setting.Version == "5" || setting.Version == "5.0") {
-		writer.PrologWriter = xml.PrologWriterFunc(writeDoctypeHTML)
-	}
-	return writer.Write(doc)
-}
+// func (s *Stylesheet) writeDocument(w io.Writer, format string, doc *xml.Document) error {
+// 	var (
+// 		writer  = xml.NewWriter(w)
+// 		setting = s.getOutput(format)
+// 	)
+// 	if !setting.Indent {
+// 		writer.WriterOptions |= xml.OptionCompact
+// 	}
+// 	if setting.OmitProlog {
+// 		writer.WriterOptions |= xml.OptionNoProlog
+// 	}
+// 	if setting.Method == "html" && (setting.Version == "5" || setting.Version == "5.0") {
+// 		writer.PrologWriter = xml.PrologWriterFunc(writeDoctypeHTML)
+// 	}
+// 	return writer.Write(doc)
+// }
 
 func (s *Stylesheet) resolve(ident string) (xpath.Expr, error) {
 	expr, err := s.env.Resolve(ident)

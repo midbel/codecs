@@ -141,16 +141,6 @@ func loadDocument(file string) (*xml.Document, error) {
 	return p.Parse()
 }
 
-func writeDocument(file, format string, doc *xml.Document, style *Stylesheet) error {
-	w, err := os.Create(file)
-	if err != nil {
-		return err
-	}
-	defer w.Close()
-
-	return style.writeDocument(w, format, doc)
-}
-
 func writeDoctypeHTML(w io.Writer) error {
 	_, err := io.WriteString(w, "<!DOCTYPE html>")
 	return err
