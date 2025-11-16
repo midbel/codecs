@@ -137,12 +137,6 @@ func (m *Mode) Merge(other *Mode) error {
 }
 
 func (m *Mode) Append(t *Template) error {
-	found := slices.ContainsFunc(m.Templates, func(other *Template) bool {
-		return other.Name == t.Name && other.Match == t.Match
-	})
-	if found {
-		return fmt.Errorf("duplicate match/name/mode template")
-	}
 	m.Templates = append(m.Templates, t)
 	return nil
 }
