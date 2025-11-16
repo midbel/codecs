@@ -27,6 +27,15 @@ func (e SuggestionError) Error() string {
 	return fmt.Sprintf("%s: unknown subcommand", e.Name)
 }
 
+type DelegateError struct {
+	Command string
+	Args    []string
+}
+
+func (e DelegateError) Error() string {
+	return fmt.Sprintf("delegate to command %s", e.Command)
+}
+
 type Command struct {
 	Name    string
 	Alias   []string
@@ -35,14 +44,63 @@ type Command struct {
 	Handler
 }
 
+func Help(summary, help string) *Command {
+	return &Command{
+		Summary: summary,
+		Help: help,
+		Handler: helpHandler{},
+	}
+}
+
+func Delegate(to string) *Command {
+	return &Command{
+		Handler: delegateHandler{},
+	}
+}
+
+func (c *Command) getHelp() string {
+	return c.Help
+}
+
+func (c *Command) getSummary() string {
+	return c.Summary
+}
+
+func (c *Command) getAliases() []string {
+	return c.Alias
+}
+
+func printHelp(w io.Writer, summary, help string) {
+	if summary != "" {
+		fmt.Fprintln(w, summary)
+		fmt.Fprintln(w)
+	}
+	if help != "" {
+		fmt.Fprintln(w, help)
+		fmt.Fprintln(w)
+	}
+}
+
 type Handler interface {
 	Run([]string) error
 }
 
-type HandlerFunc func([]string) error
+type helpHandler struct{}
 
-func (f HandlerFunc) Run(args []string) error {
-	return f(args)
+func (helpHandler) Run(_ []string) error {
+	return flag.ErrHelp
+}
+
+type delegateHandler struct {
+	To string
+}
+
+func (d delegateHandler) Run(args []string) error {
+	err := DelegateError{
+		Command: d.To,
+		Args:    args,
+	}
+	return err
 }
 
 type CommandNode struct {
@@ -59,20 +117,10 @@ func createNode(name string) *CommandNode {
 }
 
 func (c CommandNode) Help() {
-	if c.cmd.Summary != "" {
-		fmt.Fprintln(os.Stderr, c.cmd.Summary)
-		fmt.Fprintln(os.Stderr)
-	}
-	if c.cmd.Help != "" {
-		fmt.Fprintln(os.Stderr, c.cmd.Help)
-		fmt.Fprintln(os.Stderr)
-	}
-	if len(c.Children) == 0 {
-		return
-	}
+	printHelp(os.Stderr, c.cmd.getSummary(), c.cmd.getHelp())
 	fmt.Fprintln(os.Stderr, "available commands")
 	for s, n := range c.Children {
-		fmt.Printf("- %s: %s", s, n.cmd.Summary)
+		fmt.Printf("- %s: %s", s, n.cmd.getSummary())
 		fmt.Fprintln(os.Stderr)
 	}
 }
@@ -124,7 +172,7 @@ func (t *CommandTrie) Help() {
 	}
 	fmt.Fprintln(os.Stderr, "Available commands")
 	for k, n := range t.root.Children {
-		fmt.Printf("- %s: %s", k, n.cmd.Summary)
+		fmt.Printf("- %s: %s", k, n.cmd.getSummary())
 		fmt.Fprintln(os.Stderr)
 	}
 }
@@ -148,7 +196,7 @@ func (t *CommandTrie) Execute(args []string) error {
 			if c.cmd == nil {
 				continue
 			}
-			found = slices.Contains(c.cmd.Alias, args[ix])
+			found = slices.Contains(c.cmd.getAliases(), args[ix])
 			if found {
 				ix++
 				node = c
