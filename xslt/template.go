@@ -201,14 +201,16 @@ func (builtinNoMatch) Execute(ctx *Context) ([]xml.Node, error) {
 	var nodes []xml.Node
 	switch ctx.ContextNode.Type() {
 	case xml.TypeDocument:
-		doc, ok := ctx.ContextNode.(*xml.Document)
-		if ok {
-			nodes = append(nodes, doc.Root())
-		}
+		doc := ctx.ContextNode.(*xml.Document)
+		nodes = append(nodes, doc.Root())
 	case xml.TypeElement:
-		el, ok := ctx.ContextNode.(*xml.Element)
-		if ok {
-			nodes = slices.Clone(el.Nodes)
+		el := ctx.ContextNode.(*xml.Element)
+		for i := range el.Nodes {
+			t := el.Nodes[i].Type()
+			if t == xml.TypeComment || t == xml.TypeInstruction {
+				continue
+			}
+			nodes = append(nodes, el.Nodes[i])
 		}
 	case xml.TypeText:
 		nodes = append(nodes, ctx.ContextNode)

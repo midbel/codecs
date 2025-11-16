@@ -50,7 +50,7 @@ func newXmlSerializer(s *Stylesheet, n xml.Node) (Serializer, error) {
 	if i, err := getAttribute(el, "indent"); err != nil || i != "yes" {
 		x.options |= xml.OptionCompact
 	}
-	if i, err := getAttribute(el, "omit-xml-declaration"); err != nil || i != "yes" {
+	if i, err := getAttribute(el, "omit-xml-declaration"); err == nil && i == "yes" {
 		x.options |= xml.OptionNoProlog
 	}
 	var doctype xml.DocType
