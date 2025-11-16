@@ -150,8 +150,9 @@ func NewDocType(name, public, system string) *DocType {
 
 type Document struct {
 	*DocType
-	Version  string
-	Encoding string
+	Version    string
+	Encoding   string
+	Standalone string
 
 	Nodes []Node
 }

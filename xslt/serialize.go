@@ -34,8 +34,11 @@ func (textSerializer) Serialize(w io.Writer, nodes []xml.Node) error {
 }
 
 type xmlSerializer struct {
-	options xml.WriterOptions
-	doctype *xml.DocType
+	options       xml.WriterOptions
+	xmlVersion    string
+	xmlEncoding   string
+	xmlStandalone string
+	doctype       *xml.DocType
 	*Stylesheet
 }
 
@@ -54,8 +57,17 @@ func newXmlSerializer(s *Stylesheet, n xml.Node) (Serializer, error) {
 		x.options |= xml.OptionNoProlog
 	}
 	var doctype xml.DocType
-	if i, err := getAttribute(el, "doctype-public"); err == nil && i != "" {
-		doctype.PublicID = i
+	if i, err := getAttribute(el, "version"); err == nil && i != "" {
+		x.xmlVersion = i
+	}
+	if i, err := getAttribute(el, "encoding"); err == nil && i != "" {
+		x.xmlEncoding = i
+	}
+	if i, err := getAttribute(el, "standalone"); err == nil && i != "" {
+		x.xmlStandalone = i
+	}
+	if i, err := getAttribute(el, "doctype-system"); err == nil && i != "" {
+		doctype.SystemID = i
 	}
 	if i, err := getAttribute(el, "doctype-system"); err == nil && i != "" {
 		doctype.SystemID = i
@@ -90,6 +102,9 @@ func (s xmlSerializer) Serialize(w io.Writer, nodes []xml.Node) error {
 	} else {
 		doc = d
 	}
+	doc.Version = s.xmlVersion
+	doc.Encoding = s.xmlEncoding
+	doc.Standalone = s.xmlStandalone
 	doc.DocType = s.doctype
 	return writer.Write(doc)
 }
