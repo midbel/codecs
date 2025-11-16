@@ -17,7 +17,7 @@
     </xsl:template>
 
     <xsl:template match="text()">
-        <xsl:value-of select="normalize-space(.)"/>
+        "<xsl:value-of select="normalize-space(.)"/>"
     </xsl:template>
 
 </xsl:stylesheet>

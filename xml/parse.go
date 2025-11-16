@@ -707,6 +707,7 @@ func (s *Scanner) scanClosingTag(tok *Token) {
 		tok.Type = Invalid
 	} else {
 		s.read()
+		s.state =literalState
 	}
 }
 

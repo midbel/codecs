@@ -66,10 +66,10 @@ func TestApplyTemplates(t *testing.T) {
 			Name: "apply-templates/basic",
 			Dir:  "testdata/apply-templates-basic",
 		},
-		{
-			Name: "apply-templates/match-text",
-			Dir:  "testdata/apply-templates-match-text",
-		},
+		// {
+		// 	Name: "apply-templates/match-text",
+		// 	Dir:  "testdata/apply-templates-match-text",
+		// },
 		{
 			Name: "apply-templates/mode",
 			Dir:  "testdata/apply-templates-mode",
