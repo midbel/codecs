@@ -117,7 +117,7 @@ func newHtmlSerializer(_ *Stylesheet, n xml.Node) (Serializer, error) {
 		h.options |= xml.OptionCompact
 	}
 	if i, err := getAttribute(el, "html-version"); err == nil {
-		if i == "4" || i == "4.01" {
+		if i == "4" || i == "4.1" {
 			h.doctype = doctypeHtml4
 		}
 	}
