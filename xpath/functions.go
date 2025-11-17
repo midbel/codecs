@@ -1428,34 +1428,26 @@ func callRoot(ctx Context, args []Expr) (Sequence, error) {
 }
 
 func callPath(ctx Context, args []Expr) (Sequence, error) {
-	var get func(n xml.Node) []string
-
-	get = func(n xml.Node) []string {
-		p := n.Parent()
-		if p == nil {
-			return nil
-		}
-		x := get(p)
-		g := []string{n.QualifiedName()}
-		return append(g, x...)
-	}
-
+	var (
+		paths []xml.PathInfo
+		list []string
+	)
 	if len(args) == 0 {
-		list := get(ctx.Node)
-		return Singleton(strings.Join(list, "/")), nil
+		paths = ctx.Path()
+	} else {
+		items, err := expandArgs(ctx, args)
+		if err != nil {
+			return nil, err
+		}
+		if items.Empty() {
+			return nil, nil
+		}
+		paths = items[0].Node().Path()
 	}
-	items, err := expandArgs(ctx, args)
-	if err != nil {
-		return nil, err
+	for i := range paths {
+		list = append(list, paths[i].QualifiedName())
 	}
-	n, ok := items[0].(nodeItem)
-	if !ok {
-		return nil, ErrType
-	}
-	ctx.Node = n.Node()
-	ctx.Size = 1
-	ctx.Index = 1
-	return callPath(ctx, nil)
+	return Singleton("/" + strings.Join(list, "/")), nil
 }
 
 func callHasChildren(ctx Context, args []Expr) (Sequence, error) {
