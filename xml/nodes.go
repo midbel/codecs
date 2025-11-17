@@ -94,6 +94,7 @@ type Node interface {
 	Parent() Node
 	Value() string
 	Identity() string
+	Path() []PathInfo
 
 	setParent(Node)
 	setPosition(int)
@@ -107,6 +108,12 @@ type TraversableNode interface {
 	LastChild() Node
 	NextSibling() Node
 	PrevSibling() Node
+}
+
+type PathInfo struct {
+	QName
+	Type  NodeType
+	Index int
 }
 
 type NS struct {
@@ -183,16 +190,8 @@ func (d *Document) WriteString() (string, error) {
 	return buf.String(), err
 }
 
-func (d *Document) GetNodesCount() int {
-	root := d.Root()
-	if root == nil {
-		return 0
-	}
-	el, ok := root.(*Element)
-	if ok {
-		return len(el.Nodes)
-	}
-	return 0
+func (d *Document) Path() []PathInfo {
+	return nil
 }
 
 func (d *Document) GetElementById(id string) (Node, error) {
@@ -403,6 +402,18 @@ func NewAttribute(name QName, value string) Attribute {
 	}
 }
 
+func (a *Attribute) Path() []PathInfo {
+	var (
+		ps = a.parent.Path()
+		pi = PathInfo{
+			QName: a.QName,
+			Type:  TypeAttribute,
+			Index: a.position,
+		}
+	)
+	return append(ps, pi)
+}
+
 func (_ *Attribute) Type() NodeType {
 	return TypeAttribute
 }
@@ -460,6 +471,18 @@ func NewElement(name QName) *Element {
 	return &Element{
 		QName: name,
 	}
+}
+
+func (e *Element) Path() []PathInfo {
+	var (
+		ps = e.parent.Path()
+		pi = PathInfo{
+			QName: e.QName,
+			Type:  TypeElement,
+			Index: e.position,
+		}
+	)
+	return append(ps, pi)
 }
 
 func (e *Element) Namespaces() []NS {
@@ -846,6 +869,18 @@ func NewInstruction(name QName) *Instruction {
 	}
 }
 
+func (i *Instruction) Path() []PathInfo {
+	var (
+		ps = i.parent.Path()
+		pi = PathInfo{
+			QName: i.QName,
+			Type:  TypeInstruction,
+			Index: i.position,
+		}
+	)
+	return append(ps, pi)
+}
+
 func (i *Instruction) Namespaces() []NS {
 	var ns []NS
 	for _, a := range i.Attrs {
@@ -943,6 +978,17 @@ func NewCharacterData(chardata string) *CharData {
 	}
 }
 
+func (c *CharData) Path() []PathInfo {
+	var (
+		ps = c.parent.Path()
+		pi = PathInfo{
+			Type:  TypeText,
+			Index: c.position,
+		}
+	)
+	return append(ps, pi)
+}
+
 func (_ *CharData) Type() NodeType {
 	return TypeText
 }
@@ -1006,6 +1052,17 @@ func NewText(text string) *Text {
 	return &Text{
 		Content: text,
 	}
+}
+
+func (t *Text) Path() []PathInfo {
+	var (
+		ps = t.parent.Path()
+		pi = PathInfo{
+			Type:  TypeText,
+			Index: t.position,
+		}
+	)
+	return append(ps, pi)
 }
 
 func (t *Text) Clone() Node {
@@ -1080,6 +1137,17 @@ func NewComment(comment string) *Comment {
 	return &Comment{
 		Content: comment,
 	}
+}
+
+func (c *Comment) Path() []PathInfo {
+	var (
+		ps = c.parent.Path()
+		pi = PathInfo{
+			Type:  TypeComment,
+			Index: c.position,
+		}
+	)
+	return append(ps, pi)
 }
 
 func (_ *Comment) Type() NodeType {
