@@ -2,6 +2,7 @@ package xslt
 
 import (
 	"fmt"
+	"html"
 	"io"
 
 	"github.com/midbel/codecs/xml"
@@ -25,7 +26,8 @@ func newTextSerializer(_ *Stylesheet, _ xml.Node) (Serializer, error) {
 
 func (textSerializer) Serialize(w io.Writer, nodes []xml.Node) error {
 	for i := range nodes {
-		_, err := io.WriteString(w, nodes[i].Value())
+		str := nodes[i].Value()
+		_, err := io.WriteString(w, html.UnescapeString(str))
 		if err != nil {
 			return err
 		}

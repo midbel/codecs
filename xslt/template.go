@@ -173,11 +173,7 @@ func (a virtualApplyTemplate) Execute(ctx *Context) ([]xml.Node, error) {
 }
 
 func templateMatch(expr xpath.Expr, node xml.Node) (bool, int) {
-	var (
-		depth int
-		curr  = node
-	)
-	for curr != nil {
+	for curr := node; curr != nil; {
 		items, err := expr.Find(curr)
 		if err != nil {
 			break
@@ -187,9 +183,8 @@ func templateMatch(expr xpath.Expr, node xml.Node) (bool, int) {
 				n := i.Node()
 				return n.Identity() == node.Identity()
 			})
-			return ok, depth + expr.MatchPriority()
+			return ok, expr.MatchPriority()
 		}
-		depth--
 		curr = curr.Parent()
 	}
 	return false, 0

@@ -47,7 +47,7 @@ type Command struct {
 func Help(summary, help string) *Command {
 	return &Command{
 		Summary: summary,
-		Help: help,
+		Help:    help,
 		Handler: helpHandler{},
 	}
 }
