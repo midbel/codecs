@@ -71,6 +71,10 @@ func TestApplyTemplates(t *testing.T) {
 			Dir:  "testdata/apply-templates-match-text",
 		},
 		{
+			Name: "apply-templates/match-wildcard",
+			Dir:  "testdata/apply-templates-match-wildcard",
+		},
+		{
 			Name: "apply-templates/mode",
 			Dir:  "testdata/apply-templates-mode",
 		},
