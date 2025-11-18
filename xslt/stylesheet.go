@@ -838,7 +838,7 @@ func (s *Stylesheet) loadTemplate(node xml.Node) error {
 		return nil
 	}
 
-	tpl, err := NewTemplate(elem)
+	tpl, err := NewTemplate(s.env, elem)
 	if err != nil {
 		return err
 	}

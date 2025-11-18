@@ -1430,7 +1430,7 @@ func callRoot(ctx Context, args []Expr) (Sequence, error) {
 func callPath(ctx Context, args []Expr) (Sequence, error) {
 	var (
 		paths []xml.PathInfo
-		list []string
+		list  []string
 	)
 	if len(args) == 0 {
 		paths = ctx.Path()

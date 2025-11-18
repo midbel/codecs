@@ -62,7 +62,6 @@ func init() {
 		xsltQualifiedName("variable"):               single(executeVariable),
 		xsltQualifiedName("result-document"):        single(executeResultDocument),
 		xsltQualifiedName("source-document"):        nest(executeSourceDocument),
-		xsltQualifiedName("with-param"):             single(executeWithParam),
 		xsltQualifiedName("copy"):                   single(executeCopy),
 		xsltQualifiedName("copy-of"):                single(executeCopyOf),
 		xsltQualifiedName("sequence"):               single(executeSequence),
@@ -175,34 +174,6 @@ func executeVariable(ctx *Context) (xpath.Sequence, error) {
 	return nil, nil
 }
 
-func executeWithParam(ctx *Context) (xpath.Sequence, error) {
-	elem, err := getElementFromNode(ctx.XslNode)
-	if err != nil {
-		return nil, ctx.errorWithContext(err)
-	}
-	ident, err := getAttribute(elem, "name")
-	if err != nil {
-		return nil, ctx.errorWithContext(err)
-	}
-	var seq xpath.Sequence
-	if query, err1 := getAttribute(elem, "select"); err1 == nil {
-		if len(elem.Nodes) != 0 {
-			return nil, fmt.Errorf("select attribute can not be used with children")
-		}
-		seq, err = ctx.Execute(query)
-	} else {
-		if len(elem.Nodes) == 0 {
-			err := fmt.Errorf("no value given to param %q", ident)
-			return nil, ctx.errorWithContext(err)
-		}
-		seq, err = executeConstructor(ctx, elem.Nodes, 0)
-	}
-	if err == nil {
-		ctx.Set(ident, xpath.NewValueFromSequence(seq))
-	}
-	return nil, err
-}
-
 func executeApplyImport(ctx *Context) (xpath.Sequence, error) {
 	return executeApply(ctx, ctx.MatchImport)
 }
@@ -224,26 +195,19 @@ func executeCallTemplate(ctx *Context) (xpath.Sequence, error) {
 	if err == nil {
 		ctx = ctx.WithMode(mode)
 	}
-	tpl, err := ctx.Find(name, mode)
+	exec, err := ctx.Find(name, mode)
 	if err != nil {
 		return nil, err
 	}
-	sub := ctx.Sub()
-	if err := applyParams(sub); err != nil {
-		return nil, ctx.errorWithContext(err)
-	}
-	if t, ok := tpl.(interface{ FillWithDefaults(*Context) }); ok {
-		t.FillWithDefaults(sub)
-	}
-
-	call, ok := tpl.(interface {
-		Call(*Context) ([]xml.Node, error)
-	})
+	tpl, ok := exec.(*Template)
 	if !ok {
-		err := fmt.Errorf("template %q can not be called", name)
-		return nil, ctx.errorWithContext(err)
+		return nil, fmt.Errorf("template %s not resolved", name)
 	}
-	nodes, err := call.Call(sub)
+	sub, err := applyTemplateParams(ctx, tpl, elem.Nodes)
+	if err != nil {
+		return nil, err
+	}
+	nodes, err := tpl.Execute(sub)
 	if err != nil {
 		return nil, err
 	}
@@ -583,8 +547,36 @@ func executeBreak(ctx *Context) (xpath.Sequence, error) {
 }
 
 func executeNextIteration(ctx *Context) (xpath.Sequence, error) {
-	if err := applyParams(ctx); err != nil {
+	el, err := getElementFromNode(ctx.XslNode)
+	if err != nil {
 		return nil, err
+	}
+	for _, n := range el.Nodes {
+		if n.QualifiedName() != ctx.getQualifiedName("with-param") {
+			return nil, fmt.Errorf("%s: invalid child node %s", ctx.XslNode.QualifiedName(), n.QualifiedName())
+		}
+		el, err := getElementFromNode(n)
+		if err != nil {
+			return nil, err
+		}
+		ident, err := getAttribute(el, "name")
+		if err != nil {
+			return nil, ctx.errorWithContext(err)
+		}
+		var seq xpath.Sequence
+		if query, err1 := getAttribute(el, "select"); err1 == nil {
+			if len(el.Nodes) != 0 {
+				return nil, fmt.Errorf("select attribute can not be used with children")
+			}
+			seq, err = ctx.Execute(query)
+		} else {
+			if len(el.Nodes) == 0 {
+				err := fmt.Errorf("no value given to param %q", ident)
+				return nil, ctx.errorWithContext(err)
+			}
+			seq, err = executeConstructor(ctx, el.Nodes, 0)
+		}
+		ctx.Set(ident, xpath.NewValueFromSequence(seq))
 	}
 	return nil, errIterate
 }
@@ -1336,23 +1328,6 @@ func executeFallback(ctx *Context) (xpath.Sequence, error) {
 	return nil, errImplemented
 }
 
-func applyParams(ctx *Context) error {
-	elem, err := getElementFromNode(ctx.XslNode)
-	if err != nil {
-		return ctx.errorWithContext(err)
-	}
-	for _, n := range slices.Clone(elem.Nodes) {
-		if n.QualifiedName() != ctx.getQualifiedName("with-param") {
-			return fmt.Errorf("%s: invalid child node %s", ctx.XslNode.QualifiedName(), n.QualifiedName())
-		}
-		_, err := transformNode(ctx.WithXsl(n))
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func applySort(node xml.Node, items xpath.Sequence) (iter.Seq[xpath.Item], error) {
 	elem, err := getElementFromNode(node)
 	if err != nil {
@@ -1385,17 +1360,18 @@ func executeApply(ctx *Context, match matchFunc) (xpath.Sequence, error) {
 		ctx = ctx.WithMode(mode)
 	}
 	var seq xpath.Sequence
-	for _, datum := range nodes {
-		tpl, err := match(datum, mode)
+	for _, n := range nodes {
+		exec, err := match(n, mode)
 		if err != nil {
 			return seq, err
 		}
-		sub := ctx.WithXpath(datum)
-		if err := applyParams(sub); err != nil {
-			return nil, err
+		tpl, ok := exec.(*Template)
+		if !ok {
+			return nil, fmt.Errorf("template not resolved")
 		}
-		if t, ok := tpl.(interface{ FillWithDefaults(*Context) }); ok {
-			t.FillWithDefaults(sub)
+		sub, err := applyTemplateParams(ctx.WithXpath(n), tpl, elem.Nodes)
+		if err != nil {
+			return nil, err
 		}
 		res, err := tpl.Execute(sub)
 		if err != nil {
@@ -1406,6 +1382,41 @@ func executeApply(ctx *Context, match matchFunc) (xpath.Sequence, error) {
 		}
 	}
 	return seq, nil
+}
+
+func applyTemplateParams(ctx *Context, tpl *Template, nodes []xml.Node) (*Context, error) {
+	sub := ctx.Sub()
+	for _, n := range nodes {
+		if n.QualifiedName() != ctx.getQualifiedName("with-param") {
+			return nil, fmt.Errorf("%s: invalid child node %s", ctx.XslNode.QualifiedName(), n.QualifiedName())
+		}
+		el, err := getElementFromNode(n)
+		if err != nil {
+			return nil, err
+		}
+		ident, err := getAttribute(el, "name")
+		if err != nil {
+			return nil, ctx.errorWithContext(err)
+		}
+		if !tpl.hasParam(ident) {
+			continue
+		}
+		var seq xpath.Sequence
+		if query, err1 := getAttribute(el, "select"); err1 == nil {
+			if len(el.Nodes) != 0 {
+				return nil, fmt.Errorf("select attribute can not be used with children")
+			}
+			seq, err = ctx.Execute(query)
+		} else {
+			if len(el.Nodes) == 0 {
+				err := fmt.Errorf("no value given to param %q", ident)
+				return nil, ctx.errorWithContext(err)
+			}
+			seq, err = executeConstructor(ctx, el.Nodes, 0)
+		}
+		sub.Set(ident, xpath.NewValueFromSequence(seq))
+	}
+	return sub, nil
 }
 
 func iterItems(items []xpath.Item, orderBy, orderDir string) (iter.Seq[xpath.Item], error) {

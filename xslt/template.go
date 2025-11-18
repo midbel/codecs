@@ -19,20 +19,16 @@ type Template struct {
 
 	Nodes []xml.Node
 
-	env    *xpath.Evaluator
 	params map[string]xpath.Expr
 }
 
-func NewTemplate(node xml.Node) (*Template, error) {
-	elem, ok := node.(*xml.Element)
-	if !ok {
-		return nil, fmt.Errorf("%s: xml element expected to load template", node.QualifiedName())
+func NewTemplate(env *xpath.Evaluator, node xml.Node) (*Template, error) {
+	el, err := getElementFromNode(node)
+	if err != nil {
+		return nil, err
 	}
-	tpl := Template{
-		env:    xpath.NewEvaluator(),
-		params: make(map[string]xpath.Expr),
-	}
-	for _, a := range elem.Attributes() {
+	var tpl Template
+	for _, a := range el.Attributes() {
 		switch attr := a.Value(); a.Name {
 		case "priority":
 			p, err := strconv.ParseFloat(attr, 64)
@@ -49,12 +45,13 @@ func NewTemplate(node xml.Node) (*Template, error) {
 		default:
 		}
 	}
-	for i, n := range elem.Nodes {
+	tpl.params = make(map[string]xpath.Expr)
+	for i, n := range el.Nodes {
 		if n.QualifiedName() != "xsl:param" {
-			tpl.Nodes = append(tpl.Nodes, elem.Nodes[i:]...)
+			tpl.Nodes = append(tpl.Nodes, el.Nodes[i:]...)
 			break
 		}
-		if err := tpl.setParam(n); err != nil {
+		if err := tpl.setParam(env, n); err != nil {
 			return nil, err
 		}
 	}
@@ -64,20 +61,14 @@ func NewTemplate(node xml.Node) (*Template, error) {
 func (t *Template) Clone() *Template {
 	tpl := *t
 	tpl.Nodes = slices.Clone(tpl.Nodes)
-	tpl.env = t.env.Clone()
 	tpl.params = maps.Clone(t.params)
 	return &tpl
 }
 
-func (t *Template) FillWithDefaults(ctx *Context) {
-	ctx.env.Merge(t.env)
-}
-
-func (t *Template) Call(ctx *Context) ([]xml.Node, error) {
-	return t.Execute(ctx)
-}
-
 func (t *Template) Execute(ctx *Context) ([]xml.Node, error) {
+	if err := t.fillWithDefaults(ctx); err != nil {
+		return nil, err
+	}
 	var nodes []xml.Node
 	for _, n := range slices.Clone(t.Nodes) {
 		c := cloneNode(n)
@@ -98,7 +89,27 @@ func (t *Template) Execute(ctx *Context) ([]xml.Node, error) {
 	return nodes, nil
 }
 
-func (t *Template) setParam(node xml.Node) error {
+func (t *Template) fillWithDefaults(ctx *Context) error {
+	for n, e := range t.params {
+		_, err := ctx.env.Resolve(n)
+		if err == nil {
+			continue
+		}
+		seq, err := e.Find(ctx.ContextNode)
+		if err != nil {
+			return err
+		}
+		ctx.env.Set(n, xpath.NewValueFromSequence(seq))
+	}
+	return nil
+}
+
+func (t *Template) hasParam(ident string) bool {
+	_, ok := t.params[ident]
+	return ok
+}
+
+func (t *Template) setParam(parent *xpath.Evaluator, node xml.Node) error {
 	elem, err := getElementFromNode(node)
 	if err != nil {
 		return err
@@ -112,7 +123,7 @@ func (t *Template) setParam(node xml.Node) error {
 		if len(elem.Nodes) > 0 {
 			return fmt.Errorf("using select and children nodes is not allowed")
 		}
-		expr, err = t.env.Create(query)
+		expr, err = parent.Create(query)
 	} else {
 		var seq xpath.Sequence
 		for i := range elem.Nodes {
@@ -124,7 +135,6 @@ func (t *Template) setParam(node xml.Node) error {
 		if _, ok := t.params[ident]; ok {
 			return fmt.Errorf("%s: param already defined", ident)
 		}
-		t.env.Set(ident, expr)
 		t.params[ident] = expr
 	}
 	return err
