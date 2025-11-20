@@ -98,7 +98,7 @@ func (m pathMatcher) Priority() float64 {
 	return 0
 }
 
-type nodeMatcher struct {}
+type nodeMatcher struct{}
 
 func (m nodeMatcher) Match(node xml.Node) bool {
 	return false
@@ -108,13 +108,26 @@ func (m nodeMatcher) Priority() float64 {
 	return 0
 }
 
-type textMatcher struct {}
+type textMatcher struct{}
 
 func (m textMatcher) Match(node xml.Node) bool {
 	return false
 }
 
 func (m textMatcher) Priority() float64 {
+	return 0
+}
+
+type callMatcher struct {
+	name xml.QName
+	args []Matcher
+}
+
+func (m callMatcher) Match(node xml.Node) bool {
+	return false
+}
+
+func (m callMatcher) Priority() float64 {
 	return 0
 }
 
@@ -143,17 +156,6 @@ func (m predicateMatcher) Match(node xml.Node) bool {
 func (m predicateMatcher) Priority() float64 {
 	return m.curr.Priority() + m.filter.Priority()
 }
-
-const (
-	powLowest int = iota
-	powEq
-	powCmp
-	powUnion
-	powPrefix
-	powStep
-	powPred
-	powCall
-)
 
 type Compiler struct {
 	scan *Scanner
@@ -277,9 +279,52 @@ func (c *Compiler) compilePath() (Matcher, error) {
 		return nil, err
 	}
 	if c.is(begPred) {
-
+		return c.compilePredicate(m)
 	}
 	return m, nil
+}
+
+func (c *Compiler) compilePredicate(match Matcher) (Matcher, error) {
+	m := predicateMatcher{
+		curr: match,
+	}
+	c.next()
+	return m, nil
+}
+
+func (c *Compiler) compileCall(qn xml.QName) (Matcher, error) {
+	c.next()
+	call := callMatcher{
+		name: qn,
+	}
+	for !c.done() && !c.is(endGrp) {
+		arg, err := c.compilePath()
+		if err != nil {
+			return nil, err
+		}
+		call.args = append(call.args, arg)
+		switch {
+		case c.is(opSeq):
+			c.next()
+		case c.is(endGrp):
+		default:
+			return nil, fmt.Errorf("call: unexpected token")
+		}
+	}
+	if !c.is(endGrp) {
+		return nil, fmt.Errorf("missing \")\"")
+	}
+	c.next()
+	return call, nil
+}
+
+func (c *Compiler) compileLiteral() (Matcher, error) {
+	switch {
+	case c.is(opLiteral):
+	case c.is(opDigit):
+	default:
+		return nil, fmt.Errorf("literal: unexpected token")
+	}
 }
 
 func (c *Compiler) compileAttribute() (Matcher, error) {
@@ -289,21 +334,9 @@ func (c *Compiler) compileAttribute() (Matcher, error) {
 		var m wildcardMatcher
 		return m, nil
 	}
-	if !c.is(opName) && !c.is(opStar) {
-		return nil, fmt.Errorf("name/* expected")
-	}
-	qn := xml.QName{
-		Name: c.getCurrentLiteral(),
-	}
-	c.next()
-	if c.is(opNamespace) {
-		c.next()
-		if !c.is(opName) && !c.is(opStar) {
-			return nil, fmt.Errorf("name/* expected")
-		}
-		qn.Space = qn.Name
-		qn.Name = c.getCurrentLiteral()
-		c.next()
+	qn, err := c.compileQN()
+	if err != nil {
+		return nil, err
 	}
 	a := attributeMatcher{
 		name: qn,
@@ -325,26 +358,39 @@ func (c *Compiler) compileName() (Matcher, error) {
 		var m wildcardMatcher
 		return m, nil
 	}
-	if !c.is(opName) && !c.is(opStar) {
-		return nil, fmt.Errorf("name/* expected")
+	qn, err := c.compileQN()
+	if err != nil {
+		return nil, err
 	}
-	qn := xml.QName{
-		Name: c.getCurrentLiteral(),
-	}
-	c.next()
-	if c.is(opNamespace) {
-		c.next()
-		if !c.is(opName) && !c.is(opStar) {
-			return nil, fmt.Errorf("name/* expected")
-		}
-		qn.Space = qn.Name
-		qn.Name = c.getCurrentLiteral()
-		c.next()
+	if c.is(begGrp) {
+		return c.compileCall(qn)
 	}
 	m := nameMatcher{
 		name: qn,
 	}
 	return m, nil
+}
+
+func (c *Compiler) compileQN() (xml.QName, error) {
+	var qn xml.QName
+
+	if !c.is(opName) && !c.is(opStar) {
+		return qn, fmt.Errorf("name/* expected")
+	}
+
+	qn.Name = c.getCurrentLiteral()
+	c.next()
+
+	if c.is(opNamespace) {
+		c.next()
+		if !c.is(opName) && !c.is(opStar) {
+			return qn, fmt.Errorf("name/* expected")
+		}
+		qn.Space = qn.Name
+		qn.Name = c.getCurrentLiteral()
+		c.next()
+	}
+	return qn, nil
 }
 
 func (c *Compiler) getCurrentLiteral() string {
