@@ -98,6 +98,26 @@ func (m pathMatcher) Priority() float64 {
 	return 0
 }
 
+type nodeMatcher struct {}
+
+func (m nodeMatcher) Match(node xml.Node) bool {
+	return false
+}
+
+func (m nodeMatcher) Priority() float64 {
+	return 0
+}
+
+type textMatcher struct {}
+
+func (m textMatcher) Match(node xml.Node) bool {
+	return false
+}
+
+func (m textMatcher) Priority() float64 {
+	return 0
+}
+
 type unionMatcher struct {
 	left  Matcher
 	right Matcher
