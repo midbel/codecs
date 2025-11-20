@@ -17,6 +17,41 @@ type Matcher interface {
 	Priority() float64
 }
 
+type currentMatcher struct{}
+
+func (m currentMatcher) Match(node xml.Node) bool {
+	return true
+}
+
+func (m currentMatcher) Priority() float64 {
+	return 0
+}
+
+type rootMatcher struct {
+	next Matcher
+}
+
+func (m rootMatcher) Match(node xml.Node) bool {
+	return true
+}
+
+func (m rootMatcher) Priority() float64 {
+	return 0
+}
+
+type axisMatcher struct {
+	axis string
+	next Matcher
+}
+
+func (m axisMatcher) Match(node xml.Node) bool {
+	return false
+}
+
+func (m axisMatcher) Priority() float64 {
+	return 0
+}
+
 type nameMatcher struct {
 	name xml.QName
 }
@@ -29,6 +64,18 @@ func (m nameMatcher) Priority() float64 {
 	return 0
 }
 
+type attributeMatcher struct {
+	name xml.QName
+}
+
+func (m attributeMatcher) Match(node xml.Node) bool {
+	return false
+}
+
+func (m attributeMatcher) Priority() float64 {
+	return 0
+}
+
 type wildcardMatcher struct{}
 
 func (m wildcardMatcher) Match(node xml.Node) bool {
@@ -36,6 +83,18 @@ func (m wildcardMatcher) Match(node xml.Node) bool {
 }
 
 func (m wildcardMatcher) Priority() float64 {
+	return 0
+}
+
+type pathMatcher struct {
+	matchers []Matcher
+}
+
+func (m pathMatcher) Match(node xml.Node) bool {
+	return false
+}
+
+func (m pathMatcher) Priority() float64 {
 	return 0
 }
 
@@ -50,6 +109,19 @@ func (m unionMatcher) Match(node xml.Node) bool {
 
 func (m unionMatcher) Priority() float64 {
 	return 0
+}
+
+type predicateMatcher struct {
+	curr   Matcher
+	filter Matcher
+}
+
+func (m predicateMatcher) Match(node xml.Node) bool {
+	return m.curr.Match(node) && m.filter.Match(node)
+}
+
+func (m predicateMatcher) Priority() float64 {
+	return m.curr.Priority() + m.filter.Priority()
 }
 
 const (
@@ -81,11 +153,182 @@ func (c *Compiler) Compile(r io.Reader) (Matcher, error) {
 	c.scan = Scan(r)
 	c.next()
 	c.next()
-	return c.compile(powLowest)
+	return c.compile()
 }
 
-func (c *Compiler) compile(pow int) (Matcher, error) {
-	return nil, nil
+func (c *Compiler) compile() (Matcher, error) {
+	var paths []Matcher
+	switch {
+	case c.is(opCurrentLevel):
+		return c.compileFromRoot()
+	case c.is(opAnyLevel):
+		return c.compileFromAny()
+	default:
+	}
+	for {
+		m, err := c.compilePath()
+		if err != nil {
+			return nil, err
+		}
+		paths = append(paths, m)
+		if c.done() || c.is(opUnion) || c.is(opIntersect) || c.is(opExcept) {
+			break
+		}
+		if !c.is(opCurrentLevel) && !c.is(opAnyLevel) {
+			return nil, fmt.Errorf("\"/\" or \"//\" expected")
+		}
+		if len(paths) > 2 {
+			return nil, fmt.Errorf("only one step allowed in pattern")
+		}
+		c.next()
+	}
+	m := pathMatcher{
+		matchers: paths,
+	}
+	if c.is(opUnion) || c.is(opIntersect) || c.is(opExcept) {
+		c.next()
+		u := unionMatcher{
+			left: m,
+		}
+		n, err := c.compile()
+		if err != nil {
+			return nil, err
+		}
+		u.right = n
+		return u, nil
+	}
+	return m, nil
+}
+
+func (c *Compiler) compileFromRoot() (Matcher, error) {
+	c.next()
+	var (
+		root rootMatcher
+		err  error
+	)
+	if c.done() || c.is(opUnion) || c.is(opIntersect) || c.is(opExcept) {
+		return root, nil
+	}
+	if root.next, err = c.compile(); err != nil {
+		return nil, err
+	}
+	return root, nil
+}
+
+func (c *Compiler) compileFromAny() (Matcher, error) {
+	c.next()
+	m, err := c.compile()
+	if err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (c *Compiler) compilePath() (Matcher, error) {
+	if c.peekIs(opAxis) {
+		if !c.is(opName) {
+			return nil, fmt.Errorf("name expected")
+		}
+		axis := c.getCurrentLiteral()
+		switch axis {
+		case "child":
+		case "descendant":
+		case "attribute":
+		case "self":
+		case "descendant-or-self":
+		case "namespace":
+		default:
+			return nil, fmt.Errorf("invalid axis")
+		}
+		c.next()
+		c.next()
+		next, err := c.compilePath()
+		if err != nil {
+			return nil, err
+		}
+		a := axisMatcher{
+			axis: axis,
+			next: next,
+		}
+		return a, nil
+	}
+	m, err := c.compileName()
+	if err != nil {
+		return nil, err
+	}
+	if c.is(begPred) {
+
+	}
+	return m, nil
+}
+
+func (c *Compiler) compileAttribute() (Matcher, error) {
+	c.next()
+	if c.is(opStar) && !c.peekIs(opNamespace) {
+		c.next()
+		var m wildcardMatcher
+		return m, nil
+	}
+	if !c.is(opName) && !c.is(opStar) {
+		return nil, fmt.Errorf("name/* expected")
+	}
+	qn := xml.QName{
+		Name: c.getCurrentLiteral(),
+	}
+	c.next()
+	if c.is(opNamespace) {
+		c.next()
+		if !c.is(opName) && !c.is(opStar) {
+			return nil, fmt.Errorf("name/* expected")
+		}
+		qn.Space = qn.Name
+		qn.Name = c.getCurrentLiteral()
+		c.next()
+	}
+	a := attributeMatcher{
+		name: qn,
+	}
+	return a, nil
+}
+
+func (c *Compiler) compileName() (Matcher, error) {
+	if c.is(opCurrent) {
+		c.next()
+		var m currentMatcher
+		return m, nil
+	}
+	if c.is(opAttribute) {
+		return c.compileAttribute()
+	}
+	if c.is(opStar) && !c.peekIs(opNamespace) {
+		c.next()
+		var m wildcardMatcher
+		return m, nil
+	}
+	if !c.is(opName) && !c.is(opStar) {
+		return nil, fmt.Errorf("name/* expected")
+	}
+	qn := xml.QName{
+		Name: c.getCurrentLiteral(),
+	}
+	c.next()
+	if c.is(opNamespace) {
+		c.next()
+		if !c.is(opName) && !c.is(opStar) {
+			return nil, fmt.Errorf("name/* expected")
+		}
+		qn.Space = qn.Name
+		qn.Name = c.getCurrentLiteral()
+		c.next()
+	}
+	m := nameMatcher{
+		name: qn,
+	}
+	return m, nil
+}
+
+func (c *Compiler) getCurrentLiteral() string {
+	return c.curr.Literal
 }
 
 func (c *Compiler) next() {
@@ -97,6 +340,10 @@ func (c *Compiler) is(kind rune) bool {
 	return c.curr.Type == kind
 }
 
+func (c *Compiler) peekIs(kind rune) bool {
+	return c.peek.Type == kind
+}
+
 func (c *Compiler) done() bool {
 	return c.is(opEOF)
 }
@@ -104,6 +351,7 @@ func (c *Compiler) done() bool {
 const (
 	opEOF rune = -(1 + iota)
 	opName
+	opVariable
 	opAttribute
 	opLiteral
 	opDigit
@@ -183,14 +431,16 @@ func (t Token) String() string {
 		return "<sequence>"
 	case opEOF:
 		return "<eof>"
+	case opAttribute:
+		return fmt.Sprintf("<attribute>")
 	case opDigit:
 		return fmt.Sprintf("number(%s)", t.Literal)
 	case opCurrent:
 		return "<current>"
+	case opVariable:
+		return fmt.Sprintf("variable(%s)", t.Literal)
 	case opName:
 		return fmt.Sprintf("name(%s)", t.Literal)
-	case opAttribute:
-		return fmt.Sprintf("attribute(%s)", t.Literal)
 	case opLiteral:
 		return fmt.Sprintf("literal(%s)", t.Literal)
 	case opInvalid:
@@ -232,6 +482,8 @@ func (s *Scanner) Scan() Token {
 		s.scanAttr(&tok)
 	case s.char == apos || s.char == quote:
 		s.scanLiteral(&tok)
+	case s.char == dollar:
+		s.scanVariable(&tok)
 	case unicode.IsLetter(s.char):
 		s.scanIdent(&tok)
 	case unicode.IsDigit(s.char):
@@ -331,9 +583,14 @@ func (s *Scanner) scanLiteral(tok *Token) {
 	s.read()
 }
 
-func (s *Scanner) scanAttr(tok *Token) {
+func (s *Scanner) scanVariable(tok *Token) {
 	s.read()
 	s.scanIdent(tok)
+	tok.Type = opVariable
+}
+
+func (s *Scanner) scanAttr(tok *Token) {
+	s.read()
 	tok.Type = opAttribute
 }
 
@@ -348,6 +605,15 @@ func (s *Scanner) scanIdent(tok *Token) {
 	}
 	tok.Literal = s.str.String()
 	tok.Type = opName
+	switch tok.Literal {
+	case "union":
+		tok.Type = opUnion
+	case "intersect":
+		tok.Type = opIntersect
+	case "except":
+		tok.Type = opExcept
+	default:
+	}
 	s.skipBlank()
 }
 
