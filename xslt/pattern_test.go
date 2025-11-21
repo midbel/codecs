@@ -22,10 +22,13 @@ func TestMatch(t *testing.T) {
 	}
 	var (
 		attr = xml.NewAttribute(xml.LocalName("id"), "node")
+		root = xml.NewElement(xml.LocalName("root"))
 		foo  = xml.NewElement(xml.LocalName("foo"))
 		bar  = xml.NewElement(xml.LocalName("bar"))
 		txt  = xml.NewText("foobar")
 	)
+	foo.Append(bar)
+	root.Append(foo)
 	tests := []struct {
 		Pattern string
 		Want    bool
@@ -40,6 +43,11 @@ func TestMatch(t *testing.T) {
 			Pattern: "root",
 			Want:    true,
 			Node:    doc.Root(),
+		},
+		{
+			Pattern: "foo/bar",
+			Want:    true,
+			Node:    bar,
 		},
 		{
 			Pattern: "root",

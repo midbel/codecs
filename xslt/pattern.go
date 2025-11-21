@@ -110,7 +110,17 @@ type pathMatcher struct {
 }
 
 func (m pathMatcher) Match(node xml.Node) bool {
-	return false
+	for i := len(m.matchers) - 1; i >= 0; i-- {
+		if node == nil {
+			return false
+		}
+		ok := m.matchers[i].Match(node)
+		if !ok {
+			return ok
+		}
+		node = node.Parent()
+	}
+	return true
 }
 
 func (m pathMatcher) Priority() float64 {
