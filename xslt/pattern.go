@@ -32,7 +32,7 @@ type rootMatcher struct {
 }
 
 func (m rootMatcher) Match(node xml.Node) bool {
-	return true
+	return node.Type() == xml.TypeDocument
 }
 
 func (m rootMatcher) Priority() float64 {
@@ -57,7 +57,18 @@ type nameMatcher struct {
 }
 
 func (m nameMatcher) Match(node xml.Node) bool {
-	return false
+	var qn xml.QName
+	switch n := node.(type) {
+	case *xml.Element:
+		qn = n.QName
+	case *xml.Attribute:
+		qn = n.QName
+	case *xml.Instruction:
+		qn = n.QName
+	default:
+		return false
+	}
+	return m.name.Equal(qn)
 }
 
 func (m nameMatcher) Priority() float64 {
@@ -65,20 +76,28 @@ func (m nameMatcher) Priority() float64 {
 }
 
 type attributeMatcher struct {
-	name xml.QName
+	Matcher
 }
 
 func (m attributeMatcher) Match(node xml.Node) bool {
-	return false
+	if node.Type() != xml.TypeAttribute {
+		return false
+	}
+	return m.Matcher.Match(node)
 }
 
 func (m attributeMatcher) Priority() float64 {
 	return 0
 }
 
-type wildcardMatcher struct{}
+type wildcardMatcher struct {
+	kind xml.NodeType
+}
 
 func (m wildcardMatcher) Match(node xml.Node) bool {
+	if m.kind != 0 {
+		return node.Type() == m.kind
+	}
 	return true
 }
 
@@ -101,7 +120,7 @@ func (m pathMatcher) Priority() float64 {
 type nodeMatcher struct{}
 
 func (m nodeMatcher) Match(node xml.Node) bool {
-	return false
+	return xml.TypeNode&node.Type() != 0
 }
 
 func (m nodeMatcher) Priority() float64 {
@@ -111,7 +130,7 @@ func (m nodeMatcher) Priority() float64 {
 type textMatcher struct{}
 
 func (m textMatcher) Match(node xml.Node) bool {
-	return false
+	return node.Type() == xml.TypeText
 }
 
 func (m textMatcher) Priority() float64 {
@@ -155,6 +174,15 @@ func (m predicateMatcher) Match(node xml.Node) bool {
 
 func (m predicateMatcher) Priority() float64 {
 	return m.curr.Priority() + m.filter.Priority()
+}
+
+func isTest(n string) bool {
+	switch n {
+	case "text", "attribute", "node":
+	default:
+		return false
+	}
+	return true
 }
 
 type Compiler struct {
@@ -204,8 +232,13 @@ func (c *Compiler) compile() (Matcher, error) {
 		}
 		c.next()
 	}
-	m := pathMatcher{
-		matchers: paths,
+	var m Matcher
+	if len(paths) == 1 {
+		m = paths[0]
+	} else {
+		m = pathMatcher{
+			matchers: paths,
+		}
 	}
 	if c.is(opUnion) || c.is(opIntersect) || c.is(opExcept) {
 		c.next()
@@ -292,8 +325,29 @@ func (c *Compiler) compilePredicate(match Matcher) (Matcher, error) {
 	return m, nil
 }
 
+func (c *Compiler) compileTest(qn xml.QName) (Matcher, error) {
+	if !c.is(endGrp) {
+		return nil, fmt.Errorf("expected \")\"")
+	}
+	c.next()
+	var m Matcher
+	if qn.Name == "text" {
+		m = textMatcher{}
+	} else if qn.Name == "attribute" {
+		m = attributeMatcher{
+			Matcher: wildcardMatcher{},
+		}
+	} else {
+		m = nodeMatcher{}
+	}
+	return m, nil
+}
+
 func (c *Compiler) compileCall(qn xml.QName) (Matcher, error) {
 	c.next()
+	if qn.Space == "" && isTest(qn.Name) {
+		return c.compileTest(qn)
+	}
 	call := callMatcher{
 		name: qn,
 	}
@@ -325,21 +379,27 @@ func (c *Compiler) compileLiteral() (Matcher, error) {
 	default:
 		return nil, fmt.Errorf("literal: unexpected token")
 	}
+	return nil, nil
 }
 
 func (c *Compiler) compileAttribute() (Matcher, error) {
 	c.next()
 	if c.is(opStar) && !c.peekIs(opNamespace) {
 		c.next()
-		var m wildcardMatcher
+		m := wildcardMatcher{
+			kind: xml.TypeAttribute,
+		}
 		return m, nil
 	}
 	qn, err := c.compileQN()
 	if err != nil {
 		return nil, err
 	}
-	a := attributeMatcher{
+	m := nameMatcher{
 		name: qn,
+	}
+	a := attributeMatcher{
+		Matcher: m,
 	}
 	return a, nil
 }
