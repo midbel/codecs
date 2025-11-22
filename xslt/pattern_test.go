@@ -160,6 +160,9 @@ func TestCompile(t *testing.T) {
 		"node()",
 		"text()",
 		"attribute()",
+		"item[1]",
+		"item[\"foo\"]",
+		"item[\"foo\" = 1]",
 	}
 
 	cp := NewCompiler()
