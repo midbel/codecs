@@ -187,10 +187,7 @@ func (m callMatcher) Priority() float64 {
 	return 0
 }
 
-type expr interface {
-	True() bool
-	// Value() any
-}
+type expr interface{}
 
 func evalExpr(e expr, node xml.Node) (any, error) {
 	switch e := e.(type) {
@@ -223,24 +220,20 @@ type literalExpr struct {
 	str string
 }
 
-func (e literalExpr) True() bool {
-	return e.str != ""
-}
-
 type numberExpr struct {
 	value float64
 }
 
-func (e numberExpr) True() bool {
-	return e.value != 0
+type reverseExpr struct {
+	value expr
+}
+
+func (e reverseExpr) eval() (any, error) {
+	return nil, nil
 }
 
 type sequenceExpr struct {
 	list []expr
-}
-
-func (e sequenceExpr) True() bool {
-	return len(e.list) > 0
 }
 
 type callExpr struct {
@@ -252,23 +245,15 @@ func (e callExpr) eval() (any, error) {
 	return nil, nil
 }
 
-func (e callExpr) True() bool {
-	return false
-}
-
 type compareExpr struct {
 	op    rune
 	left  expr
 	right expr
 }
 
-func (e compareExpr) True() bool {
-	return false
-}
-
 func (e compareExpr) eval(node xml.Node) (any, error) {
 	var (
-		ok bool
+		ok  bool
 		err error
 	)
 	switch e.op {
@@ -343,18 +328,6 @@ func getFloatFromExpr(e expr, node xml.Node) (float64, error) {
 	}
 }
 
-type reverseExpr struct {
-	value expr
-}
-
-func (e reverseExpr) True() bool {
-	return false
-}
-
-func (e reverseExpr) eval() (any, error) {
-	return nil, nil
-}
-
 func isTest(n string) bool {
 	switch n {
 	case "text", "attribute", "node", "document-node":
@@ -401,6 +374,9 @@ func NewCompiler() *Compiler {
 		opVariable: cp.compileVariable,
 		begGrp:     cp.compileSequence,
 		opRev:      cp.compileRev,
+		// opCurrentLevel: cp.compileFromRoot,
+		// opAnyLevel:     cp.compileFromAny,
+		// opName:         cp.compilePath,
 	}
 	cp.infix = map[rune]func(expr) (expr, error){
 		opEq: cp.compileCompare,
@@ -544,7 +520,7 @@ func (c *Compiler) compilePredicate(match Matcher) (Matcher, error) {
 		return nil, fmt.Errorf("unexpected token at end of predicate")
 	}
 	c.next()
-	_ = expr
+	m.filter = expr
 	return m, nil
 }
 
@@ -569,32 +545,7 @@ func (c *Compiler) compileTest(qn xml.QName) (Matcher, error) {
 }
 
 func (c *Compiler) compileCall(qn xml.QName) (Matcher, error) {
-	c.next()
-	if qn.Space == "" && isTest(qn.Name) {
-		return c.compileTest(qn)
-	}
-	call := callMatcher{
-		name: qn,
-	}
-	for !c.done() && !c.is(endGrp) {
-		arg, err := c.compilePath()
-		if err != nil {
-			return nil, err
-		}
-		call.args = append(call.args, arg)
-		switch {
-		case c.is(opSeq):
-			c.next()
-		case c.is(endGrp):
-		default:
-			return nil, fmt.Errorf("call: unexpected token")
-		}
-	}
-	if !c.is(endGrp) {
-		return nil, fmt.Errorf("missing \")\"")
-	}
-	c.next()
-	return call, nil
+	return nil, nil
 }
 
 func (c *Compiler) compileAttribute() (Matcher, error) {
@@ -744,7 +695,14 @@ func (c *Compiler) compileSequence() (expr, error) {
 
 func (c *Compiler) compileRev() (expr, error) {
 	c.next()
-	return nil, nil
+	e, err := c.compileExpr(powPrefix)
+	if err != nil {
+		return nil, err
+	}
+	r := reverseExpr{
+		value: e,
+	}
+	return r, nil
 }
 
 func (c *Compiler) compileCompare(left expr) (expr, error) {
