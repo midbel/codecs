@@ -159,21 +159,17 @@ func (m *Mode) matchTemplate(node xml.Node, env *xpath.Evaluator) (Executer, err
 	}
 	var results []*TemplateMatch
 	for i, t := range m.Templates {
-		if t.Name != "" || t.Match == "" {
+		if t.Name != "" || t.Matcher == nil {
 			continue
 		}
-		expr, err := env.Create(t.Match)
-		if err != nil {
-			continue
-		}
-		ok, prio := templateMatch(expr, node)
+		ok := t.Matcher.Match(node)
 		if !ok {
 			continue
 		}
 		match := TemplateMatch{
 			Template: t,
 			Position: i,
-			Priority: float64(prio) + t.Priority,
+			Priority: t.Matcher.Priority() + t.Priority,
 		}
 		results = append(results, &match)
 	}

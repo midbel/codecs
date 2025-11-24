@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"strings"
 	"unicode"
 	"unicode/utf8"
 
@@ -204,6 +205,11 @@ type Compiler struct {
 
 	engine     *xpath.Evaluator
 	namespaces environ.Environ[string]
+}
+
+func CompileMatch(str string) (Matcher, error) {
+	cp := NewCompiler()
+	return cp.Compile(strings.NewReader(str))
 }
 
 func NewCompiler() *Compiler {

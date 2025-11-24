@@ -16,6 +16,7 @@ type Template struct {
 	Match    string
 	Mode     string
 	Priority float64
+	Matcher
 
 	Nodes []xml.Node
 
@@ -40,6 +41,10 @@ func NewTemplate(env *xpath.Evaluator, node xml.Node) (*Template, error) {
 			tpl.Name = attr
 		case "match":
 			tpl.Match = attr
+			tpl.Matcher, err = CompileMatch(tpl.Match)
+			if err != nil {
+				return nil, err
+			}
 		case "mode":
 			tpl.Mode = attr
 		default:
