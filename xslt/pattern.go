@@ -475,6 +475,11 @@ func (c *Compiler) compileQN() (xml.QName, error) {
 		qn.Name = c.getCurrentLiteral()
 		c.next()
 	}
+	uri, err := c.namespaces.Resolve(qn.Space)
+	if err != nil {
+		uri, _ = c.engine.ResolveNS(qn.Space)
+	}
+	qn.Uri = uri
 	return qn, nil
 }
 
