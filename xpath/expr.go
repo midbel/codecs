@@ -33,7 +33,6 @@ const (
 type Expr interface {
 	Find(xml.Node) (Sequence, error)
 	find(Context) (Sequence, error)
-	MatchPriority() int
 }
 
 type TypedExpr interface {
@@ -225,10 +224,6 @@ func (q query) Find(node xml.Node) (Sequence, error) {
 	return q.find(q.ctx)
 }
 
-func (q query) MatchPriority() int {
-	return q.expr.MatchPriority()
-}
-
 func (q query) find(ctx Context) (Sequence, error) {
 	if ctx.Builtins == nil {
 		ctx.Builtins = DefaultBuiltin()
@@ -242,10 +237,6 @@ func (w wildcard) Find(node xml.Node) (Sequence, error) {
 	return w.find(defaultContext(node))
 }
 
-func (w wildcard) MatchPriority() int {
-	return prioLow
-}
-
 func (w wildcard) find(ctx Context) (Sequence, error) {
 	return Singleton(ctx.Node), nil
 }
@@ -254,10 +245,6 @@ type root struct{}
 
 func (r root) Find(node xml.Node) (Sequence, error) {
 	return r.find(defaultContext(node).Root())
-}
-
-func (r root) MatchPriority() int {
-	return prioHigh
 }
 
 func (_ root) find(ctx Context) (Sequence, error) {
@@ -271,10 +258,6 @@ func (c current) Find(node xml.Node) (Sequence, error) {
 	return c.find(defaultContext(node))
 }
 
-func (c current) MatchPriority() int {
-	return prioMed
-}
-
 func (_ current) find(ctx Context) (Sequence, error) {
 	return Singleton(ctx.Node), nil
 }
@@ -286,10 +269,6 @@ type step struct {
 
 func (s step) Find(node xml.Node) (Sequence, error) {
 	return s.find(defaultContext(node))
-}
-
-func (s step) MatchPriority() int {
-	return getPriority(prioMed, s.curr, s.next)
 }
 
 func (s step) find(ctx Context) (Sequence, error) {
@@ -337,10 +316,6 @@ type axis struct {
 
 func (a axis) Find(node xml.Node) (Sequence, error) {
 	return a.find(defaultContext(node))
-}
-
-func (a axis) MatchPriority() int {
-	return getPriority(prioMed, a.next)
 }
 
 func (a axis) principalType() xml.NodeType {
@@ -636,10 +611,6 @@ func (i identifier) Find(node xml.Node) (Sequence, error) {
 	return i.find(defaultContext(node))
 }
 
-func (i identifier) MatchPriority() int {
-	return prioHigh
-}
-
 func (i identifier) find(ctx Context) (Sequence, error) {
 	expr, err := ctx.Resolve(i.ident)
 	if err != nil {
@@ -657,10 +628,6 @@ type name struct {
 
 func (n name) Find(node xml.Node) (Sequence, error) {
 	return n.find(defaultContext(node))
-}
-
-func (n name) MatchPriority() int {
-	return prioMed
 }
 
 func (n name) find(ctx Context) (Sequence, error) {
@@ -699,10 +666,6 @@ func (s sequence) Find(node xml.Node) (Sequence, error) {
 	return s.find(defaultContext(node))
 }
 
-func (s sequence) MatchPriority() int {
-	return prioLow
-}
-
 func (s sequence) find(ctx Context) (Sequence, error) {
 	var list Sequence
 	for i := range s.all {
@@ -728,10 +691,6 @@ func (b binary) Find(node xml.Node) (Sequence, error) {
 	return b.find(defaultContext(node))
 }
 
-func (b binary) MatchPriority() int {
-	return getPriority(prioMed, b.left, b.right)
-}
-
 func (b binary) find(ctx Context) (Sequence, error) {
 	left, err := b.left.find(ctx)
 	if err != nil {
@@ -755,10 +714,6 @@ type identity struct {
 
 func (i identity) Find(node xml.Node) (Sequence, error) {
 	return i.find(defaultContext(node))
-}
-
-func (i identity) MatchPriority() int {
-	return getPriority(prioMed, i.left, i.right)
 }
 
 func (i identity) find(ctx Context) (Sequence, error) {
@@ -788,10 +743,6 @@ func (r reverse) Find(node xml.Node) (Sequence, error) {
 	return r.find(defaultContext(node))
 }
 
-func (r reverse) MatchPriority() int {
-	return getPriority(prioMed, r.expr)
-}
-
 func (r reverse) find(ctx Context) (Sequence, error) {
 	v, err := r.expr.find(ctx)
 	if err != nil {
@@ -815,10 +766,6 @@ func (i literal) Find(node xml.Node) (Sequence, error) {
 	return i.find(defaultContext(node))
 }
 
-func (i literal) MatchPriority() int {
-	return prioLow
-}
-
 func (i literal) find(_ Context) (Sequence, error) {
 	return Singleton(i.expr), nil
 }
@@ -835,10 +782,6 @@ func (n number) Find(node xml.Node) (Sequence, error) {
 	return n.find(defaultContext(node))
 }
 
-func (n number) MatchPriority() int {
-	return prioLow
-}
-
 func (n number) find(_ Context) (Sequence, error) {
 	return Singleton(n.expr), nil
 }
@@ -853,10 +796,6 @@ type boolean struct {
 
 func (b boolean) Find(node xml.Node) (Sequence, error) {
 	return b.find(defaultContext(node))
-}
-
-func (b boolean) MatchPriority() int {
-	return prioLow
 }
 
 func (b boolean) find(_ Context) (Sequence, error) {
@@ -888,10 +827,6 @@ func (k typeText) Find(node xml.Node) (Sequence, error) {
 	return k.find(defaultContext(node))
 }
 
-func (typeText) MatchPriority() int {
-	return prioLow
-}
-
 func (typeText) find(ctx Context) (Sequence, error) {
 	var seq Sequence
 	if ctx.Type() == xml.TypeText {
@@ -904,10 +839,6 @@ type typeComment struct{}
 
 func (k typeComment) Find(node xml.Node) (Sequence, error) {
 	return k.find(defaultContext(node))
-}
-
-func (typeComment) MatchPriority() int {
-	return prioLow
 }
 
 func (typeComment) find(ctx Context) (Sequence, error) {
@@ -924,10 +855,6 @@ func (k typeNode) Find(node xml.Node) (Sequence, error) {
 	return k.find(defaultContext(node))
 }
 
-func (typeNode) MatchPriority() int {
-	return prioLow
-}
-
 func (typeNode) find(ctx Context) (Sequence, error) {
 	return Singleton(ctx.Node), nil
 }
@@ -936,10 +863,6 @@ type typeDocument struct{}
 
 func (k typeDocument) Find(node xml.Node) (Sequence, error) {
 	return k.find(defaultContext(node))
-}
-
-func (typeDocument) MatchPriority() int {
-	return prioLow
 }
 
 func (typeDocument) find(ctx Context) (Sequence, error) {
@@ -956,10 +879,6 @@ type typeInstruction struct {
 
 func (k typeInstruction) Find(node xml.Node) (Sequence, error) {
 	return k.find(defaultContext(node))
-}
-
-func (typeInstruction) MatchPriority() int {
-	return prioLow
 }
 
 func (t typeInstruction) find(ctx Context) (Sequence, error) {
@@ -982,10 +901,6 @@ type typeAttribute struct {
 
 func (k typeAttribute) Find(node xml.Node) (Sequence, error) {
 	return k.find(defaultContext(node))
-}
-
-func (typeAttribute) MatchPriority() int {
-	return prioLow
 }
 
 func (t typeAttribute) find(ctx Context) (Sequence, error) {
@@ -1033,10 +948,6 @@ func (k typeElement) Find(node xml.Node) (Sequence, error) {
 	return k.find(defaultContext(node))
 }
 
-func (typeElement) MatchPriority() int {
-	return prioLow
-}
-
 func (t typeElement) find(ctx Context) (Sequence, error) {
 	if ctx.Type() != xml.TypeElement {
 		return nil, nil
@@ -1058,10 +969,6 @@ type call struct {
 
 func (c call) Find(node xml.Node) (Sequence, error) {
 	return c.find(defaultContext(node))
-}
-
-func (c call) MatchPriority() int {
-	return prioHigh
 }
 
 func (c call) find(ctx Context) (Sequence, error) {
@@ -1101,10 +1008,6 @@ func (a attr) Find(node xml.Node) (Sequence, error) {
 	return a.find(defaultContext(node))
 }
 
-func (a attr) MatchPriority() int {
-	return prioMed
-}
-
 func (a attr) find(ctx Context) (Sequence, error) {
 	if ctx.Type() != xml.TypeElement {
 		return nil, nil
@@ -1125,10 +1028,6 @@ type except struct {
 
 func (e except) Find(node xml.Node) (Sequence, error) {
 	return e.find(defaultContext(node))
-}
-
-func (e except) MatchPriority() int {
-	return getPriority(prioMed, e.all...)
 }
 
 func (e except) find(ctx Context) (Sequence, error) {
@@ -1160,10 +1059,6 @@ func (e intersect) Find(node xml.Node) (Sequence, error) {
 	return e.find(defaultContext(node))
 }
 
-func (e intersect) MatchPriority() int {
-	return getPriority(prioMed, e.all...)
-}
-
 func (e intersect) find(ctx Context) (Sequence, error) {
 	left, err := e.all[0].find(ctx)
 	if err != nil {
@@ -1193,10 +1088,6 @@ func (u union) Find(node xml.Node) (Sequence, error) {
 	return u.find(defaultContext(node))
 }
 
-func (u union) MatchPriority() int {
-	return getPriority(prioMed, u.all...)
-}
-
 func (u union) find(ctx Context) (Sequence, error) {
 	left, err := u.all[0].find(ctx)
 	if err != nil {
@@ -1217,10 +1108,6 @@ type subscript struct {
 
 func (i subscript) Find(node xml.Node) (Sequence, error) {
 	return i.find(defaultContext(node))
-}
-
-func (i subscript) MatchPriority() int {
-	return getPriority(prioHigh, i.expr, i.index)
 }
 
 func (i subscript) find(ctx Context) (Sequence, error) {
@@ -1295,10 +1182,6 @@ func (f filter) Find(node xml.Node) (Sequence, error) {
 	return f.find(defaultContext(node))
 }
 
-func (f filter) MatchPriority() int {
-	return getPriority(prioHigh, f.expr, f.check)
-}
-
 func (f filter) find(ctx Context) (Sequence, error) {
 	list, err := f.expr.find(ctx)
 	if err != nil {
@@ -1341,10 +1224,6 @@ func (e let) Find(node xml.Node) (Sequence, error) {
 	return e.find(defaultContext(node))
 }
 
-func (e let) MatchPriority() int {
-	return prioLow
-}
-
 func (e let) find(ctx Context) (Sequence, error) {
 	nest := ctx.Nest()
 	for _, b := range e.binds {
@@ -1360,10 +1239,6 @@ type rng struct {
 
 func (r rng) Find(node xml.Node) (Sequence, error) {
 	return r.find(defaultContext(node))
-}
-
-func (r rng) MatchPriority() int {
-	return prioLow
 }
 
 func (r rng) find(ctx Context) (Sequence, error) {
@@ -1409,10 +1284,6 @@ func (o loop) Find(node xml.Node) (Sequence, error) {
 	return o.find(defaultContext(node))
 }
 
-func (o loop) MatchPriority() int {
-	return prioLow
-}
-
 func (o loop) find(ctx Context) (Sequence, error) {
 	return nil, ErrImplemented
 }
@@ -1425,10 +1296,6 @@ type conditional struct {
 
 func (c conditional) Find(node xml.Node) (Sequence, error) {
 	return c.find(defaultContext(node))
-}
-
-func (c conditional) MatchPriority() int {
-	return getPriority(prioHigh, c.test)
 }
 
 func (c conditional) find(ctx Context) (Sequence, error) {
@@ -1450,10 +1317,6 @@ type quantified struct {
 
 func (q quantified) Find(node xml.Node) (Sequence, error) {
 	return q.find(defaultContext(node))
-}
-
-func (q quantified) MatchPriority() int {
-	return getPriority(prioHigh, q.test)
 }
 
 func (q quantified) find(ctx Context) (Sequence, error) {
@@ -1553,10 +1416,6 @@ func (v value) Find(node xml.Node) (Sequence, error) {
 	return v.find(defaultContext(node))
 }
 
-func (v value) MatchPriority() int {
-	return prioLow
-}
-
 func (v value) find(ctx Context) (Sequence, error) {
 	return slices.Clone(v.seq), nil
 }
@@ -1573,10 +1432,6 @@ func (a hashmap) Find(node xml.Node) (Sequence, error) {
 	return a.find(defaultContext(node))
 }
 
-func (a hashmap) MatchPriority() int {
-	return prioLow
-}
-
 func (a hashmap) find(ctx Context) (Sequence, error) {
 	return nil, nil
 }
@@ -1587,10 +1442,6 @@ type array struct {
 
 func (a array) Find(node xml.Node) (Sequence, error) {
 	return a.find(defaultContext(node))
-}
-
-func (a array) MatchPriority() int {
-	return prioLow
 }
 
 func (a array) find(ctx Context) (Sequence, error) {
@@ -1626,10 +1477,6 @@ type instanceof struct {
 
 func (i instanceof) Find(node xml.Node) (Sequence, error) {
 	return i.find(defaultContext(node))
-}
-
-func (i instanceof) MatchPriority() int {
-	return getPriority(prioLow, i.expr)
 }
 
 func (i instanceof) find(ctx Context) (Sequence, error) {
@@ -1676,10 +1523,6 @@ func (c cast) Find(node xml.Node) (Sequence, error) {
 	return c.find(defaultContext(node))
 }
 
-func (c cast) MatchPriority() int {
-	return getPriority(prioLow, c.expr)
-}
-
 func (c cast) find(ctx Context) (Sequence, error) {
 	seq, err := c.expr.find(ctx)
 	if err != nil {
@@ -1707,10 +1550,6 @@ func (c castable) Find(node xml.Node) (Sequence, error) {
 	return c.find(defaultContext(node))
 }
 
-func (c castable) MatchPriority() int {
-	return getPriority(prioLow, c.expr)
-}
-
 func (c castable) find(ctx Context) (Sequence, error) {
 	seq, err := c.expr.find(ctx)
 	if err != nil {
@@ -1727,13 +1566,6 @@ func (c castable) find(ctx Context) (Sequence, error) {
 	}
 	ok := c.kind.Castable(seq.First().Value())
 	return Singleton(ok), nil
-}
-
-func getPriority(base int, values ...Expr) int {
-	for i := range values {
-		base += values[i].MatchPriority()
-	}
-	return base
 }
 
 func exprFromItem(it Item) (Expr, error) {
