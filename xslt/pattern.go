@@ -207,9 +207,16 @@ type Compiler struct {
 	namespaces environ.Environ[string]
 }
 
-func CompileMatch(str string) (Matcher, error) {
+func CompileMatch(query string) (Matcher, error) {
+	return compileMatchWithEnv(nil, query)
+}
+
+func compileMatchWithEnv(env *xpath.Evaluator, query string) (Matcher, error) {
 	cp := NewCompiler()
-	return cp.Compile(strings.NewReader(str))
+	if env != nil {
+		cp.engine = env.Clone()
+	}
+	return cp.Compile(strings.NewReader(query))
 }
 
 func NewCompiler() *Compiler {

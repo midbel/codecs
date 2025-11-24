@@ -41,7 +41,7 @@ func NewTemplate(env *xpath.Evaluator, node xml.Node) (*Template, error) {
 			tpl.Name = attr
 		case "match":
 			tpl.Match = attr
-			tpl.Matcher, err = CompileMatch(tpl.Match)
+			tpl.Matcher, err = compileMatchWithEnv(env, tpl.Match)
 			if err != nil {
 				return nil, err
 			}
@@ -185,24 +185,6 @@ func (a virtualApplyTemplate) Execute(ctx *Context) ([]xml.Node, error) {
 		others = slices.Concat(others, res)
 	}
 	return others, nil
-}
-
-func templateMatch(expr xpath.Expr, node xml.Node) (bool, int) {
-	for curr := node; curr != nil; {
-		items, err := expr.Find(curr)
-		if err != nil {
-			break
-		}
-		if items.Len() > 0 {
-			ok := slices.ContainsFunc(items, func(i xpath.Item) bool {
-				n := i.Node()
-				return n.Identity() == node.Identity()
-			})
-			return ok, expr.MatchPriority()
-		}
-		curr = curr.Parent()
-	}
-	return false, 0
 }
 
 type builtinNoMatch struct{}
