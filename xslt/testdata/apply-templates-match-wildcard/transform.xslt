@@ -11,8 +11,9 @@
 	</xsl:template>
 
 	<xsl:template match="*">
-		<item>
+		<element>
 			<xsl:value-of select="fn:local-name()"/>
-		</item>
+		</element>
 	</xsl:template>
+
 </xsl:stylesheet>

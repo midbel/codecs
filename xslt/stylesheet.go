@@ -113,9 +113,9 @@ type Mode struct {
 
 func namedMode(name string) *Mode {
 	return &Mode{
-		Name:       name,
-		NoMatch:    NoMatchBuiltins,
-		MultiMatch: MultiMatchLast,
+		Name:    name,
+		NoMatch: NoMatchBuiltins,
+		// MultiMatch: MultiMatchLast,
 	}
 }
 

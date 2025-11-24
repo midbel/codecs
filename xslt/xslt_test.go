@@ -78,6 +78,10 @@ func TestApplyTemplates(t *testing.T) {
 			Name: "apply-templates/mode",
 			Dir:  "testdata/apply-templates-mode",
 		},
+		{
+			Name: "apply-templates/remove-element",
+			Dir:  "testdata/apply-templates-remove-el",
+		},
 	}
 	runTests(t, tests)
 }

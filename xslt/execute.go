@@ -1365,15 +1365,14 @@ func executeApply(ctx *Context, match matchFunc) (xpath.Sequence, error) {
 		if err != nil {
 			return seq, err
 		}
-		tpl, ok := exec.(*Template)
-		if !ok {
-			return nil, fmt.Errorf("template not resolved")
+		sub := ctx
+		if tpl, ok := exec.(*Template); ok {
+			sub, err = applyTemplateParams(ctx.WithXpath(n), tpl, elem.Nodes)
+			if err != nil {
+				return nil, err
+			}
 		}
-		sub, err := applyTemplateParams(ctx.WithXpath(n), tpl, elem.Nodes)
-		if err != nil {
-			return nil, err
-		}
-		res, err := tpl.Execute(sub)
+		res, err := exec.Execute(sub)
 		if err != nil {
 			return nil, err
 		}

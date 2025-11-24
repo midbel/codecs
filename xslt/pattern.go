@@ -19,6 +19,21 @@ type Matcher interface {
 	Priority() float64
 }
 
+type wildcardMatcher struct {
+	kind xml.NodeType
+}
+
+func (m wildcardMatcher) Match(node xml.Node) bool {
+	if m.kind != 0 {
+		return node.Type() == m.kind
+	}
+	return true
+}
+
+func (m wildcardMatcher) Priority() float64 {
+	return 0
+}
+
 type currentMatcher struct{}
 
 func (m currentMatcher) Match(node xml.Node) bool {
@@ -98,21 +113,6 @@ func (m attributeMatcher) Match(node xml.Node) bool {
 }
 
 func (m attributeMatcher) Priority() float64 {
-	return 0
-}
-
-type wildcardMatcher struct {
-	kind xml.NodeType
-}
-
-func (m wildcardMatcher) Match(node xml.Node) bool {
-	if m.kind != 0 {
-		return node.Type() == m.kind
-	}
-	return true
-}
-
-func (m wildcardMatcher) Priority() float64 {
 	return 0
 }
 
