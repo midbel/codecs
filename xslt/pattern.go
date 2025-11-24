@@ -5,12 +5,12 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"strconv"
 	"unicode"
 	"unicode/utf8"
 
 	"github.com/midbel/codecs/environ"
 	"github.com/midbel/codecs/xml"
+	"github.com/midbel/codecs/xpath"
 )
 
 type Matcher interface {
@@ -33,10 +33,19 @@ type rootMatcher struct {
 }
 
 func (m rootMatcher) Match(node xml.Node) bool {
+	if m.next != nil {
+		ok := m.next.Match(node)
+		if !ok {
+			return ok
+		}
+	}
 	return node.Type() == xml.TypeDocument
 }
 
 func (m rootMatcher) Priority() float64 {
+	if m.next != nil {
+		return m.next.Priority()
+	}
 	return 0
 }
 
@@ -46,7 +55,7 @@ type axisMatcher struct {
 }
 
 func (m axisMatcher) Match(node xml.Node) bool {
-	return false
+	return m.next.Match(node)
 }
 
 func (m axisMatcher) Priority() float64 {
@@ -73,7 +82,7 @@ func (m nameMatcher) Match(node xml.Node) bool {
 }
 
 func (m nameMatcher) Priority() float64 {
-	return 0
+	return 0.5
 }
 
 type attributeMatcher struct {
@@ -158,174 +167,25 @@ func (m unionMatcher) Match(node xml.Node) bool {
 }
 
 func (m unionMatcher) Priority() float64 {
-	return 0
+	return max(m.left.Priority(), m.right.Priority())
 }
 
 type predicateMatcher struct {
 	curr   Matcher
-	filter expr
+	filter xpath.Expr
 }
 
 func (m predicateMatcher) Match(node xml.Node) bool {
-	return m.curr.Match(node) && m.filter.Match(node)
+	ok := m.curr.Match(node)
+	if !ok {
+		return ok
+	}
+	seq, _ := m.filter.Find(node)
+	return seq.True()
 }
 
 func (m predicateMatcher) Priority() float64 {
-	return m.curr.Priority() + m.filter.Priority()
-}
-
-type callMatcher struct {
-	name xml.QName
-	args []Matcher
-}
-
-func (m callMatcher) Match(node xml.Node) bool {
-	return false
-}
-
-func (m callMatcher) Priority() float64 {
-	return 0
-}
-
-type expr interface{}
-
-func evalExpr(e expr, node xml.Node) (any, error) {
-	switch e := e.(type) {
-	case literalExpr:
-		return e.str, nil
-	case numberExpr:
-		return e.value, nil
-	case identifierExpr:
-		return nil, nil
-	case compareExpr:
-		return e.eval(node)
-	case reverseExpr:
-		return e.eval()
-	case callExpr:
-		return e.eval()
-	default:
-		return nil, fmt.Errorf("fail to evaluate expression")
-	}
-}
-
-type identifierExpr struct {
-	ident string
-}
-
-func (e identifierExpr) True() bool {
-	return true
-}
-
-type literalExpr struct {
-	str string
-}
-
-type numberExpr struct {
-	value float64
-}
-
-type reverseExpr struct {
-	value expr
-}
-
-func (e reverseExpr) eval() (any, error) {
-	return nil, nil
-}
-
-type sequenceExpr struct {
-	list []expr
-}
-
-type callExpr struct {
-	name xml.QName
-	args []expr
-}
-
-func (e callExpr) eval() (any, error) {
-	return nil, nil
-}
-
-type compareExpr struct {
-	op    rune
-	left  expr
-	right expr
-}
-
-func (e compareExpr) eval(node xml.Node) (any, error) {
-	var (
-		ok  bool
-		err error
-	)
-	switch e.op {
-	case opEq:
-		ok, err = e.equal(node)
-	case opNe:
-		ok, err = e.equal(node)
-		ok = !ok
-	case opLt:
-	case opLe:
-	case opGt:
-	case opGe:
-	default:
-		return nil, fmt.Errorf("unsupported operator")
-	}
-	return ok, err
-}
-
-func (e compareExpr) equal(node xml.Node) (bool, error) {
-	left, err := evalExpr(e.left, node)
-	if err != nil {
-		return false, err
-	}
-	var ok bool
-	switch left := left.(type) {
-	case string:
-		right, err := getStringFromExpr(e.right, node)
-		if err != nil {
-			return ok, err
-		}
-		ok = left == right
-	case float64:
-		right, err := getFloatFromExpr(e.right, node)
-		if err != nil {
-			return ok, err
-		}
-		ok = left == right
-	default:
-		return ok, fmt.Errorf("type is not comparable")
-	}
-	return ok, nil
-}
-
-func getStringFromExpr(e expr, node xml.Node) (string, error) {
-	v, err := evalExpr(e, node)
-	if err != nil {
-		return "", err
-	}
-	switch v := v.(type) {
-	case string:
-		return v, nil
-	case float64:
-		s := strconv.FormatFloat(v, 'f', -1, 64)
-		return s, nil
-	default:
-		return "", fmt.Errorf("value can not be converted to string")
-	}
-}
-
-func getFloatFromExpr(e expr, node xml.Node) (float64, error) {
-	v, err := evalExpr(e, node)
-	if err != nil {
-		return 0, err
-	}
-	switch v := v.(type) {
-	case string:
-		return strconv.ParseFloat(v, 64)
-	case float64:
-		return v, nil
-	default:
-		return 0, fmt.Errorf("value can not be converted to float")
-	}
+	return m.curr.Priority()
 }
 
 func isTest(n string) bool {
@@ -337,55 +197,19 @@ func isTest(n string) bool {
 	return true
 }
 
-const (
-	powLowest int = iota
-	powEqual
-	powCompare
-	powPrefix
-	powCall
-)
-
-var bindings = map[rune]int{
-	opEq:   powEqual,
-	opNe:   powEqual,
-	opLt:   powCompare,
-	opLe:   powCompare,
-	opGt:   powCompare,
-	opGe:   powCompare,
-	begGrp: powCall,
-}
-
 type Compiler struct {
 	scan *Scanner
 	curr Token
 	peek Token
 
+	engine     *xpath.Evaluator
 	namespaces environ.Environ[string]
-	prefix     map[rune]func() (expr, error)
-	infix      map[rune]func(expr) (expr, error)
 }
 
 func NewCompiler() *Compiler {
 	var cp Compiler
+	cp.engine = xpath.NewEvaluator()
 	cp.namespaces = environ.Empty[string]()
-	cp.prefix = map[rune]func() (expr, error){
-		opLiteral:  cp.compileLiteral,
-		opDigit:    cp.compileNumber,
-		opVariable: cp.compileVariable,
-		begGrp:     cp.compileSequence,
-		opRev:      cp.compileRev,
-		// opCurrentLevel: cp.compileFromRoot,
-		// opAnyLevel:     cp.compileFromAny,
-		// opName:         cp.compilePath,
-	}
-	cp.infix = map[rune]func(expr) (expr, error){
-		opEq: cp.compileCompare,
-		opNe: cp.compileCompare,
-		opLt: cp.compileCompare,
-		opLe: cp.compileCompare,
-		opGt: cp.compileCompare,
-		opGe: cp.compileCompare,
-	}
 	return &cp
 }
 
@@ -394,6 +218,27 @@ func (c *Compiler) Compile(r io.Reader) (Matcher, error) {
 	c.next()
 	c.next()
 	return c.compile()
+}
+
+func (c *Compiler) RegisterNS(prefix, uri string) {
+	c.namespaces.Define(prefix, uri)
+	c.engine.RegisterNS(prefix, uri)
+}
+
+func (c *Compiler) Define(ident, value string) {
+	c.engine.Define(ident, value)
+}
+
+func (c *Compiler) SetElemNS(ns string) {
+	c.engine.SetElemNS(ns)
+}
+
+func (c *Compiler) SetFuncNS(ns string) {
+	c.engine.SetFuncNS(ns)
+}
+
+func (c *Compiler) SetTypeNS(ns string) {
+	c.engine.SetTypeNS(ns)
 }
 
 func (c *Compiler) compile() (Matcher, error) {
@@ -501,27 +346,32 @@ func (c *Compiler) compilePath() (Matcher, error) {
 	if err != nil {
 		return nil, err
 	}
-	if c.is(begPred) {
+	if c.is(opPredicate) {
 		return c.compilePredicate(m)
 	}
 	return m, nil
 }
 
 func (c *Compiler) compilePredicate(match Matcher) (Matcher, error) {
+	defer c.next()
+
 	m := predicateMatcher{
 		curr: match,
 	}
-	c.next()
-	expr, err := c.compileExpr(powLowest)
+	expr, err := c.engine.Create(c.getCurrentLiteral())
 	if err != nil {
 		return nil, err
 	}
-	if !c.is(endPred) {
-		return nil, fmt.Errorf("unexpected token at end of predicate")
-	}
-	c.next()
 	m.filter = expr
 	return m, nil
+}
+
+func (c *Compiler) compileCall(qn xml.QName) (Matcher, error) {
+	c.next()
+	if isTest(qn.Name) {
+		return c.compileTest(qn)
+	}
+	return nil, fmt.Errorf("call not yet supported")
 }
 
 func (c *Compiler) compileTest(qn xml.QName) (Matcher, error) {
@@ -542,10 +392,6 @@ func (c *Compiler) compileTest(qn xml.QName) (Matcher, error) {
 		m = nodeMatcher{}
 	}
 	return m, nil
-}
-
-func (c *Compiler) compileCall(qn xml.QName) (Matcher, error) {
-	return nil, nil
 }
 
 func (c *Compiler) compileAttribute() (Matcher, error) {
@@ -619,106 +465,6 @@ func (c *Compiler) compileQN() (xml.QName, error) {
 	return qn, nil
 }
 
-func (c *Compiler) compileExpr(pow int) (expr, error) {
-	fn, ok := c.prefix[c.curr.Type]
-	if !ok {
-		return nil, fmt.Errorf("invalid syntax - unexpected token %s", c.curr)
-	}
-	left, err := fn()
-	if err != nil {
-		return nil, err
-	}
-	for !c.is(endPred) && pow < bindings[c.curr.Type] {
-		fn, ok := c.infix[c.curr.Type]
-		if !ok {
-			return nil, fmt.Errorf("invalid syntax - unexpected token %s", c.curr)
-		}
-		left, err = fn(left)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return left, nil
-}
-
-func (c *Compiler) compileLiteral() (expr, error) {
-	defer c.next()
-	e := literalExpr{
-		str: c.getCurrentLiteral(),
-	}
-	return e, nil
-}
-
-func (c *Compiler) compileNumber() (expr, error) {
-	defer c.next()
-	n, err := strconv.ParseFloat(c.getCurrentLiteral(), 64)
-	if err != nil {
-		return nil, err
-	}
-	e := numberExpr{
-		value: n,
-	}
-	return e, nil
-}
-
-func (c *Compiler) compileVariable() (expr, error) {
-	defer c.next()
-	e := identifierExpr{
-		ident: c.getCurrentLiteral(),
-	}
-	return e, nil
-}
-
-func (c *Compiler) compileSequence() (expr, error) {
-	c.next()
-	var seq sequenceExpr
-	for !c.done() && !c.is(endGrp) {
-		e, err := c.compileExpr(powLowest)
-		if err != nil {
-			return nil, err
-		}
-		seq.list = append(seq.list, e)
-		switch {
-		case c.is(opSeq):
-			c.next()
-		case c.is(endGrp):
-		default:
-			return nil, fmt.Errorf("syntax error, \",\" or \")\" expected")
-		}
-	}
-	if !c.is(endGrp) {
-		return nil, fmt.Errorf("syntax error: expected \")\" at end of sequence")
-	}
-	c.next()
-	return seq, nil
-}
-
-func (c *Compiler) compileRev() (expr, error) {
-	c.next()
-	e, err := c.compileExpr(powPrefix)
-	if err != nil {
-		return nil, err
-	}
-	r := reverseExpr{
-		value: e,
-	}
-	return r, nil
-}
-
-func (c *Compiler) compileCompare(left expr) (expr, error) {
-	e := compareExpr{
-		left: left,
-		op:   c.curr.Type,
-	}
-	c.next()
-	right, err := c.compileExpr(bindings[e.op])
-	if err != nil {
-		return nil, err
-	}
-	e.right = right
-	return e, nil
-}
-
 func (c *Compiler) getCurrentLiteral() string {
 	return c.curr.Literal
 }
@@ -746,13 +492,12 @@ const (
 	opVariable
 	opAttribute
 	opLiteral
+	opPredicate
 	opDigit
 	opInvalid
 	opCurrent
 	opCurrentLevel
 	opAnyLevel
-	begPred
-	endPred
 	begGrp
 	endGrp
 	opNamespace
@@ -800,10 +545,6 @@ func (t Token) String() string {
 		return fmt.Sprintf("current-level(%s)", t.Literal)
 	case opAnyLevel:
 		return fmt.Sprintf("any-level(%s)", t.Literal)
-	case begPred:
-		return "<begin-predicate>"
-	case endPred:
-		return "<end-predicate>"
 	case begGrp:
 		return "<begin-group>"
 	case endGrp:
@@ -838,6 +579,8 @@ func (t Token) String() string {
 		return fmt.Sprintf("name(%s)", t.Literal)
 	case opLiteral:
 		return fmt.Sprintf("literal(%s)", t.Literal)
+	case opPredicate:
+		return fmt.Sprintf("predicate(%s)", t.Literal)
 	case opInvalid:
 		return "<invalid>"
 	default:
@@ -879,6 +622,8 @@ func (s *Scanner) Scan() Token {
 		s.scanLiteral(&tok)
 	case s.char == dollar:
 		s.scanVariable(&tok)
+	case s.char == lsquare:
+		s.scanPredicate(&tok)
 	case unicode.IsLetter(s.char):
 		s.scanIdent(&tok)
 	case unicode.IsDigit(s.char):
@@ -890,35 +635,11 @@ func (s *Scanner) Scan() Token {
 }
 
 func (s *Scanner) scanOperator(tok *Token) {
-	switch k := s.peek(); s.char {
+	switch s.char {
 	case star:
 		tok.Type = opStar
-	case dash:
-		tok.Type = opRev
-	case equal:
-		tok.Type = opEq
-	case bang:
-		tok.Type = opInvalid
-		if k == equal {
-			s.read()
-			tok.Type = opNe
-		}
-	case langle:
-		tok.Type = opLt
-		if k == equal {
-			s.read()
-			tok.Type = opLe
-		}
-	case rangle:
-		tok.Type = opGt
-		if k == equal {
-			s.read()
-			tok.Type = opGe
-		}
-	case lparen:
-		tok.Type = begGrp
-	case rparen:
-		tok.Type = endGrp
+	case comma:
+		tok.Type = opSeq
 	default:
 		tok.Type = opInvalid
 	}
@@ -942,10 +663,6 @@ func (s *Scanner) scanDelimiter(tok *Token) {
 		tok.Type = opSeq
 	case pipe:
 		tok.Type = opUnion
-	case lsquare:
-		tok.Type = begPred
-	case rsquare:
-		tok.Type = endPred
 	case lparen:
 		tok.Type = begGrp
 	case rparen:
@@ -962,6 +679,32 @@ func (s *Scanner) scanDelimiter(tok *Token) {
 	if tok.Type != opInvalid {
 		s.read()
 		s.skipBlank()
+	}
+}
+
+func (s *Scanner) scanPredicate(tok *Token) {
+	s.read()
+	var count int
+	count++
+	for !s.done() || (s.char == rsquare && count == 0) {
+		if s.char == lsquare {
+			count++
+		} else if s.char == rsquare {
+			count--
+			if count == 0 {
+				break
+			}
+		}
+		s.write()
+		s.read()
+	}
+	tok.Literal = s.str.String()
+	tok.Type = opPredicate
+	if s.done() {
+		tok.Type = opInvalid
+	}
+	if s.char == rsquare {
+		s.read()
 	}
 }
 
@@ -1116,10 +859,10 @@ func isBlank(c rune) bool {
 
 func isDelimiter(c rune) bool {
 	return c == dot || c == pipe || c == slash ||
-		c == comma || c == lsquare || c == rsquare ||
-		c == lparen || c == rparen || c == colon
+		c == comma || c == lparen || c == rparen ||
+		c == colon
 }
 
 func isOperator(c rune) bool {
-	return c == star || c == equal || c == bang || c == dash
+	return c == star || c == comma
 }
