@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<languages>
+	<language>
+		<name>go</name>
+		<version>1.16</version>
+		<star>5</star>
+	</language>
+	<language>
+		<name>es</name>
+		<version>ecma2025</version>
+		<star>5</star>
+	</language>
+</languages>
