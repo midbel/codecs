@@ -149,44 +149,6 @@ type virtualApplyTemplate struct {
 	exec Executer
 }
 
-func ApplyVirtual(exec Executer) Executer {
-	return virtualApplyTemplate{
-		exec: exec,
-	}
-}
-
-func (a virtualApplyTemplate) Execute(ctx *Context) ([]xml.Node, error) {
-	nodes, err := a.exec.Execute(ctx)
-	if err != nil {
-		return nil, err
-	}
-	var (
-		others []xml.Node
-		fake   = xml.NewElement(xml.LocalName("fake"))
-	)
-	ctx = ctx.WithXsl(fake)
-	for _, n := range nodes {
-		if t := n.Type(); t != xml.TypeElement && t != xml.TypeDocument {
-			others = append(others, n)
-			continue
-		}
-		c := cloneNode(n)
-		if c == nil {
-			continue
-		}
-		exec, err := ctx.Match(c, ctx.Mode)
-		if err != nil {
-			return nil, err
-		}
-		res, err := exec.Execute(ctx.WithXpath(c))
-		if err != nil {
-			return nil, err
-		}
-		others = slices.Concat(others, res)
-	}
-	return others, nil
-}
-
 type builtinNoMatch struct{}
 
 func (builtinNoMatch) Execute(ctx *Context) ([]xml.Node, error) {
@@ -194,7 +156,7 @@ func (builtinNoMatch) Execute(ctx *Context) ([]xml.Node, error) {
 	switch ctx.ContextNode.Type() {
 	case xml.TypeDocument:
 		doc := ctx.ContextNode.(*xml.Document)
-		nodes = append(nodes, doc.Root())
+		return ctx.WithXpath(doc.Root()).ApplyTemplate()
 	case xml.TypeElement:
 		el := ctx.ContextNode.(*xml.Element)
 		for i := range el.Nodes {
@@ -202,7 +164,11 @@ func (builtinNoMatch) Execute(ctx *Context) ([]xml.Node, error) {
 			if t == xml.TypeComment || t == xml.TypeInstruction {
 				continue
 			}
-			nodes = append(nodes, el.Nodes[i])
+			others, err := ctx.WithXpath(el.Nodes[i]).ApplyTemplate()
+			if err != nil {
+				return nil, err
+			}
+			nodes = slices.Concat(nodes, others)
 		}
 	case xml.TypeText:
 		nodes = append(nodes, ctx.ContextNode)
@@ -218,7 +184,7 @@ func (textOnlyCopy) Execute(ctx *Context) ([]xml.Node, error) {
 	switch ctx.ContextNode.Type() {
 	case xml.TypeDocument:
 		doc := ctx.ContextNode.(*xml.Document)
-		nodes = append(nodes, doc.Root())
+		return ctx.WithXpath(doc.Root()).ApplyTemplate()
 	case xml.TypeElement:
 		el := ctx.ContextNode.(*xml.Element)
 		for i := range el.Nodes {
@@ -226,7 +192,11 @@ func (textOnlyCopy) Execute(ctx *Context) ([]xml.Node, error) {
 			if t == xml.TypeComment || t == xml.TypeInstruction {
 				continue
 			}
-			nodes = append(nodes, el.Nodes[i])
+			others, err := ctx.WithXpath(el.Nodes[i]).ApplyTemplate()
+			if err != nil {
+				return nil, err
+			}
+			nodes = slices.Concat(nodes, others)
 		}
 	case xml.TypeText:
 		nodes = append(nodes, ctx.ContextNode)
@@ -279,27 +249,24 @@ func (deepSkip) Execute(ctx *Context) ([]xml.Node, error) {
 type shallowSkip struct{}
 
 func (shallowSkip) Execute(ctx *Context) ([]xml.Node, error) {
-	var list []xml.Node
 	switch ctx.ContextNode.Type() {
 	case xml.TypeDocument:
 		doc := ctx.ContextNode.(*xml.Document)
-		for _, n := range doc.Nodes {
-			res, err := ctx.WithXpath(n).ApplyTemplate()
-			if err != nil {
-				return nil, err
-			}
-			list = slices.Concat(list, res)
-		}
+		return ctx.WithXpath(doc.Root()).ApplyTemplate()
 	case xml.TypeElement:
-		elem := ctx.ContextNode.(*xml.Element)
+		var (
+			elem  = ctx.ContextNode.(*xml.Element)
+			nodes []xml.Node
+		)
 		for _, n := range elem.Nodes {
-			res, err := ctx.WithXpath(n).ApplyTemplate()
+			others, err := ctx.WithXpath(n).ApplyTemplate()
 			if err != nil {
 				return nil, err
 			}
-			list = slices.Concat(list, res)
+			nodes = slices.Concat(nodes, others)
 		}
+		return nodes, nil
 	default:
+		return nil, nil
 	}
-	return list, nil
 }

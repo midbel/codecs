@@ -53,11 +53,11 @@ func (c *Context) Test(query string) (bool, error) {
 }
 
 func (c *Context) ApplyTemplate() ([]xml.Node, error) {
-	ex, err := c.Match(c.ContextNode, c.Mode)
+	exec, err := c.Match(c.ContextNode, c.Mode)
 	if err != nil {
 		return nil, err
 	}
-	return ex.Execute(c)
+	return exec.Execute(c)
 }
 
 func (c *Context) RegisterFunc(ident string, fn xpath.BuiltinFunc) {

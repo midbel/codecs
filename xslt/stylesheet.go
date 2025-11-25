@@ -81,7 +81,7 @@ func getNoMatchMode(str string) NoMatchMode {
 		mode = NoMatchDeepSkip
 	case "shallow-skip":
 		mode = NoMatchShallowSkip
-	case "":
+	case "", defaultMode:
 		mode = NoMatchBuiltins
 	default:
 		mode = NoMatchFail
@@ -218,7 +218,7 @@ func (m *Mode) noMatch() (Executer, error) {
 	default:
 		return nil, fmt.Errorf("no template match")
 	}
-	return ApplyVirtual(exec), nil
+	return exec, nil
 }
 
 type Stylesheet struct {

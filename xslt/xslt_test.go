@@ -46,6 +46,14 @@ func TestDefaultRules(t *testing.T) {
 			Name: "default-rules/text-copy-only",
 			Dir:  "testdata/default-rule-text-copy",
 		},
+		{
+			Name: "default-rules/shallow-skip",
+			Dir:  "testdata/default-rule-shallow-skip",
+		},
+		{
+			Name: "default-rules/deep-skip",
+			Dir:  "testdata/default-rule-deep-skip",
+		},
 	}
 	runTests(t, tests)
 }
