@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<root id="config">
+	<name>foobar</name>
+	<url>https://foobar.org</url>
+	<star>5</star>
+	<dtstart>2025-01-01</dtstart>
+	<dtend>2025-12-01</dtend>
+</root>
