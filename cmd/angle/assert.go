@@ -85,26 +85,36 @@ func (a *SchAssertCmd) Run(args []string) error {
 		w = io.Discard
 	}
 	for i := 1; i < set.NArg(); i++ {
-		doc, err := parseDocument(set.Arg(i), a.ParserOptions)
-		if err != nil {
+		if err := a.assertFile(w, schema, set.Arg(i)); err != nil {
 			return err
 		}
-		var (
-			now     = time.Now()
-			results []sch.Result
-		)
-		results, err = schema.RunPhase(a.phase, doc)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			continue
-		}
-		var (
-			elapsed  = time.Since(now)
-			failures = printResults(w, results, a.erronly)
-		)
-		fmt.Printf("%s: %d failure(s) on %d assertion(s) (elapsed time: %s)", set.Arg(i), failures, len(results), elapsed)
-		fmt.Println()
 	}
+	return nil
+}
+
+func (a *SchAssertCmd) assertFile(w io.Writer, schema *sch.Schema, file string) error {
+	doc, err := parseDocument(file, a.ParserOptions)
+	if err != nil {
+		return err
+	}
+	var (
+		now     = time.Now()
+		results []sch.Result
+	)
+	spin := cli.NewSpinner()
+	spin.SetMessage(fmt.Sprintf("processing %s", filepath.Base(file)))
+	spin.Run(func() {
+		results, err = schema.RunPhase(a.phase, doc)
+	})
+	if err != nil {
+		return err
+	}
+	var (
+		elapsed  = time.Since(now)
+		failures = printResults(w, results, a.erronly)
+	)
+	fmt.Printf("done %s: %d failure(s) on %d assertion(s) (elapsed time: %s)", filepath.Base(file), failures, len(results), elapsed)
+	fmt.Println()
 	return nil
 }
 
