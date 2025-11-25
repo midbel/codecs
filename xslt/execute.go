@@ -199,15 +199,11 @@ func executeCallTemplate(ctx *Context) (xpath.Sequence, error) {
 	if err != nil {
 		return nil, err
 	}
-	tpl, ok := exec.(*Template)
-	if !ok {
-		return nil, fmt.Errorf("template %s not resolved", name)
-	}
-	sub, err := applyTemplateParams(ctx, tpl, elem.Nodes)
+	sub, err := applyTemplateParams(ctx, exec, elem.Nodes)
 	if err != nil {
 		return nil, err
 	}
-	nodes, err := tpl.Execute(sub)
+	nodes, err := exec.Execute(sub)
 	if err != nil {
 		return nil, err
 	}
@@ -1365,12 +1361,9 @@ func executeApply(ctx *Context, match matchFunc) (xpath.Sequence, error) {
 		if err != nil {
 			return seq, err
 		}
-		sub := ctx
-		if tpl, ok := exec.(*Template); ok {
-			sub, err = applyTemplateParams(ctx.WithXpath(n), tpl, elem.Nodes)
-			if err != nil {
-				return nil, err
-			}
+		sub, err := applyTemplateParams(ctx.WithXpath(n), exec, elem.Nodes)
+		if err != nil {
+			return nil, err
 		}
 		res, err := exec.Execute(sub)
 		if err != nil {
@@ -1383,8 +1376,12 @@ func executeApply(ctx *Context, match matchFunc) (xpath.Sequence, error) {
 	return seq, nil
 }
 
-func applyTemplateParams(ctx *Context, tpl *Template, nodes []xml.Node) (*Context, error) {
+func applyTemplateParams(ctx *Context, exec Executer, nodes []xml.Node) (*Context, error) {
 	sub := ctx.Sub()
+	tpl, ok := exec.(*Template)
+	if !ok {
+		return sub, nil
+	}
 	for _, n := range nodes {
 		if n.QualifiedName() != ctx.getQualifiedName("with-param") {
 			return nil, fmt.Errorf("%s: invalid child node %s", ctx.XslNode.QualifiedName(), n.QualifiedName())
