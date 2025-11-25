@@ -216,28 +216,32 @@ func (deepCopy) Execute(ctx *Context) ([]xml.Node, error) {
 type shallowCopy struct{}
 
 func (shallowCopy) Execute(ctx *Context) ([]xml.Node, error) {
-	if ctx.ContextNode.Type() == xml.TypeDocument {
+	switch ctx.ContextNode.Type() {
+	case xml.TypeDocument:
 		doc := ctx.ContextNode.(*xml.Document)
 		return ctx.WithXpath(doc.Root()).ApplyTemplate()
-	}
-	elem, err := getElementFromNode(ctx.ContextNode)
-	if err != nil {
-		return nil, err
-	}
-	clone, ok := elem.Copy().(*xml.Element)
-	if !ok {
-		return nil, nil
-	}
-	for _, n := range slices.Clone(elem.Nodes) {
-		others, err := ctx.WithXpath(n).ApplyTemplate()
+	case xml.TypeElement:
+		elem, err := getElementFromNode(ctx.ContextNode)
 		if err != nil {
 			return nil, err
 		}
-		for i := range others {
-			clone.Append(others[i])
+		clone, ok := elem.Copy().(*xml.Element)
+		if !ok {
+			return nil, nil
 		}
+		for _, n := range slices.Clone(elem.Nodes) {
+			others, err := ctx.WithXpath(n).ApplyTemplate()
+			if err != nil {
+				return nil, err
+			}
+			for i := range others {
+				clone.Append(others[i])
+			}
+		}
+		return []xml.Node{clone}, nil
+	default:
+		return []xml.Node{ctx.ContextNode}, nil
 	}
-	return []xml.Node{clone}, nil
 }
 
 type deepSkip struct{}
