@@ -10,7 +10,7 @@ import (
 )
 
 type Spinner struct {
-	frames []string
+	frames  []string
 	message string
 
 	mu      sync.Mutex
@@ -65,7 +65,7 @@ func (s *Spinner) run() {
 		case <-s.ticker.C:
 			f := s.frames[i%len(s.frames)]
 			io.WriteString(os.Stdout, fmt.Sprintf("\r%s", f))
-			if s.message != "" {
+			if s.message != "" && i == 0 {
 				io.WriteString(os.Stdout, " ")
 				io.WriteString(os.Stdout, s.message)
 				io.WriteString(os.Stdout, "...")
