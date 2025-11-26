@@ -703,7 +703,7 @@ func executeForeach(ctx *Context) (xpath.Sequence, error) {
 		it = slices.Values(items)
 	}
 
-	seq := xpath.NewSequence()
+	var seq xpath.Sequence
 	for i := range it {
 		node := i.Node()
 		others, err := executeConstructor(ctx.WithXpath(node), nodes, AllowOnEmpty|AllowOnNonEmpty)

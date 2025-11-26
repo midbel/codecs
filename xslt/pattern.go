@@ -54,6 +54,14 @@ func (m rootMatcher) Match(node xml.Node) bool {
 		if !ok {
 			return ok
 		}
+		return m.match(node.Parent())
+	}
+	return m.match(node)
+}
+
+func (m rootMatcher) match(node xml.Node) bool {
+	if node == nil {
+		return false
 	}
 	return node.Type() == xml.TypeDocument
 }

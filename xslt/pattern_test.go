@@ -45,6 +45,11 @@ func TestMatch(t *testing.T) {
 			Node:    doc.Root(),
 		},
 		{
+			Pattern: "/root",
+			Want:    true,
+			Node:    doc.Root(),
+		},
+		{
 			Pattern: "foo/bar",
 			Want:    true,
 			Node:    bar,
