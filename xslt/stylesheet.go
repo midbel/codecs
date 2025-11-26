@@ -104,7 +104,6 @@ const (
 
 type Mode struct {
 	Name       string
-	Default    bool
 	NoMatch    NoMatchMode
 	MultiMatch MultiMatchMode
 
@@ -116,6 +115,18 @@ func namedMode(name string) *Mode {
 		Name:    name,
 		NoMatch: NoMatchBuiltins,
 		// MultiMatch: MultiMatchLast,
+	}
+}
+
+func (m *Mode) setNoMatch(other *Mode) {
+	if m.NoMatch == 0 {
+		m.NoMatch = other.NoMatch
+	}
+}
+
+func (m *Mode) setMultiMatch(other *Mode) {
+	if m.MultiMatch == 0 {
+		m.MultiMatch = other.MultiMatch
 	}
 }
 
@@ -222,7 +233,6 @@ func (m *Mode) noMatch() (Executer, error) {
 }
 
 type Stylesheet struct {
-	DefaultMode           string
 	WrapRoot              bool
 	WrapName              string
 	StrictModeDeclaration bool
@@ -269,14 +279,10 @@ func Load(file, contextDir string) (*Stylesheet, error) {
 	if err := sheet.loadNamespacesFromRoot(root); err != nil {
 		return nil, err
 	}
-	ix := slices.IndexFunc(root.Attrs, func(a xml.Attribute) bool {
-		return a.Name == "default-mode"
-	})
-	if ix >= 0 {
-		mode := namedMode(sheet.DefaultMode)
-		mode.Default = true
+	if attr, err := getAttribute(root, "default-mode"); err == nil && attr != "" {
+		sheet.Mode = attr
+		mode := namedMode(sheet.Mode)
 		sheet.Modes = append(sheet.Modes, mode)
-		sheet.DefaultMode = root.Attrs[ix].Value()
 	}
 
 	if ns, err := getAttribute(root, sheet.getQualifiedName("xpath-default-namespace")); err == nil {
@@ -470,14 +476,6 @@ func (s *Stylesheet) init(doc xml.Node) error {
 	r, err := getElementFromNode(root)
 	if err != nil {
 		return err
-	}
-	// TODO: put attribute into namespace
-	if attr, err := getAttribute(r, "wrap-multiple-elements"); err == nil {
-		s.WrapRoot = strings.EqualFold(attr, "yes") || strings.EqualFold(attr, "true")
-	}
-	// TODO: put attribute into namespace
-	if attr, err := getAttribute(r, "wrap-root-name"); err == nil {
-		s.WrapName = attr
 	}
 	for _, n := range r.Nodes {
 		if n.Type() == xml.TypeComment {
@@ -698,7 +696,7 @@ func (s *Stylesheet) loadMode(node xml.Node) error {
 	})
 	if ix < 0 {
 		s.Modes = append(s.Modes, &m)
-	} else if s.Modes[ix].Unnamed() || s.Modes[ix].Default {
+	} else if s.Modes[ix].Unnamed() {
 		s.Modes[ix].NoMatch = m.NoMatch
 		s.Modes[ix].MultiMatch = m.MultiMatch
 	} else {
@@ -889,14 +887,24 @@ func (s *Stylesheet) getQualifiedName(name string) string {
 	return qn.QualifiedName()
 }
 
-func (s *Stylesheet) getMainTemplate(node xml.Node) (Executer, error) {
+func (s *Stylesheet) getDefaultMode() *Mode {
+	unnamed := unnamedMode()
+
 	ix := slices.IndexFunc(s.Modes, func(m *Mode) bool {
 		return m.Name == s.Mode
 	})
-	if ix >= 0 {
-		return s.Modes[ix].matchTemplate(node, s.env)
+	if ix < 0 {
+		return unnamed
 	}
-	return nil, fmt.Errorf("template not found")
+	current := s.Modes[ix]
+	current.setNoMatch(unnamed)
+	current.setMultiMatch(unnamed)
+	return current
+}
+
+func (s *Stylesheet) getMainTemplate(node xml.Node) (Executer, error) {
+	mode := s.getDefaultMode()
+	return mode.matchTemplate(node, s.env)
 }
 
 func importSheet(ctx *Context) error {

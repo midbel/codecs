@@ -168,7 +168,7 @@ func (c *Context) getMode(mode string) string {
 	case currentMode:
 		return c.Mode
 	case defaultMode:
-		return c.Stylesheet.DefaultMode
+		return c.Stylesheet.Mode
 	default:
 		return mode
 	}
