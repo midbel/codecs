@@ -903,7 +903,42 @@ func executeValueOf(ctx *Context) (xpath.Sequence, error) {
 }
 
 func executeCopy(ctx *Context) (xpath.Sequence, error) {
-	return executeCopyOf(ctx)
+	elem, err := getElementFromNode(ctx.ContextNode)
+	if err != nil {
+		return nil, err
+	}
+	node := ctx.ContextNode
+	if query, err := getAttribute(elem, "select"); err == nil && query != "" {
+		seq, err := ctx.Execute(query)
+		if err != nil {
+			return nil, err
+		}
+		if seq.Empty() {
+			return nil, nil
+		}
+		if !seq.Singleton() {
+			return nil, fmt.Errorf("copy should return singleton sequence")
+		}
+		if seq.First().Atomic() {
+			return seq, nil
+		}
+		node = seq.First().Node()
+	}
+	if elem, err = getElementFromNode(node); err != nil {
+		return nil, err
+	}
+	clone, ok := elem.Copy().(*xml.Element)
+	if !ok {
+		return nil, fmt.Errorf("fail to copy element node")
+	}
+	seq, err := executeConstructor(ctx.WithXpath(node), nil, 0)
+	if err != nil {
+		return nil, err
+	}
+	for _, n := range seq {
+		clone.Nodes = append(clone.Nodes, n.Node())
+	}
+	return xpath.Singleton(clone), nil
 }
 
 func executeCopyOf(ctx *Context) (xpath.Sequence, error) {
@@ -919,7 +954,7 @@ func executeCopyOf(ctx *Context) (xpath.Sequence, error) {
 	if err != nil {
 		return nil, ctx.errorWithContext(err)
 	}
-	seq := xpath.NewSequence()
+	var seq xpath.Sequence
 	for i := range items {
 		c := cloneNode(items[i].Node())
 		if c != nil {
