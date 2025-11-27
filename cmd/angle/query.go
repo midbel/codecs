@@ -21,7 +21,7 @@ var debugCmd = cli.Command{
 var queryCmd = cli.Command{
 	Name:    "query",
 	Alias:   []string{"exec"},
-	Summary: "search nodes into xml document",
+	Summary: "find nodes in xml document",
 	Handler: &QueryCmd{},
 }
 

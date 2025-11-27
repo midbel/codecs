@@ -24,7 +24,7 @@ type SuggestionError struct {
 }
 
 func (e SuggestionError) Error() string {
-	return fmt.Sprintf("%s: unknown subcommand", e.Name)
+	return fmt.Sprintf("%s: unknown sub command", e.Name)
 }
 
 type DelegateError struct {
@@ -118,7 +118,7 @@ func createNode(name string) *CommandNode {
 
 func (c CommandNode) Help() {
 	printHelp(os.Stderr, c.cmd.getSummary(), c.cmd.getHelp())
-	fmt.Fprintln(os.Stderr, "available commands")
+	fmt.Fprintln(os.Stderr, "available sub command(s)")
 	for s, n := range c.Children {
 		fmt.Printf("- %s: %s", s, n.cmd.getSummary())
 		fmt.Fprintln(os.Stderr)
