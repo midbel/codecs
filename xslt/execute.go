@@ -942,26 +942,7 @@ func executeCopy(ctx *Context) (xpath.Sequence, error) {
 }
 
 func executeCopyOf(ctx *Context) (xpath.Sequence, error) {
-	elem, err := getElementFromNode(ctx.XslNode)
-	if err != nil {
-		return nil, ctx.errorWithContext(err)
-	}
-	query, err := getAttribute(elem, "select")
-	if err != nil {
-		return nil, ctx.errorWithContext(err)
-	}
-	items, err := ctx.Execute(query)
-	if err != nil {
-		return nil, ctx.errorWithContext(err)
-	}
-	var seq xpath.Sequence
-	for i := range items {
-		c := cloneNode(items[i].Node())
-		if c != nil {
-			seq.Append(xpath.NewNodeItem(c))
-		}
-	}
-	return seq, nil
+	return nil, nil
 }
 
 func executeMessage(ctx *Context) (xpath.Sequence, error) {
