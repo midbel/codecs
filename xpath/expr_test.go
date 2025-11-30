@@ -742,22 +742,22 @@ func testNodeFunctions(t *testing.T) {
 		},
 		{
 			Query: "local-name(root())",
-			Want:  []string{"root"},
+			Want:  []string{""},
 		},
 		{
 			Query: "local-name(root(/root/item))",
-			Want:  []string{"root"},
+			Want:  []string{""},
 		},
 		{
 			Query: "path(/root)",
-			Want:  []string{"/"},
+			Want:  []string{"/root"},
 		},
 		{
-			Query: "has-children('/root')",
+			Query: "has-children(/root)",
 			Want:  []string{"true"},
 		},
 		{
-			Query: "has-children('/root/group/item')",
+			Query: "has-children(/root/group/item/text())",
 			Want:  []string{"false"},
 		},
 	}
