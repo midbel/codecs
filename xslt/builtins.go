@@ -10,6 +10,18 @@ func callCurrent(ctx xpath.Context, _ []xpath.Expr) (xpath.Sequence, error) {
 	return xpath.Singleton(ctx.Node), nil
 }
 
+func callId(ctx xpath.Context, _ []xpath.Ewpr) (xpath.Sequence, error) {
+	return nil, nil
+}
+
+func callKey(ctx xpath.Context, _ []xpath.Expr) (xpath.Sequence, error) {
+	return nil, nil
+}
+
+func callDocument(ctx xpath.Context, _ []xpath.Expr) (xpath.Sequence, error) {
+	return nil, nil
+}
+
 func callSystemProperty(ctx xpath.Context, args []xpath.Expr) (xpath.Sequence, error) {
 	if len(args) > 1 {
 		return nil, fmt.Errorf("invalid number of arguments")
