@@ -10,7 +10,7 @@ func callCurrent(ctx xpath.Context, _ []xpath.Expr) (xpath.Sequence, error) {
 	return xpath.Singleton(ctx.Node), nil
 }
 
-func callId(ctx xpath.Context, _ []xpath.Ewpr) (xpath.Sequence, error) {
+func callId(ctx xpath.Context, _ []xpath.Expr) (xpath.Sequence, error) {
 	return nil, nil
 }
 

@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -197,6 +198,41 @@ func (m predicateMatcher) Priority() float64 {
 	return m.curr.Priority()
 }
 
+type idMatcher struct {
+	list []string
+}
+
+func (m idMatcher) Match(node xml.Node) bool {
+	if node.Type() != xml.TypeElement {
+		return false
+	}
+	el := node.(*xml.Element)
+	ix := slices.IndexFunc(el.Attrs, func(a xml.Attribute) bool {
+		return a.Name == "id"
+	})
+	if ix < 0 {
+		return false
+	}
+	return slices.Contains(m.list, el.Attrs[ix].Value())
+}
+
+func (m idMatcher) Priority() float64 {
+	return 0
+}
+
+type keyMatcher struct {
+	name    string
+	matcher Matcher
+}
+
+func (m keyMatcher) Match(node xml.Node) bool {
+	return false
+}
+
+func (m keyMatcher) Priority() float64 {
+	return 0
+}
+
 func isTest(n string) bool {
 	switch n {
 	case "text", "attribute", "node", "document-node":
@@ -281,6 +317,9 @@ func (c *Compiler) compile() (Matcher, error) {
 			break
 		}
 		if !c.is(opCurrentLevel) && !c.is(opAnyLevel) {
+			if c.is(endGrp) {
+				break
+			}
 			return nil, fmt.Errorf("\"/\" or \"//\" expected")
 		}
 		if len(paths) > 2 {
@@ -392,15 +431,47 @@ func (c *Compiler) compileCall(qn xml.QName) (Matcher, error) {
 	if isTest(qn.Name) {
 		return c.compileTest(qn)
 	}
+	var m Matcher
 	switch qn.Name {
 	case "doc":
 	case "id":
+		if !c.is(opLiteral) {
+			return nil, fmt.Errorf("literal expected")
+		}
+		m = idMatcher{
+			list: strings.Fields(c.getCurrentLiteral()),
+		}
+		c.next()
 	case "element-with-id":
 	case "key":
+		if !c.is(opLiteral) {
+			return nil, fmt.Errorf("literal expected")
+		}
+		k := keyMatcher{
+			name: c.getCurrentLiteral(),
+		}
+		c.next()
+		if !c.is(opSeq) {
+			return nil, fmt.Errorf("missing ',' after name")
+		}
+		c.next()
+
+		x, err := c.compile()
+		if err != nil {
+			return nil, err
+		}
+		k.matcher = x
+
+		m = k
 	case "root":
+		m = rootMatcher{}
 	default:
 	}
-	return nil, fmt.Errorf("call not yet supported")
+	if !c.is(endGrp) {
+		return nil, fmt.Errorf("expected ')' at end of pattern operator")
+	}
+	c.next()
+	return m, nil
 }
 
 func (c *Compiler) compileTest(qn xml.QName) (Matcher, error) {

@@ -29,6 +29,7 @@ func TestMatch(t *testing.T) {
 	)
 	foo.Append(bar)
 	root.Append(foo)
+	root.Append(&attr)
 	tests := []struct {
 		Pattern string
 		Want    bool
@@ -124,6 +125,16 @@ func TestMatch(t *testing.T) {
 			Want:    true,
 			Node:    doc.Root(),
 		},
+		{
+			Pattern: "id(\"node attr instr\")",
+			Want: false,
+			Node: &attr,
+		},
+		{
+			Pattern: "id(\"node attr instr\")",
+			Want: true,
+			Node: root,
+		},
 	}
 	cp := NewCompiler()
 	for _, c := range tests {
@@ -168,6 +179,9 @@ func TestCompile(t *testing.T) {
 		"item[1]",
 		"item[\"foo\"]",
 		"item[\"foo\" = 1]",
+		"id(\"foo bar\")",
+		"key(\"foo\", @lang)",
+		"key(\"foo\", foo/bar)",
 	}
 
 	cp := NewCompiler()
