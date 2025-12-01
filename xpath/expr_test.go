@@ -280,6 +280,16 @@ func TestOperators(t *testing.T) {
 	runTests(t, docBase, tests)
 }
 
+func TestMap(t *testing.T) {
+	tests := []TestCase{
+		{
+			Query: "map{'foo': 42}('foo')",
+			Want:  []string{"42"},
+		},
+	}
+	runTests(t, docBase, tests)
+}
+
 func TestArray(t *testing.T) {
 	tests := []TestCase{
 		{

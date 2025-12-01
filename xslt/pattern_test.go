@@ -127,13 +127,13 @@ func TestMatch(t *testing.T) {
 		},
 		{
 			Pattern: "id(\"node attr instr\")",
-			Want: false,
-			Node: &attr,
+			Want:    false,
+			Node:    &attr,
 		},
 		{
 			Pattern: "id(\"node attr instr\")",
-			Want: true,
-			Node: root,
+			Want:    true,
+			Node:    root,
 		},
 	}
 	cp := NewCompiler()

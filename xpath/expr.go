@@ -1111,6 +1111,25 @@ func (i subscript) Find(node xml.Node) (Sequence, error) {
 }
 
 func (i subscript) find(ctx Context) (Sequence, error) {
+	if _, ok := i.expr.(hashmap); ok {
+		return i.subscriptHashmap(ctx)
+	}
+	return i.subscriptArray(ctx)
+}
+
+func (i subscript) subscriptHashmap(ctx Context) (Sequence, error) {
+	h, ok := i.expr.(hashmap)
+	if !ok {
+		return nil, nil
+	}
+	v, ok := h.values[i.index]
+	if !ok {
+		return nil, nil
+	}
+	return v.find(ctx)
+}
+
+func (i subscript) subscriptArray(ctx Context) (Sequence, error) {
 	arr, err := i.getArrayFromExpr(ctx)
 	if err != nil {
 		return nil, err
