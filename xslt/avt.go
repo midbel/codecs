@@ -10,7 +10,7 @@ func processAVT(ctx *Context) error {
 	if err != nil {
 		return err
 	}
-	for i, a := range elem.Attrs {
+	for i, a := range elem.Attributes() {
 		var (
 			value = a.Value()
 			str   strings.Builder

@@ -392,6 +392,10 @@ func (c *Compiler) compileCall(qn xml.QName) (Matcher, error) {
 	if isTest(qn.Name) {
 		return c.compileTest(qn)
 	}
+	switch qn.Name {
+	case "doc", "id", "element-with-id", "key", "root":
+	default:
+	}
 	return nil, fmt.Errorf("call not yet supported")
 }
 
