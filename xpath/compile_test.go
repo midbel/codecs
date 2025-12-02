@@ -21,11 +21,11 @@ func TestCompile(t *testing.T) {
 		"map{'foo': 10, 'nest': [1, 2]}",
 		"[1, 2, [1, 2]](0)",
 		"[1, 2, [1, 2]](2)(0)",
-		"let $arr := array{1, 2, 3} return $arr(0)",
-		"let $arr := [1, 2, 3] return $arr(0)",
-		"let $arr := map{'name': 'foobar', 'answer': 42} return $arr('answer')",
-		"let $arr := map{'name': 'foobar', 'answer': 42}, $key := 'name' return $arr($key)",
-		"let $arr := map{'name': 'foobar', 'foobar': map{'answer': 42}} return $arr('foobar')('answer')",
+		"let $arr1 := array{1, 2, 3} return $arr1(0)",
+		"let $arr2 := [1, 2, 3] return $arr2(0)",
+		"let $arr3 := map{'name': 'foobar', 'answer': 42} return $arr3('answer')",
+		"let $arr4 := map{'name': 'foobar', 'answer': 42}, $key := 'name' return $arr4($key)",
+		"let $arr5 := map{'name': 'foobar', 'foobar': map{'answer': 42}} return $arr5('foobar')('answer')",
 	}
 	for _, str := range tests {
 		_, err := CompileString(str)

@@ -214,8 +214,8 @@ func (c *Compiler) compileMap() (Expr, error) {
 	c.Enter("map")
 	defer c.Leave("map")
 
+	defer c.skipBlank()
 	c.scan.KeepBlanks()
-	defer c.scan.DiscardBlanks()
 
 	c.next()
 	if !c.is(begCurl) {
@@ -248,6 +248,7 @@ func (c *Compiler) compileMap() (Expr, error) {
 				return nil, c.syntaxError("map", "unexpected ',' before ']'")
 			}
 		case c.is(endCurl):
+			c.scan.DiscardBlanks()
 		default:
 			return nil, c.syntaxError("map", "expected ',' or '}' after map value")
 		}
@@ -263,6 +264,7 @@ func (c *Compiler) compileMap() (Expr, error) {
 func (c *Compiler) compileArray() (Expr, error) {
 	c.Enter("array")
 	defer c.Leave("array")
+	defer c.skipBlank()
 
 	c.next()
 	var arr array
@@ -294,6 +296,7 @@ func (c *Compiler) compileArray() (Expr, error) {
 func (c *Compiler) compileArrayFunc() (Expr, error) {
 	c.Enter("array")
 	defer c.Leave("array")
+	defer c.skipBlank()
 
 	c.next()
 	if !c.is(begCurl) {
