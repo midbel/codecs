@@ -389,7 +389,8 @@ func (q QName) isDocumentNode() bool {
 
 type Attribute struct {
 	QName
-	Datum string
+	SchemaType QName
+	Datum      string
 
 	parent   Node
 	position int
@@ -460,8 +461,9 @@ func (a *Attribute) setPosition(pos int) {
 
 type Element struct {
 	QName
-	Attrs []Attribute
-	Nodes []Node
+	SchemaType QName
+	Attrs      []Attribute
+	Nodes      []Node
 
 	parent   Node
 	position int
@@ -857,7 +859,8 @@ func (e *Element) setParent(parent Node) {
 
 type Instruction struct {
 	QName
-	Attrs []Attribute
+	SchemaType QName
+	Attrs      []Attribute
 
 	parent   Node
 	position int

@@ -1122,11 +1122,21 @@ func (i subscript) subscriptHashmap(ctx Context) (Sequence, error) {
 	if !ok {
 		return nil, nil
 	}
-	v, ok := h.values[i.index]
+	var sub Expr
+	switch e := i.index.(type) {
+	case identifier:
+		key, err := ctx.Resolve(e.ident)
+		if err != nil {
+			return nil, err
+		}
+		sub, ok = h.values[key]
+	default:
+		sub, ok = h.values[i.index]
+	}
 	if !ok {
 		return nil, nil
 	}
-	return v.find(ctx)
+	return sub.find(ctx)
 }
 
 func (i subscript) subscriptArray(ctx Context) (Sequence, error) {
