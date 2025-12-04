@@ -2,6 +2,7 @@ package xpath
 
 import (
 	"fmt"
+	"maps"
 	"math"
 	"slices"
 	"strconv"
@@ -28,18 +29,19 @@ func NewSequence() Sequence {
 
 func Singleton(value any) Sequence {
 	var item Item
-	if n, ok := value.(xml.Node); ok {
-		item = createNode(n)
-	} else if i, ok := value.(literalItem); ok {
-		item = i
-	} else if i, ok := value.(nodeItem); ok {
-		item = i
-	} else {
-		if vs, ok := value.([]Item); ok {
-			item = createArray(vs)
-		} else {
-			item = createLiteral(value)
-		}
+	switch value := value.(type) {
+	case xml.Node:
+		item = createNode(value)
+	case literalItem:
+		item = value
+	case nodeItem:
+		item = value
+	case []Item:
+		item = createArray(value)
+	case map[Item]Item:
+		item = createMap(value)
+	default:
+		item = createLiteral(value)
 	}
 	var seq Sequence
 	seq.Append(item)
@@ -250,8 +252,17 @@ func createLiteral(value any) Item {
 	if i, ok := value.(literalItem); ok {
 		return i
 	}
+	var v any
+	switch e := value.(type) {
+	default:
+		v = value
+	case number:
+		v = e.expr
+	case literal:
+		v = e.expr
+	}
 	return literalItem{
-		value: value,
+		value: v,
 	}
 }
 
@@ -295,6 +306,108 @@ func (i literalItem) Assert(_ Expr, _ environ.Environ[Expr]) (Sequence, error) {
 	return nil, fmt.Errorf("can not assert on literal item")
 }
 
+type mapItem struct {
+	values map[Item]Item
+}
+
+func createMap(vs map[Item]Item) Item {
+	return mapItem{
+		values: maps.Clone(vs),
+	}
+}
+
+func (i mapItem) toExpr() (Expr, error) {
+	var (
+		arr     hashmap
+		convert func(any, bool) (Expr, error)
+	)
+
+	convert = func(v any, atomic bool) (Expr, error) {
+		var e Expr
+		switch v := v.(type) {
+		case string:
+			e = literal{
+				expr: v,
+			}
+		case int64:
+			e = number{
+				expr: float64(v),
+			}
+		case float64:
+			e = number{
+				expr: v,
+			}
+		case []any:
+			if atomic {
+				return nil, fmt.Errorf("only atomic value allowed")
+			}
+			var arr array
+			for i := range v {
+				x, err := convert(v[i], false)
+				if err != nil {
+					return nil, err
+				}
+				arr.all = append(arr.all, x)
+			}
+			e = arr
+		case map[any]any:
+			if atomic {
+				return nil, fmt.Errorf("only atomic value allowed")
+			}
+		default:
+			return nil, fmt.Errorf("value can not be converted to expression")
+		}
+		return e, nil
+	}
+
+	arr.values = make(map[Expr]Expr)
+	for k, v := range i.values {
+		ke, err := convert(k.Value(), true)
+		if err != nil {
+			return nil, err
+		}
+		ve, err := convert(v.Value(), false)
+		if err != nil {
+			return nil, err
+		}
+		arr.values[ke] = ve
+	}
+	return arr, nil
+}
+
+func (i mapItem) Sequence() Sequence {
+	var seq Sequence
+	return seq
+}
+
+func (i mapItem) Node() xml.Node {
+	return nil
+}
+
+func (i mapItem) Value() any {
+	list := make(map[any]any)
+	for k, v := range i.values {
+		list[k.Value()] = v.Value()
+	}
+	return list
+}
+
+func (i mapItem) True() bool {
+	if len(i.values) == 0 {
+		return false
+	}
+	for j := range i.values {
+		if !i.values[j].True() {
+			return false
+		}
+	}
+	return true
+}
+
+func (i mapItem) Atomic() bool {
+	return false
+}
+
 type arrayItem struct {
 	values []Item
 }
@@ -303,6 +416,53 @@ func createArray(vs []Item) Item {
 	return arrayItem{
 		values: slices.Clone(vs),
 	}
+}
+
+func (i arrayItem) toExpr() (Expr, error) {
+	var (
+		arr     array
+		convert func(any) (Expr, error)
+	)
+
+	convert = func(v any) (Expr, error) {
+		var e Expr
+		switch v := v.(type) {
+		case string:
+			e = literal{
+				expr: v,
+			}
+		case int64:
+			e = number{
+				expr: float64(v),
+			}
+		case float64:
+			e = number{
+				expr: v,
+			}
+		case []any:
+			var arr array
+			for i := range v {
+				x, err := convert(v[i])
+				if err != nil {
+					return nil, err
+				}
+				arr.all = append(arr.all, x)
+			}
+			e = arr
+		default:
+			return nil, fmt.Errorf("value can not be converted to expression")
+		}
+		return e, nil
+	}
+
+	for _, v := range i.values {
+		e, err := convert(v.Value())
+		if err != nil {
+			return nil, err
+		}
+		arr.all = append(arr.all, e)
+	}
+	return arr, nil
 }
 
 func (i arrayItem) Sequence() Sequence {

@@ -280,29 +280,7 @@ func TestOperators(t *testing.T) {
 	runTests(t, docBase, tests)
 }
 
-func TestMap(t *testing.T) {
-	tests := []TestCase{
-		{
-			Query: "map{'foo': 42}('foo')",
-			Want:  []string{"42"},
-		},
-		{
-			Query: "map{'name': 'foobar', 'foobar': map{'age': 42}}('foobar')('age')",
-			Want:  []string{"42"},
-		},
-		{
-			Query: "let $n := 'name' return map{'name': 'foobar'}($n)",
-			Want:  []string{"foobar"},
-		},
-		{
-			Query: "let $n := 'name', $arr := map{'name': 'foobar'} return $arr($n)",
-			Want:  []string{"foobar"},
-		},
-	}
-	runTests(t, docBase, tests)
-}
-
-func TestArray(t *testing.T) {
+func TestArrayMap(t *testing.T) {
 	tests := []TestCase{
 		{
 			Query: "[1, 2, 3, 'test']",
@@ -327,6 +305,22 @@ func TestArray(t *testing.T) {
 		{
 			Query: "array{1, 2, 3}(79)",
 			Want:  []string{},
+		},
+		{
+			Query: "map{'foo': 42}('foo')",
+			Want:  []string{"42"},
+		},
+		{
+			Query: "map{'name': 'foobar', 'foobar': map{'age': 42}}('foobar')('age')",
+			Want:  []string{"42"},
+		},
+		{
+			Query: "let $n := 'name' return map{'name': 'foobar'}($n)",
+			Want:  []string{"foobar"},
+		},
+		{
+			Query: "let $n := 'name', $arr := map{'name': 'foobar'} return $arr($n)",
+			Want:  []string{"foobar"},
 		},
 	}
 	runArrayTests(t, docBase, tests)

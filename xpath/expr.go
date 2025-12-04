@@ -1111,95 +1111,111 @@ func (i subscript) Find(node xml.Node) (Sequence, error) {
 }
 
 func (i subscript) find(ctx Context) (Sequence, error) {
-	if _, ok := i.expr.(hashmap); ok {
-		return i.subscriptHashmap(ctx)
-	}
-	return i.subscriptArray(ctx)
-}
-
-func (i subscript) subscriptHashmap(ctx Context) (Sequence, error) {
-	h, ok := i.expr.(hashmap)
-	if !ok {
-		return nil, nil
-	}
-	var sub Expr
-	switch e := i.index.(type) {
-	case identifier:
-		key, err := ctx.Resolve(e.ident)
+	e, ok := i.expr.(identifier)
+	if ok {
+		sub, err := ctx.Resolve(e.ident)
 		if err != nil {
 			return nil, err
 		}
-		sub, ok = h.values[key]
-	default:
-		sub, ok = h.values[i.index]
+		other := subscript{
+			expr:  sub,
+			index: i.index,
+		}
+		return other.find(ctx)
 	}
+	switch e := i.expr.(type) {
+	case hashmap:
+		return i.subscriptHashmap(ctx, e)
+	case array:
+		return i.subscriptArray(ctx, e)
+	case subscript:
+		return i.subscriptNested(ctx)
+	default:
+		return nil, ErrType
+	}
+}
+
+func (i subscript) subscriptNested(ctx Context) (Sequence, error) {
+	seq, err := i.expr.find(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if seq.Empty() {
+		return nil, nil
+	}
+	if !seq.Singleton() {
+		return nil, fmt.Errorf("subscript returns more than one expr")
+	}
+	to, ok := seq.First().(interface{ toExpr() (Expr, error) })
+	if !ok {
+		return nil, fmt.Errorf("subscript does not return a expression")
+	}
+	expr, err := to.toExpr()
+	if err != nil {
+		return nil, err
+	}
+	other := subscript{
+		expr:  expr,
+		index: i.index,
+	}
+	return other.find(ctx)
+}
+
+func (i subscript) subscriptHashmap(ctx Context, arr hashmap) (Sequence, error) {
+	var (
+		sub Expr
+		ok  bool
+	)
+	test, err := i.index.find(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if test.Empty() {
+		return nil, nil
+	}
+	switch v := test.First().Value().(type) {
+	case string:
+		sub = literal{
+			expr: v,
+		}
+	case int64:
+		sub = number{
+			expr: float64(v),
+		}
+	case float64:
+		sub = number{
+			expr: v,
+		}
+	default:
+		return nil, fmt.Errorf("map key can only be atomic value")
+	}
+	sub, ok = arr.values[sub]
 	if !ok {
 		return nil, nil
 	}
 	return sub.find(ctx)
 }
 
-func (i subscript) subscriptArray(ctx Context) (Sequence, error) {
-	arr, err := i.getArrayFromExpr(ctx)
+func (i subscript) subscriptArray(ctx Context, arr array) (Sequence, error) {
+	ix, err := i.index.find(ctx)
 	if err != nil {
 		return nil, err
 	}
-	res, err := i.index.find(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if res.Empty() {
+	if ix.Empty() {
 		return nil, nil
 	}
-	ix, err := toInt(res[0].Value())
+	if !ix.Singleton() {
+		return nil, fmt.Errorf("subscript returns more than one expr")
+	}
+	x, err := toInt(ix.First().Value())
 	if err != nil {
 		return nil, err
 	}
-	ix--
-	if ix < 0 || ix >= int64(len(arr.all)) {
+	x--
+	if x < 0 || int(x) >= len(arr.all) {
 		return nil, nil
 	}
-	return arr.all[ix].find(ctx)
-}
-
-func (i subscript) getArrayFromExpr(ctx Context) (array, error) {
-	var arr array
-	switch id := i.expr.(type) {
-	case subscript:
-		seq, err := id.find(ctx)
-		if err != nil {
-			return arr, err
-		}
-		if seq.Empty() {
-			return arr, nil
-		}
-		values, ok := seq[0].Value().([]any)
-		if !ok {
-			return arr, ErrType
-		}
-		for j := range values {
-			arr.all = append(arr.all, NewValueFromLiteral(values[j]))
-		}
-		return arr, nil
-	case identifier:
-		id, ok := i.expr.(identifier)
-		if !ok {
-			return arr, fmt.Errorf("identifier expected")
-		}
-		value, err := ctx.Resolve(id.ident)
-		if err != nil {
-			return arr, err
-		}
-		arr, ok := value.(array)
-		if !ok {
-			return arr, ErrType
-		}
-		return arr, nil
-	case array:
-		return id, nil
-	default:
-		return arr, ErrType
-	}
+	return arr.all[x].find(ctx)
 }
 
 type filter struct {
@@ -1462,7 +1478,22 @@ func (a hashmap) Find(node xml.Node) (Sequence, error) {
 }
 
 func (a hashmap) find(ctx Context) (Sequence, error) {
-	return nil, nil
+	vs := make(map[Item]Item)
+	for k, v := range a.values {
+		i, err := k.find(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if i.Empty() {
+			continue
+		}
+		j, err := v.find(ctx)
+		if err != nil {
+			return nil, err
+		}
+		vs[i.First()] = j.First()
+	}
+	return Singleton(vs), nil
 }
 
 type array struct {
