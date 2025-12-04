@@ -354,6 +354,21 @@ func (i mapItem) toExpr() (Expr, error) {
 			if atomic {
 				return nil, fmt.Errorf("only atomic value allowed")
 			}
+			vs := make(map[Expr]Expr)
+			for i, j := range v {
+				k, err := convert(i, true)
+				if err != nil {
+					return nil, err
+				}
+				v, err := convert(j, false)
+				if err != nil {
+					return nil, err
+				}
+				vs[k] = v
+			}
+			e = hashmap{
+				values: vs,
+			}
 		default:
 			return nil, fmt.Errorf("value can not be converted to expression")
 		}
@@ -449,6 +464,22 @@ func (i arrayItem) toExpr() (Expr, error) {
 				arr.all = append(arr.all, x)
 			}
 			e = arr
+		case map[any]any:
+			vs := make(map[Expr]Expr)
+			for i, j := range v {
+				k, err := convert(i)
+				if err != nil {
+					return nil, err
+				}
+				v, err := convert(j)
+				if err != nil {
+					return nil, err
+				}
+				vs[k] = v
+			}
+			e = hashmap{
+				values: vs,
+			}
 		default:
 			return nil, fmt.Errorf("value can not be converted to expression")
 		}

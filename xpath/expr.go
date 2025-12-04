@@ -1111,8 +1111,17 @@ func (i subscript) Find(node xml.Node) (Sequence, error) {
 }
 
 func (i subscript) find(ctx Context) (Sequence, error) {
-	e, ok := i.expr.(identifier)
-	if ok {
+	if err := i.validIndex(); err != nil {
+		return nil, err
+	}
+	switch e := i.expr.(type) {
+	case hashmap:
+		return i.subscriptHashmap(ctx, e)
+	case array:
+		return i.subscriptArray(ctx, e)
+	case subscript:
+		return i.subscriptNested(ctx)
+	case identifier:
 		sub, err := ctx.Resolve(e.ident)
 		if err != nil {
 			return nil, err
@@ -1122,17 +1131,20 @@ func (i subscript) find(ctx Context) (Sequence, error) {
 			index: i.index,
 		}
 		return other.find(ctx)
-	}
-	switch e := i.expr.(type) {
-	case hashmap:
-		return i.subscriptHashmap(ctx, e)
-	case array:
-		return i.subscriptArray(ctx, e)
-	case subscript:
-		return i.subscriptNested(ctx)
 	default:
 		return nil, ErrType
 	}
+}
+
+func (i subscript) validIndex() error {
+	switch i.index.(type) {
+	case literal:
+	case number:
+	case identifier:
+	default:
+		return fmt.Errorf("expression can not be used as index")
+	}
+	return nil
 }
 
 func (i subscript) subscriptNested(ctx Context) (Sequence, error) {

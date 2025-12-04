@@ -322,6 +322,14 @@ func TestArrayMap(t *testing.T) {
 			Query: "let $n := 'name', $arr := map{'name': 'foobar'} return $arr($n)",
 			Want:  []string{"foobar"},
 		},
+		{
+			Query: "map{'values': [42, 'foobar']}('values')(2)",
+			Want:  []string{"foobar"},
+		},
+		{
+			Query: "[map{'name': 'foobar', 'age': 42}](1)('name')",
+			Want:  []string{"foobar"},
+		},
 	}
 	runArrayTests(t, docBase, tests)
 }
