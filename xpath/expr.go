@@ -1114,13 +1114,17 @@ func (i subscript) find(ctx Context) (Sequence, error) {
 	if err := i.validIndex(); err != nil {
 		return nil, err
 	}
+	var (
+		expr Expr
+		err  error
+	)
 	switch e := i.expr.(type) {
 	case hashmap:
-		return i.subscriptHashmap(ctx, e)
+		expr, err = i.subscriptHashmap(ctx, e)
 	case array:
-		return i.subscriptArray(ctx, e)
+		expr, err = i.subscriptArray(ctx, e)
 	case subscript:
-		return i.subscriptNested(ctx)
+		expr, err = i.subscriptNested(ctx)
 	case identifier:
 		sub, err := ctx.Resolve(e.ident)
 		if err != nil {
@@ -1134,6 +1138,10 @@ func (i subscript) find(ctx Context) (Sequence, error) {
 	default:
 		return nil, ErrType
 	}
+	if err != nil || expr == nil {
+		return nil, err
+	}
+	return expr.find(ctx)
 }
 
 func (i subscript) validIndex() error {
@@ -1147,7 +1155,7 @@ func (i subscript) validIndex() error {
 	return nil
 }
 
-func (i subscript) subscriptNested(ctx Context) (Sequence, error) {
+func (i subscript) subscriptNested(ctx Context) (Expr, error) {
 	seq, err := i.expr.find(ctx)
 	if err != nil {
 		return nil, err
@@ -1170,22 +1178,19 @@ func (i subscript) subscriptNested(ctx Context) (Sequence, error) {
 		expr:  expr,
 		index: i.index,
 	}
-	return other.find(ctx)
+	return other, nil
 }
 
-func (i subscript) subscriptHashmap(ctx Context, arr hashmap) (Sequence, error) {
+func (i subscript) subscriptHashmap(ctx Context, arr hashmap) (Expr, error) {
 	var (
 		sub Expr
 		ok  bool
 	)
-	test, err := i.index.find(ctx)
+	index, err := i.at()
 	if err != nil {
 		return nil, err
 	}
-	if test.Empty() {
-		return nil, nil
-	}
-	switch v := test.First().Value().(type) {
+	switch v := index.(type) {
 	case string:
 		sub = literal{
 			expr: v,
@@ -1205,21 +1210,15 @@ func (i subscript) subscriptHashmap(ctx Context, arr hashmap) (Sequence, error) 
 	if !ok {
 		return nil, nil
 	}
-	return sub.find(ctx)
+	return sub, nil
 }
 
-func (i subscript) subscriptArray(ctx Context, arr array) (Sequence, error) {
-	ix, err := i.index.find(ctx)
+func (i subscript) subscriptArray(ctx Context, arr array) (Expr, error) {
+	index, err := i.at()
 	if err != nil {
 		return nil, err
 	}
-	if ix.Empty() {
-		return nil, nil
-	}
-	if !ix.Singleton() {
-		return nil, fmt.Errorf("subscript returns more than one expr")
-	}
-	x, err := toInt(ix.First().Value())
+	x, err := toInt(index)
 	if err != nil {
 		return nil, err
 	}
@@ -1227,7 +1226,21 @@ func (i subscript) subscriptArray(ctx Context, arr array) (Sequence, error) {
 	if x < 0 || int(x) >= len(arr.all) {
 		return nil, nil
 	}
-	return arr.all[x].find(ctx)
+	return arr.all[x], nil
+}
+
+func (i subscript) at() (any, error) {
+	index, err := i.index.find(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if index.Empty() {
+		return nil, nil
+	}
+	if !index.Singleton() {
+		return nil, fmt.Errorf("subscript returns more than one expr")
+	}
+	return index.First().Value(), nil
 }
 
 type filter struct {
