@@ -1111,74 +1111,39 @@ func (i subscript) Find(node xml.Node) (Sequence, error) {
 }
 
 func (i subscript) find(ctx Context) (Sequence, error) {
-	if err := i.validIndex(); err != nil {
-		return nil, err
-	}
-	var (
-		expr Expr
-		err  error
-	)
-	switch e := i.expr.(type) {
-	case hashmap:
-		expr, err = i.subscriptHashmap(ctx, e)
-	case array:
-		expr, err = i.subscriptArray(ctx, e)
-	case subscript:
-		expr, err = i.subscriptNested(ctx)
-	case identifier:
-		sub, err := ctx.Resolve(e.ident)
-		if err != nil {
-			return nil, err
-		}
-		other := subscript{
-			expr:  sub,
-			index: i.index,
-		}
-		return other.find(ctx)
-	default:
-		return nil, ErrType
-	}
+	expr, err := i.subscriptExpr(ctx, i.expr)
 	if err != nil || expr == nil {
 		return nil, err
 	}
 	return expr.find(ctx)
 }
 
-func (i subscript) validIndex() error {
-	switch i.index.(type) {
-	case literal:
-	case number:
+func (i subscript) subscriptExpr(ctx Context, expr Expr) (Expr, error) {
+	var err error
+	switch e := expr.(type) {
 	case identifier:
+		expr, err := ctx.Resolve(e.ident)
+		if err != nil {
+			return nil, err
+		}
+		other := subscript{
+			expr:  expr,
+			index: i.index,
+		}
+		return other.subscriptExpr(ctx, other.expr)
+	case array:
+		expr, err = i.subscriptArray(ctx, e)
+	case hashmap:
+		expr, err = i.subscriptHashmap(ctx, e)
+	case subscript:
+		expr, err = e.subscriptExpr(ctx, e.expr)
+		if err == nil {
+			expr, err = i.subscriptExpr(ctx, expr)
+		}
 	default:
-		return fmt.Errorf("expression can not be used as index")
+		err = fmt.Errorf("expression is not subscriptable")
 	}
-	return nil
-}
-
-func (i subscript) subscriptNested(ctx Context) (Expr, error) {
-	seq, err := i.expr.find(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if seq.Empty() {
-		return nil, nil
-	}
-	if !seq.Singleton() {
-		return nil, fmt.Errorf("subscript returns more than one expr")
-	}
-	to, ok := seq.First().(interface{ toExpr() (Expr, error) })
-	if !ok {
-		return nil, fmt.Errorf("subscript does not return a expression")
-	}
-	expr, err := to.toExpr()
-	if err != nil {
-		return nil, err
-	}
-	other := subscript{
-		expr:  expr,
-		index: i.index,
-	}
-	return other, nil
+	return expr, err
 }
 
 func (i subscript) subscriptHashmap(ctx Context, arr hashmap) (Expr, error) {
@@ -1186,7 +1151,7 @@ func (i subscript) subscriptHashmap(ctx Context, arr hashmap) (Expr, error) {
 		sub Expr
 		ok  bool
 	)
-	index, err := i.at()
+	index, err := i.at(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -1214,7 +1179,7 @@ func (i subscript) subscriptHashmap(ctx Context, arr hashmap) (Expr, error) {
 }
 
 func (i subscript) subscriptArray(ctx Context, arr array) (Expr, error) {
-	index, err := i.at()
+	index, err := i.at(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -1229,7 +1194,21 @@ func (i subscript) subscriptArray(ctx Context, arr array) (Expr, error) {
 	return arr.all[x], nil
 }
 
-func (i subscript) at() (any, error) {
+func (i subscript) validIndex() error {
+	switch i.index.(type) {
+	case literal:
+	case number:
+	case identifier:
+	default:
+		return fmt.Errorf("expression can not be used as index")
+	}
+	return nil
+}
+
+func (i subscript) at(ctx Context) (any, error) {
+	if err := i.validIndex(); err != nil {
+		return nil, err
+	}
 	index, err := i.index.find(ctx)
 	if err != nil {
 		return nil, err

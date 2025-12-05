@@ -303,6 +303,10 @@ func TestArrayMap(t *testing.T) {
 			Want:  []string{"2"},
 		},
 		{
+			Query: "[[1, [7, 8], 3], [4, 5, 6]](1)(2)(1)",
+			Want:  []string{"7"},
+		},
+		{
 			Query: "array{1, 2, 3}(79)",
 			Want:  []string{},
 		},
