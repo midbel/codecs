@@ -26,6 +26,9 @@ func TestCompile(t *testing.T) {
 		"let $arr3 := map{'name': 'foobar', 'answer': 42} return $arr3('answer')",
 		"let $arr4 := map{'name': 'foobar', 'answer': 42}, $key := 'name' return $arr4($key)",
 		"let $arr5 := map{'name': 'foobar', 'foobar': map{'answer': 42}} return $arr5('foobar')('answer')",
+		"map{'name' : 'foobar'}[?name = 'foobar']",
+		"map{'name' : 'foobar'}?name",
+		"[1, 2, 3]? 1",
 	}
 	for _, str := range tests {
 		_, err := CompileString(str)

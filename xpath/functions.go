@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"maps"
 	"math"
 	"net/http"
 	"os"
@@ -229,16 +230,16 @@ var builtins = []registeredBuiltin{
 	registerFunc("subarray", "array", callXYZ),
 	registerFunc("tail", "array", callXYZ),
 	// map functions
-	registerFunc("contains", "map", callXYZ),
-	registerFunc("entry", "map", callXYZ),
-	registerFunc("find", "map", callXYZ),
-	registerFunc("for-each", "map", callXYZ),
-	registerFunc("get", "map", callXYZ),
-	registerFunc("keys", "map", callXYZ),
-	registerFunc("merge", "map", callXYZ),
-	registerFunc("put", "map", callXYZ),
-	registerFunc("remove", "map", callXYZ),
-	registerFunc("size", "map", callXYZ),
+	registerFunc("contains", "map", callContainsMap),
+	registerFunc("entry", "map", calEntryMap),
+	registerFunc("find", "map", callFindMap),
+	registerFunc("for-each", "map", callForeachMap),
+	registerFunc("get", "map", callGetMap),
+	registerFunc("keys", "map", callKeysMap),
+	registerFunc("merge", "map", callMergeMap),
+	registerFunc("put", "map", callPutMap),
+	registerFunc("remove", "map", callRemoveMap),
+	registerFunc("size", "map", callSizeMap),
 	// constructor functions
 	registerFunc("string", "xs", callConstructor(xsString)),
 	registerFunc("decimal", "xs", callConstructor(xsDecimal)),
@@ -1528,6 +1529,86 @@ func callDoc(ctx Context, args []Expr) (Sequence, error) {
 		return nil, err
 	}
 	return Singleton(n), nil
+}
+
+func callContainsMap(ctx Context, args []Expr) (Sequence, error) {
+	if len(args) != 1 {
+		return nil, ErrArgument
+	}
+	arr, ok := args[0].(hashmap)
+	if !ok {
+		return nil, ErrType
+	}
+	_, ok = arr.values[args[1]]
+	return Singleton(ok), nil
+}
+
+func calEntryMap(ctx Context, args []Expr) (Sequence, error) {
+	return nil, nil
+}
+
+func callFindMap(ctx Context, args []Expr) (Sequence, error) {
+	return nil, nil
+}
+
+func callForeachMap(ctx Context, args []Expr) (Sequence, error) {
+	return nil, nil
+}
+
+func callGetMap(ctx Context, args []Expr) (Sequence, error) {
+	if len(args) != 2 {
+		return nil, ErrArgument
+	}
+	arr, ok := args[0].(hashmap)
+	if !ok {
+		return nil, ErrType
+	}
+	return arr.values[args[1]].find(ctx)
+}
+
+func callKeysMap(ctx Context, args []Expr) (Sequence, error) {
+	if len(args) != 1 {
+		return nil, ErrArgument
+	}
+	arr, ok := args[0].(hashmap)
+	if !ok {
+		return nil, ErrType
+	}
+	var seq Sequence
+	for k := range maps.Keys(arr.values) {
+		i, err := k.find(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if i.Empty() || !i.Singleton() {
+			return nil, fmt.Errorf("invalid map key")
+		}
+		seq.Append(i.First())
+	}
+	return seq, nil
+}
+
+func callMergeMap(ctx Context, args []Expr) (Sequence, error) {
+	return nil, nil
+}
+
+func callPutMap(ctx Context, args []Expr) (Sequence, error) {
+	return nil, nil
+}
+
+func callRemoveMap(ctx Context, args []Expr) (Sequence, error) {
+	return nil, nil
+}
+
+func callSizeMap(ctx Context, args []Expr) (Sequence, error) {
+	if len(args) != 1 {
+		return nil, ErrArgument
+	}
+	arr, ok := args[0].(hashmap)
+	if !ok {
+		return nil, ErrType
+	}
+	return Singleton(len(arr.values)), nil
 }
 
 func callConstructor(xt XdmType) BuiltinFunc {
