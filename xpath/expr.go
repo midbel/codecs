@@ -1147,14 +1147,11 @@ func (i subscript) subscriptExpr(ctx Context, expr Expr) (Expr, error) {
 }
 
 func (i subscript) subscriptHashmap(ctx Context, arr hashmap) (Expr, error) {
-	var (
-		sub Expr
-		ok  bool
-	)
 	index, err := i.at(ctx)
 	if err != nil {
 		return nil, err
 	}
+	var sub Expr
 	switch v := index.(type) {
 	case string:
 		sub = literal{
@@ -1171,11 +1168,7 @@ func (i subscript) subscriptHashmap(ctx Context, arr hashmap) (Expr, error) {
 	default:
 		return nil, fmt.Errorf("map key can only be atomic value")
 	}
-	sub, ok = arr.values[sub]
-	if !ok {
-		return nil, nil
-	}
-	return sub, nil
+	return arr.values[sub], nil
 }
 
 func (i subscript) subscriptArray(ctx Context, arr array) (Expr, error) {
