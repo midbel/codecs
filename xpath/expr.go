@@ -1101,9 +1101,23 @@ func (u union) find(ctx Context) (Sequence, error) {
 	return left.Unique(), nil
 }
 
+type lookup struct {
+	expr Expr
+	key  Expr
+}
+
+func (i lookup) Find(node xml.Node) (Sequence, error) {
+	return i.find(defaultContext(node))
+}
+
+func (i lookup) find(ctx Context) (Sequence, error) {
+	return nil, nil
+}
+
 type subscript struct {
-	expr  Expr
-	index Expr
+	expr   Expr
+	index  Expr
+	lookup bool
 }
 
 func (i subscript) Find(node xml.Node) (Sequence, error) {

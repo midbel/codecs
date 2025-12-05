@@ -130,8 +130,9 @@ func createCompiler(r io.Reader) *Compiler {
 		opInstanceOf: cp.compileInstanceOf,
 	}
 	cp.postfix = map[rune]func(Expr) (Expr, error){
-		begPred: cp.compileFilter,
-		begGrp:  cp.compileCall,
+		begPred:    cp.compileFilter,
+		begGrp:     cp.compileCall,
+		opQuestion: cp.compileLookupPostfix,
 	}
 	cp.prefix = map[rune]func() (Expr, error){
 		begPred:    cp.compileArray,
@@ -148,6 +149,7 @@ func createCompiler(r io.Reader) *Compiler {
 		opMul:      cp.compileName,
 		begGrp:     cp.compileSequence,
 		reserved:   cp.compileReservedPrefix,
+		opQuestion: cp.compileLookupPrefix,
 	}
 
 	for prefix, ns := range defaultNS {
@@ -208,6 +210,32 @@ func (c *Compiler) compileReservedPrefix() (Expr, error) {
 	default:
 		return c.compileName()
 	}
+}
+
+func (c *Compiler) compileLookupPrefix() (Expr, error) {
+	c.next()
+	key, err := c.compileQName()
+	if err != nil {
+		return nil, err
+	}
+	expr := lookup{
+		expr: current{},
+		key:  key,
+	}
+	return expr, nil
+}
+
+func (c *Compiler) compileLookupPostfix(left Expr) (Expr, error) {
+	c.next()
+	index, err := c.compileExpr(powLowest)
+	if err != nil {
+		return nil, err
+	}
+	expr := lookup{
+		expr: left,
+		key:  index,
+	}
+	return expr, nil
 }
 
 func (c *Compiler) compileMap() (Expr, error) {
