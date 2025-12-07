@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/midbel/codecs/cmd/cli"
+	"github.com/midbel/cli"
 )
 
 var formatCmd = cli.Command{

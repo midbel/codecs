@@ -4,7 +4,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/midbel/codecs/cmd/cli"
+	"github.com/midbel/cli"
 	"github.com/midbel/codecs/xslt"
 )
 

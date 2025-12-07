@@ -1,2 +1,4 @@
-github.com/midbel/distance v0.1.0 h1:AuhNiidCDy2Sxb9FMdFUuFasOIYIhFH0ADNTB8PyJk0=
-github.com/midbel/distance v0.1.0/go.mod h1:HhnNVr4IVXXDr7Xfp+38z+nPWNpo1EjOnX4qfLQHl08=
+github.com/midbel/cli v0.4.2 h1:pQNrZYq0OjBoec17ML4YxmXMmvK2lREj0853VddA3E8=
+github.com/midbel/cli v0.4.2/go.mod h1:X4Np/w6TSQUoTt1eUom0GOeasASIXCGPoy8O5sgsRzo=
+github.com/midbel/distance v0.1.2 h1:+Uoze5/AagC/usXHWfi3JQ5IWrq2KbzZyc8nJlHOJGA=
+github.com/midbel/distance v0.1.2/go.mod h1:XiAeb7yJ5fEUgFn9nm/6sa77UEVK3UtDxW+mPSApljI=

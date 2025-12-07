@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/midbel/codecs/cmd/cli"
+	"github.com/midbel/cli"
 )
 
 var compareCmd = cli.Command{

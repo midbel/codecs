@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/midbel/codecs/cmd/cli"
+	"github.com/midbel/cli"
 )
 
 var errFail = errors.New("fail")
