@@ -13,106 +13,57 @@ var (
 	ErrDiscard = errors.New("discard")
 )
 
-type (
-	OnNodeFunc    func(*Reader, Node) error
-	OnElementFunc func(*Reader, *Element, bool) error
-	OnInstrFunc   func(*Reader, *Instruction) error
-	OnTextFunc    func(*Reader, string) error
-)
+type OnElementFunc func(*Reader, *Element) error
+
+type OnTextFunc func(*Reader, string) error
+
+type OnNodeFunc func(*Reader, Node) error
+
+type OnSet struct {
+	onOpen  map[QName]OnElementFunc
+	onClose map[QName]OnElementFunc
+	onNode  map[NodeType]OnNodeFunc
+	onText  OnTextFunc
+}
 
 type Reader struct {
 	scan *Scanner
 	curr Token
 	peek Token
 
-	openEls   map[QName]OnElementFunc
-	closedEls map[QName]OnElementFunc
-	instrEls  map[QName]OnInstrFunc
-	textEls   map[QName]OnTextFunc
-	nodes     map[NodeType]OnNodeFunc
-
-	parent *Reader
+	stack []OnSet
 }
 
 func NewReader(r io.Reader) *Reader {
 	rs := Reader{
-		scan:      Scan(r),
-		closedEls: make(map[QName]OnElementFunc),
-		openEls:   make(map[QName]OnElementFunc),
-		instrEls:  make(map[QName]OnInstrFunc),
-		textEls:   make(map[QName]OnTextFunc),
-		nodes:     make(map[NodeType]OnNodeFunc),
+		scan: Scan(r),
 	}
+	rs.Push()
 	rs.next()
 	rs.next()
 	return &rs
-}
-
-func (r *Reader) Sub() *Reader {
-	rs := Reader{
-		scan:      r.scan,
-		curr:      r.curr,
-		peek:      r.peek,
-		closedEls: make(map[QName]OnElementFunc),
-		openEls:   make(map[QName]OnElementFunc),
-		instrEls:  make(map[QName]OnInstrFunc),
-		textEls:   make(map[QName]OnTextFunc),
-		nodes:     make(map[NodeType]OnNodeFunc),
-		parent:    r,
-	}
-	return &rs
-}
-
-func (r *Reader) OnNode(kind NodeType, fn OnNodeFunc) {
-	r.nodes[kind] = fn
-}
-
-func (r *Reader) ClearNodeFunc(kind NodeType) {
-	delete(r.nodes, kind)
-}
-
-func (r *Reader) OnElement(name QName, fn OnElementFunc) {
-	r.OnElementOpen(name, fn)
-	r.OnElementClosed(name, fn)
-}
-
-func (r *Reader) ClearElementFunc(name QName) {
-	r.ClearElementOpenFunc(name)
-	r.ClearElementClosedFunc(name)
-}
-
-func (r *Reader) OnElementOpen(name QName, fn OnElementFunc) {
-	r.openEls[name] = fn
-}
-
-func (r *Reader) OnElementClosed(name QName, fn OnElementFunc) {
-	r.closedEls[name] = fn
-}
-
-func (r *Reader) ClearElementOpenFunc(name QName) {
-	delete(r.openEls, name)
-}
-
-func (r *Reader) ClearElementClosedFunc(name QName) {
-	delete(r.closedEls, name)
 }
 
 func (r *Reader) Start() error {
 	for {
-		var closed bool
 		node, err := r.Read()
-		if closed = errors.Is(err, ErrClosed); !closed && err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		if err != nil && !errors.Is(err, ErrClosed) {
 			return err
 		}
-		if err = r.emit(node, closed); err != nil {
+		closed := errors.Is(err, ErrClosed)
+
+		if err := r.dispatch(node, closed); err != nil {
 			if errors.Is(err, ErrBreak) {
 				break
 			}
-			if !closed && errors.Is(err, ErrDiscard) {
-				err = r.discard(node)
+			if errors.Is(err, ErrDiscard) && !closed {
+				if err := r.discard(node); err != nil {
+					return err
+				}
+				continue
 			}
 			return err
 		}
@@ -120,79 +71,28 @@ func (r *Reader) Start() error {
 	return nil
 }
 
-func (r *Reader) discard(node Node) error {
-	for {
-		n, err := r.Read()
-		if errors.Is(err, ErrClosed) {
-			if n.QualifiedName() == node.QualifiedName() {
-				break
-			}
-			continue
-		}
-		if err != nil {
-			return err
-		}
+func (r *Reader) OnText(fn OnTextFunc) {
+	if i := len(r.stack) - 1; i >= 0 {
+		r.stack[i].onText = fn
 	}
-	return nil
 }
 
-func (r *Reader) emit(node Node, closed bool) error {
-	if fn, ok := r.getNodeFunc(node.Type()); ok {
-		if err := fn(r, node); err != nil {
-			return err
-		}
+func (r *Reader) OnOpen(name QName, fn OnElementFunc) {
+	if i := len(r.stack) - 1; i >= 0 {
+		r.stack[i].onOpen[name] = fn
 	}
-	switch n := node.(type) {
-	case *Element:
-		var (
-			fn OnElementFunc
-			ok bool
-		)
-		if closed {
-			fn, ok = r.getClosedElementFunc(n.QName)
-		} else {
-			fn, ok = r.getOpenElementFunc(n.QName)
-		}
-		if ok {
-			return fn(r, n, closed)
-		}
-	default:
-		// pass
-	}
-	return nil
 }
 
-func (r *Reader) getOpenElementFunc(name QName) (OnElementFunc, bool) {
-	fn, ok := r.openEls[name]
-	if ok {
-		return fn, ok
+func (r *Reader) OnClose(name QName, fn OnElementFunc) {
+	if i := len(r.stack) - 1; i >= 0 {
+		r.stack[i].onClose[name] = fn
 	}
-	if r.parent != nil {
-		return r.parent.getOpenElementFunc(name)
-	}
-	return nil, false
 }
 
-func (r *Reader) getClosedElementFunc(name QName) (OnElementFunc, bool) {
-	fn, ok := r.closedEls[name]
-	if ok {
-		return fn, ok
+func (r *Reader) OnNode(kind NodeType, fn OnNodeFunc) {
+	if i := len(r.stack) - 1; i >= 0 {
+		r.stack[i].onNode[kind] = fn
 	}
-	if r.parent != nil {
-		return r.parent.getClosedElementFunc(name)
-	}
-	return nil, false
-}
-
-func (r *Reader) getNodeFunc(kind NodeType) (OnNodeFunc, bool) {
-	fn, ok := r.nodes[kind]
-	if ok {
-		return fn, ok
-	}
-	if r.parent != nil {
-		return r.parent.getNodeFunc(kind)
-	}
-	return nil, false
 }
 
 func (r *Reader) Read() (Node, error) {
@@ -223,6 +123,123 @@ func (r *Reader) Read() (Node, error) {
 	default:
 		return nil, r.createError("reader", "unexpected element type")
 	}
+}
+
+func (r *Reader) Push() {
+	s := OnSet{
+		onOpen:  make(map[QName]OnElementFunc),
+		onClose: make(map[QName]OnElementFunc),
+		onNode:  make(map[NodeType]OnNodeFunc),
+	}
+	r.stack = append(r.stack, s)
+}
+
+func (r *Reader) Pop() {
+	if i := len(r.stack); i > 1 {
+		r.stack = r.stack[:i-1]
+	}
+}
+
+func (r *Reader) dispatch(node Node, closed bool) error {
+	if err := r.dispatchNode(node); err != nil {
+		return err
+	}
+	var err error
+	switch e := node.(type) {
+	case *Element:
+		if closed {
+			err = r.dispatchClose(e)
+		} else {
+			err = r.dispatchOpen(e)
+		}
+	case *Instruction:
+	case *Text:
+		err = r.dispatchText(e.Content)
+	case *CharData:
+		err = r.dispatchText(e.Content)
+	default:
+	}
+	return err
+}
+
+func (r *Reader) dispatchNode(node Node) error {
+	for i := len(r.stack) - 1; i >= 0; i-- {
+		fn, ok := r.stack[i].onNode[node.Type()]
+		if ok {
+			if err := fn(r, node); err != nil {
+				return err
+			}
+			break
+		}
+	}
+	return nil
+}
+
+func (r *Reader) dispatchOpen(elem *Element) error {
+	for i := len(r.stack) - 1; i >= 0; i-- {
+		fn, ok := r.stack[i].onOpen[elem.QName]
+		if ok {
+			if err := fn(r, elem); err != nil {
+				return err
+			}
+			break
+		}
+	}
+	return nil
+}
+
+func (r *Reader) dispatchClose(elem *Element) error {
+	for i := len(r.stack) - 1; i >= 0; i-- {
+		fn, ok := r.stack[i].onClose[elem.QName]
+		if ok {
+			if err := fn(r, elem); err != nil {
+				return err
+			}
+			break
+		}
+	}
+	return nil
+}
+
+func (r *Reader) dispatchText(str string) error {
+	for i := len(r.stack) - 1; i >= 0; i-- {
+		fn := r.stack[i].onText
+		if fn != nil {
+			if err := fn(r, str); err != nil {
+				return err
+			}
+			break
+		}
+	}
+	return nil
+}
+
+func (r *Reader) discard(node Node) error {
+	if _, ok := node.(*Element); !ok {
+		return nil
+	}
+	var depth int
+	depth++
+	for depth > 0 {
+		n, err := r.Read()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return io.ErrUnexpectedEOF
+			}
+			if errors.Is(err, ErrClosed) {
+				_, ok := n.(*Element)
+				if ok && n.QualifiedName() == node.QualifiedName() {
+					depth--
+				}
+				continue
+			}
+			return err
+		}
+		if _, ok := n.(*Element); ok {
+			depth++
+		}
+	}
+	return nil
 }
 
 func (r *Reader) readPI() (Node, error) {
@@ -372,11 +389,6 @@ func (r *Reader) is(kind rune) bool {
 func (r *Reader) next() {
 	r.curr = r.peek
 	r.peek = r.scan.Scan()
-
-	if r.parent != nil {
-		r.parent.curr = r.curr
-		r.parent.peek = r.peek
-	}
 }
 
 func (r *Reader) createError(elem, msg string) error {
