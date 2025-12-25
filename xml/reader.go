@@ -95,6 +95,17 @@ func (r *Reader) OnNode(kind NodeType, fn OnNodeFunc) {
 	}
 }
 
+func (r *Reader) Element(name QName, fn OnElementFunc) {
+	r.OnOpen(name, func(rs *Reader, el *Element) error {
+		rs.Push()
+		return fn(rs, el)
+	})
+	r.OnClose(name, func(rs *Reader, _ *Element) error {
+		rs.Pop()
+		return nil
+	})
+}
+
 func (r *Reader) Read() (Node, error) {
 	if r.done() {
 		return nil, io.EOF
