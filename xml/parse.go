@@ -753,15 +753,17 @@ func (s *Scanner) scanEntity() string {
 
 func (s *Scanner) scanLiteral(tok *Token) {
 	for !s.done() && s.char != langle {
-		s.write()
-		s.read()
 		if s.char == ampersand {
 			str := s.scanEntity()
 			if str == "" {
 				break
 			}
 			s.str.WriteString(str)
+		} else {
+			s.write()
+			s.read()
 		}
+
 	}
 	tok.Type = Literal
 	tok.Literal = s.str.String()
