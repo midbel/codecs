@@ -13,16 +13,57 @@ var (
 	ErrDiscard = errors.New("discard")
 )
 
-type OnElementFunc func(*Reader, *Element) error
+func isClosed(err error) bool {
+	return errors.Is(err, ErrClosed)
+}
+
+// Element
+type E struct {
+	QName
+	Type       NodeType
+	Attrs      []A
+	SelfClosed bool
+}
+
+func (e E) GetAttribute(name string) A {
+	i := slices.IndexFunc(e.Attrs, func(a A) bool {
+		return a.Name == name
+	})
+	var a A
+	if i >= 0 {
+		a = e.Attrs[i]
+	}
+	return a
+}
+
+func (e E) GetAttributeValue(name string) string {
+	a := e.GetAttribute(name)
+	return a.Value
+}
+
+// Attribute
+type A struct {
+	QName
+	Value string
+}
+
+// Text or CharData
+type T struct {
+	Content string
+}
+
+// Comment
+type C struct {
+	Content string
+}
+
+type OnElementFunc func(*Reader, E) error
 
 type OnTextFunc func(*Reader, string) error
-
-type OnNodeFunc func(*Reader, Node) error
 
 type OnSet struct {
 	onOpen  map[QName]OnElementFunc
 	onClose map[QName]OnElementFunc
-	onNode  map[NodeType]OnNodeFunc
 	onText  OnTextFunc
 }
 
@@ -50,10 +91,10 @@ func (r *Reader) Start() error {
 		if errors.Is(err, io.EOF) {
 			return nil
 		}
-		if err != nil && !errors.Is(err, ErrClosed) {
+		if err != nil && !isClosed(err) {
 			return err
 		}
-		closed := errors.Is(err, ErrClosed)
+		closed := isClosed(err)
 
 		if err := r.dispatch(node, closed); err != nil {
 			if errors.Is(err, ErrBreak) {
@@ -89,24 +130,18 @@ func (r *Reader) OnClose(name QName, fn OnElementFunc) {
 	}
 }
 
-func (r *Reader) OnNode(kind NodeType, fn OnNodeFunc) {
-	if i := len(r.stack) - 1; i >= 0 {
-		r.stack[i].onNode[kind] = fn
-	}
-}
-
 func (r *Reader) Element(name QName, fn OnElementFunc) {
-	r.OnOpen(name, func(rs *Reader, el *Element) error {
+	r.OnOpen(name, func(rs *Reader, el E) error {
 		rs.Push()
 		return fn(rs, el)
 	})
-	r.OnClose(name, func(rs *Reader, _ *Element) error {
+	r.OnClose(name, func(rs *Reader, _ E) error {
 		rs.Pop()
 		return nil
 	})
 }
 
-func (r *Reader) Read() (Node, error) {
+func (r *Reader) Read() (any, error) {
 	if r.done() {
 		return nil, io.EOF
 	}
@@ -126,8 +161,7 @@ func (r *Reader) Read() (Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		txt, ok := node.(*Text)
-		if ok && txt.Content == "" {
+		if node.Content == "" {
 			return r.Read()
 		}
 		return node, nil
@@ -140,7 +174,6 @@ func (r *Reader) Push() {
 	s := OnSet{
 		onOpen:  make(map[QName]OnElementFunc),
 		onClose: make(map[QName]OnElementFunc),
-		onNode:  make(map[NodeType]OnNodeFunc),
 	}
 	r.stack = append(r.stack, s)
 }
@@ -151,42 +184,31 @@ func (r *Reader) Pop() {
 	}
 }
 
-func (r *Reader) dispatch(node Node, closed bool) error {
-	if err := r.dispatchNode(node); err != nil {
-		return err
-	}
+func (r *Reader) dispatch(node any, closed bool) error {
 	var err error
 	switch e := node.(type) {
-	case *Element:
+	case E:
 		if closed {
+			if e.SelfClosed {
+				err = r.dispatchOpen(e)
+				if err != nil {
+					return err
+				}
+			}
 			err = r.dispatchClose(e)
 		} else {
 			err = r.dispatchOpen(e)
 		}
-	case *Instruction:
-	case *Text:
+	case T:
 		err = r.dispatchText(e.Content)
-	case *CharData:
+	case C:
 		err = r.dispatchText(e.Content)
 	default:
 	}
 	return err
 }
 
-func (r *Reader) dispatchNode(node Node) error {
-	for i := len(r.stack) - 1; i >= 0; i-- {
-		fn, ok := r.stack[i].onNode[node.Type()]
-		if ok {
-			if err := fn(r, node); err != nil {
-				return err
-			}
-			break
-		}
-	}
-	return nil
-}
-
-func (r *Reader) dispatchOpen(elem *Element) error {
+func (r *Reader) dispatchOpen(elem E) error {
 	for i := len(r.stack) - 1; i >= 0; i-- {
 		fn, ok := r.stack[i].onOpen[elem.QName]
 		if ok {
@@ -199,7 +221,7 @@ func (r *Reader) dispatchOpen(elem *Element) error {
 	return nil
 }
 
-func (r *Reader) dispatchClose(elem *Element) error {
+func (r *Reader) dispatchClose(elem E) error {
 	for i := len(r.stack) - 1; i >= 0; i-- {
 		fn, ok := r.stack[i].onClose[elem.QName]
 		if ok {
@@ -225,8 +247,9 @@ func (r *Reader) dispatchText(str string) error {
 	return nil
 }
 
-func (r *Reader) discard(node Node) error {
-	if _, ok := node.(*Element); !ok {
+func (r *Reader) discard(node any) error {
+	root, ok := node.(E)
+	if !ok {
 		return nil
 	}
 	var depth int
@@ -238,27 +261,27 @@ func (r *Reader) discard(node Node) error {
 				return io.ErrUnexpectedEOF
 			}
 			if errors.Is(err, ErrClosed) {
-				_, ok := n.(*Element)
-				if ok && n.QualifiedName() == node.QualifiedName() {
+				a, ok := n.(E)
+				if ok && a.QualifiedName() == root.QualifiedName() {
 					depth--
 				}
 				continue
 			}
 			return err
 		}
-		if _, ok := n.(*Element); ok {
+		if _, ok := n.(E); ok {
 			depth++
 		}
 	}
 	return nil
 }
 
-func (r *Reader) readPI() (Node, error) {
+func (r *Reader) readPI() (E, error) {
 	r.next()
+	var elem E
 	if !r.is(Name) {
-		return nil, r.createError("processing instruction", "name is missing")
+		return elem, r.createError("processing instruction", "name is missing")
 	}
-	var elem Instruction
 	elem.Name = r.curr.Literal
 	r.next()
 	var err error
@@ -266,19 +289,19 @@ func (r *Reader) readPI() (Node, error) {
 		return r.is(ProcInstTag)
 	})
 	if err != nil {
-		return nil, err
+		return elem, err
 	}
 	if !r.is(ProcInstTag) {
-		return nil, r.createError("processing instruction", "end of element expected")
+		return elem, r.createError("processing instruction", "end of element expected")
 	}
 	r.next()
-	return &elem, nil
+	return elem, nil
 }
 
-func (r *Reader) readStartElement() (Node, error) {
+func (r *Reader) readStartElement() (E, error) {
 	r.next()
 	var (
-		elem Element
+		elem E
 		err  error
 	)
 	if r.is(Namespace) {
@@ -286,7 +309,7 @@ func (r *Reader) readStartElement() (Node, error) {
 		r.next()
 	}
 	if !r.is(Name) {
-		return nil, r.createError("element", "name is missing")
+		return elem, r.createError("element", "name is missing")
 	}
 	elem.Name = r.curr.Literal
 	r.next()
@@ -295,47 +318,48 @@ func (r *Reader) readStartElement() (Node, error) {
 		return r.is(EndTag) || r.is(EmptyElemTag)
 	})
 	if err != nil {
-		return nil, err
+		return elem, err
 	}
 	switch {
 	case r.is(EmptyElemTag) || r.is(EndTag):
 		if r.is(EmptyElemTag) {
+			elem.SelfClosed = true
 			err = ErrClosed
 		}
 		r.next()
-		return &elem, err
+		return elem, err
 	default:
-		return nil, r.createError("element", "end of element expected")
+		return elem, r.createError("element", "end of element expected")
 	}
 }
 
-func (r *Reader) readEndElement() (Node, error) {
+func (r *Reader) readEndElement() (E, error) {
 	r.next()
-	var elem Element
+	var elem E
 	if r.is(Namespace) {
 		elem.Space = r.curr.Literal
 		r.next()
 	}
 	if !r.is(Name) {
-		return nil, r.createError("element", "name is missing")
+		return elem, r.createError("element", "name is missing")
 	}
 	elem.Name = r.curr.Literal
 	r.next()
 	if !r.is(EndTag) {
-		return nil, r.createError("element", "end of element expected")
+		return elem, r.createError("element", "end of element expected")
 	}
 	r.next()
-	return &elem, ErrClosed
+	return elem, ErrClosed
 }
 
-func (r *Reader) readAttributes(done func() bool) ([]Attribute, error) {
-	var attrs []Attribute
+func (r *Reader) readAttributes(done func() bool) ([]A, error) {
+	var attrs []A
 	for !r.done() && !done() {
 		attr, err := r.readAttr()
 		if err != nil {
 			return nil, err
 		}
-		ok := slices.ContainsFunc(attrs, func(a Attribute) bool {
+		ok := slices.ContainsFunc(attrs, func(a A) bool {
 			return attr.QualifiedName() == a.QualifiedName()
 		})
 		if ok {
@@ -346,8 +370,8 @@ func (r *Reader) readAttributes(done func() bool) ([]Attribute, error) {
 	return attrs, nil
 }
 
-func (r *Reader) readAttr() (Attribute, error) {
-	var attr Attribute
+func (r *Reader) readAttr() (A, error) {
+	var attr A
 	if r.is(Namespace) {
 		attr.Space = r.curr.Literal
 		r.next()
@@ -360,33 +384,33 @@ func (r *Reader) readAttr() (Attribute, error) {
 	if !r.is(Literal) {
 		return attr, r.createError("attribute", "value is missing")
 	}
-	attr.Datum = r.curr.Literal
+	attr.Value = r.curr.Literal
 	r.next()
 	return attr, nil
 }
 
-func (r *Reader) readComment() (Node, error) {
+func (r *Reader) readComment() (C, error) {
 	defer r.next()
-	node := Comment{
+	node := C{
 		Content: r.curr.Literal,
 	}
-	return &node, nil
+	return node, nil
 }
 
-func (r *Reader) readChardata() (Node, error) {
+func (r *Reader) readChardata() (T, error) {
 	defer r.next()
-	char := CharData{
+	char := T{
 		Content: strings.TrimSpace(r.curr.Literal),
 	}
-	return &char, nil
+	return char, nil
 }
 
-func (r *Reader) readLiteral() (Node, error) {
+func (r *Reader) readLiteral() (T, error) {
 	defer r.next()
-	text := Text{
+	text := T{
 		Content: strings.TrimSpace(r.curr.Literal),
 	}
-	return &text, nil
+	return text, nil
 }
 
 func (r *Reader) done() bool {
