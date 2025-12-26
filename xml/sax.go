@@ -1,7 +1,9 @@
 package xml
 
 import (
+	"bufio"
 	"errors"
+	"fmt"
 	"io"
 	"slices"
 	"strings"
@@ -65,6 +67,111 @@ type OnSet struct {
 	onOpen  map[QName]OnElementFunc
 	onClose map[QName]OnElementFunc
 	onText  OnTextFunc
+}
+
+type StreamWriter struct {
+	writer *bufio.Writer
+	stack  []QName
+}
+
+func Stream(w io.Writer) (*StreamWriter, error) {
+	sw := StreamWriter{
+		writer: bufio.NewWriter(w),
+	}
+	return &sw, sw.prolog()
+}
+
+func (w *StreamWriter) Flush() error {
+	return w.writer.Flush()
+}
+
+func (w *StreamWriter) Empty(qn QName, attrs []A) error {
+	return w.open(qn, attrs, true)
+}
+
+func (w *StreamWriter) Open(qn QName, attrs []A) error {
+	return w.open(qn, attrs, false)
+}
+
+func (w *StreamWriter) Close(qn QName) error {
+	if err := w.pop(qn); err != nil {
+		return err
+	}
+	w.writer.WriteRune(langle)
+	w.writer.WriteRune(slash)
+	w.writer.WriteString(qn.QualifiedName())
+	w.writer.WriteRune(rangle)
+	return nil
+}
+
+func (w *StreamWriter) Text(str string) error {
+	_, err := w.writer.WriteString(escapeText(str))
+	return err
+}
+
+func (w *StreamWriter) NL() error {
+	_, err := w.writer.WriteRune('\n')
+	return err
+}
+
+func (w *StreamWriter) push(qn QName) {
+	w.stack = append(w.stack, qn)
+}
+
+func (w *StreamWriter) pop(qn QName) error {
+	size := len(w.stack)
+	if size == 0 {
+		return fmt.Errorf("%s: can not be closed without being open", qn.QualifiedName())
+	}
+	if w.stack[size-1] != qn {
+		return fmt.Errorf("element name mismatched!")
+	}
+	w.stack = w.stack[:size-1]
+	return nil
+}
+
+func (w *StreamWriter) open(qn QName, attrs []A, closed bool) error {
+	if !closed {
+		w.push(qn)
+	}
+	w.writer.WriteRune(langle)
+	w.writer.WriteString(qn.QualifiedName())
+	for _, a := range attrs {
+		w.writer.WriteRune(' ')
+		w.writer.WriteString(a.QualifiedName())
+		w.writer.WriteRune(equal)
+		w.writer.WriteRune(quote)
+		w.writer.WriteString(escapeText(a.Value))
+		w.writer.WriteRune(quote)
+	}
+	if closed {
+		w.writer.WriteRune(slash)
+	}
+	w.writer.WriteRune(rangle)
+	return nil
+}
+
+func (w *StreamWriter) prolog() error {
+	w.writer.WriteRune(langle)
+	w.writer.WriteRune(question)
+
+	w.writer.WriteString("xml")
+	w.writer.WriteRune(' ')
+
+	w.writer.WriteString("version")
+	w.writer.WriteRune(equal)
+	w.writer.WriteRune(quote)
+	w.writer.WriteString("1.0")
+	w.writer.WriteRune(quote)
+	w.writer.WriteRune(' ')
+	w.writer.WriteString("encoding")
+	w.writer.WriteRune(equal)
+	w.writer.WriteRune(quote)
+	w.writer.WriteString("utf-8")
+	w.writer.WriteRune(quote)
+	w.writer.WriteRune(question)
+	w.writer.WriteRune(rangle)
+	return nil
 }
 
 type Reader struct {

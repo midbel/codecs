@@ -194,4 +194,17 @@ func main() {
 			fmt.Println(">> cell", c.Type, c.Index, c.RawValue, c.ParsedValue, c.Formula)
 		}
 	}
+	sw, _ := xml.Stream(os.Stdout)
+	sw.Open(xml.LocalName("test"), nil)
+	sw.Open(xml.LocalName("foo"), []xml.A{
+		{
+			QName: xml.LocalName("id"),
+			Value: "test",
+		},
+	})
+	sw.Text("foobar")
+	sw.Close(xml.LocalName("foo"))
+	sw.Empty(xml.LocalName("bar"), nil)
+	sw.Close(xml.LocalName("test"))
+	sw.Flush()
 }
