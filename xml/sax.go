@@ -99,6 +99,24 @@ func (w *StreamWriter) Flush() error {
 	return w.writer.Flush()
 }
 
+func (w *StreamWriter) Comment(str string) error {
+	if !w.lastText {
+		w.enter()
+		defer w.leave()
+		w.NL()
+		w.writePrefix()
+	}
+	w.writer.WriteRune(langle)
+	w.writer.WriteRune(bang)
+	w.writer.WriteRune(dash)
+	w.writer.WriteRune(dash)
+	w.writer.WriteString(str)
+	w.writer.WriteRune(dash)
+	w.writer.WriteRune(dash)
+	w.writer.WriteRune(rangle)
+	return nil
+}
+
 func (w *StreamWriter) Empty(qn QName, attrs []A) error {
 	w.enter()
 	defer w.leave()

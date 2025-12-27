@@ -204,6 +204,7 @@ func main() {
 	})
 	sw.Text("foobar")
 	sw.Close(xml.LocalName("foo"))
+	sw.Comment("this is a comment!")
 	sw.Empty(xml.LocalName("bar"), nil)
 	sw.Close(xml.LocalName("test"))
 	sw.Flush()
