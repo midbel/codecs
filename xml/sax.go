@@ -70,12 +70,13 @@ type OnSet struct {
 }
 
 type StreamWriter struct {
-	writer  *bufio.Writer
-	stack   []QName
+	writer *bufio.Writer
+	stack  []QName
 
-	compact bool
-	depth   int
-	prefix  string
+	compact  bool
+	depth    int
+	prefix   string
+	lastText bool
 }
 
 func Stream(w io.Writer) (*StreamWriter, error) {
@@ -86,38 +87,53 @@ func Stream(w io.Writer) (*StreamWriter, error) {
 	return &sw, sw.prolog()
 }
 
+func Compact(w io.Writer) (*StreamWriter, error) {
+	sw, err := Stream(w)
+	if err == nil {
+		sw.compact = true
+	}
+	return sw, nil
+}
+
 func (w *StreamWriter) Flush() error {
 	return w.writer.Flush()
 }
 
 func (w *StreamWriter) Empty(qn QName, attrs []A) error {
-	// w.enter()
-	// defer w.leave()
-	// w.NL()
-	// w.writePrefix()
+	w.enter()
+	defer w.leave()
+	w.NL()
+	w.writePrefix()
 	return w.open(qn, attrs, true)
 }
 
 func (w *StreamWriter) Open(qn QName, attrs []A) error {
-	// w.enter()
-	// w.NL()
-	// w.writePrefix()
+	w.enter()
+	w.NL()
+	w.writePrefix()
 	return w.open(qn, attrs, false)
 }
 
 func (w *StreamWriter) Close(qn QName) error {
+	defer w.popText()
 	if err := w.pop(qn); err != nil {
 		return err
 	}
+	if !w.lastText {
+		w.NL()
+		w.writePrefix()
+	}
+
 	w.writer.WriteRune(langle)
 	w.writer.WriteRune(slash)
 	w.writer.WriteString(qn.QualifiedName())
 	w.writer.WriteRune(rangle)
-	// w.leave()
+	w.leave()
 	return nil
 }
 
 func (w *StreamWriter) Text(str string) error {
+	defer w.pushText()
 	_, err := w.writer.WriteString(escapeText(str))
 	return err
 }
@@ -147,6 +163,7 @@ func (w *StreamWriter) pop(qn QName) error {
 }
 
 func (w *StreamWriter) open(qn QName, attrs []A, closed bool) error {
+	defer w.popText()
 	if !closed {
 		w.push(qn)
 	}
@@ -187,6 +204,7 @@ func (w *StreamWriter) prolog() error {
 	w.writer.WriteRune(quote)
 	w.writer.WriteRune(question)
 	w.writer.WriteRune(rangle)
+	w.NL()
 	return nil
 }
 
@@ -197,6 +215,14 @@ func (w *StreamWriter) writePrefix() {
 	w.writer.WriteString(w.indent())
 }
 
+func (w *StreamWriter) pushText() {
+	w.lastText = true
+}
+
+func (w *StreamWriter) popText() {
+	w.lastText = false
+}
+
 func (w *StreamWriter) enter() {
 	w.depth++
 }
@@ -205,7 +231,6 @@ func (w *StreamWriter) leave() {
 	w.depth--
 }
 
-
 func (w *StreamWriter) indent() string {
 	if w.compact {
 		return ""
@@ -213,7 +238,7 @@ func (w *StreamWriter) indent() string {
 	if w.depth == 0 {
 		return w.prefix
 	}
-	return strings.Repeat(w.prefix, w.depth)
+	return strings.Repeat(w.prefix, w.depth-1)
 }
 
 type Reader struct {
