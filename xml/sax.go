@@ -70,13 +70,18 @@ type OnSet struct {
 }
 
 type StreamWriter struct {
-	writer *bufio.Writer
-	stack  []QName
+	writer  *bufio.Writer
+	stack   []QName
+
+	compact bool
+	depth   int
+	prefix  string
 }
 
 func Stream(w io.Writer) (*StreamWriter, error) {
 	sw := StreamWriter{
 		writer: bufio.NewWriter(w),
+		prefix: "  ",
 	}
 	return &sw, sw.prolog()
 }
@@ -86,10 +91,17 @@ func (w *StreamWriter) Flush() error {
 }
 
 func (w *StreamWriter) Empty(qn QName, attrs []A) error {
+	// w.enter()
+	// defer w.leave()
+	// w.NL()
+	// w.writePrefix()
 	return w.open(qn, attrs, true)
 }
 
 func (w *StreamWriter) Open(qn QName, attrs []A) error {
+	// w.enter()
+	// w.NL()
+	// w.writePrefix()
 	return w.open(qn, attrs, false)
 }
 
@@ -101,6 +113,7 @@ func (w *StreamWriter) Close(qn QName) error {
 	w.writer.WriteRune(slash)
 	w.writer.WriteString(qn.QualifiedName())
 	w.writer.WriteRune(rangle)
+	// w.leave()
 	return nil
 }
 
@@ -110,6 +123,9 @@ func (w *StreamWriter) Text(str string) error {
 }
 
 func (w *StreamWriter) NL() error {
+	if w.compact {
+		return nil
+	}
 	_, err := w.writer.WriteRune('\n')
 	return err
 }
@@ -172,6 +188,32 @@ func (w *StreamWriter) prolog() error {
 	w.writer.WriteRune(question)
 	w.writer.WriteRune(rangle)
 	return nil
+}
+
+func (w *StreamWriter) writePrefix() {
+	if w.compact {
+		return
+	}
+	w.writer.WriteString(w.indent())
+}
+
+func (w *StreamWriter) enter() {
+	w.depth++
+}
+
+func (w *StreamWriter) leave() {
+	w.depth--
+}
+
+
+func (w *StreamWriter) indent() string {
+	if w.compact {
+		return ""
+	}
+	if w.depth == 0 {
+		return w.prefix
+	}
+	return strings.Repeat(w.prefix, w.depth)
 }
 
 type Reader struct {
@@ -418,6 +460,7 @@ func (r *Reader) readStartElement() (E, error) {
 	if !r.is(Name) {
 		return elem, r.createError("element", "name is missing")
 	}
+	elem.Type = TypeElement
 	elem.Name = r.curr.Literal
 	r.next()
 
@@ -450,6 +493,7 @@ func (r *Reader) readEndElement() (E, error) {
 	if !r.is(Name) {
 		return elem, r.createError("element", "name is missing")
 	}
+	elem.Type = TypeElement
 	elem.Name = r.curr.Literal
 	r.next()
 	if !r.is(EndTag) {

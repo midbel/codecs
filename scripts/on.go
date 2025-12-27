@@ -54,7 +54,7 @@ func New(r io.Reader, sharedStrings []string) *Reader {
 }
 
 func (r *Reader) Parse() (*Sheet, error) {
-	r.reader.OnClose(xml.LocalName("dimension"), r.onDimension)
+	r.reader.Element(xml.LocalName("dimension"), r.onDimension)
 	r.reader.Element(xml.LocalName("row"), r.onRow)
 	r.reader.Element(xml.LocalName("c"), r.onCell)
 	return r.sheet, r.reader.Start()
