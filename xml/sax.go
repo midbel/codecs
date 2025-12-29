@@ -61,15 +61,14 @@ type C struct {
 
 type OnElementFunc func(*Reader, E) error
 
-type OnNodeFunc func(*Reader, E) error
-
 type OnTextFunc func(*Reader, string) error
 
 type OnSet struct {
-	onOpen  map[QName]OnElementFunc
-	onClose map[QName]OnElementFunc
-	onNode map[NodeType]OnNodeFunc
-	onText  OnTextFunc
+	onOpen     map[QName]OnElementFunc
+	onClose    map[QName]OnElementFunc
+	onOpenAny  OnElementFunc
+	onCloseAny OnElementFunc
+	onText     OnTextFunc
 }
 
 type StreamWriter struct {
@@ -282,6 +281,9 @@ func NewReader(r io.Reader) *Reader {
 }
 
 func (r *Reader) Start() error {
+	if err := r.start(); err != nil {
+		return err
+	}
 	for {
 		node, err := r.Read()
 		if errors.Is(err, io.EOF) {
@@ -290,8 +292,8 @@ func (r *Reader) Start() error {
 		if err != nil && !isClosed(err) {
 			return err
 		}
-		closed := isClosed(err)
 
+		closed := isClosed(err)
 		if err := r.dispatch(node, closed); err != nil {
 			if errors.Is(err, ErrBreak) {
 				break
@@ -303,6 +305,20 @@ func (r *Reader) Start() error {
 				continue
 			}
 			return err
+		}
+	}
+	return nil
+}
+
+func (r *Reader) start() error {
+	for {
+		node, err := r.Read()
+		if err != nil && isClosed(err) {
+			return err
+		}
+		if e, ok := node.(E); ok && e.Type == TypeElement {
+			r.dispatch(node, isClosed(err))
+			break
 		}
 	}
 	return nil
@@ -326,10 +342,27 @@ func (r *Reader) OnClose(name QName, fn OnElementFunc) {
 	}
 }
 
-func (r *Reader) OnNode(kind NodeType, fn OnNodeFunc) {
+func (r *Reader) OnOpenAny(fn OnElementFunc) {
 	if i := len(r.stack) - 1; i >= 0 {
-		r.stack[i].onNode[kind] = fn
-	}	
+		r.stack[i].onOpenAny = fn
+	}
+}
+
+func (r *Reader) OnCloseAny(fn OnElementFunc) {
+	if i := len(r.stack) - 1; i >= 0 {
+		r.stack[i].onCloseAny = fn
+	}
+}
+
+func (r *Reader) Any(fn OnElementFunc) {
+	r.OnOpenAny(func(rs *Reader, el E) error {
+		rs.Push()
+		return fn(rs, el)
+	})
+	r.OnCloseAny(func(rs *Reader, _ E) error {
+		rs.Pop()
+		return nil
+	})
 }
 
 func (r *Reader) Element(name QName, fn OnElementFunc) {
@@ -384,7 +417,6 @@ func (r *Reader) Push() {
 	s := OnSet{
 		onOpen:  make(map[QName]OnElementFunc),
 		onClose: make(map[QName]OnElementFunc),
-		onNode: make(map[NodeType]OnNodeFunc),
 	}
 	r.stack = append(r.stack, s)
 }
@@ -420,9 +452,6 @@ func (r *Reader) dispatch(node any, closed bool) error {
 			}
 			err = r.dispatchClose(e)
 		} else {
-			if err := r.dispatchNode(e); err != nil {
-				return err
-			}
 			err = r.dispatchOpen(e)
 		}
 	case T:
@@ -434,24 +463,29 @@ func (r *Reader) dispatch(node any, closed bool) error {
 	return err
 }
 
-func (r *Reader) dispatchNode(elem E) error {
+func (r *Reader) dispatchOpen(elem E) error {
+	r.pushName(elem.QName)
+	var found bool
 	for i := len(r.stack) - 1; i >= 0; i-- {
-		fn, ok := r.stack[i].onNode[elem.Type]
+		fn, ok := r.stack[i].onOpen[elem.QName]
 		if ok {
+			found = true
 			if err := fn(r, elem); err != nil {
 				return err
 			}
 			break
 		}
-	}	
+	}
+	if !found {
+		return r.dispatchOpenAny(elem)
+	}
 	return nil
 }
 
-func (r *Reader) dispatchOpen(elem E) error {
-	r.pushName(elem.QName)
+func (r *Reader) dispatchOpenAny(elem E) error {
 	for i := len(r.stack) - 1; i >= 0; i-- {
-		fn, ok := r.stack[i].onOpen[elem.QName]
-		if ok {
+		fn := r.stack[i].onOpenAny
+		if fn != nil {
 			if err := fn(r, elem); err != nil {
 				return err
 			}
@@ -462,16 +496,34 @@ func (r *Reader) dispatchOpen(elem E) error {
 }
 
 func (r *Reader) dispatchClose(elem E) error {
+	defer r.popName()
+	var found bool
 	for i := len(r.stack) - 1; i >= 0; i-- {
 		fn, ok := r.stack[i].onClose[elem.QName]
 		if ok {
+			found = true
 			if err := fn(r, elem); err != nil {
 				return err
 			}
 			break
 		}
 	}
-	r.popName()
+	if !found {
+		return r.dispatchCloseAny(elem)
+	}
+	return nil
+}
+
+func (r *Reader) dispatchCloseAny(elem E) error {
+	for i := len(r.stack) - 1; i >= 0; i-- {
+		fn := r.stack[i].onCloseAny
+		if fn != nil {
+			if err := fn(r, elem); err != nil {
+				return err
+			}
+			break
+		}
+	}
 	return nil
 }
 
