@@ -382,6 +382,10 @@ func escapeText(str string) string {
 		r, z := utf8.DecodeRuneInString(str[i:])
 		i += z
 
+		if r == utf8.RuneError {
+			continue
+		}
+
 		switch r {
 		case '<':
 			buf.WriteString("&lt;")

@@ -61,11 +61,14 @@ type C struct {
 
 type OnElementFunc func(*Reader, E) error
 
+type OnNodeFunc func(*Reader, E) error
+
 type OnTextFunc func(*Reader, string) error
 
 type OnSet struct {
 	onOpen  map[QName]OnElementFunc
 	onClose map[QName]OnElementFunc
+	onNode map[NodeType]OnNodeFunc
 	onText  OnTextFunc
 }
 
@@ -265,6 +268,7 @@ type Reader struct {
 	peek Token
 
 	stack []OnSet
+	names []QName
 }
 
 func NewReader(r io.Reader) *Reader {
@@ -322,6 +326,12 @@ func (r *Reader) OnClose(name QName, fn OnElementFunc) {
 	}
 }
 
+func (r *Reader) OnNode(kind NodeType, fn OnNodeFunc) {
+	if i := len(r.stack) - 1; i >= 0 {
+		r.stack[i].onNode[kind] = fn
+	}	
+}
+
 func (r *Reader) Element(name QName, fn OnElementFunc) {
 	r.OnOpen(name, func(rs *Reader, el E) error {
 		rs.Push()
@@ -331,6 +341,14 @@ func (r *Reader) Element(name QName, fn OnElementFunc) {
 		rs.Pop()
 		return nil
 	})
+}
+
+func (r *Reader) Path() string {
+	var list []string
+	for i := range r.names {
+		list = append(list, r.names[i].QualifiedName())
+	}
+	return strings.Join(list, "/")
 }
 
 func (r *Reader) Read() (any, error) {
@@ -366,6 +384,7 @@ func (r *Reader) Push() {
 	s := OnSet{
 		onOpen:  make(map[QName]OnElementFunc),
 		onClose: make(map[QName]OnElementFunc),
+		onNode: make(map[NodeType]OnNodeFunc),
 	}
 	r.stack = append(r.stack, s)
 }
@@ -374,6 +393,18 @@ func (r *Reader) Pop() {
 	if i := len(r.stack); i > 1 {
 		r.stack = r.stack[:i-1]
 	}
+}
+
+func (r *Reader) pushName(qn QName) {
+	r.names = append(r.names, qn)
+}
+
+func (r *Reader) popName() {
+	n := len(r.names)
+	if n == 0 {
+		return
+	}
+	r.names = r.names[:n-1]
 }
 
 func (r *Reader) dispatch(node any, closed bool) error {
@@ -389,6 +420,9 @@ func (r *Reader) dispatch(node any, closed bool) error {
 			}
 			err = r.dispatchClose(e)
 		} else {
+			if err := r.dispatchNode(e); err != nil {
+				return err
+			}
 			err = r.dispatchOpen(e)
 		}
 	case T:
@@ -400,7 +434,21 @@ func (r *Reader) dispatch(node any, closed bool) error {
 	return err
 }
 
+func (r *Reader) dispatchNode(elem E) error {
+	for i := len(r.stack) - 1; i >= 0; i-- {
+		fn, ok := r.stack[i].onNode[elem.Type]
+		if ok {
+			if err := fn(r, elem); err != nil {
+				return err
+			}
+			break
+		}
+	}	
+	return nil
+}
+
 func (r *Reader) dispatchOpen(elem E) error {
+	r.pushName(elem.QName)
 	for i := len(r.stack) - 1; i >= 0; i-- {
 		fn, ok := r.stack[i].onOpen[elem.QName]
 		if ok {
@@ -423,6 +471,7 @@ func (r *Reader) dispatchClose(elem E) error {
 			break
 		}
 	}
+	r.popName()
 	return nil
 }
 
