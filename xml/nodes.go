@@ -459,6 +459,10 @@ func (a *Attribute) setPosition(pos int) {
 	a.position = pos
 }
 
+func (a *Attribute) Accept(v Visitor) {
+	v.VisitAttribute(a)
+}
+
 type Element struct {
 	QName
 	SchemaType QName
@@ -857,6 +861,10 @@ func (e *Element) setParent(parent Node) {
 	e.parent = parent
 }
 
+func (e *Element) Accept(v Visitor) {
+	v.VisitElement(e)
+}
+
 type Instruction struct {
 	QName
 	SchemaType QName
@@ -968,6 +976,10 @@ func (i *Instruction) setParent(parent Node) {
 	i.parent = parent
 }
 
+func (i *Instruction) Accept(v Visitor) {
+	v.VisitPI(i)
+}
+
 type CharData struct {
 	Content string
 
@@ -1042,6 +1054,10 @@ func (c *CharData) setPosition(pos int) {
 
 func (c *CharData) setParent(parent Node) {
 	c.parent = parent
+}
+
+func (c *CharData) Accept(v Visitor) {
+	v.VisitCharData(c)
 }
 
 type Text struct {
@@ -1129,6 +1145,10 @@ func (t *Text) setParent(parent Node) {
 	t.parent = parent
 }
 
+func (t *Text) Accept(v Visitor) {
+	v.VisitText(t)
+}
+
 type Comment struct {
 	Content string
 
@@ -1203,4 +1223,8 @@ func (c *Comment) setPosition(pos int) {
 
 func (c *Comment) setParent(parent Node) {
 	c.parent = parent
+}
+
+func (c *Comment) Accept(v Visitor) {
+	v.VisitComment(c)
 }
