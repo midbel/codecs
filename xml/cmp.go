@@ -71,7 +71,7 @@ func (n *hashNode) Compare(other *hashNode, mode CmpMode) CmpResult {
 	for k, v := range n.children {
 		x, ok := values[k]
 		if !ok {
-			res.Source = v.Node
+			res.Source = n.Node
 			res.Target = other.Node
 			break
 		}
@@ -92,11 +92,6 @@ func buildHashTree(root Node, mode CmpMode) *hashNode {
 	node := hashNode{
 		Node:     root,
 		children: make(map[uint64]*hashNode),
-	}
-	if root.Leaf() {
-		node.orderedHash = computeHashForNode(root)
-		node.unorderedHash = node.orderedHash
-		return &node
 	}
 	if elem, ok := root.(*Element); ok {
 		var (
@@ -121,6 +116,9 @@ func buildHashTree(root Node, mode CmpMode) *hashNode {
 
 		node.unorderedHash = computeHash(unorderedHash)
 		node.orderedHash = computeHash(orderedHash)
+	} else {
+		node.orderedHash = computeHashForNode(root)
+		node.unorderedHash = node.orderedHash
 	}
 	return &node
 }
@@ -142,26 +140,23 @@ func computeHashForNode(root Node) uint64 {
 	case *Element:
 		var values []uint64
 
-		values = append(values, getHashForText(n.QName.QualifiedName()))
+		values = append(values, getHashForText(n.QualifiedName()))
 		for _, a := range n.Attrs {
 			v := computeHashForNode(&a)
 			values = append(values, v)
-		}
-		if n.Leaf() && len(n.Nodes) > 0 {
-			values = append(values, computeHashForNode(n.Nodes[0]))
 		}
 		return computeHash(values)
 	case *Instruction:
 		var values []uint64
 
-		values = append(values, getHashForText(n.QName.QualifiedName()))
+		values = append(values, getHashForText(n.QualifiedName()))
 		for _, a := range n.Attrs {
 			v := computeHashForNode(&a)
 			values = append(values, v)
 		}
 		return computeHash(values)
 	case *Attribute:
-		str := fmt.Sprintf("%s = %s", n.QName.QualifiedName(), n.Value())
+		str := fmt.Sprintf("%s = %s", n.QualifiedName(), n.Value())
 		return getHashForText(str)
 	case *Comment:
 		str := fmt.Sprintf("<!-- %s -- >", n.Content)
