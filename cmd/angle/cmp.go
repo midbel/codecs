@@ -1,9 +1,7 @@
 package main
 
 import (
-	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/midbel/cli"
 	"github.com/midbel/codecs/xml"
@@ -15,6 +13,13 @@ var compareCmd = cli.Command{
 	Summary: "compare two xml documents",
 	Handler: &CompareCmd{},
 	Usage:   "compare [-o] <file1> <file2>",
+}
+
+var diffCmd = cli.Command{
+	Name:    "diff",
+	Summary: "show difference between two xml documents",
+	Handler: &DiffCmd{},
+	Usage:   "diff <file1> <file2>",
 }
 
 var sortCmd = cli.Command{
@@ -30,7 +35,6 @@ func (c *CompareCmd) Run(args []string) error {
 		mode    = xml.CmpUnordered
 		set     = cli.NewFlagSet("compare")
 		ordered = set.Bool("o", false, "ordered comparison")
-		print   = set.Bool("p", false, "print diverging nodes")
 	)
 	if err := set.Parse(args); err != nil {
 		return err
@@ -38,17 +42,18 @@ func (c *CompareCmd) Run(args []string) error {
 	if *ordered {
 		mode = xml.CmpOrdered
 	}
-	res, err := xml.Compare(set.Arg(0), set.Arg(1), mode)
-	if errors.Is(err, xml.ErrCompare) && *print {
-		str := xml.WriteNodeDepth(res.Source, 0)
-		fmt.Println(">>>", strings.TrimSpace(str))
-		
-		if res.Target != nil {
-			str = xml.WriteNodeDepth(res.Target, 0)
-			fmt.Println("<<<", strings.TrimSpace(str))
-		}
-	}
+	_, err := xml.Compare(set.Arg(0), set.Arg(1), mode)
 	return err
+}
+
+type DiffCmd struct{}
+
+func (c *DiffCmd) Run(args []string) error {
+	set := cli.NewFlagSet("diff")
+	if err := set.Parse(args); err != nil {
+		return err
+	}
+	return fmt.Errorf("not yet implemented")
 }
 
 type SortCmd struct{}

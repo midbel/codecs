@@ -57,6 +57,7 @@ func prepare() *cli.CommandTrie {
 	root.Register([]string{"assert", "compile"}, &compileCmd)
 	root.Register([]string{"transform"}, &transformCmd)
 	root.Register([]string{"compare"}, &compareCmd)
+	root.Register([]string{"diff"}, &diffCmd)
 	root.Register([]string{"sort"}, &sortCmd)
 
 	return root

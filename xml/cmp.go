@@ -1,8 +1,8 @@
 package xml
 
 import (
-	"errors"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"maps"
