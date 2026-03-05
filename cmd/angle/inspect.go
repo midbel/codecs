@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/midbel/cli"
-	"github.com/midbel/codecs/xml"
+	"github.com/midbel/codecs/inspect"
 )
 
 var compareCmd = cli.Command{
@@ -28,11 +28,17 @@ var sortCmd = cli.Command{
 	Handler: &SortCmd{},
 }
 
+var infosCmd = cli.Command{
+	Name:    "infos",
+	Summary: "Give infos on node in a document",
+	Handler: &InfoCmd{},
+}
+
 type CompareCmd struct{}
 
 func (c *CompareCmd) Run(args []string) error {
 	var (
-		mode    = xml.CmpUnordered
+		mode    = inspect.CmpUnordered
 		set     = cli.NewFlagSet("compare")
 		ordered = set.Bool("o", false, "ordered comparison")
 	)
@@ -40,9 +46,9 @@ func (c *CompareCmd) Run(args []string) error {
 		return err
 	}
 	if *ordered {
-		mode = xml.CmpOrdered
+		mode = inspect.CmpOrdered
 	}
-	_, err := xml.Compare(set.Arg(0), set.Arg(1), mode)
+	_, err := inspect.Compare(set.Arg(0), set.Arg(1), mode)
 	return err
 }
 
@@ -64,4 +70,15 @@ func (c *SortCmd) Run(args []string) error {
 		return err
 	}
 	return fmt.Errorf("not yet implemented")
+}
+
+type InfoCmd struct{}
+
+func (c *InfoCmd) Run(args []string) error {
+	set := cli.NewFlagSet("infos")
+	if err := set.Parse(args); err != nil {
+		return err
+	}
+	_, err := inspect.Infos(set.Arg(0))
+	return err
 }

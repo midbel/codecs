@@ -1,4 +1,4 @@
-package xml
+package inspect
 
 import (
 	"encoding/binary"
@@ -8,6 +8,8 @@ import (
 	"maps"
 	"sort"
 	"strings"
+
+	"github.com/midbel/codecs/xml"
 )
 
 type CmpMode int
@@ -18,8 +20,8 @@ const (
 )
 
 type CmpResult struct {
-	Source Node
-	Target Node
+	Source xml.Node
+	Target xml.Node
 	Match  bool
 }
 
@@ -45,7 +47,7 @@ func Compare(source, target string, mode CmpMode) (CmpResult, error) {
 }
 
 func buildHash(file string, mode CmpMode) (*hashNode, error) {
-	doc, err := ParseFile(file)
+	doc, err := xml.ParseFile(file)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +55,7 @@ func buildHash(file string, mode CmpMode) (*hashNode, error) {
 }
 
 type hashNode struct {
-	Node
+	xml.Node
 	orderedHash   uint64
 	unorderedHash uint64
 	children      map[uint64]*hashNode
@@ -88,12 +90,12 @@ func (n *hashNode) Compare(other *hashNode, mode CmpMode) CmpResult {
 	return res
 }
 
-func buildHashTree(root Node, mode CmpMode) *hashNode {
+func buildHashTree(root xml.Node, mode CmpMode) *hashNode {
 	node := hashNode{
 		Node:     root,
 		children: make(map[uint64]*hashNode),
 	}
-	if elem, ok := root.(*Element); ok {
+	if elem, ok := root.(*xml.Element); ok {
 		var (
 			orderedHash   []uint64
 			unorderedHash []uint64
@@ -135,9 +137,9 @@ func computeHash(values []uint64) uint64 {
 	return sum.Sum64()
 }
 
-func computeHashForNode(root Node) uint64 {
+func computeHashForNode(root xml.Node) uint64 {
 	switch n := root.(type) {
-	case *Element:
+	case *xml.Element:
 		var values []uint64
 
 		values = append(values, getHashForText(n.QualifiedName()))
@@ -146,7 +148,7 @@ func computeHashForNode(root Node) uint64 {
 			values = append(values, v)
 		}
 		return computeHash(values)
-	case *Instruction:
+	case *xml.Instruction:
 		var values []uint64
 
 		values = append(values, getHashForText(n.QualifiedName()))
@@ -155,15 +157,15 @@ func computeHashForNode(root Node) uint64 {
 			values = append(values, v)
 		}
 		return computeHash(values)
-	case *Attribute:
+	case *xml.Attribute:
 		str := fmt.Sprintf("%s = %s", n.QualifiedName(), n.Value())
 		return getHashForText(str)
-	case *Comment:
+	case *xml.Comment:
 		str := fmt.Sprintf("<!-- %s -- >", n.Content)
 		return getHashForText(str)
-	case *Text:
+	case *xml.Text:
 		return getHashForText(n.Content)
-	case *CharData:
+	case *xml.CharData:
 		return getHashForText(n.Content)
 	default:
 	}
