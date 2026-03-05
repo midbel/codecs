@@ -7,6 +7,8 @@ import (
 	"io"
 	"slices"
 	"strings"
+
+	"github.com/midbel/codecs/environ"
 )
 
 var (
@@ -266,13 +268,16 @@ type Reader struct {
 	curr Token
 	peek Token
 
+	namespaces environ.Environ[string]
+
 	stack []OnSet
 	names []QName
 }
 
 func NewReader(r io.Reader) *Reader {
 	rs := Reader{
-		scan: Scan(r),
+		scan:       Scan(r),
+		namespaces: environ.Empty[string](),
 	}
 	rs.Push()
 	rs.next()
@@ -611,6 +616,12 @@ func (r *Reader) readStartElement() (E, error) {
 	elem.Attrs, err = r.readAttributes(func() bool {
 		return r.is(EndTag) || r.is(EmptyElemTag)
 	})
+	for _, a := range elem.Attrs {
+		if a.Space == "xmlns" {
+			r.namespaces.Define(a.Name, a.Value)
+		}
+	}
+	elem.Uri, _ = r.namespaces.Resolve(elem.Space)
 	if err != nil {
 		return elem, err
 	}

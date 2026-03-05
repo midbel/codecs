@@ -97,7 +97,7 @@ func (c *InfoCmd) Run(args []string) error {
 	rd := cli.NewTableRenderer(os.Stdout)
 	if *verbose {
 		var (
-			elements = stats.Elements
+			elements   = stats.Elements
 			attributes = stats.Attributes
 		)
 		if *qualified {
@@ -116,6 +116,10 @@ func (c *InfoCmd) Run(args []string) error {
 	rd.Render(depthTable(stats.Depth, 50))
 	fmt.Fprintln(os.Stdout)
 	fmt.Fprintf(os.Stdout, "Max depth: %d", stats.MaxDepth)
+	fmt.Fprintln(os.Stdout)
+	fmt.Fprintln(os.Stdout)
+	rd.Render(countersTable("Path", stats.Paths, 10))
+	fmt.Fprintln(os.Stdout)
 	return err
 }
 

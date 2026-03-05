@@ -2,6 +2,7 @@ package inspect
 
 import (
 	"os"
+	"strings"
 
 	"github.com/midbel/codecs/xml"
 )
@@ -16,6 +17,8 @@ type DocStats struct {
 	Attributes     map[string]int
 	QualifiedAttrs map[string]int
 	Types          map[string]int
+
+	Paths map[string]int
 }
 
 func Infos(file string) (*DocStats, error) {
@@ -33,16 +36,21 @@ func Infos(file string) (*DocStats, error) {
 		QualifiedAttrs: make(map[string]int),
 		Types:          make(map[string]int),
 		Depth:          make(map[int]int),
+		Paths:          make(map[string]int),
 	}
 
 	var (
 		rs    = xml.NewReader(r)
 		depth int
+		path  []string
 	)
 	rs.OnOpenAny(func(rs *xml.Reader, e xml.E) error {
 		stats.Elements[e.LocalName()]++
 		stats.QualifiedEls[e.QualifiedName()]++
 		stats.Types[e.Type.String()]++
+
+		path = append(path, e.LocalName())
+
 		for _, a := range e.Attrs {
 			stats.Types[xml.TypeAttribute.String()]++
 			if a.Space == "xmlns" {
@@ -61,12 +69,16 @@ func Infos(file string) (*DocStats, error) {
 		depth++
 
 		stats.Depth[depth]++
+		stats.Paths["/"+strings.Join(path, "/")]++
 
 		return nil
 	})
 	rs.OnCloseAny(func(rs *xml.Reader, _ xml.E) error {
 		stats.MaxDepth = max(depth, stats.MaxDepth)
 		depth--
+		if n := len(path); n > 0 {
+			path = path[:n-1]
+		}
 		return nil
 	})
 	rs.OnText(func(rs *xml.Reader, _ string) error {
