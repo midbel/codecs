@@ -93,9 +93,6 @@ func (c *InfoCmd) Run(args []string) error {
 	if err != nil {
 		return err
 	}
-	_ = *verbose
-	_ = *qualified
-
 
 	rd := cli.NewTableRenderer(os.Stdout)
 	if *verbose {
