@@ -1,10 +1,9 @@
 package main
 
 import (
-	"github.com/midbel/cli"
-
 	tea "charm.land/bubbletea/v2"
-	"github.com/midbel/codecs/terminal"
+	"github.com/midbel/cli"
+	"github.com/midbel/codecs/studio"
 )
 
 var terminalQueryCmd = cli.Command{
@@ -21,7 +20,8 @@ func (c *TerminalQueryCmd) Run(args []string) error {
 	if err := set.Parse(args); err != nil {
 		return err
 	}
-	p := tea.NewProgram(terminal.NewQueryModel(set.Arg(0)))
+
+	p := tea.NewProgram(studio.NewQueryApp(set.Arg(0)))
 	if _, err := p.Run(); err != nil {
 		return err
 	}

@@ -60,7 +60,7 @@ func prepare() *cli.CommandTrie {
 	root.Register([]string{"diff"}, &diffCmd)
 	root.Register([]string{"sort"}, &sortCmd)
 	root.Register([]string{"infos"}, &infosCmd)
-	root.Register([]string{"terminal", "query"}, &terminalQueryCmd)
+	root.Register([]string{"studio", "query"}, &terminalQueryCmd)
 
 	return root
 }

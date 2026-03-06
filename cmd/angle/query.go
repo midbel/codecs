@@ -70,8 +70,17 @@ func (q *QueryCmd) Run(args []string) error {
 	if err := q.parseArgs(args); err != nil {
 		return err
 	}
-	now := time.Now()
-	results, err := q.run()
+	var (
+		now     = time.Now()
+		spin    = cli.NewSpinner()
+		err     error
+		results xpath.Sequence
+	)
+
+	spin.SetMessage(fmt.Sprintf("processing..."))
+	spin.Run(func() {
+		results, err = q.run()
+	})
 	if err != nil {
 		return err
 	}

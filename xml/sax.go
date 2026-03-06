@@ -397,9 +397,16 @@ func (r *Reader) Read() (any, error) {
 	case r.is(ProcInstTag):
 		return r.readPI()
 	case r.is(OpenTag):
+		r.namespaces = environ.Enclosed(r.namespaces)
 		return r.readStartElement()
 	case r.is(CloseTag):
-		return r.readEndElement()
+		x, err := r.readEndElement()
+		if u, ok := r.namespaces.(interface {
+			Unwrap() environ.Environ[string]
+		}); ok {
+			r.namespaces = u.Unwrap()
+		}
+		return x, err
 	case r.is(CommentTag):
 		return r.readComment()
 	case r.is(Cdata):
