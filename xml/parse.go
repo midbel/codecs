@@ -588,7 +588,7 @@ func (s *Scanner) Scan() Token {
 		s.scanEndTag(&tok)
 	case s.char == slash || s.char == question:
 		s.scanClosingTag(&tok)
-	case s.char == quote:
+	case s.char == quote || s.char == apos:
 		s.scanValue(&tok)
 	case unicode.IsLetter(s.char):
 		s.scanName(&tok)
@@ -712,8 +712,9 @@ func (s *Scanner) scanClosingTag(tok *Token) {
 }
 
 func (s *Scanner) scanValue(tok *Token) {
+	q := s.char
 	s.read()
-	for !s.done() && s.char != quote {
+	for !s.done() && s.char != q {
 		s.write()
 		s.read()
 		if s.char == ampersand {
@@ -727,7 +728,7 @@ func (s *Scanner) scanValue(tok *Token) {
 	}
 	tok.Type = Literal
 	tok.Literal = s.str.String()
-	if s.char != quote {
+	if s.char != q {
 		tok.Type = Invalid
 	}
 	s.read()
