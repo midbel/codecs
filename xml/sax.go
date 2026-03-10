@@ -263,6 +263,30 @@ func (w *StreamWriter) indent() string {
 	return strings.Repeat(w.prefix, w.depth-1)
 }
 
+type Handler interface {
+	Open(*Reader, E) error
+	Close(*Reader, E) error
+}
+
+type DefaultHandler struct {
+	OnOpen  OnElementFunc
+	OnClose OnElementFunc
+}
+
+func (h DefaultHandler) Open(rs *Reader, e E) error {
+	if h.OnOpen != nil {
+		return h.OnOpen(rs, e)
+	}
+	return nil
+}
+
+func (h DefaultHandler) Close(rs *Reader, e E) error {
+	if h.OnClose != nil {
+		return h.OnClose(rs, e)
+	}
+	return nil
+}
+
 type Reader struct {
 	scan *Scanner
 	curr Token
@@ -360,24 +384,52 @@ func (r *Reader) OnCloseAny(fn OnElementFunc) {
 }
 
 func (r *Reader) Any(fn OnElementFunc) {
-	r.OnOpenAny(func(rs *Reader, el E) error {
-		rs.Push()
-		return fn(rs, el)
-	})
-	r.OnCloseAny(func(rs *Reader, _ E) error {
-		rs.Pop()
-		return nil
-	})
+	h := DefaultHandler{
+		OnOpen: func(rs *Reader, el E) error {
+			rs.Push()
+			return fn(rs, el)
+		},
+		OnClose: func(rs *Reader, el E) error {
+			rs.Pop()
+			return nil
+		},
+	}
+	r.HandleAny(h)
 }
 
 func (r *Reader) Element(name QName, fn OnElementFunc) {
+	h := DefaultHandler{
+		OnOpen: func(rs *Reader, el E) error {
+			rs.Push()
+			return fn(rs, el)
+		},
+		OnClose: func(rs *Reader, el E) error {
+			rs.Pop()
+			return nil
+		},
+	}
+	r.HandleElement(name, h)
+}
+
+func (r *Reader) HandleAny(h Handler) {
+	r.OnOpenAny(func(rs *Reader, el E) error {
+		rs.Push()
+		return h.Open(rs, el)
+	})
+	r.OnCloseAny(func(rs *Reader, el E) error {
+		rs.Pop()
+		return h.Close(rs, el)
+	})
+}
+
+func (r *Reader) HandleElement(name QName, h Handler) {
 	r.OnOpen(name, func(rs *Reader, el E) error {
 		rs.Push()
-		return fn(rs, el)
+		return h.Open(rs, el)
 	})
-	r.OnClose(name, func(rs *Reader, _ E) error {
+	r.OnClose(name, func(rs *Reader, el E) error {
 		rs.Pop()
-		return nil
+		return h.Close(rs, el)
 	})
 }
 
@@ -655,6 +707,7 @@ func (r *Reader) readEndElement() (E, error) {
 	if !r.is(Name) {
 		return elem, r.createError("element", "name is missing")
 	}
+	elem.Uri, _ = r.namespaces.Resolve(elem.Space)
 	elem.Type = TypeElement
 	elem.Name = r.curr.Literal
 	r.next()
