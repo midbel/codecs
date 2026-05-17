@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/midbel/codecs/json"
+	"github.com/midbel/codecs/jsonata"
 )
 
 func main() {
@@ -19,7 +20,7 @@ func main() {
 	}
 	defer r.Close()
 
-	doc, err := json.Find(r, *query)
+	doc, err := jsonata.Find(r, *query)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

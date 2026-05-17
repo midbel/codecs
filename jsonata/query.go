@@ -1,4 +1,4 @@
-package json
+package jsonata
 
 import (
 	"bufio"
@@ -12,10 +12,12 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/midbel/codecs/json"
 )
 
 func Find(r io.Reader, q string) (any, error) {
-	doc, err := Parse(r)
+	doc, err := json.Parse(r)
 	if err != nil {
 		return nil, err
 	}
@@ -1392,4 +1394,66 @@ func (s *QueryScanner) skipBlank() {
 	for !s.done() && unicode.IsSpace(s.char) {
 		s.read()
 	}
+}
+
+func isComment(c, k rune) bool {
+	return c == '/' && c == k
+}
+
+func isHex(c rune) bool {
+	return isNumber(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
+}
+
+func isNumber(c rune) bool {
+	return c >= '0' && c <= '9'
+}
+
+func isLower(c rune) bool {
+	return c >= 'a' && c <= 'z'
+}
+
+func isUpper(c rune) bool {
+	return c >= 'A' && c <= 'Z'
+}
+
+func isLetter(c rune) bool {
+	return isLower(c) || isUpper(c)
+}
+
+func isAlpha(c rune) bool {
+	return isLetter(c) || isNumber(c) || c == '_'
+}
+
+func isApos(c rune) bool {
+	return c == '\''
+}
+
+func isQuote(c rune) bool {
+	return c == '"'
+}
+
+func isBackQuote(c rune) bool {
+	return c == '`'
+}
+
+func isDelim(c rune) bool {
+	return c == '{' || c == '}' || c == '[' || c == ']' || c == ',' || c == ':'
+}
+
+func isNL(c rune) bool {
+	return c == '\n' || c == '\r'
+}
+
+func isOperator(c rune) bool {
+	return c == '!' || c == '=' || c == '<' || c == '>' ||
+		c == '&' || c == '*' || c == '/' || c == '%' || c == '-' ||
+		c == '+' || c == '.' || c == '?' || c == ':'
+}
+
+func isTransform(c rune) bool {
+	return c == '|'
+}
+
+func isDollar(c rune) bool {
+	return c == '$'
 }

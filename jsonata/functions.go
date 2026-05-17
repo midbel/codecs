@@ -1,4 +1,4 @@
-package json
+package jsonata
 
 import (
 	"bytes"
@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/midbel/codecs/json"
 )
 
 var builtins = map[string]builtinFunc{
@@ -108,7 +110,7 @@ func strString(ctx any, args []any) (any, error) {
 	case []any, map[string]any:
 		var (
 			buf bytes.Buffer
-			ws  = NewWriter(&buf)
+			ws  = json.NewWriter(&buf)
 		)
 		if err := ws.Write(a); err != nil {
 			return "", err
