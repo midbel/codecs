@@ -11,6 +11,8 @@ import (
 	"unicode/utf8"
 )
 
+var errSyntax = errors.New("syntax error")
+
 type Parser struct {
 	scan *Scanner
 	curr Token
@@ -67,12 +69,12 @@ func (p *Parser) parseKey() (string, error) {
 	case p.is(String):
 	case p.is(Ident) && p.mode.isExtended():
 	default:
-		return "", fmt.Errorf("syntax error: object key should be string")
+		return "", p.syntaxError("object key should be string")
 	}
-	key := p.curr.Literal
+	key := p.currentLiteral()
 	p.next()
 	if !p.is(Colon) {
-		return "", fmt.Errorf("syntax error: missing ':'")
+		return "", p.syntaxError("missing colon after key")
 	}
 	p.next()
 	return key, nil
@@ -96,15 +98,15 @@ func (p *Parser) parseObject() (any, error) {
 		case p.is(Comma):
 			p.next()
 			if p.is(EndObj) && !p.mode.isExtended() {
-				return nil, fmt.Errorf("syntax error: trailing comma not allowed")
+				return nil, p.syntaxError("trailing comma not allowed")
 			}
 		case p.is(EndObj):
 		default:
-			return nil, fmt.Errorf("syntax error: expected ',' or '}'")
+			return nil, p.syntaxError("expected ',' or '}'")
 		}
 	}
 	if !p.is(EndObj) {
-		return nil, fmt.Errorf("array: missing '}'")
+		return nil, p.syntaxError("missing '}' at end of object")
 	}
 	p.next()
 	return obj, nil
@@ -123,15 +125,15 @@ func (p *Parser) parseArray() (any, error) {
 		case p.is(Comma):
 			p.next()
 			if p.is(EndArr) && !p.mode.isExtended() {
-				return nil, fmt.Errorf("syntax error: trailing comma not allowed")
+				return nil, p.syntaxError("trailing comma not allowed")
 			}
 		case p.is(EndArr):
 		default:
-			return nil, fmt.Errorf("syntax error: expected ',' or ']'")
+			return nil, p.syntaxError("expected ',' or ']'")
 		}
 	}
 	if !p.is(EndArr) {
-		return nil, fmt.Errorf("array: missing ']'")
+		return nil, p.syntaxError("missing ']' at end of array")
 	}
 	p.next()
 	return arr, nil
@@ -180,6 +182,10 @@ func (p *Parser) next() {
 
 func (p *Parser) currentLiteral() string {
 	return p.curr.Literal
+}
+
+func (p *Parser) syntaxError(msg string) error {
+	return fmt.Errorf("%w: %s", errSyntax, msg)
 }
 
 type mode int8
