@@ -18,6 +18,12 @@ type Writer struct {
 	level int
 }
 
+func Compact(w io.Writer) *Writer {
+	ws := NewWriter(w)
+	ws.Compact = true
+	return ws
+}
+
 func NewWriter(w io.Writer) *Writer {
 	ws := Writer{
 		ws:     bufio.NewWriter(w),

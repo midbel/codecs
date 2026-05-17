@@ -10,7 +10,10 @@ import (
 )
 
 func main() {
-	query := flag.String("q", "", "query")
+	var (
+		query   = flag.String("q", "", "query")
+		compact = flag.Bool("c", false, "compact")
+	)
 	flag.Parse()
 
 	r, err := os.Open(flag.Arg(0))
@@ -26,5 +29,6 @@ func main() {
 		os.Exit(1)
 	}
 	ws := json.NewWriter(os.Stdout)
+	ws.Compact = *compact
 	ws.Write(doc)
 }
