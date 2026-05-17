@@ -147,9 +147,9 @@ func (p *Parser) parseArray() (any, error) {
 
 func (p *Parser) parseNumber() any {
 	defer p.next()
-	n, err := strconv.ParseFloat(p.curr.Literal, 64)
+	n, err := strconv.ParseFloat(p.currentLiteral(), 64)
 	if err != nil {
-		n, _ := strconv.ParseInt(p.curr.Literal, 0, 64)
+		n, _ := strconv.ParseInt(p.currentLiteral(), 0, 64)
 		return float64(n)
 	}
 	return n
@@ -184,6 +184,10 @@ func (p *Parser) is(kind rune) bool {
 func (p *Parser) next() {
 	p.curr = p.peek
 	p.peek = p.scan.Scan()
+}
+
+func (p *Parser) currentLiteral() string {
+	return p.curr.Literal
 }
 
 type mode int8
