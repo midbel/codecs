@@ -1,4 +1,4 @@
-package json
+package jsonkit
 
 import "fmt"
 

@@ -9,14 +9,16 @@ import (
 	"strconv"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/midbel/codecs/internal/jsonkit"
 )
 
 var errSyntax = errors.New("syntax error")
 
 type Parser struct {
 	scan *Scanner
-	curr Token
-	peek Token
+	curr jsonkit.Token
+	peek jsonkit.Token
 
 	mode
 }
@@ -47,17 +49,17 @@ func (p *Parser) Parse() (any, error) {
 
 func (p *Parser) parse() (any, error) {
 	switch p.curr.Type {
-	case BegArr:
+	case jsonkit.BegArr:
 		return p.parseArray()
-	case BegObj:
+	case jsonkit.BegObj:
 		return p.parseObject()
-	case String:
+	case jsonkit.String:
 		return p.parseString(), nil
-	case Number:
+	case jsonkit.Number:
 		return p.parseNumber(), nil
-	case Boolean:
+	case jsonkit.Boolean:
 		return p.parseBool(), nil
-	case Null:
+	case jsonkit.Null:
 		return p.parseNull(), nil
 	default:
 		return nil, fmt.Errorf("syntax error")
@@ -66,14 +68,14 @@ func (p *Parser) parse() (any, error) {
 
 func (p *Parser) parseKey() (string, error) {
 	switch {
-	case p.is(String):
-	case p.is(Ident) && p.mode.isExtended():
+	case p.is(jsonkit.String):
+	case p.is(jsonkit.Ident) && p.mode.isExtended():
 	default:
 		return "", p.syntaxError("object key should be string")
 	}
 	key := p.currentLiteral()
 	p.next()
-	if !p.is(Colon) {
+	if !p.is(jsonkit.Colon) {
 		return "", p.syntaxError("missing colon after key")
 	}
 	p.next()
@@ -83,7 +85,7 @@ func (p *Parser) parseKey() (string, error) {
 func (p *Parser) parseObject() (any, error) {
 	p.next()
 	obj := make(map[string]any)
-	for !p.done() && !p.is(EndObj) {
+	for !p.done() && !p.is(jsonkit.EndObj) {
 		k, err := p.parseKey()
 		if err != nil {
 			return nil, err
@@ -95,17 +97,17 @@ func (p *Parser) parseObject() (any, error) {
 
 		obj[k] = a
 		switch {
-		case p.is(Comma):
+		case p.is(jsonkit.Comma):
 			p.next()
-			if p.is(EndObj) && !p.mode.isExtended() {
+			if p.is(jsonkit.EndObj) && !p.mode.isExtended() {
 				return nil, p.syntaxError("trailing comma not allowed")
 			}
-		case p.is(EndObj):
+		case p.is(jsonkit.EndObj):
 		default:
 			return nil, p.syntaxError("expected ',' or '}'")
 		}
 	}
-	if !p.is(EndObj) {
+	if !p.is(jsonkit.EndObj) {
 		return nil, p.syntaxError("missing '}' at end of object")
 	}
 	p.next()
@@ -115,24 +117,24 @@ func (p *Parser) parseObject() (any, error) {
 func (p *Parser) parseArray() (any, error) {
 	p.next()
 	var arr []any
-	for !p.done() && !p.is(EndArr) {
+	for !p.done() && !p.is(jsonkit.EndArr) {
 		a, err := p.parse()
 		if err != nil {
 			return nil, err
 		}
 		arr = append(arr, a)
 		switch {
-		case p.is(Comma):
+		case p.is(jsonkit.Comma):
 			p.next()
-			if p.is(EndArr) && !p.mode.isExtended() {
+			if p.is(jsonkit.EndArr) && !p.mode.isExtended() {
 				return nil, p.syntaxError("trailing comma not allowed")
 			}
-		case p.is(EndArr):
+		case p.is(jsonkit.EndArr):
 		default:
 			return nil, p.syntaxError("expected ',' or ']'")
 		}
 	}
-	if !p.is(EndArr) {
+	if !p.is(jsonkit.EndArr) {
 		return nil, p.syntaxError("missing ']' at end of array")
 	}
 	p.next()
@@ -151,7 +153,7 @@ func (p *Parser) parseNumber() any {
 
 func (p *Parser) parseBool() any {
 	defer p.next()
-	if p.curr.Literal == "true" {
+	if p.currentLiteral() == "true" {
 		return true
 	}
 	return false
@@ -159,7 +161,7 @@ func (p *Parser) parseBool() any {
 
 func (p *Parser) parseString() any {
 	defer p.next()
-	return p.curr.Literal
+	return p.currentLiteral()
 }
 
 func (p *Parser) parseNull() any {
@@ -168,7 +170,7 @@ func (p *Parser) parseNull() any {
 }
 
 func (p *Parser) done() bool {
-	return p.is(EOF)
+	return p.is(jsonkit.EOF)
 }
 
 func (p *Parser) is(kind rune) bool {
@@ -208,8 +210,8 @@ type Scanner struct {
 	char  rune
 	mode
 
-	Position
-	old Position
+	jsonkit.Position
+	old jsonkit.Position
 
 	str bytes.Buffer
 }
@@ -224,93 +226,93 @@ func Scan(r io.Reader, mode mode) *Scanner {
 	return &scan
 }
 
-func (s *Scanner) Scan() Token {
+func (s *Scanner) Scan() jsonkit.Token {
 	defer s.str.Reset()
 	s.skipBlank()
 
-	var tok Token
+	var tok jsonkit.Token
 	if s.done() {
-		tok.Type = EOF
+		tok.Type = jsonkit.EOF
 		return tok
 	}
 	switch {
-	case s.mode.isExtended() && isComment(s.char, s.peek()):
+	case s.mode.isExtended() && jsonkit.IsComment(s.char, s.peek()):
 		s.scanComment(&tok)
-	case s.mode.isExtended() && isLetter(s.char):
+	case s.mode.isExtended() && jsonkit.IsLetter(s.char):
 		s.scanLiteral(&tok)
-	case isLower(s.char):
+	case jsonkit.IsLower(s.char):
 		s.scanIdent(&tok)
-	case isQuote(s.char) || (s.mode.isExtended() && isApos(s.char)):
+	case jsonkit.IsQuote(s.char) || (s.mode.isExtended() && jsonkit.IsApos(s.char)):
 		s.scanString(&tok)
-	case isNumber(s.char) || s.char == '-':
+	case jsonkit.IsNumber(s.char) || s.char == '-':
 		s.scanNumber(&tok)
 	case s.mode.isExtended() && (s.char == '+' || s.char == '.'):
 		s.scanNumber(&tok)
-	case isDelim(s.char):
+	case jsonkit.IsDelim(s.char):
 		s.scanDelimiter(&tok)
 	default:
-		tok.Type = Invalid
+		tok.Type = jsonkit.Invalid
 	}
 	return tok
 }
 
-func (s *Scanner) scanLiteral(tok *Token) {
-	for !s.done() && isAlpha(s.char) {
+func (s *Scanner) scanLiteral(tok *jsonkit.Token) {
+	for !s.done() && jsonkit.IsAlpha(s.char) {
 		s.write()
 		s.read()
 	}
 	tok.Literal = s.str.String()
 	switch tok.Literal {
 	case "true", "false":
-		tok.Type = Boolean
+		tok.Type = jsonkit.Boolean
 	case "null":
-		tok.Type = Null
+		tok.Type = jsonkit.Null
 	default:
-		tok.Type = Ident
+		tok.Type = jsonkit.Ident
 	}
 }
 
-func (s *Scanner) scanComment(tok *Token) {
+func (s *Scanner) scanComment(tok *jsonkit.Token) {
 	s.read()
 	s.read()
 	s.skipBlank()
-	for !s.done() && !isNL(s.char) {
+	for !s.done() && !jsonkit.IsNL(s.char) {
 		s.write()
 		s.read()
 	}
 	tok.Literal = s.str.String()
-	tok.Type = Comment
+	tok.Type = jsonkit.Comment
 }
 
-func (s *Scanner) scanIdent(tok *Token) {
-	for !s.done() && isAlpha(s.char) {
+func (s *Scanner) scanIdent(tok *jsonkit.Token) {
+	for !s.done() && jsonkit.IsAlpha(s.char) {
 		s.write()
 		s.read()
 	}
 	tok.Literal = s.str.String()
 	switch tok.Literal {
 	case "true", "false":
-		tok.Type = Boolean
+		tok.Type = jsonkit.Boolean
 	case "null":
-		tok.Type = Null
+		tok.Type = jsonkit.Null
 	default:
-		tok.Type = Invalid
+		tok.Type = jsonkit.Invalid
 	}
 }
 
-func (s *Scanner) scanString(tok *Token) {
+func (s *Scanner) scanString(tok *jsonkit.Token) {
 	quote := s.char
 	s.read()
 	for !s.done() && s.char != quote {
 		if s.char == '\\' {
 			s.read()
-			if isNL(s.char) {
+			if jsonkit.IsNL(s.char) {
 				s.write()
 				s.read()
 				continue
 			}
 			if ok := s.scanEscape(quote); !ok {
-				tok.Type = Invalid
+				tok.Type = jsonkit.Invalid
 				return
 			}
 		}
@@ -318,9 +320,9 @@ func (s *Scanner) scanString(tok *Token) {
 		s.read()
 	}
 	tok.Literal = s.str.String()
-	tok.Type = String
+	tok.Type = jsonkit.String
 	if s.char != quote {
-		tok.Type = Invalid
+		tok.Type = jsonkit.Invalid
 	} else {
 		s.read()
 	}
@@ -348,7 +350,7 @@ func (s *Scanner) scanEscape(quote rune) bool {
 		s.read()
 		buf := make([]rune, 4)
 		for i := 1; i <= 4; i++ {
-			if !isHex(s.char) {
+			if !jsonkit.IsHex(s.char) {
 				return false
 			}
 			buf[i-1] = s.char
@@ -364,20 +366,20 @@ func (s *Scanner) scanEscape(quote rune) bool {
 	return true
 }
 
-func (s *Scanner) scanHexa(tok *Token) {
+func (s *Scanner) scanHexa(tok *jsonkit.Token) {
 	s.read()
 	s.read()
 	s.writeRune('0')
 	s.writeRune('x')
-	for !s.done() && isHex(s.char) {
+	for !s.done() && jsonkit.IsHex(s.char) {
 		s.write()
 		s.read()
 	}
 	tok.Literal = s.str.String()
 }
 
-func (s *Scanner) scanNumber(tok *Token) {
-	tok.Type = Number
+func (s *Scanner) scanNumber(tok *jsonkit.Token) {
+	tok.Type = jsonkit.Number
 	if s.mode.isExtended() && s.char == '0' && s.peek() == 'x' {
 		s.scanHexa(tok)
 		return
@@ -391,7 +393,7 @@ func (s *Scanner) scanNumber(tok *Token) {
 		s.write()
 		s.read()
 	}
-	for !s.done() && isNumber(s.char) {
+	for !s.done() && jsonkit.IsNumber(s.char) {
 		s.write()
 		s.read()
 	}
@@ -399,13 +401,13 @@ func (s *Scanner) scanNumber(tok *Token) {
 	if s.char == '.' {
 		s.write()
 		s.read()
-		if !isNumber(s.char) {
+		if !jsonkit.IsNumber(s.char) {
 			if !s.mode.isExtended() {
-				tok.Type = Invalid
+				tok.Type = jsonkit.Invalid
 			}
 			return
 		}
-		for !s.done() && isNumber(s.char) {
+		for !s.done() && jsonkit.IsNumber(s.char) {
 			s.write()
 			s.read()
 		}
@@ -418,11 +420,11 @@ func (s *Scanner) scanNumber(tok *Token) {
 			s.write()
 			s.read()
 		}
-		if !isNumber(s.char) {
-			tok.Type = Invalid
+		if !jsonkit.IsNumber(s.char) {
+			tok.Type = jsonkit.Invalid
 			return
 		}
-		for !s.done() && isNumber(s.char) {
+		for !s.done() && jsonkit.IsNumber(s.char) {
 			s.write()
 			s.read()
 		}
@@ -430,24 +432,24 @@ func (s *Scanner) scanNumber(tok *Token) {
 	}
 }
 
-func (s *Scanner) scanDelimiter(tok *Token) {
+func (s *Scanner) scanDelimiter(tok *jsonkit.Token) {
 	switch s.char {
 	case '[':
-		tok.Type = BegArr
+		tok.Type = jsonkit.BegArr
 	case ']':
-		tok.Type = EndArr
+		tok.Type = jsonkit.EndArr
 	case '{':
-		tok.Type = BegObj
+		tok.Type = jsonkit.BegObj
 	case '}':
-		tok.Type = EndObj
+		tok.Type = jsonkit.EndObj
 	case ',':
-		tok.Type = Comma
+		tok.Type = jsonkit.Comma
 	case ':':
-		tok.Type = Colon
+		tok.Type = jsonkit.Colon
 	default:
-		tok.Type = Invalid
+		tok.Type = jsonkit.Invalid
 	}
-	if tok.Type != Invalid {
+	if tok.Type != jsonkit.Invalid {
 		s.read()
 	}
 }
@@ -489,66 +491,4 @@ func (s *Scanner) skipBlank() {
 	for !s.done() && unicode.IsSpace(s.char) {
 		s.read()
 	}
-}
-
-func isComment(c, k rune) bool {
-	return c == '/' && c == k
-}
-
-func isHex(c rune) bool {
-	return isNumber(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
-}
-
-func isNumber(c rune) bool {
-	return c >= '0' && c <= '9'
-}
-
-func isLower(c rune) bool {
-	return c >= 'a' && c <= 'z'
-}
-
-func isUpper(c rune) bool {
-	return c >= 'A' && c <= 'Z'
-}
-
-func isLetter(c rune) bool {
-	return isLower(c) || isUpper(c)
-}
-
-func isAlpha(c rune) bool {
-	return isLetter(c) || isNumber(c) || c == '_'
-}
-
-func isApos(c rune) bool {
-	return c == '\''
-}
-
-func isQuote(c rune) bool {
-	return c == '"'
-}
-
-func isBackQuote(c rune) bool {
-	return c == '`'
-}
-
-func isDelim(c rune) bool {
-	return c == '{' || c == '}' || c == '[' || c == ']' || c == ',' || c == ':'
-}
-
-func isNL(c rune) bool {
-	return c == '\n' || c == '\r'
-}
-
-func isOperator(c rune) bool {
-	return c == '!' || c == '=' || c == '<' || c == '>' ||
-		c == '&' || c == '*' || c == '/' || c == '%' || c == '-' ||
-		c == '+' || c == '.' || c == '?' || c == ':'
-}
-
-func isTransform(c rune) bool {
-	return c == '|'
-}
-
-func isDollar(c rune) bool {
-	return c == '$'
 }
