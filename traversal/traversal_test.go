@@ -36,3 +36,33 @@ func TestCollect(t *testing.T) {
 		}
 	}
 }
+
+func TestScan(t *testing.T) {
+	tests := []struct {
+		Input string
+		Want  []token
+	}{
+		{
+			Input: "$.first",
+			Want: []token{
+				{Literal: "", Type: Root},
+				{Literal: "", Type: Dot},
+				{Literal: "first", Type: Ident},
+				{Literal: "", Type: Eof},
+			},
+		},
+	}
+	for _, c := range tests {
+		scan := createScanner(c.Input)
+		for i := 0; i < len(c.Want); i++ {
+			tok := scan.Scan()
+			if tok != c.Want[i] {
+				t.Errorf("%s: unexpected token: %+v", c.Input, tok)
+				break
+			}
+		}
+		if tok := scan.Scan(); tok.Type != Eof {
+			t.Errorf("%s: expected last token to be EOF", c.Input)
+		}
+	}
+}
