@@ -13,16 +13,6 @@ var (
 	ErrProp = errors.New("property not found")
 )
 
-type Path struct {
-	Relative bool
-	Steps    []Step
-}
-
-type Step struct {
-	Field string
-	Cast  string
-}
-
 func Collect(in any, paths []string) ([]any, error) {
 	st := make([]Step, 0, len(paths))
 	for _, p := range paths {
@@ -32,6 +22,20 @@ func Collect(in any, paths []string) ([]any, error) {
 		st = append(st, s)
 	}
 	return traverse(in, st)
+}
+
+type Path struct {
+	Anchored bool
+	Steps    []Step
+}
+
+func (p Path) Collect(in any) ([]any, error) {
+	return traverse(in, p.Steps)
+}
+
+type Step struct {
+	Field string
+	Cast  string
 }
 
 func traverse(in any, paths []Step) ([]any, error) {
@@ -103,8 +107,8 @@ func (c *compiler) Compile() (Path, error) {
 		if !c.is(Dot) {
 			return p, syntaxError("'.' expected after '$'!")
 		}
+		p.Anchored = true
 	case c.is(Dot):
-		p.Relative = true
 		c.next()
 	default:
 		return p, syntaxError("path should start with '$'' or '.'!")
@@ -143,11 +147,65 @@ func (c *compiler) compileStep() (Step, error) {
 	step.Field = c.currentLiteral()
 	if c.is(Cast) {
 		c.next()
+		if !c.is(Ident) {
+			return step, syntaxError("cast type expected")
+		}
+		step.Cast = c.currentLiteral()
+		c.next()
 	}
 	if c.is(Select) {
 		c.next()
+		err := c.compileSelector()
+		if err != nil {
+			return step, err
+		}
 	}
 	return step, nil
+}
+
+func (c *compiler) compileValue() error {
+	switch {
+	case c.is(String):
+	case c.is(Number):
+	case c.is(Boolean):
+	case c.is(Dot):
+	default:
+		return syntaxError("primitive value of relative path expected")
+	}
+	return nil
+}
+
+func (c *compiler) compileSelector() error {
+	c.next()
+	if !c.is(Ident) {
+		return syntaxError("selector name expected")
+	}
+	c.next()
+	if !c.is(BegGrp) {
+		return syntaxError("expected '(' at beginning of selector")
+	}
+	c.next()
+	for !c.done() && !c.is(EndGrp) {
+		err := c.compileValue()
+		if err != nil {
+			return err
+		}
+		switch {
+		case c.is(Comma):
+			c.next()
+			if c.is(EndGrp) {
+				return syntaxError("')' is not allowed after ','")
+			}
+		case c.is(EndGrp):
+		default:
+			return syntaxError("',' or ')' after selector argument")
+		}
+	}
+	if !c.is(BegGrp) {
+		return syntaxError("expected ')' at end of selector")
+	}
+	c.next()
+	return nil
 }
 
 func (c *compiler) next() {
@@ -170,12 +228,16 @@ func (c *compiler) currentLiteral() string {
 const (
 	Invalid rune = iota
 	Ident
+	Number
+	String
+	Boolean
 	Dot
 	Root
 	Cast
 	Select
+	Comma
 	BegGrp
-	EndGrap
+	EndGrp
 	Eof
 )
 
@@ -190,6 +252,8 @@ type scanner struct {
 	next  int
 	char  rune
 
+	allowedValues int
+
 	buf bytes.Buffer
 }
 
@@ -203,7 +267,33 @@ func createScanner(str string) *scanner {
 
 func (s *scanner) Scan() token {
 	defer s.reset()
+	s.skipBlanks()
 
+	if s.allowedValues >= 1 {
+		tok := s.scanValue()
+		if tok.Type != Invalid {
+			return tok
+		}
+	}
+	return s.scanDefault()
+}
+
+func (s *scanner) scanValue() token {
+	var tok token
+	switch {
+	case s.char == '"':
+		s.scanString(&tok)
+	case isNumber(s.char) || s.char == '-':
+		s.scanNumber(&tok)
+	case isLetter(s.char):
+		s.scanBool(&tok)
+	default:
+		tok.Type = Invalid
+	}
+	return tok
+}
+
+func (s *scanner) scanDefault() token {
 	var tok token
 	if s.done() {
 		tok.Type = Eof
@@ -213,13 +303,81 @@ func (s *scanner) Scan() token {
 	case s.char == '.':
 		tok.Type = Dot
 		s.read()
+	case s.char == ',':
+		tok.Type = Comma
+		s.read()
+	case s.char == '(':
+		tok.Type = Comma
+		s.read()
+	case s.char == ')':
+		tok.Type = Comma
+		s.read()
 	case s.char == '$':
 		tok.Type = Root
 		s.read()
+	case s.char == ':':
+		tok.Type = Select
+		s.read()
+		if s.char == ':' {
+			tok.Type = Cast
+			s.read()
+		}
 	default:
 		s.scanIdent(&tok)
 	}
 	return tok
+}
+
+func (s *scanner) scanString(tok *token) {
+	s.read()
+	for !s.done() && s.char != '"' {
+		s.write()
+		s.read()
+	}
+	tok.Type = String
+	tok.Literal = s.literal()
+	if s.char != '"' {
+		tok.Type = Invalid
+	} else {
+		s.read()
+	}
+}
+
+func (s *scanner) scanNumber(tok *token) {
+	if s.char == '-' {
+		s.write()
+		s.read()
+	}
+	for !s.done() && !isNumber(s.char) {
+		s.write()
+		s.read()
+	}
+	tok.Type = Number
+	tok.Literal = s.literal()
+	if s.char != '.' {
+		return
+	}
+	s.write()
+	s.read()
+	for !s.done() && !isNumber(s.char) {
+		s.write()
+		s.read()
+	}
+	tok.Literal = s.literal()
+}
+
+func (s *scanner) scanBool(tok *token) {
+	tok.Type = Boolean
+	for !s.done() && isAlpha(s.char) {
+		s.write()
+		s.read()
+	}
+	tok.Literal = s.literal()
+	switch tok.Literal {
+	case "true", "false":
+	default:
+		tok.Type = Invalid
+	}
 }
 
 func (s *scanner) scanIdent(tok *token) {
@@ -254,6 +412,12 @@ func (s *scanner) reset() {
 	s.buf.Reset()
 }
 
+func (s *scanner) skipBlanks() {
+	for !s.done() && isBlank(s.char) {
+		s.read()
+	}
+}
+
 func (s *scanner) literal() string {
 	return s.buf.String()
 }
@@ -276,4 +440,8 @@ func isLetter(c rune) bool {
 
 func isAlpha(c rune) bool {
 	return isLetter(c) || isNumber(c) || c == '_'
+}
+
+func isBlank(c rune) bool {
+	return c == ' ' || c == '\t' || c == '\r' || c == '\n'
 }
