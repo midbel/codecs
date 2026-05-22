@@ -221,6 +221,14 @@ func (c *compiler) is(kind rune) bool {
 	return c.curr.Type == kind
 }
 
+func (c *compiler) isIdentifier() bool {
+	return c.is(Ident) || c.is(String) || c.is(Number) || c.is(Boolean)
+}
+
+func (c *compiler) isValue() bool {
+	return c.is(String) || c.is(Number) || c.is(Boolean)
+}
+
 func (c *compiler) currentLiteral() string {
 	return c.curr.Literal
 }
@@ -252,8 +260,6 @@ type scanner struct {
 	next  int
 	char  rune
 
-	allowedValues int
-
 	buf bytes.Buffer
 }
 
@@ -269,28 +275,7 @@ func (s *scanner) Scan() token {
 	defer s.reset()
 	s.skipBlanks()
 
-	if s.allowedValues >= 1 {
-		tok := s.scanValue()
-		if tok.Type != Invalid {
-			return tok
-		}
-	}
 	return s.scanDefault()
-}
-
-func (s *scanner) scanValue() token {
-	var tok token
-	switch {
-	case s.char == '"':
-		s.scanString(&tok)
-	case isNumber(s.char) || s.char == '-':
-		s.scanNumber(&tok)
-	case isLetter(s.char):
-		s.scanBool(&tok)
-	default:
-		tok.Type = Invalid
-	}
-	return tok
 }
 
 func (s *scanner) scanDefault() token {
@@ -322,6 +307,10 @@ func (s *scanner) scanDefault() token {
 			tok.Type = Cast
 			s.read()
 		}
+	case s.char == '"':
+		s.scanString(&tok)
+	case isNumber(s.char) || s.char == '-':
+		s.scanNumber(&tok)
 	default:
 		s.scanIdent(&tok)
 	}
