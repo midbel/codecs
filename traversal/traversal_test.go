@@ -37,6 +37,42 @@ func TestCollect(t *testing.T) {
 	}
 }
 
+func TestCompile(t *testing.T) {
+	tests := []struct {
+		Input   string
+		Invalid bool
+	}{
+		{
+			Input: "$.foo",
+		},
+		{
+			Input: ".foo",
+		},
+		{
+			Input: "$.foo, $.bar",
+		},
+		{
+			Input: ".foo, .bar",
+		},
+		{
+			Input:   "$.foo.",
+			Invalid: true,
+		},
+		{
+			Input:   "$.foo,",
+			Invalid: true,
+		},
+	}
+	for _, c := range tests {
+		_, err := CompilePath(c.Input)
+		if c.Invalid && err == nil {
+			t.Errorf("%s: invalid input compiled successfully!", c.Input)
+		} else if !c.Invalid && err != nil {
+			t.Errorf("%s: fail to compile valid input: %s", c.Input, err)
+		}
+	}
+}
+
 func TestScan(t *testing.T) {
 	tests := []struct {
 		Input string

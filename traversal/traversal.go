@@ -50,13 +50,41 @@ func Collect(in any, paths []string) ([]any, error) {
 	return traverse(in, st)
 }
 
-type Path struct {
+type Path interface {
+	Collect(any) ([]any, error)
+}
+
+type singlePath struct {
 	Anchored bool
 	Steps    []Step
 }
 
-func (p Path) Collect(in any) ([]any, error) {
+func (p singlePath) Collect(in any) ([]any, error) {
 	return traverse(in, p.Steps)
+}
+
+type multiPath struct {
+	paths []Path
+}
+
+func (p multiPath) Collect(in any) ([]any, error) {
+	var list []any
+	for _, ps := range p.paths {
+		s, err := ps.Collect(in)
+		if err != nil {
+			return nil, err
+		}
+		list = append(list, s)
+	}
+	return list, nil
+}
+
+type alternativePath struct {
+	paths []Path
+}
+
+func (p alternativePath) Collect(in any) ([]any, error) {
+	return nil, nil
 }
 
 type Step struct {
@@ -113,6 +141,11 @@ type compiler struct {
 	peek token
 }
 
+func CompilePath(str string) (Path, error) {
+	c := compile(str)
+	return c.Compile()
+}
+
 func compile(str string) *compiler {
 	c := compiler{
 		scan: createScanner(str),
@@ -123,30 +156,72 @@ func compile(str string) *compiler {
 }
 
 func (c *compiler) Compile() (Path, error) {
-	var (
-		p   Path
-		err error
-	)
+	return c.compilePath()
+}
+
+func (c *compiler) compilePath() (Path, error) {
+	var paths []Path
+	for !c.done() {
+		var (
+			sp  singlePath
+			err error
+		)
+		sp.Anchored, err = c.compileAnchored()
+		if err != nil {
+			return nil, err
+		}
+
+		sp.Steps, err = c.compile()
+		if err != nil {
+			return nil, err
+		}
+		switch {
+		case c.is(Eof):
+		case c.is(Comma):
+			c.next()
+			if c.is(Eof) {
+				return nil, syntaxError("',' not allowed at end of path")
+			}
+		default:
+			return nil, syntaxError("',' expected after path")
+		}
+		paths = append(paths, sp)
+
+	}
+	switch len(paths) {
+	case 0:
+		return nil, fmt.Errorf("no path parsed")
+	case 1:
+		return paths[0], nil
+	default:
+		mp := multiPath{
+			paths: paths,
+		}
+		return mp, nil
+	}
+}
+
+func (c *compiler) compileAnchored() (bool, error) {
+	var anchored bool
 	switch {
 	case c.is(Root):
 		c.next()
 		if !c.is(Dot) {
-			return p, syntaxError("'.' expected after '$'!")
+			return false, syntaxError("'.' expected after '$'!")
 		}
-		p.Anchored = true
+		anchored = true
 		c.next()
 	case c.is(Dot):
 		c.next()
 	default:
-		return p, syntaxError("path should start with '$'' or '.'!")
+		return false, syntaxError("path should start with '$'' or '.'!")
 	}
-	p.Steps, err = c.compile()
-	return p, err
+	return anchored, nil
 }
 
 func (c *compiler) compile() ([]Step, error) {
 	var steps []Step
-	for !c.done() {
+	for !c.done() && !c.is(Comma) {
 		step, err := c.compileStep()
 		if err != nil {
 			return nil, err
@@ -156,8 +231,11 @@ func (c *compiler) compile() ([]Step, error) {
 			c.next()
 			if c.is(Eof) {
 				return nil, syntaxError("'.' not allowed at end of path")
+			} else if c.is(Comma) {
+				return nil, syntaxError("'.' not allowed before ','")
 			}
 		case c.is(Eof):
+		case c.is(Comma):
 		default:
 			return nil, syntaxError("'.' expected after step")
 		}
@@ -272,6 +350,7 @@ const (
 	Cast
 	Select
 	Comma
+	Pipe
 	BegGrp
 	EndGrp
 	Eof
@@ -335,6 +414,9 @@ func (s *scanner) scanDefault() token {
 			tok.Type = Cast
 			s.read()
 		}
+	case s.char == '|':
+		tok.Type = Pipe
+		s.read()
 	case s.char == '"':
 		s.scanString(&tok)
 	case isNumber(s.char) || s.char == '-':
