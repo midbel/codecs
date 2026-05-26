@@ -15,6 +15,16 @@ import (
 
 var errSyntax = errors.New("syntax error")
 
+func Decode(r io.Reader) (any, error) {
+	p := createParser(r, stdMode)
+	return p.Parse()
+}
+
+func Decode5(r io.Reader) (any, error) {
+	p := createParser(r, json5Mode)
+	return p.Parse()
+}
+
 type Parser struct {
 	scan *Scanner
 	curr jsonkit.Token
@@ -23,24 +33,14 @@ type Parser struct {
 	mode
 }
 
-func Parse(r io.Reader) (any, error) {
+func createParser(r io.Reader, jm mode) *Parser {
 	p := &Parser{
-		scan: Scan(r, stdMode),
+		scan: Scan(r, jm),
 		mode: stdMode,
 	}
 	p.next()
 	p.next()
-	return p.Parse()
-}
-
-func Parse5(r io.Reader) (any, error) {
-	p := &Parser{
-		scan: Scan(r, json5Mode),
-		mode: json5Mode,
-	}
-	p.next()
-	p.next()
-	return p.Parse()
+	return p
 }
 
 func (p *Parser) Parse() (any, error) {

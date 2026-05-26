@@ -16,7 +16,7 @@ import (
 )
 
 func Find(r io.Reader, q string) (any, error) {
-	doc, err := json.Parse(r)
+	doc, err := json.Decode(r)
 	if err != nil {
 		return nil, err
 	}
