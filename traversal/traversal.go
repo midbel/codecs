@@ -134,6 +134,7 @@ func (c *compiler) Compile() (Path, error) {
 			return p, syntaxError("'.' expected after '$'!")
 		}
 		p.Anchored = true
+		c.next()
 	case c.is(Dot):
 		c.next()
 	default:
@@ -171,6 +172,7 @@ func (c *compiler) compileStep() (Step, error) {
 		return step, syntaxError("identifier expected")
 	}
 	step.Field = c.currentLiteral()
+	c.next()
 	if c.is(Cast) {
 		c.next()
 		if !c.is(Ident) {

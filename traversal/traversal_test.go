@@ -51,6 +51,17 @@ func TestScan(t *testing.T) {
 				{Literal: "", Type: Eof},
 			},
 		},
+		{
+			Input: "$.repos.name",
+			Want: []token{
+				{Literal: "", Type: Root},
+				{Literal: "", Type: Dot},
+				{Literal: "repos", Type: Ident},
+				{Literal: "", Type: Dot},
+				{Literal: "name", Type: Ident},
+				{Literal: "", Type: Eof},
+			},
+		},
 	}
 	for _, c := range tests {
 		scan := createScanner(c.Input)

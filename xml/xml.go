@@ -5,5 +5,9 @@ import (
 )
 
 func Decode(r io.Reader) (any, error) {
-	return nil, nil
+	doc, err := ParseReader(r)
+	if err != nil {
+		return nil, err
+	}
+	return doc.Map()
 }
