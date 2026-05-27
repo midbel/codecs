@@ -1,4 +1,4 @@
-package traversal
+package probe
 
 import (
 	"testing"

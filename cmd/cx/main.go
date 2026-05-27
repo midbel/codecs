@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/midbel/codecs/json"
-	"github.com/midbel/codecs/traversal"
+	"github.com/midbel/codecs/probe"
 	"github.com/midbel/codecs/xml"
 )
 
@@ -48,7 +48,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "decode: %s\n", err)
 		os.Exit(1)
 	}
-	res, err := traversal.Traverse(flag.Arg(1), in)
+	res, err := probe.Traverse(flag.Arg(1), in)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "traverse: %s\n", err)
 		os.Exit(1)

@@ -1,138 +1,28 @@
-package traversal
+package probe
 
 import (
 	"bytes"
 	"errors"
 	"fmt"
+	"strconv"
 	"unicode/utf8"
 )
 
 var (
-	ErrType = errors.New("array or object expected")
-	ErrEnd  = errors.New("unexpected end of path")
-	ErrProp = errors.New("property not found")
+	errSyntax  = errors.New("syntax error")
+	errConvert = errors.New("conversion error")
 )
-
-func Traverse(path string, in any) ([]any, error) {
-	c := compile(path)
-
-	p, err := c.Compile()
-	if err != nil {
-		return nil, err
-	}
-	return p.Collect(in)
-}
-
-func TraverseFrom(root, path string, in any) ([]any, error) {
-	starts, err := Traverse(root, in)
-	if err != nil {
-		return nil, err
-	}
-	var res []any
-	for _, s := range starts {
-		xs, err := Traverse(path, s)
-		if err != nil {
-			return nil, err
-		}
-		res = append(res, xs...)
-	}
-	return res, nil
-}
-
-func Collect(in any, paths []string) ([]any, error) {
-	st := make([]Step, 0, len(paths))
-	for _, p := range paths {
-		s := Step{
-			Field: p,
-		}
-		st = append(st, s)
-	}
-	return traverse(in, st)
-}
-
-type Path interface {
-	Collect(any) ([]any, error)
-}
-
-type singlePath struct {
-	Anchored bool
-	Steps    []Step
-}
-
-func (p singlePath) Collect(in any) ([]any, error) {
-	return traverse(in, p.Steps)
-}
-
-type multiPath struct {
-	paths []Path
-}
-
-func (p multiPath) Collect(in any) ([]any, error) {
-	var list []any
-	for _, ps := range p.paths {
-		s, err := ps.Collect(in)
-		if err != nil {
-			return nil, err
-		}
-		list = append(list, s)
-	}
-	return list, nil
-}
-
-type alternativePath struct {
-	paths []Path
-}
-
-func (p alternativePath) Collect(in any) ([]any, error) {
-	return nil, nil
-}
-
-type Step struct {
-	Field string
-	Cast  string
-}
-
-func traverse(in any, paths []Step) ([]any, error) {
-	switch in := in.(type) {
-	case []any:
-		return traverseArray(in, paths)
-	case map[string]any:
-		return traverseObject(in, paths)
-	default:
-		return nil, ErrType
-	}
-}
-
-func traverseArray(in []any, paths []Step) ([]any, error) {
-	var result []any
-	for i := range in {
-		tmp, err := traverse(in[i], paths)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, tmp...)
-	}
-	return result, nil
-}
-
-func traverseObject(in map[string]any, paths []Step) ([]any, error) {
-	if len(paths) == 0 {
-		return nil, ErrEnd
-	}
-	p, ok := in[paths[0].Field]
-	if !ok {
-		return nil, fmt.Errorf("%s: %w", paths[0].Field, ErrProp)
-	}
-	if len(paths) == 1 {
-		return []any{p}, nil
-	}
-	return traverse(p, paths[1:])
-}
-
-var errSyntax = errors.New("syntax error")
 
 func syntaxError(msg string) error {
 	return fmt.Errorf("%w: %s", errSyntax, msg)
+}
+
+func convertNumberError(str string) error {
+	return fmt.Errorf("%w: %s can not be converted to number", errConvert, str)
+}
+
+func convertBoolError(str string) error {
+	return fmt.Errorf("%w: %s can not be converted to boolean", errConvert, str)
 }
 
 type compiler struct {
@@ -156,22 +46,21 @@ func compile(str string) *compiler {
 }
 
 func (c *compiler) Compile() (Path, error) {
-	return c.compilePath()
+	return c.compile()
 }
 
-func (c *compiler) compilePath() (Path, error) {
+func (c *compiler) compile() (Path, error) {
 	var paths []Path
 	for !c.done() {
 		var (
-			sp  singlePath
+			pth Path
 			err error
 		)
-		sp.Anchored, err = c.compileAnchored()
-		if err != nil {
-			return nil, err
+		if c.isLiteral() {
+			pth, err = c.compileValue()
+		} else {
+			pth, err = c.compilePath()
 		}
-
-		sp.Steps, err = c.compile()
 		if err != nil {
 			return nil, err
 		}
@@ -185,20 +74,63 @@ func (c *compiler) compilePath() (Path, error) {
 		default:
 			return nil, syntaxError("',' expected after path")
 		}
-		paths = append(paths, sp)
+		paths = append(paths, pth)
 
 	}
 	switch len(paths) {
 	case 0:
-		return nil, fmt.Errorf("no path parsed")
+		return nil, syntaxError("no path could be parsed from input string")
 	case 1:
 		return paths[0], nil
 	default:
-		mp := multiPath{
+		mp := multi{
 			paths: paths,
 		}
 		return mp, nil
 	}
+}
+
+func (c *compiler) compileValue() (Path, error) {
+	var value any
+	switch {
+	case c.is(String):
+		value = c.currentLiteral()
+	case c.is(Number):
+		x, err := strconv.ParseFloat(c.currentLiteral(), 64)
+		if err != nil {
+			return nil, convertNumberError(c.currentLiteral())
+		}
+		value = x
+	case c.is(Boolean):
+		x, err := strconv.ParseBool(c.currentLiteral())
+		if err != nil {
+			return nil, convertBoolError(c.currentLiteral())
+		}
+		value = x
+	default:
+		return nil, syntaxError("literal value expected")
+	}
+	c.next()
+	lit := literal{
+		value: value,
+	}
+	return lit, nil
+}
+
+func (c *compiler) compilePath() (Path, error) {
+	var (
+		pth single
+		err error
+	)
+	pth.Anchored, err = c.compileAnchored()
+	if err != nil {
+		return nil, err
+	}
+	pth.Start, err = c.compileExpr()
+	if err != nil {
+		return nil, err
+	}
+	return pth, nil
 }
 
 func (c *compiler) compileAnchored() (bool, error) {
@@ -219,69 +151,41 @@ func (c *compiler) compileAnchored() (bool, error) {
 	return anchored, nil
 }
 
-func (c *compiler) compile() ([]Step, error) {
-	var steps []Step
-	for !c.done() && !c.is(Comma) {
-		step, err := c.compileStep()
-		if err != nil {
-			return nil, err
-		}
-		switch {
-		case c.is(Dot):
-			c.next()
-			if c.is(Eof) {
-				return nil, syntaxError("'.' not allowed at end of path")
-			} else if c.is(Comma) {
-				return nil, syntaxError("'.' not allowed before ','")
-			}
-		case c.is(Eof):
-		case c.is(Comma):
-		default:
-			return nil, syntaxError("'.' expected after step")
-		}
-		steps = append(steps, step)
-	}
-	return steps, nil
-}
-
-func (c *compiler) compileStep() (Step, error) {
-	var step Step
+func (c *compiler) compileExpr() (Expr, error) {
+	var (
+		step field
+		err  error
+	)
 	if !c.is(Ident) {
-		return step, syntaxError("identifier expected")
+		return nil, syntaxError("identifier expected")
 	}
-	step.Field = c.currentLiteral()
+	step.Name = c.currentLiteral()
 	c.next()
 	if c.is(Cast) {
 		c.next()
 		if !c.is(Ident) {
-			return step, syntaxError("cast type expected")
+			return nil, syntaxError("cast type expected")
 		}
 		step.Cast = c.currentLiteral()
 		c.next()
 	}
-	if c.is(Select) {
+	if c.is(Call) {
 		c.next()
-		err := c.compileSelector()
+		err := c.compileCall()
 		if err != nil {
-			return step, err
+			return nil, err
+		}
+	}
+	if c.is(Dot) {
+		step.Next, err = c.compileExpr()
+		if err != nil {
+			return nil, err
 		}
 	}
 	return step, nil
 }
 
-func (c *compiler) compileValue() error {
-	switch {
-	case c.is(String):
-	case c.is(Number):
-	case c.is(Boolean):
-	case c.is(Dot):
-	default:
-		return syntaxError("primitive value of relative path expected")
-	}
-	return nil
-}
-
-func (c *compiler) compileSelector() error {
+func (c *compiler) compileCall() error {
 	c.next()
 	if !c.is(Ident) {
 		return syntaxError("selector name expected")
@@ -292,7 +196,7 @@ func (c *compiler) compileSelector() error {
 	}
 	c.next()
 	for !c.done() && !c.is(EndGrp) {
-		err := c.compileValue()
+		_, err := c.compileValue()
 		if err != nil {
 			return err
 		}
@@ -327,12 +231,12 @@ func (c *compiler) is(kind rune) bool {
 	return c.curr.Type == kind
 }
 
-func (c *compiler) isIdentifier() bool {
-	return c.is(Ident) || c.is(String) || c.is(Number) || c.is(Boolean)
+func (c *compiler) isLiteral() bool {
+	return c.is(String) || c.is(Number) || c.is(Boolean)
 }
 
-func (c *compiler) isValue() bool {
-	return c.is(String) || c.is(Number) || c.is(Boolean)
+func (c *compiler) isIdentifier() bool {
+	return c.is(Ident)
 }
 
 func (c *compiler) currentLiteral() string {
@@ -348,7 +252,7 @@ const (
 	Dot
 	Root
 	Cast
-	Select
+	Call
 	Comma
 	Pipe
 	BegGrp
@@ -399,16 +303,16 @@ func (s *scanner) scanDefault() token {
 		tok.Type = Comma
 		s.read()
 	case s.char == '(':
-		tok.Type = Comma
+		tok.Type = BegGrp
 		s.read()
 	case s.char == ')':
-		tok.Type = Comma
+		tok.Type = EndGrp
 		s.read()
 	case s.char == '$':
 		tok.Type = Root
 		s.read()
 	case s.char == ':':
-		tok.Type = Select
+		tok.Type = Call
 		s.read()
 		if s.char == ':' {
 			tok.Type = Cast
