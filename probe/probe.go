@@ -29,3 +29,23 @@ func TraverseFrom(root, path string, in any) ([]any, error) {
 func Collect(in any, paths []string) ([]any, error) {
 	return nil, nil
 }
+
+func traverse(e Expr, in any) ([]any, error) {
+	switch in := in.(type) {
+	case []any:
+		_ = in
+	case map[any]string:
+		_ = in
+	default:
+		return nil, ErrType
+	}
+	return nil, nil
+}
+
+func traverseArray(e Expr, in []any) ([]any, error) {
+	return nil, nil
+}
+
+func traverseMap(e Expr, in map[string]any) (any, error) {
+	return nil, nil
+}

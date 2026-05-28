@@ -60,6 +60,9 @@ func (c *compiler) compile() (Path, error) {
 			pth, err = c.compileValue()
 		} else {
 			pth, err = c.compilePath()
+			if err == nil && c.is(Pipe) {
+				
+			}
 		}
 		if err != nil {
 			return nil, err
