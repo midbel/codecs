@@ -61,7 +61,7 @@ func (c *compiler) compile() (Path, error) {
 		} else {
 			pth, err = c.compilePath()
 			if err == nil && c.is(Pipe) {
-				
+
 			}
 		}
 		if err != nil {
@@ -298,6 +298,7 @@ func (s *scanner) scanDefault() token {
 		tok.Type = Eof
 		return tok
 	}
+	s.skipBlanks()
 	switch {
 	case s.char == '.':
 		tok.Type = Dot
@@ -354,7 +355,7 @@ func (s *scanner) scanNumber(tok *token) {
 		s.write()
 		s.read()
 	}
-	for !s.done() && !isNumber(s.char) {
+	for !s.done() && isNumber(s.char) {
 		s.write()
 		s.read()
 	}
@@ -365,7 +366,7 @@ func (s *scanner) scanNumber(tok *token) {
 	}
 	s.write()
 	s.read()
-	for !s.done() && !isNumber(s.char) {
+	for !s.done() && isNumber(s.char) {
 		s.write()
 		s.read()
 	}
