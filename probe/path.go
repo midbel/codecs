@@ -24,7 +24,7 @@ type single struct {
 }
 
 func (p single) Collect(in any) (any, error) {
-	return traverse(p.Start, in)
+	return p.Start.Eval(in)
 }
 
 type multi struct {
@@ -32,38 +32,15 @@ type multi struct {
 }
 
 func (p multi) Collect(in any) (any, error) {
-	var (
-		list []any
-		size int
-	)
+	var list []any
 	for _, i := range p.paths {
 		res, err := i.Collect(in)
 		if err != nil {
 			return nil, err
 		}
-		if z, ok := res.([]any); ok {
-			size = max(size, len(z))
-		}
 		list = append(list, res)
 	}
-	out := make([]any, 0, size)
-	for i := 0; i < size; i++ {
-		tmp := make([]any, 0, size)
-		for j := range list {
-			switch a := list[j].(type) {
-			case []any:
-				if i < len(a) {
-					tmp = append(tmp, a[i])
-				} else {
-					tmp = append(tmp, nil)
-				}
-			default:
-				tmp = append(tmp, a)
-			}
-		}
-		out = append(out, tmp)
-	}
-	return out, nil
+	return list, nil
 }
 
 type alternative struct {
@@ -76,12 +53,11 @@ func (p alternative) Collect(in any) (any, error) {
 
 type field struct {
 	Name string
-	Cast string
 	Next Expr
 }
 
 func (s field) Eval(in any) (any, error) {
-	return nil, nil
+	return traverse(s, in)
 }
 
 type literal struct {
@@ -94,4 +70,48 @@ func (s literal) Collect(_ any) (any, error) {
 
 func (s literal) Eval(_ any) (any, error) {
 	return s.value, nil
+}
+
+func traverse(e Expr, in any) (any, error) {
+	if e, ok := e.(literal); ok {
+		return []any{e.value}, nil
+	}
+	switch in := in.(type) {
+	case []any:
+		return traverseArray(e, in)
+	case map[string]any:
+		return traverseMap(e, in)
+	default:
+		return nil, ErrType
+	}
+}
+
+func traverseArray(e Expr, in []any) (any, error) {
+	var result []any
+	for i := range in {
+		tmp, err := traverse(e, in[i])
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, tmp)
+	}
+	return result, nil
+}
+
+func traverseMap(e Expr, in map[string]any) (any, error) {
+	if e == nil {
+		return nil, ErrEnd
+	}
+	x, ok := e.(field)
+	if !ok {
+		return nil, nil
+	}
+	p, ok := in[x.Name]
+	if !ok {
+		return nil, nil
+	}
+	if x.Next == nil {
+		return p, nil
+	}
+	return traverse(x.Next, p)
 }

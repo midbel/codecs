@@ -164,14 +164,6 @@ func (c *compiler) compileExpr() (Expr, error) {
 	}
 	step.Name = c.currentLiteral()
 	c.next()
-	if c.is(Cast) {
-		c.next()
-		if !c.is(Ident) {
-			return nil, syntaxError("cast type expected")
-		}
-		step.Cast = c.currentLiteral()
-		c.next()
-	}
 	if c.is(Call) {
 		c.next()
 		err := c.compileCall()
@@ -180,6 +172,7 @@ func (c *compiler) compileExpr() (Expr, error) {
 		}
 	}
 	if c.is(Dot) {
+		c.next()
 		step.Next, err = c.compileExpr()
 		if err != nil {
 			return nil, err
@@ -254,7 +247,6 @@ const (
 	Boolean
 	Dot
 	Root
-	Cast
 	Call
 	Comma
 	Pipe
@@ -318,10 +310,6 @@ func (s *scanner) scanDefault() token {
 	case s.char == ':':
 		tok.Type = Call
 		s.read()
-		if s.char == ':' {
-			tok.Type = Cast
-			s.read()
-		}
 	case s.char == '|':
 		tok.Type = Pipe
 		s.read()

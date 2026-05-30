@@ -1,69 +1,182 @@
 package probe
 
-import "fmt"
+import (
+	"fmt"
+	"slices"
+)
 
-func Traverse(path string, in any) (any, error) {
+type ZipMode int8
+
+const (
+	NoZip ZipMode = iota
+	ZipShort
+	ZipLongest
+	ZipStrict
+)
+
+type Options struct {
+	Zip     ZipMode
+	Expand  bool
+	Missing any
+}
+
+func (o *Options) rowCount(in []any) (int, error) {
+	var (
+		res int
+		err error
+	)
+	switch o.Zip {
+	case ZipShort:
+		res = o.minSize(in)
+	case ZipLongest:
+		res = o.maxSize(in)
+	case ZipStrict:
+		res, err = o.strictSize(in)
+	default:
+		err = fmt.Errorf("no zip")
+	}
+	if err != nil {
+		return res, err
+	}
+	if res == 0 {
+		res++
+	}
+	return res, nil
+}
+
+func (o *Options) minSize(arr []any) int {
+	var (
+		size int
+		set  bool
+	)
+	for _, a := range arr {
+		if a, ok := a.([]any); ok {
+			if !set {
+				size = len(a)
+				set = true
+			}
+			size = min(size, len(a))
+		}
+	}
+	return size
+}
+
+func (o *Options) maxSize(arr []any) int {
+	var size int
+	for _, a := range arr {
+		if a, ok := a.([]any); ok {
+			size = max(size, len(a))
+		}
+	}
+	return size
+}
+
+func (o *Options) strictSize(arr []any) (int, error) {
+	var (
+		size int
+		set  bool
+	)
+	for _, a := range arr {
+		if a, ok := a.([]any); ok {
+			if !set {
+				set = true
+				size = len(a)
+			}
+			if size != len(a) {
+				return 0, fmt.Errorf("size mismatched!")
+			}
+		}
+	}
+	return size, nil
+}
+
+func Traverse(path string, in any, opts *Options) (any, error) {
+	if opts == nil {
+		opts = &Options{
+			Expand: true,
+			Zip:    ZipStrict,
+		}
+	}
 	c := compile(path)
 
 	p, err := c.Compile()
 	if err != nil {
 		return nil, err
 	}
-	return p.Collect(in)
-}
-
-func TraverseFrom(root, path string, in any) (any, error) {
-	starts, err := Traverse(root, in)
+	res, err := p.Collect(in)
 	if err != nil {
 		return nil, err
 	}
-	return Traverse(path, starts)
-}
-
-func Collect(in any, paths []string) ([]any, error) {
-	return nil, nil
-}
-
-func traverse(e Expr, in any) ([]any, error) {
-	if e, ok := e.(literal); ok {
-		return []any{e.value}, nil
+	if a, ok := res.([]any); ok && opts.Zip != NoZip {
+		return materialize(a, opts)
 	}
-	switch in := in.(type) {
-	case []any:
-		return traverseArray(e, in)
-	case map[string]any:
-		return traverseMap(e, in)
-	default:
-		return nil, ErrType
-	}
+	return res, nil
 }
 
-func traverseArray(e Expr, in []any) ([]any, error) {
-	var result []any
-	for i := range in {
-		tmp, err := traverse(e, in[i])
-		if err != nil {
-			return nil, err
+func materialize(arr []any, opts *Options) (any, error) {
+	size, err := opts.rowCount(arr)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]any, 0, size)
+	for i := 0; i < size; i++ {
+		var (
+			tmp  = make([]any, 0, size)
+			flat bool
+		)
+		for j := range arr {
+			switch a := arr[j].(type) {
+			case []any:
+				if i < len(a) {
+					tmp = append(tmp, a[i])
+					if ok := canExpand(a[i]); ok && !flat {
+						flat = true
+					}
+				} else {
+					tmp = append(tmp, opts.Missing)
+				}
+			default:
+				tmp = append(tmp, a)
+			}
 		}
-		result = append(result, tmp...)
+		if opts.Expand && flat {
+			out = append(out, expand(tmp)...)
+		} else {
+			out = append(out, tmp)
+		}
 	}
-	return result, nil
+	return out, nil
 }
 
-func traverseMap(e Expr, in map[string]any) ([]any, error) {
-	if e == nil {
-		return nil, ErrEnd
+func expand(arr []any) []any {
+	var tmp [][]any
+	tmp = append(tmp, []any{})
+	for i := range arr {
+		a, ok := arr[i].([]any)
+		if !ok {
+			for j := range tmp {
+				tmp[j] = append(tmp[j], arr[i])
+			}
+		} else {
+			xs := make([][]any, 0, len(tmp)*len(a))
+			for j := range a {
+				for k := range tmp {
+					t := slices.Clone(tmp[k])
+					t = append(t, a[j])
+					xs = append(xs, t)
+				}
+			}
+			tmp = xs
+		}
 	}
-	x, ok := e.(field)
-	if !ok {
-		return nil, nil
+	res := make([]any, len(tmp))
+	for i := range res {
+		res[i] = tmp[i]
 	}
-	p, ok := in[x.Name]
-	if !ok {
-		return nil, fmt.Errorf("%s: %w", x.Name, ErrProp)
-	}
-	if x.Next == nil {
-		return []any{p}, nil
-	}
-	return traverse(x.Next, p)
+	return res
+}
+
+func canExpand(a any) bool {
+	_, ok := a.([]any)
+	return ok
 }

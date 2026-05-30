@@ -48,7 +48,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "decode: %s\n", err)
 		os.Exit(1)
 	}
-	res, err := probe.Traverse(flag.Arg(1), in)
+	res, err := probe.Traverse(flag.Arg(1), in, nil)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "traverse: %s\n", err)
 		os.Exit(1)
