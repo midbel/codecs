@@ -49,7 +49,7 @@ func ParseExpandMode(str string) (ExpandMode, error) {
 	default:
 		return mode, fmt.Errorf("unsupported expand mode given: %s", str)
 	}
-	return mode, nil	
+	return mode, nil
 }
 
 type Options struct {

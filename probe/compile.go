@@ -52,18 +52,17 @@ func (c *compiler) Compile() (Path, error) {
 func (c *compiler) compile() (Path, error) {
 	var paths []Path
 	for !c.done() {
-		var (
-			pth Path
-			err error
-		)
-		if c.isLiteral() {
-			pth, err = c.compileValue()
-		} else {
-			pth, err = c.compilePath()
-			if err == nil && c.is(Pipe) {
-
-			}
-		}
+		// var (
+		// 	pth Path
+		// 	err error
+		// )
+		// if c.isLiteral() {
+		// 	pth, err = c.compileValue()
+		// } else {
+		// 	// pth, err = c.compilePath()
+		// 	pth, err = c.compileAlternative()
+		// }
+		pth, err := c.compileAlternative()
 		if err != nil {
 			return nil, err
 		}
@@ -87,6 +86,40 @@ func (c *compiler) compile() (Path, error) {
 		return paths[0], nil
 	default:
 		mp := multi{
+			paths: paths,
+		}
+		return mp, nil
+	}
+}
+
+func (c *compiler) compileAlternative() (Path, error) {
+	var paths []Path
+	for !c.done() {
+		var (
+			pth Path
+			err error
+		)
+		if c.isLiteral() {
+			pth, err = c.compileValue()
+		} else {
+			pth, err = c.compilePath()
+		}
+		if err != nil {
+			return nil, err
+		}
+		paths = append(paths, pth)
+		if !c.is(Pipe) {
+			break
+		}
+		c.next()
+	}
+	switch len(paths) {
+	case 0:
+		return nil, syntaxError("no path could be parsed from input string")
+	case 1:
+		return paths[0], nil
+	default:
+		mp := alternative{
 			paths: paths,
 		}
 		return mp, nil
@@ -159,7 +192,7 @@ func (c *compiler) compileExpr() (Expr, error) {
 		step field
 		err  error
 	)
-	if !c.is(Ident) {
+	if !c.isIdentifier() {
 		return nil, syntaxError("identifier expected")
 	}
 	step.Name = c.currentLiteral()
@@ -232,7 +265,7 @@ func (c *compiler) isLiteral() bool {
 }
 
 func (c *compiler) isIdentifier() bool {
-	return c.is(Ident)
+	return c.is(Ident) || c.is(String) || c.is(Number)
 }
 
 func (c *compiler) currentLiteral() string {

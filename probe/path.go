@@ -48,6 +48,12 @@ type alternative struct {
 }
 
 func (p alternative) Collect(in any) (any, error) {
+	for _, p := range p.paths {
+		a, err := p.Collect(in)
+		if err == nil {
+			return a, nil
+		}
+	}
 	return nil, nil
 }
 
