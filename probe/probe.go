@@ -14,9 +14,17 @@ const (
 	ZipStrict
 )
 
+type ExpandMode int8
+
+const (
+	ExpandDefault ExpandMode = iota
+	ExpandIgnore
+	ExpandError
+)
+
 type Options struct {
 	Zip     ZipMode
-	Expand  bool
+	Expand  ExpandMode
 	Missing any
 }
 
@@ -93,7 +101,7 @@ func (o *Options) strictSize(arr []any) (int, error) {
 func Traverse(path string, in any, opts *Options) (any, error) {
 	if opts == nil {
 		opts = &Options{
-			Expand: true,
+			Expand: ExpandDefault,
 			Zip:    ZipStrict,
 		}
 	}
@@ -128,9 +136,17 @@ func materialize(arr []any, opts *Options) (any, error) {
 			switch a := arr[j].(type) {
 			case []any:
 				if i < len(a) {
-					tmp = append(tmp, a[i])
 					if ok := canExpand(a[i]); ok && !flat {
 						flat = true
+					}
+					if flat && opts.Expand == ExpandError {
+						return nil, fmt.Errorf("only primitive values allowed")
+					}
+					if flat && opts.Expand == ExpandIgnore {
+						flat = false
+						tmp = append(tmp, nil)
+					} else {
+						tmp = append(tmp, a[i])
 					}
 				} else {
 					tmp = append(tmp, opts.Missing)
@@ -139,7 +155,7 @@ func materialize(arr []any, opts *Options) (any, error) {
 				tmp = append(tmp, a)
 			}
 		}
-		if opts.Expand && flat {
+		if opts.Expand == ExpandDefault && flat {
 			out = append(out, expand(tmp)...)
 		} else {
 			out = append(out, tmp)

@@ -15,7 +15,34 @@ func main() {
 	var (
 		decode func(io.Reader) (any, error) = json.Decode
 		encode func(any)                    = writeJSON
+		opts   probe.Options
 	)
+	flag.Func("z", "zip mode", func(str string) error {
+		switch str {
+		case "", "short", "default":
+			opts.Zip = probe.ZipShort
+		case "longest":
+			opts.Zip = probe.ZipLongest
+		case "strict":
+			opts.Zip = probe.ZipStrict
+		default:
+			return fmt.Errorf("unsupported zip mode given: %s", str)
+		}
+		return nil
+	})
+	flag.Func("e", "expand mode", func(str string) error {
+		switch str {
+		case "", "default":
+			opts.Expand = probe.ExpandDefault
+		case "ignore":
+			opts.Expand = probe.ExpandIgnore
+		case "strict":
+			opts.Expand = probe.ExpandError
+		default:
+			return fmt.Errorf("unsupported expand mode given: %s", str)
+		}
+		return nil
+	})
 	flag.Func("i", "input format", func(str string) error {
 		switch str {
 		case "json", "":
@@ -48,7 +75,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "decode: %s\n", err)
 		os.Exit(1)
 	}
-	res, err := probe.Traverse(flag.Arg(1), in, nil)
+	res, err := probe.Traverse(flag.Arg(1), in, &opts)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "traverse: %s\n", err)
 		os.Exit(1)
