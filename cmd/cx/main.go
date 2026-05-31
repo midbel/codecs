@@ -18,30 +18,18 @@ func main() {
 		opts   probe.Options
 	)
 	flag.Func("z", "zip mode", func(str string) error {
-		switch str {
-		case "", "short", "default":
-			opts.Zip = probe.ZipShort
-		case "longest":
-			opts.Zip = probe.ZipLongest
-		case "strict":
-			opts.Zip = probe.ZipStrict
-		default:
-			return fmt.Errorf("unsupported zip mode given: %s", str)
+		m, err := probe.ParseZipMode(str)
+		if err == nil {
+			opts.Zip = m
 		}
-		return nil
+		return err
 	})
 	flag.Func("e", "expand mode", func(str string) error {
-		switch str {
-		case "", "default":
-			opts.Expand = probe.ExpandDefault
-		case "ignore":
-			opts.Expand = probe.ExpandIgnore
-		case "strict":
-			opts.Expand = probe.ExpandError
-		default:
-			return fmt.Errorf("unsupported expand mode given: %s", str)
+		m, err := probe.ParseExpandMode(str)
+		if err == nil {
+			opts.Expand = m
 		}
-		return nil
+		return err
 	})
 	flag.Func("i", "input format", func(str string) error {
 		switch str {

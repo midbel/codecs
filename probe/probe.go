@@ -14,6 +14,21 @@ const (
 	ZipStrict
 )
 
+func ParseZipMode(str string) (ZipMode, error) {
+	var mode ZipMode
+	switch str {
+	case "", "short", "default":
+		mode = ZipShort
+	case "longest":
+		mode = ZipLongest
+	case "strict":
+		mode = ZipStrict
+	default:
+		return mode, fmt.Errorf("unsupported zip mode given: %s", str)
+	}
+	return mode, nil
+}
+
 type ExpandMode int8
 
 const (
@@ -21,6 +36,21 @@ const (
 	ExpandIgnore
 	ExpandError
 )
+
+func ParseExpandMode(str string) (ExpandMode, error) {
+	var mode ExpandMode
+	switch str {
+	case "", "default":
+		mode = ExpandDefault
+	case "ignore":
+		mode = ExpandIgnore
+	case "strict":
+		mode = ExpandError
+	default:
+		return mode, fmt.Errorf("unsupported expand mode given: %s", str)
+	}
+	return mode, nil	
+}
 
 type Options struct {
 	Zip     ZipMode
