@@ -11,13 +11,58 @@ func invalidArgs(msg string, n int) error {
 	return fmt.Errorf("%w: %s - %d given", errArgument, msg, n)
 }
 
+var builtins = map[string]func(any, []Expr) (any, error){
+	"as":       runAs,
+	"len":      runLen,
+	"length":   runLen,
+	"at":       runAt,
+	"first":    runFirst,
+	"last":     runLast,
+	"default":  runDefault,
+	"not":      runNot,
+	"eq":       runEq,
+	"ne":       runNotEqual,
+	"lt":       runLesserThan,
+	"le":       runLesserEq,
+	"gt":       runGreaterThan,
+	"ge":       runGreaterEq,
+	"between":  runBetween,
+	"in":       runIn,
+	"ifeq":     runIfEqual,
+	"ifne":     runIfNotEqual,
+	"ifexists": runIfExists,
+	"exists":   runExists,
+	"empty":    runEmpty,
+	"null":     runNull,
+}
+
 // :as()
-func cast(val any, args []Expr) (any, error) {
+func runAs(val any, args []Expr) (any, error) {
+	if len(args) != 1 {
+		return nil, invalidArgs("as takes only one argument", len(args))
+	}
+	target, err := getStrFromExpr(args[0])
+	if err != nil {
+		return nil, err
+	}
+	switch target {
+	case "string":
+		val, err = castToString(val)
+	case "number":
+		val, err = castToNumber(val)
+	case "bool":
+		val, err = castToBool(val)
+	default:
+		return nil, fmt.Errorf("%s: unknown target type", target)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("%w: value can not be converted to target type %s", ErrType, target)
+	}
 	return val, nil
 }
 
 // :len, :length
-func length(val any, args []Expr) (any, error) {
+func runLen(val any, args []Expr) (any, error) {
 	if len(args) != 0 {
 		return nil, invalidArgs("length takes not argument(s)", len(args))
 	}
@@ -32,7 +77,7 @@ func length(val any, args []Expr) (any, error) {
 }
 
 // :at()
-func at(val any, args []Expr) (any, error) {
+func runAt(val any, args []Expr) (any, error) {
 	if len(args) != 1 {
 		return nil, invalidArgs("at takes only one argument", len(args))
 	}
@@ -51,7 +96,7 @@ func at(val any, args []Expr) (any, error) {
 }
 
 // :first()
-func first(val any, args []Expr) (any, error) {
+func runFirst(val any, args []Expr) (any, error) {
 	if len(args) != 0 {
 		return nil, invalidArgs("first takes not argument(s)", len(args))
 	}
@@ -66,7 +111,7 @@ func first(val any, args []Expr) (any, error) {
 }
 
 // :last()
-func last(val any, args []Expr) (any, error) {
+func runLast(val any, args []Expr) (any, error) {
 	if len(args) != 0 {
 		return nil, invalidArgs("last takes not argument(s)", len(args))
 	}
@@ -81,7 +126,7 @@ func last(val any, args []Expr) (any, error) {
 }
 
 // :default()
-func fallback(val any, args []Expr) (any, error) {
+func runDefault(val any, args []Expr) (any, error) {
 	if len(args) != 1 {
 		return nil, invalidArgs("default takes only one argument", len(args))
 	}
@@ -92,7 +137,7 @@ func fallback(val any, args []Expr) (any, error) {
 }
 
 // :not()
-func not(val any, args []Expr) (any, error) {
+func ruNot(val any, args []Expr) (any, error) {
 	if len(args) != 1 {
 		return nil, invalidArgs("not takes no argument(s)", len(args))
 	}
@@ -100,7 +145,7 @@ func not(val any, args []Expr) (any, error) {
 }
 
 // :eq()
-func equal(val any, args []Expr) (any, error) {
+func runEqual(val any, args []Expr) (any, error) {
 	if len(args) != 1 {
 		return nil, invalidArgs("eq takes only one argument", len(args))
 	}
@@ -108,7 +153,7 @@ func equal(val any, args []Expr) (any, error) {
 }
 
 // :ne()
-func notEqual(val any, args []Expr) (any, error) {
+func runNotEqual(val any, args []Expr) (any, error) {
 	if len(args) != 1 {
 		return nil, invalidArgs("ne takes only one argument", len(args))
 	}
@@ -116,7 +161,7 @@ func notEqual(val any, args []Expr) (any, error) {
 }
 
 // :lt
-func lesserThan(val any, args []Expr) (any, error) {
+func runLesserThan(val any, args []Expr) (any, error) {
 	if len(args) != 1 {
 		return nil, invalidArgs("lt takes only one argument", len(args))
 	}
@@ -124,7 +169,7 @@ func lesserThan(val any, args []Expr) (any, error) {
 }
 
 // :le
-func lesserEq(val any, args []Expr) (any, error) {
+func runLesserEq(val any, args []Expr) (any, error) {
 	if len(args) != 1 {
 		return nil, invalidArgs("le takes only one argument", len(args))
 	}
@@ -132,7 +177,7 @@ func lesserEq(val any, args []Expr) (any, error) {
 }
 
 // :gt
-func greaterThan(val any, args []Expr) (any, error) {
+func runGreaterThan(val any, args []Expr) (any, error) {
 	if len(args) != 1 {
 		return nil, invalidArgs("gt takes only one argument", len(args))
 	}
@@ -140,7 +185,7 @@ func greaterThan(val any, args []Expr) (any, error) {
 }
 
 // :ge
-func greaterEq(val any, args []Expr) (any, error) {
+func runGreaterEq(val any, args []Expr) (any, error) {
 	if len(args) != 1 {
 		return nil, invalidArgs("ge takes only one argument", len(args))
 	}
@@ -148,7 +193,7 @@ func greaterEq(val any, args []Expr) (any, error) {
 }
 
 // :between
-func between(val any, args []Expr) (any, error) {
+func runBetween(val any, args []Expr) (any, error) {
 	if len(args) != 2 {
 		return nil, invalidArgs("between takes two arguments", len(args))
 	}
@@ -162,7 +207,7 @@ func between(val any, args []Expr) (any, error) {
 }
 
 // :in
-func in(val any, args []Expr) (any, error) {
+func runIn(val any, args []Expr) (any, error) {
 	if len(args) == 0 {
 		return nil, invalidArgs("in takes at least one argument", len(args))
 	}
@@ -175,7 +220,7 @@ func in(val any, args []Expr) (any, error) {
 }
 
 // :ifeq
-func ifEqual(val any, args []Expr) (any, error) {
+func runIfEqual(val any, args []Expr) (any, error) {
 	if len(args) != 3 {
 		return nil, invalidArgs("ifeq takes exactly three arguments", len(args))
 	}
@@ -186,7 +231,7 @@ func ifEqual(val any, args []Expr) (any, error) {
 }
 
 // :ifne
-func ifNotEqual(val any, args []Expr) (any, error) {
+func runIfNotEqual(val any, args []Expr) (any, error) {
 	if len(args) != 3 {
 		return nil, invalidArgs("ifne takes exactly three arguments", len(args))
 	}
@@ -197,7 +242,7 @@ func ifNotEqual(val any, args []Expr) (any, error) {
 }
 
 // :ifexists
-func ifExists(val any, args []Expr) (any, error) {
+func runIfExists(val any, args []Expr) (any, error) {
 	if len(args) < 2 {
 		return nil, invalidArgs("ifexists takes at least two arguments", len(args))
 	}
@@ -222,7 +267,7 @@ func ifExists(val any, args []Expr) (any, error) {
 		}
 		_, ok = arr[key]
 	default:
-		return nil, compositeExpected("exists")
+		return nil, compositeExpected("ifexists")
 	}
 	if ok {
 		return args[1], nil
@@ -231,7 +276,7 @@ func ifExists(val any, args []Expr) (any, error) {
 }
 
 // :exists
-func exists(val any, args []Expr) (any, error) {
+func runExists(val any, args []Expr) (any, error) {
 	if len(args) == 0 {
 		return isDefined(val), nil
 	}
@@ -258,7 +303,7 @@ func exists(val any, args []Expr) (any, error) {
 }
 
 // :empty
-func empty(val any, args []Expr) (any, error) {
+func runEmpty(val any, args []Expr) (any, error) {
 	if len(args) != 0 {
 		return nil, invalidArgs("empty takes no argument(s)", len(args))
 	}
@@ -273,7 +318,7 @@ func empty(val any, args []Expr) (any, error) {
 }
 
 // :null
-func null(val any, args []Expr) (any, error) {
+func runNull(val any, args []Expr) (any, error) {
 	if len(args) != 0 {
 		return nil, invalidArgs("null takes not argument(s)", len(args))
 	}

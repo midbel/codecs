@@ -3,6 +3,7 @@ package probe
 import (
 	"errors"
 	"fmt"
+	"strconv"
 )
 
 var (
@@ -234,6 +235,44 @@ func getIntFromExpr(expr Expr) (int, error) {
 		return 0, ErrType
 	}
 	return int(n), nil
+}
+
+func castToString(val any) (any, error) {
+	return fmt.Sprint(val), nil
+}
+
+func castToBool(val any) (any, error) {
+	switch v := val.(type) {
+	case bool:
+		return v, nil
+	case string:
+		return v != "", nil
+	case float64:
+		return v != 0, nil
+	default:
+		return false, ErrType
+	}
+}
+
+func castToNumber(val any) (any, error) {
+	switch v := val.(type) {
+	case bool:
+		if v {
+			return 1, nil
+		}
+		return 0, nil
+		return v, nil
+	case string:
+		x, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			err = ErrType
+		}
+		return x, err
+	case float64:
+		return v, nil
+	default:
+		return 0, ErrType
+	}
 }
 
 func arrayExpected(fn string) error {
