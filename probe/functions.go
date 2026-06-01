@@ -65,14 +65,16 @@ func runLen(val any, args []Expr) (any, error) {
 	if len(args) != 0 {
 		return nil, invalidArgs("length takes not argument(s)", len(args))
 	}
+	var x int
 	switch arr := val.(type) {
 	case []any:
-		return len(arr), nil
+		x = len(arr)
 	case map[string]any:
-		return len(arr), nil
+		x = len(arr)
 	default:
 		return nil, compositeExpected("length")
 	}
+	return float64(x), nil
 }
 
 // :at()
