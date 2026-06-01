@@ -70,7 +70,11 @@ type call struct {
 }
 
 func (c call) Eval(in any) (any, error) {
-	return in, nil
+	fn, ok := builtins[c.Ident]
+	if !ok {
+		return nil, nil
+	}
+	return fn(in, c.Args)
 }
 
 type field struct {
