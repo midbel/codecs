@@ -52,16 +52,6 @@ func (c *compiler) Compile() (Path, error) {
 func (c *compiler) compile() (Path, error) {
 	var paths []Path
 	for !c.done() {
-		// var (
-		// 	pth Path
-		// 	err error
-		// )
-		// if c.isLiteral() {
-		// 	pth, err = c.compileValue()
-		// } else {
-		// 	// pth, err = c.compilePath()
-		// 	pth, err = c.compileAlternative()
-		// }
 		pth, err := c.compileAlternative()
 		if err != nil {
 			return nil, err
@@ -199,7 +189,7 @@ func (c *compiler) compileExpr() (Expr, error) {
 	c.next()
 	if c.is(Call) {
 		c.next()
-		err := c.compileCall()
+		step.Apply, err = c.compileCall()
 		if err != nil {
 			return nil, err
 		}
@@ -214,37 +204,41 @@ func (c *compiler) compileExpr() (Expr, error) {
 	return step, nil
 }
 
-func (c *compiler) compileCall() error {
+func (c *compiler) compileCall() (Expr, error) {
 	c.next()
 	if !c.is(Ident) {
-		return syntaxError("selector name expected")
+		return nil, syntaxError("selector name expected")
+	}
+	apply := call{
+		Ident: c.currentLiteral(),
 	}
 	c.next()
 	if !c.is(BegGrp) {
-		return syntaxError("expected '(' at beginning of selector")
+		return nil, syntaxError("expected '(' at beginning of selector")
 	}
 	c.next()
 	for !c.done() && !c.is(EndGrp) {
-		_, err := c.compileValue()
+		v, err := c.compileValue()
 		if err != nil {
-			return err
+			return nil, err
 		}
+		apply.Args = append(apply.Args, v.(Expr))
 		switch {
 		case c.is(Comma):
 			c.next()
 			if c.is(EndGrp) {
-				return syntaxError("')' is not allowed after ','")
+				return nil, syntaxError("')' is not allowed after ','")
 			}
 		case c.is(EndGrp):
 		default:
-			return syntaxError("',' or ')' after selector argument")
+			return nil, syntaxError("',' or ')' after selector argument")
 		}
 	}
 	if !c.is(BegGrp) {
-		return syntaxError("expected ')' at end of selector")
+		return nil, syntaxError("expected ')' at end of selector")
 	}
 	c.next()
-	return nil
+	return apply, nil
 }
 
 func (c *compiler) next() {

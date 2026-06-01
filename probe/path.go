@@ -2,10 +2,11 @@ package probe
 
 import (
 	"errors"
+	"fmt"
 )
 
 var (
-	ErrType = errors.New("array or object expected")
+	ErrType = errors.New("invalid type")
 	ErrEnd  = errors.New("unexpected end of path")
 	ErrProp = errors.New("property not found")
 )
@@ -48,31 +49,41 @@ type alternative struct {
 }
 
 func (p alternative) Collect(in any) (any, error) {
+	var last any
 	for _, p := range p.paths {
 		a, err := p.Collect(in)
 		if err != nil {
 			continue
 		}
-		switch a := a.(type) {
-		case nil:
-		case []any:
-			if len(a) > 0 {
-				return a, nil
-			}
-		default:
+		last = a
+		if isDefined(a) {
 			return a, nil
 		}
 	}
-	return nil, nil
+	return last, nil
+}
+
+type call struct {
+	Ident string
+	Args  []Expr
+}
+
+func (c call) Eval(in any) (any, error) {
+	return in, nil
 }
 
 type field struct {
-	Name string
-	Next Expr
+	Name  string
+	Apply Expr
+	Next  Expr
 }
 
 func (s field) Eval(in any) (any, error) {
-	return traverse(s, in)
+	val, err := traverse(s, in)
+	if err == nil && s.Apply != nil {
+		return s.Apply.Eval(val)
+	}
+	return val, err
 }
 
 type literal struct {
@@ -97,7 +108,7 @@ func traverse(e Expr, in any) (any, error) {
 	case map[string]any:
 		return traverseMap(e, in)
 	default:
-		return nil, ErrType
+		return nil, fmt.Errorf("%w: array or object expected", ErrType)
 	}
 }
 
@@ -129,4 +140,110 @@ func traverseMap(e Expr, in map[string]any) (any, error) {
 		return p, nil
 	}
 	return traverse(x.Next, p)
+}
+
+func isDefined(val any) bool {
+	switch a := val.(type) {
+	case nil:
+	case []any:
+		return len(a) > 0
+	case map[string]any:
+		return len(a) > 0
+	case string:
+		return len(a) > 0
+	case float64:
+		return a != 0
+	case bool:
+		return a
+	default:
+	}
+	return false
+}
+
+func isEqual(fst, snd any) bool {
+	switch f := fst.(type) {
+	case bool:
+		other, ok := snd.(bool)
+		if ok {
+			return f == other
+		}
+		return ok
+	case string:
+		other, ok := snd.(string)
+		if ok {
+			return f == other
+		}
+		return ok
+	case float64:
+		other, ok := snd.(float64)
+		if ok {
+			return f == other
+		}
+		return ok
+	default:
+		return false
+	}
+}
+
+func isLess(fst, snd any) bool {
+	switch f := fst.(type) {
+	case string:
+		other, ok := snd.(string)
+		if ok {
+			return f < other
+		}
+		return ok
+	case float64:
+		other, ok := snd.(float64)
+		if ok {
+			return f < other
+		}
+		return ok
+	default:
+		return false
+	}
+}
+
+func getAnyFromExpr(expr Expr) (any, error) {
+	lit, ok := expr.(literal)
+	if !ok {
+		return nil, ErrType
+	}
+	return lit.value, nil
+}
+
+func getStrFromExpr(expr Expr) (string, error) {
+	val, err := getAnyFromExpr(expr)
+	if err != nil {
+		return "", err
+	}
+	s, ok := val.(string)
+	if !ok {
+		return "", ErrType
+	}
+	return s, nil
+}
+
+func getIntFromExpr(expr Expr) (int, error) {
+	val, err := getAnyFromExpr(expr)
+	if err != nil {
+		return 0, err
+	}
+	n, ok := val.(float64)
+	if !ok {
+		return 0, ErrType
+	}
+	return int(n), nil
+}
+
+func arrayExpected(fn string) error {
+	return fmt.Errorf("%w: expected array as input of %s", ErrType, fn)
+}
+
+func objectExpected(fn string) error {
+	return fmt.Errorf("%w: expected object as input of %s", ErrType, fn)
+}
+
+func compositeExpected(fn string) error {
+	return fmt.Errorf("%w: expected array or object as input of %s", ErrType, fn)
 }

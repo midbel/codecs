@@ -29,6 +29,15 @@ func TestCompile(t *testing.T) {
 			Input:   "$.foo,",
 			Invalid: true,
 		},
+		{
+			Input: "$.foo | \"value\"",
+		},
+		{
+			Input: "$.foo | \"value\" | 0.1",
+		},
+		{
+			Input: "$.foo | $.bar | 0",
+		},
 	}
 	for _, c := range tests {
 		_, err := CompilePath(c.Input)
