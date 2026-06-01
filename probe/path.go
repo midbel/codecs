@@ -50,7 +50,16 @@ type alternative struct {
 func (p alternative) Collect(in any) (any, error) {
 	for _, p := range p.paths {
 		a, err := p.Collect(in)
-		if err == nil {
+		if err != nil {
+			continue
+		}
+		switch a := a.(type) {
+		case nil:
+		case []any:
+			if len(a) > 0 {
+				return a, nil
+			}
+		default:
 			return a, nil
 		}
 	}
