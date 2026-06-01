@@ -14,13 +14,12 @@ func invalidArgs(msg string, n int) error {
 var builtins = map[string]func(any, []Expr) (any, error){
 	"as":       runAs,
 	"len":      runLen,
-	"length":   runLen,
 	"at":       runAt,
 	"first":    runFirst,
 	"last":     runLast,
 	"default":  runDefault,
 	"not":      runNot,
-	"eq":       runEq,
+	"eq":       runEqual,
 	"ne":       runNotEqual,
 	"lt":       runLesserThan,
 	"le":       runLesserEq,
@@ -137,7 +136,7 @@ func runDefault(val any, args []Expr) (any, error) {
 }
 
 // :not()
-func ruNot(val any, args []Expr) (any, error) {
+func runNot(val any, args []Expr) (any, error) {
 	if len(args) != 1 {
 		return nil, invalidArgs("not takes no argument(s)", len(args))
 	}

@@ -188,7 +188,6 @@ func (c *compiler) compileExpr() (Expr, error) {
 	step.Name = c.currentLiteral()
 	c.next()
 	if c.is(Call) {
-		c.next()
 		step.Apply, err = c.compileCall()
 		if err != nil {
 			return nil, err
@@ -234,7 +233,7 @@ func (c *compiler) compileCall() (Expr, error) {
 			return nil, syntaxError("',' or ')' after selector argument")
 		}
 	}
-	if !c.is(BegGrp) {
+	if !c.is(EndGrp) {
 		return nil, syntaxError("expected ')' at end of selector")
 	}
 	c.next()

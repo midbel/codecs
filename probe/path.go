@@ -141,6 +141,13 @@ func traverseMap(e Expr, in map[string]any) (any, error) {
 	if !ok {
 		return nil, nil
 	}
+	if x.Apply != nil {
+		r, err := x.Apply.Eval(p)
+		if err != nil {
+			return nil, err
+		}
+		p = r
+	}
 	if x.Next == nil {
 		return p, nil
 	}
