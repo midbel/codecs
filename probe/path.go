@@ -194,6 +194,8 @@ func isEqual(fst, snd any) bool {
 			return f == other
 		}
 		return ok
+	case nil:
+		return snd == nil
 	default:
 		return false
 	}

@@ -387,20 +387,6 @@ func (s *scanner) scanNumber(tok *token) {
 	tok.Literal = s.literal()
 }
 
-func (s *scanner) scanBool(tok *token) {
-	tok.Type = Boolean
-	for !s.done() && isAlpha(s.char) {
-		s.write()
-		s.read()
-	}
-	tok.Literal = s.literal()
-	switch tok.Literal {
-	case "true", "false":
-	default:
-		tok.Type = Invalid
-	}
-}
-
 func (s *scanner) scanIdent(tok *token) {
 	for !s.done() && isAlpha(s.char) {
 		s.write()
