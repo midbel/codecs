@@ -7,9 +7,10 @@ import (
 )
 
 var (
-	ErrType = errors.New("invalid type")
-	ErrEnd  = errors.New("unexpected end of path")
-	ErrProp = errors.New("property not found")
+	ErrType    = errors.New("invalid type")
+	ErrEnd     = errors.New("unexpected end of path")
+	ErrProp    = errors.New("property not found")
+	errDiscard = errors.New("discard")
 )
 
 type Path interface {
@@ -26,7 +27,8 @@ type single struct {
 }
 
 func (p single) Collect(in any) (any, error) {
-	return p.Start.Eval(in)
+	ret, err := p.Start.Eval(in)
+	return ret, checkError(err)
 }
 
 type multi struct {
@@ -37,7 +39,7 @@ func (p multi) Collect(in any) (any, error) {
 	var list []any
 	for _, i := range p.paths {
 		res, err := i.Collect(in)
-		if err != nil {
+		if err := checkError(err); err != nil {
 			return nil, err
 		}
 		list = append(list, res)
@@ -53,7 +55,7 @@ func (p alternative) Collect(in any) (any, error) {
 	var last any
 	for _, p := range p.paths {
 		a, err := p.Collect(in)
-		if err != nil {
+		if err := checkError(err); err != nil {
 			continue
 		}
 		last = a
@@ -296,4 +298,11 @@ func objectExpected(fn string) error {
 
 func compositeExpected(fn string) error {
 	return fmt.Errorf("%w: expected array or object as input of %s", ErrType, fn)
+}
+
+func checkError(err error) error {
+	if errors.Is(err, errDiscard) {
+		return nil
+	}
+	return err
 }

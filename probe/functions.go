@@ -150,7 +150,11 @@ func runEqual(val any, args []Expr) (any, error) {
 	if len(args) != 1 {
 		return nil, invalidArgs("eq takes only one argument", len(args))
 	}
-	return isEqual(val, args[0]), nil
+	ok := isEqual(val, args[0])
+	if !ok {
+		return ok, errDiscard
+	}
+	return ok, nil
 }
 
 // :ne()
@@ -158,7 +162,11 @@ func runNotEqual(val any, args []Expr) (any, error) {
 	if len(args) != 1 {
 		return nil, invalidArgs("ne takes only one argument", len(args))
 	}
-	return !isEqual(val, args[0]), nil
+	ok := !isEqual(val, args[0])
+	if !ok {
+		return ok, errDiscard
+	}
+	return ok, nil
 }
 
 // :lt
@@ -166,7 +174,11 @@ func runLesserThan(val any, args []Expr) (any, error) {
 	if len(args) != 1 {
 		return nil, invalidArgs("lt takes only one argument", len(args))
 	}
-	return isLess(val, args[0]), nil
+	ok := isLess(val, args[0])
+	if !ok {
+		return ok, errDiscard
+	}
+	return ok, nil
 }
 
 // :le
@@ -174,7 +186,11 @@ func runLesserEq(val any, args []Expr) (any, error) {
 	if len(args) != 1 {
 		return nil, invalidArgs("le takes only one argument", len(args))
 	}
-	return isLess(val, args[0]) || isEqual(val, args[0]), nil
+	ok := isLess(val, args[0]) || isEqual(val, args[0])
+	if !ok {
+		return ok, errDiscard
+	}
+	return ok, nil
 }
 
 // :gt
@@ -182,7 +198,11 @@ func runGreaterThan(val any, args []Expr) (any, error) {
 	if len(args) != 1 {
 		return nil, invalidArgs("gt takes only one argument", len(args))
 	}
-	return !isLess(val, args[0]) && !isEqual(val, args[0]), nil
+	ok := !isLess(val, args[0]) && !isEqual(val, args[0])
+	if !ok {
+		return ok, errDiscard
+	}
+	return ok, nil
 }
 
 // :ge
@@ -190,7 +210,11 @@ func runGreaterEq(val any, args []Expr) (any, error) {
 	if len(args) != 1 {
 		return nil, invalidArgs("ge takes only one argument", len(args))
 	}
-	return !isLess(val, args[0]) || isEqual(val, args[0]), nil
+	ok := !isLess(val, args[0]) || isEqual(val, args[0])
+	if !ok {
+		return ok, errDiscard
+	}
+	return ok, nil
 }
 
 // :between
@@ -204,7 +228,7 @@ func runBetween(val any, args []Expr) (any, error) {
 	if isLess(val, args[1]) || !isLess(val, args[0]) {
 		return true, nil
 	}
-	return false, nil
+	return false, errDiscard
 }
 
 // :in
@@ -217,7 +241,7 @@ func runIn(val any, args []Expr) (any, error) {
 			return true, nil
 		}
 	}
-	return false, nil
+	return false, errDiscard
 }
 
 // :ifeq
