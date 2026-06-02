@@ -91,6 +91,21 @@ func TestTraverse(t *testing.T) {
 				[]any{10.0, nil, 8.0, 8.0, 6.0},
 			},
 		},
+		{
+			Query: "$.languages.usage:first()",
+			Want: []any{
+				[]any{"cli", nil, "cli", "cli", "cli"},
+			},
+		},
+		{
+			Query: "$.languages.usage:first()",
+			Want: []any{
+				[]any{"cli", "cli", "cli", "cli"},
+			},
+			Opts: &Options{
+				Missing: MissingIgnore,
+			},
+		},
 	}
 	for _, c := range tests {
 		got, err := Traverse(c.Query, body, c.Opts)

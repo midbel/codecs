@@ -37,6 +37,14 @@ const (
 	ExpandError
 )
 
+type MissingMode int8
+
+const (
+	MissingReplace MissingMode = iota
+	MissingIgnore
+	MissingError
+)
+
 func ParseExpandMode(str string) (ExpandMode, error) {
 	var mode ExpandMode
 	switch str {
@@ -53,9 +61,10 @@ func ParseExpandMode(str string) (ExpandMode, error) {
 }
 
 type Options struct {
-	Zip     ZipMode
-	Expand  ExpandMode
-	Missing any
+	Zip          ZipMode
+	Expand       ExpandMode
+	Missing      MissingMode
+	MissingValue any
 }
 
 func (o *Options) rowCount(in []any) (int, error) {
@@ -131,8 +140,9 @@ func (o *Options) strictSize(arr []any) (int, error) {
 func Traverse(path string, in any, opts *Options) (any, error) {
 	if opts == nil {
 		opts = &Options{
-			Expand: ExpandDefault,
-			Zip:    ZipStrict,
+			Expand:  ExpandDefault,
+			Missing: MissingIgnore,
+			Zip:     ZipStrict,
 		}
 	}
 	c := compile(path)
@@ -141,7 +151,7 @@ func Traverse(path string, in any, opts *Options) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	res, err := p.Collect(in)
+	res, err := p.Collect(in, opts)
 	if err != nil {
 		return nil, err
 	}

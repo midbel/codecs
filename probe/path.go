@@ -11,14 +11,15 @@ var (
 	ErrEnd     = errors.New("unexpected end of path")
 	ErrProp    = errors.New("property not found")
 	errDiscard = errors.New("discard")
+	errIgnore  = errors.New("ignore")
 )
 
 type Path interface {
-	Collect(any) (any, error)
+	Collect(any, *Options) (any, error)
 }
 
 type Expr interface {
-	Eval(any) (any, error)
+	Eval(any, *Options) (any, error)
 }
 
 type single struct {
@@ -26,8 +27,8 @@ type single struct {
 	Start    Expr
 }
 
-func (p single) Collect(in any) (any, error) {
-	ret, err := p.Start.Eval(in)
+func (p single) Collect(in any, opts *Options) (any, error) {
+	ret, err := p.Start.Eval(in, opts)
 	return ret, checkError(err)
 }
 
@@ -35,10 +36,10 @@ type multi struct {
 	paths []Path
 }
 
-func (p multi) Collect(in any) (any, error) {
+func (p multi) Collect(in any, opts *Options) (any, error) {
 	var list []any
 	for _, i := range p.paths {
-		res, err := i.Collect(in)
+		res, err := i.Collect(in, opts)
 		if err := checkError(err); err != nil {
 			return nil, err
 		}
@@ -51,10 +52,10 @@ type alternative struct {
 	paths []Path
 }
 
-func (p alternative) Collect(in any) (any, error) {
+func (p alternative) Collect(in any, opts *Options) (any, error) {
 	var last any
 	for _, p := range p.paths {
-		a, err := p.Collect(in)
+		a, err := p.Collect(in, opts)
 		if err := checkError(err); err != nil {
 			continue
 		}
@@ -71,7 +72,7 @@ type call struct {
 	Args  []Expr
 }
 
-func (c call) Eval(in any) (any, error) {
+func (c call) Eval(in any, _ *Options) (any, error) {
 	fn, ok := builtins[c.Ident]
 	if !ok {
 		return nil, nil
@@ -85,10 +86,10 @@ type field struct {
 	Next  Expr
 }
 
-func (s field) Eval(in any) (any, error) {
-	val, err := traverse(s, in)
+func (s field) Eval(in any, opts *Options) (any, error) {
+	val, err := traverse(s, in, opts)
 	if err == nil && s.Apply != nil {
-		return s.Apply.Eval(val)
+		return s.Apply.Eval(val, opts)
 	}
 	return val, err
 }
@@ -97,32 +98,32 @@ type literal struct {
 	value any
 }
 
-func (s literal) Collect(_ any) (any, error) {
+func (s literal) Collect(_ any, _ *Options) (any, error) {
 	return s.value, nil
 }
 
-func (s literal) Eval(_ any) (any, error) {
+func (s literal) Eval(_ any, _ *Options) (any, error) {
 	return s.value, nil
 }
 
-func traverse(e Expr, in any) (any, error) {
+func traverse(e Expr, in any, opts *Options) (any, error) {
 	if e, ok := e.(literal); ok {
 		return []any{e.value}, nil
 	}
 	switch in := in.(type) {
 	case []any:
-		return traverseArray(e, in)
+		return traverseArray(e, in, opts)
 	case map[string]any:
-		return traverseMap(e, in)
+		return traverseMap(e, in, opts)
 	default:
 		return nil, fmt.Errorf("%w: array or object expected", ErrType)
 	}
 }
 
-func traverseArray(e Expr, in []any) (any, error) {
+func traverseArray(e Expr, in []any, opts *Options) (any, error) {
 	var result []any
 	for i := range in {
-		tmp, err := traverse(e, in[i])
+		tmp, err := traverse(e, in[i], opts)
 		if err != nil {
 			return nil, err
 		}
@@ -131,7 +132,7 @@ func traverseArray(e Expr, in []any) (any, error) {
 	return result, nil
 }
 
-func traverseMap(e Expr, in map[string]any) (any, error) {
+func traverseMap(e Expr, in map[string]any, opts *Options) (any, error) {
 	if e == nil {
 		return nil, ErrEnd
 	}
@@ -141,10 +142,19 @@ func traverseMap(e Expr, in map[string]any) (any, error) {
 	}
 	p, ok := in[x.Name]
 	if !ok {
+		if opts.Missing == MissingError {
+			return nil, ErrEnd
+		} else if opts.Missing == MissingIgnore {
+			return nil, errIgnore
+		} else if opts.Missing == MissingReplace {
+			p = opts.MissingValue
+		} else {
+			return nil, fmt.Errorf("unknown missing behaviour")
+		}
 		return nil, nil
 	}
 	if x.Apply != nil {
-		r, err := x.Apply.Eval(p)
+		r, err := x.Apply.Eval(p, opts)
 		if err != nil {
 			return nil, err
 		}
@@ -153,7 +163,7 @@ func traverseMap(e Expr, in map[string]any) (any, error) {
 	if x.Next == nil {
 		return p, nil
 	}
-	return traverse(x.Next, p)
+	return traverse(x.Next, p, opts)
 }
 
 func isDefined(val any) bool {
