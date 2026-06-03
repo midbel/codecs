@@ -8,7 +8,7 @@ import (
 type ZipMode int8
 
 const (
-	NoZip ZipMode = iota
+	NoZip ZipMode = 1 << iota
 	ZipShort
 	ZipLongest
 	ZipStrict
@@ -32,7 +32,7 @@ func ParseZipMode(str string) (ZipMode, error) {
 type ExpandMode int8
 
 const (
-	ExpandDefault ExpandMode = iota
+	ExpandDefault ExpandMode = 1 << iota
 	ExpandIgnore
 	ExpandError
 )
@@ -40,7 +40,7 @@ const (
 type MissingMode int8
 
 const (
-	MissingReplace MissingMode = iota
+	MissingReplace MissingMode = 1 << iota
 	MissingIgnore
 	MissingError
 )
@@ -65,6 +65,18 @@ type Options struct {
 	Expand       ExpandMode
 	Missing      MissingMode
 	MissingValue any
+}
+
+func (o *Options) normalize() {
+	if o.Zip == 0 {
+		o.Zip = ZipStrict
+	}
+	if o.Expand == 0 {
+		o.Expand = ExpandDefault
+	}
+	if o.Missing == 0 {
+		o.Missing = MissingReplace
+	}
 }
 
 func (o *Options) rowCount(in []any) (int, error) {
@@ -141,10 +153,11 @@ func Traverse(path string, in any, opts *Options) (any, error) {
 	if opts == nil {
 		opts = &Options{
 			Expand:  ExpandDefault,
-			Missing: MissingIgnore,
+			Missing: MissingReplace,
 			Zip:     ZipStrict,
 		}
 	}
+	opts.normalize()
 	c := compile(path)
 
 	p, err := c.Compile()

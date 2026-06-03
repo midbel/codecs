@@ -87,11 +87,7 @@ type field struct {
 }
 
 func (s field) Eval(in any, opts *Options) (any, error) {
-	val, err := traverse(s, in, opts)
-	if err == nil && s.Apply != nil {
-		return s.Apply.Eval(val, opts)
-	}
-	return val, err
+	return traverse(s, in, opts)
 }
 
 type literal struct {
@@ -125,7 +121,14 @@ func traverseArray(e Expr, in []any, opts *Options) (any, error) {
 	for i := range in {
 		tmp, err := traverse(e, in[i], opts)
 		if err != nil {
-			return nil, err
+			if opts.Missing == MissingReplace {
+				tmp = opts.MissingValue
+				err = nil
+			} else if opts.Missing == MissingIgnore {
+				continue
+			} else {
+				return nil, err
+			}
 		}
 		result = append(result, tmp)
 	}
@@ -142,16 +145,7 @@ func traverseMap(e Expr, in map[string]any, opts *Options) (any, error) {
 	}
 	p, ok := in[x.Name]
 	if !ok {
-		if opts.Missing == MissingError {
-			return nil, ErrEnd
-		} else if opts.Missing == MissingIgnore {
-			return nil, errIgnore
-		} else if opts.Missing == MissingReplace {
-			p = opts.MissingValue
-		} else {
-			return nil, fmt.Errorf("unknown missing behaviour")
-		}
-		return nil, nil
+		return nil, ErrProp
 	}
 	if x.Apply != nil {
 		r, err := x.Apply.Eval(p, opts)

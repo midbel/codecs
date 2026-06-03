@@ -106,6 +106,16 @@ func TestTraverse(t *testing.T) {
 				Missing: MissingIgnore,
 			},
 		},
+		{
+			Query: "$.languages.usage:first()",
+			Want: []any{
+				[]any{"cli", "*", "cli", "cli", "cli"},
+			},
+			Opts: &Options{
+				Missing:      MissingReplace,
+				MissingValue: "*",
+			},
+		},
 	}
 	for _, c := range tests {
 		got, err := Traverse(c.Query, body, c.Opts)
