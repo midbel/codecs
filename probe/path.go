@@ -10,8 +10,8 @@ var (
 	ErrType    = errors.New("invalid type")
 	ErrEnd     = errors.New("unexpected end of path")
 	ErrProp    = errors.New("property not found")
+	ErrIndex   = errors.New("index out of range")
 	errDiscard = errors.New("discard")
-	errIgnore  = errors.New("ignore")
 )
 
 type Path interface {
@@ -54,10 +54,12 @@ type alternative struct {
 
 func (p alternative) Collect(in any, opts *Options) (any, error) {
 	var last any
-	for _, p := range p.paths {
-		a, err := p.Collect(in, opts)
+	for _, i := range p.paths {
+		a, err := i.Collect(in, opts)
 		if err := checkError(err); err != nil {
-			continue
+			if isIgnorable(err) {
+				continue
+			}
 		}
 		last = a
 		if isDefined(a) {
@@ -121,13 +123,12 @@ func traverseArray(e Expr, in []any, opts *Options) (any, error) {
 	for i := range in {
 		tmp, err := traverse(e, in[i], opts)
 		if err != nil {
-			if opts.Missing == MissingReplace {
-				tmp = opts.MissingValue
-				err = nil
-			} else if opts.Missing == MissingIgnore {
-				continue
-			} else {
+			tmp, err = opts.handleMissing(err)
+			if err != nil {
 				return nil, err
+			}
+			if opts.Missing == MissingIgnore && tmp == nil {
+				continue
 			}
 		}
 		result = append(result, tmp)
@@ -311,4 +312,8 @@ func checkError(err error) error {
 		return nil
 	}
 	return err
+}
+
+func isIgnorable(err error) bool {
+	return errors.Is(err, ErrProp) || errors.Is(err, ErrIndex)
 }

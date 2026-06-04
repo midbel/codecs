@@ -79,6 +79,20 @@ func (o *Options) normalize() {
 	}
 }
 
+func (o *Options) handleMissing(err error) (any, error) {
+	if !isIgnorable(err) {
+		return nil, err
+	}
+	switch o.Missing {
+	case MissingReplace:
+		return o.MissingValue, nil
+	case MissingIgnore:
+		return nil, nil
+	default:
+		return nil, err
+	}
+}
+
 func (o *Options) rowCount(in []any) (int, error) {
 	var (
 		res int

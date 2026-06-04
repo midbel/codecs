@@ -337,6 +337,8 @@ func runEmpty(val any, args []Expr) (any, error) {
 		return len(arr) == 0, nil
 	case map[string]any:
 		return len(arr) == 0, nil
+	case nil:
+		return true, nil
 	default:
 		return nil, compositeExpected("empty")
 	}

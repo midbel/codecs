@@ -76,45 +76,81 @@ func TestTraverse(t *testing.T) {
 		{
 			Query: "$.owner.name, $.owner.repo",
 			Want: []any{
-				[]any{"midbel", "https://github.com/midbel"},
+				createArray("midbel", "https://github.com/midbel"),
 			},
 		},
 		{
 			Query: "$.languages.name",
 			Want: []any{
-				[]any{"go", "rust", "js", "ts", "java"},
+				createArray("go", "rust", "js", "ts", "java"),
 			},
 		},
 		{
 			Query: "$.languages.star",
 			Want: []any{
-				[]any{10.0, nil, 8.0, 8.0, 6.0},
+				createArray(10.0, nil, 8.0, 8.0, 6.0),
 			},
 		},
 		{
 			Query: "$.languages.usage:first()",
 			Want: []any{
-				[]any{"cli", nil, "cli", "cli", "cli"},
+				createArray("cli", nil, "cli", "cli", "cli"),
 			},
 		},
 		{
 			Query: "$.languages.usage:first()",
 			Want: []any{
-				[]any{"cli", "cli", "cli", "cli"},
+				createArray("cli", "cli", "cli", "cli"),
 			},
 			Opts: &Options{
 				Missing: MissingIgnore,
 			},
 		},
 		{
+			Query: "$.languages.usage:last()",
+			Want: []any{
+				createArray("daemon", nil, "browser", "browser", "data"),
+			},
+		},
+		{
+			Query: "$.owner.age:default(\"42\")",
+			Want:  42.0,
+		},
+		{
 			Query: "$.languages.usage:first()",
 			Want: []any{
-				[]any{"cli", "*", "cli", "cli", "cli"},
+				createArray("cli", "*", "cli", "cli", "cli"),
 			},
 			Opts: &Options{
 				Missing:      MissingReplace,
 				MissingValue: "*",
 			},
+		},
+		{
+			Query: "$.languages.name, $.languages.star | 0",
+			Want: []any{
+				createArray("go", 10.0),
+				createArray("rust", 0.0),
+				createArray("js", 8.0),
+				createArray("ts", 8.0),
+				createArray("java", 6.0),
+			},
+		},
+		{
+			Query: "$.language.star:eq(10)",
+			Want: []any{
+				createArray(10.0),
+			},
+		},
+		{
+			Query: "$.language.star:ge(7)",
+			Want: []any{
+				createArray(10.0, 8.0, 8.0),
+			},
+		},
+		{
+			Query: "$.owner:len()",
+			Want:  createArray(2.0),
 		},
 	}
 	for _, c := range tests {
@@ -268,4 +304,8 @@ func TestScan(t *testing.T) {
 			t.Errorf("%s: expected last token to be EOF", c.Input)
 		}
 	}
+}
+
+func createArray(vals ...any) []any {
+	return vals
 }
