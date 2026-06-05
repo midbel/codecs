@@ -141,16 +141,22 @@ func TestTraverse(t *testing.T) {
 			Want: []any{
 				createArray(10.0),
 			},
+			Opts: &Options{
+				Missing: MissingIgnore,
+			},
 		},
 		{
 			Query: "$.language.star:ge(7)",
 			Want: []any{
 				createArray(10.0, 8.0, 8.0),
 			},
+			Opts: &Options{
+				Missing: MissingIgnore,
+			},
 		},
 		{
 			Query: "$.owner:len()",
-			Want:  createArray(2.0),
+			Want:  2.0,
 		},
 	}
 	for _, c := range tests {

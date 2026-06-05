@@ -14,6 +14,10 @@ var (
 	errDiscard = errors.New("discard")
 )
 
+type missing struct{}
+
+var missed = missing{}
+
 type Path interface {
 	Collect(any, *Options) (any, error)
 }
@@ -57,9 +61,7 @@ func (p alternative) Collect(in any, opts *Options) (any, error) {
 	for _, i := range p.paths {
 		a, err := i.Collect(in, opts)
 		if err := checkError(err); err != nil {
-			if isIgnorable(err) {
-				continue
-			}
+			continue
 		}
 		last = a
 		if isDefined(a) {
@@ -84,6 +86,7 @@ func (c call) Eval(in any, _ *Options) (any, error) {
 
 type field struct {
 	Name  string
+	Alt   Expr
 	Apply Expr
 	Next  Expr
 }
@@ -123,13 +126,7 @@ func traverseArray(e Expr, in []any, opts *Options) (any, error) {
 	for i := range in {
 		tmp, err := traverse(e, in[i], opts)
 		if err != nil {
-			tmp, err = opts.handleMissing(err)
-			if err != nil {
-				return nil, err
-			}
-			if opts.Missing == MissingIgnore && tmp == nil {
-				continue
-			}
+			return nil, err
 		}
 		result = append(result, tmp)
 	}
@@ -146,7 +143,11 @@ func traverseMap(e Expr, in map[string]any, opts *Options) (any, error) {
 	}
 	p, ok := in[x.Name]
 	if !ok {
-		return nil, ErrProp
+		if x.Alt == nil {
+			p = missed
+		} else {
+			p, _ = x.Alt.Eval(in, opts)
+		}
 	}
 	if x.Apply != nil {
 		r, err := x.Apply.Eval(p, opts)
@@ -161,7 +162,14 @@ func traverseMap(e Expr, in map[string]any, opts *Options) (any, error) {
 	return traverse(x.Next, p, opts)
 }
 
+func isMissing(val any) bool {
+	return val == missed
+}
+
 func isDefined(val any) bool {
+	if isMissing(val) {
+		return false
+	}
 	switch a := val.(type) {
 	case nil:
 	case []any:
@@ -312,8 +320,4 @@ func checkError(err error) error {
 		return nil
 	}
 	return err
-}
-
-func isIgnorable(err error) bool {
-	return errors.Is(err, ErrProp) || errors.Is(err, ErrIndex)
 }

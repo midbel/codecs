@@ -193,12 +193,27 @@ func (c *compiler) compileExpr() (Expr, error) {
 			return nil, err
 		}
 	}
-	if c.is(Dot) {
+	switch {
+	case c.is(Dot):
 		c.next()
 		step.Next, err = c.compileExpr()
 		if err != nil {
 			return nil, err
 		}
+	case c.is(Pipe):
+		if !c.aheadLiteral() {
+			break
+		}
+		c.next()
+		v, err := c.compileValue()
+		if err != nil {
+			return nil, err
+		}
+		if !c.is(Comma) && !c.is(Pipe) && !c.is(Eof) {
+			return nil, syntaxError("alternative value only allow at end of path")
+		}
+		step.Alt = v.(Expr)
+	default:
 	}
 	return step, nil
 }
@@ -255,6 +270,14 @@ func (c *compiler) is(kind rune) bool {
 
 func (c *compiler) isLiteral() bool {
 	return c.is(String) || c.is(Number) || c.is(Boolean)
+}
+
+func (c *compiler) aheadLiteral() bool {
+	return c.aheadIs(String) || c.aheadIs(Number) || c.aheadIs(Boolean)
+}
+
+func (c *compiler) aheadIs(kind rune) bool {
+	return c.peek.Type == kind
 }
 
 func (c *compiler) isIdentifier() bool {

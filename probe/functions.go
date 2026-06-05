@@ -150,6 +150,9 @@ func runEqual(val any, args []Expr) (any, error) {
 	if len(args) != 1 {
 		return nil, invalidArgs("eq takes only one argument", len(args))
 	}
+	if isMissing(val) {
+		return false, errDiscard
+	}
 	ok := isEqual(val, args[0])
 	if !ok {
 		return ok, errDiscard
@@ -161,6 +164,9 @@ func runEqual(val any, args []Expr) (any, error) {
 func runNotEqual(val any, args []Expr) (any, error) {
 	if len(args) != 1 {
 		return nil, invalidArgs("ne takes only one argument", len(args))
+	}
+	if isMissing(val) {
+		return false, errDiscard
 	}
 	ok := !isEqual(val, args[0])
 	if !ok {
@@ -174,6 +180,9 @@ func runLesserThan(val any, args []Expr) (any, error) {
 	if len(args) != 1 {
 		return nil, invalidArgs("lt takes only one argument", len(args))
 	}
+	if isMissing(val) {
+		return false, errDiscard
+	}
 	ok := isLess(val, args[0])
 	if !ok {
 		return ok, errDiscard
@@ -185,6 +194,9 @@ func runLesserThan(val any, args []Expr) (any, error) {
 func runLesserEq(val any, args []Expr) (any, error) {
 	if len(args) != 1 {
 		return nil, invalidArgs("le takes only one argument", len(args))
+	}
+	if isMissing(val) {
+		return false, errDiscard
 	}
 	ok := isLess(val, args[0]) || isEqual(val, args[0])
 	if !ok {
@@ -198,6 +210,9 @@ func runGreaterThan(val any, args []Expr) (any, error) {
 	if len(args) != 1 {
 		return nil, invalidArgs("gt takes only one argument", len(args))
 	}
+	if isMissing(val) {
+		return false, errDiscard
+	}
 	ok := !isLess(val, args[0]) && !isEqual(val, args[0])
 	if !ok {
 		return ok, errDiscard
@@ -210,6 +225,9 @@ func runGreaterEq(val any, args []Expr) (any, error) {
 	if len(args) != 1 {
 		return nil, invalidArgs("ge takes only one argument", len(args))
 	}
+	if isMissing(val) {
+		return false, errDiscard
+	}
 	ok := !isLess(val, args[0]) || isEqual(val, args[0])
 	if !ok {
 		return ok, errDiscard
@@ -221,6 +239,9 @@ func runGreaterEq(val any, args []Expr) (any, error) {
 func runBetween(val any, args []Expr) (any, error) {
 	if len(args) != 2 {
 		return nil, invalidArgs("between takes two arguments", len(args))
+	}
+	if isMissing(val) {
+		return false, errDiscard
 	}
 	if isEqual(val, args[0]) || isEqual(val, args[1]) {
 		return true, nil
@@ -235,6 +256,9 @@ func runBetween(val any, args []Expr) (any, error) {
 func runIn(val any, args []Expr) (any, error) {
 	if len(args) == 0 {
 		return nil, invalidArgs("in takes at least one argument", len(args))
+	}
+	if isMissing(val) {
+		return false, errDiscard
 	}
 	for i := range args {
 		if isEqual(val, args[i]) {

@@ -41,6 +41,7 @@ type MissingMode int8
 
 const (
 	MissingReplace MissingMode = 1 << iota
+	MissingNull
 	MissingIgnore
 	MissingError
 )
@@ -76,20 +77,6 @@ func (o *Options) normalize() {
 	}
 	if o.Missing == 0 {
 		o.Missing = MissingReplace
-	}
-}
-
-func (o *Options) handleMissing(err error) (any, error) {
-	if !isIgnorable(err) {
-		return nil, err
-	}
-	switch o.Missing {
-	case MissingReplace:
-		return o.MissingValue, nil
-	case MissingIgnore:
-		return nil, nil
-	default:
-		return nil, err
 	}
 }
 
