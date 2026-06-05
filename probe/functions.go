@@ -103,6 +103,9 @@ func runFirst(val any, args []Expr) (any, error) {
 	}
 	arr, ok := val.([]any)
 	if !ok {
+		if isMissing(val) {
+			return val, nil
+		}
 		return nil, arrayExpected("first")
 	}
 	if len(arr) == 0 {
@@ -118,6 +121,9 @@ func runLast(val any, args []Expr) (any, error) {
 	}
 	arr, ok := val.([]any)
 	if !ok {
+		if isMissing(val) {
+			return val, nil
+		}
 		return nil, arrayExpected("last")
 	}
 	if len(arr) == 0 {

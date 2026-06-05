@@ -108,6 +108,9 @@ func (s literal) Eval(_ any, _ *Options) (any, error) {
 }
 
 func traverse(e Expr, in any, opts *Options) (any, error) {
+	if isMissing(in) {
+		return in, nil
+	}
 	if e, ok := e.(literal); ok {
 		return []any{e.value}, nil
 	}
