@@ -14,9 +14,15 @@ var (
 	errDiscard = errors.New("discard")
 )
 
-type missing struct{}
+type (
+	missing struct{}
+	discard struct{}
+)
 
-var missed = missing{}
+var (
+	missed = missing{}
+	discarded = discard{}
+)
 
 type Path interface {
 	Collect(any, *Options) (any, error)
@@ -166,7 +172,13 @@ func traverseMap(e Expr, in map[string]any, opts *Options) (any, error) {
 }
 
 func isMissing(val any) bool {
-	return val == missed
+	_, ok := val.(missing)
+	return ok
+}
+
+func isDiscard(val any) bool {
+	_, ok := val.(discard)
+	return ok
 }
 
 func isDefined(val any) bool {
