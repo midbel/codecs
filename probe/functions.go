@@ -91,7 +91,7 @@ func runAt(val any, args []Expr) (any, error) {
 		return nil, err
 	}
 	if ix < 0 || ix >= len(arr) {
-		return nil, nil // nil, errIndex
+		return missed, nil // nil, errIndex
 	}
 	return arr[ix], nil
 }
@@ -109,7 +109,7 @@ func runFirst(val any, args []Expr) (any, error) {
 		return nil, arrayExpected("first")
 	}
 	if len(arr) == 0 {
-		return nil, nil
+		return missed, nil
 	}
 	return arr[0], nil
 }
@@ -127,7 +127,7 @@ func runLast(val any, args []Expr) (any, error) {
 		return nil, arrayExpected("last")
 	}
 	if len(arr) == 0 {
-		return nil, nil
+		return missed, nil
 	}
 	return arr[len(arr)-1], nil
 }
@@ -157,11 +157,11 @@ func runEqual(val any, args []Expr) (any, error) {
 		return nil, invalidArgs("eq takes only one argument", len(args))
 	}
 	if isMissing(val) {
-		return false, errDiscard
+		return discarded, nil
 	}
 	ok := isEqual(val, args[0])
 	if !ok {
-		return ok, errDiscard
+		return discarded, nil
 	}
 	return ok, nil
 }
@@ -172,11 +172,11 @@ func runNotEqual(val any, args []Expr) (any, error) {
 		return nil, invalidArgs("ne takes only one argument", len(args))
 	}
 	if isMissing(val) {
-		return false, errDiscard
+		return discarded, nil
 	}
 	ok := !isEqual(val, args[0])
 	if !ok {
-		return ok, errDiscard
+		return discarded, nil
 	}
 	return ok, nil
 }
@@ -187,11 +187,11 @@ func runLesserThan(val any, args []Expr) (any, error) {
 		return nil, invalidArgs("lt takes only one argument", len(args))
 	}
 	if isMissing(val) {
-		return false, errDiscard
+		return discarded, nil
 	}
 	ok := isLess(val, args[0])
 	if !ok {
-		return ok, errDiscard
+		return discarded, nil
 	}
 	return ok, nil
 }
@@ -202,11 +202,11 @@ func runLesserEq(val any, args []Expr) (any, error) {
 		return nil, invalidArgs("le takes only one argument", len(args))
 	}
 	if isMissing(val) {
-		return false, errDiscard
+		return discarded, nil
 	}
 	ok := isLess(val, args[0]) || isEqual(val, args[0])
 	if !ok {
-		return ok, errDiscard
+		return discarded, nil
 	}
 	return ok, nil
 }
@@ -217,11 +217,11 @@ func runGreaterThan(val any, args []Expr) (any, error) {
 		return nil, invalidArgs("gt takes only one argument", len(args))
 	}
 	if isMissing(val) {
-		return false, errDiscard
+		return discarded, nil
 	}
 	ok := !isLess(val, args[0]) && !isEqual(val, args[0])
 	if !ok {
-		return ok, errDiscard
+		return discarded, nil
 	}
 	return ok, nil
 }
@@ -232,11 +232,11 @@ func runGreaterEq(val any, args []Expr) (any, error) {
 		return nil, invalidArgs("ge takes only one argument", len(args))
 	}
 	if isMissing(val) {
-		return false, errDiscard
+		return discarded, nil
 	}
 	ok := !isLess(val, args[0]) || isEqual(val, args[0])
 	if !ok {
-		return ok, errDiscard
+		return discarded, nil
 	}
 	return ok, nil
 }
@@ -247,7 +247,7 @@ func runBetween(val any, args []Expr) (any, error) {
 		return nil, invalidArgs("between takes two arguments", len(args))
 	}
 	if isMissing(val) {
-		return false, errDiscard
+		return discarded, nil
 	}
 	if isEqual(val, args[0]) || isEqual(val, args[1]) {
 		return true, nil
@@ -255,7 +255,7 @@ func runBetween(val any, args []Expr) (any, error) {
 	if isLess(val, args[1]) || !isLess(val, args[0]) {
 		return true, nil
 	}
-	return false, errDiscard
+	return discarded, nil
 }
 
 // :in
@@ -264,14 +264,14 @@ func runIn(val any, args []Expr) (any, error) {
 		return nil, invalidArgs("in takes at least one argument", len(args))
 	}
 	if isMissing(val) {
-		return false, errDiscard
+		return discarded, nil
 	}
 	for i := range args {
 		if isEqual(val, args[i]) {
 			return true, nil
 		}
 	}
-	return false, errDiscard
+	return discarded, nil
 }
 
 // :ifeq
