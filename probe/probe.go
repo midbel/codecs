@@ -38,6 +38,8 @@ func Traverse(path string, in any, opts *Options) (any, error) {
 
 func clean(in any) any {
 	switch in := in.(type) {
+	case discard:
+		return nil
 	case []any:
 		tmp := make([]any, 0, len(in))
 		for i := range in {

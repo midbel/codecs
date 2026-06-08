@@ -176,7 +176,7 @@ func TestTraverse(t *testing.T) {
 		},
 		{
 			Query: "$.owner:len()",
-			Want:  2.0,
+			Want:  3.0,
 		},
 		{
 			Query: "$.owner.name:ifeq(\"midbel\", 100, 0)",
@@ -223,7 +223,7 @@ func TestTraverse(t *testing.T) {
 		},
 		{
 			Query: "$.owner.name:null()",
-			Want:  map[string]any{},
+			Want:  nil,
 		},
 	}
 	for _, c := range tests {
@@ -233,7 +233,7 @@ func TestTraverse(t *testing.T) {
 			continue
 		}
 		if !testEqual(got, c.Want) {
-			t.Errorf("results mismatched! want %v, got %v", c.Want, got)
+			t.Errorf("%s: results mismatched! want %v, got %v", c.Query, c.Want, got)
 		}
 	}
 }
