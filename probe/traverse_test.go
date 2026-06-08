@@ -114,7 +114,7 @@ func TestTraverse(t *testing.T) {
 		},
 		{
 			Query: "$.owner.age:default(\"42\")",
-			Want:  42.0,
+			Want:  "42",
 		},
 		{
 			Query: "$.languages.usage:first()",
@@ -137,7 +137,7 @@ func TestTraverse(t *testing.T) {
 			},
 		},
 		{
-			Query: "$.language.star:eq(10)",
+			Query: "$.languages.star:eq(10)",
 			Want: []any{
 				createArray(10.0),
 			},
@@ -146,7 +146,7 @@ func TestTraverse(t *testing.T) {
 			},
 		},
 		{
-			Query: "$.language.star:ge(7)",
+			Query: "$.languages.star:ge(7)",
 			Want: []any{
 				createArray(10.0, 8.0, 8.0),
 			},

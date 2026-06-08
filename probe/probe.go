@@ -24,10 +24,55 @@ func Traverse(path string, in any, opts *Options) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	if res, err = normalize(res, opts); err != nil {
+		return nil, err
+	}
 	if a, ok := res.([]any); ok && opts.Zip != NoZip {
 		return materialize(a, opts)
 	}
 	return res, nil
+}
+
+func normalize(in any, opts *Options) (any, error) {
+	switch x := in.(type) {
+	case missing:
+		if opts.Missing == MissingReplace {
+			in = opts.MissingValue
+		} else if opts.Missing == MissingNull {
+			in = nil
+		} else if opts.Missing == MissingIgnore {
+			// pass
+		} else if opts.Missing == MissingError {
+			return nil, fmt.Errorf("missing value")
+		} else {
+			return nil, fmt.Errorf("missing value can not be handled")
+		}
+	case []any:
+		tmp := make([]any, 0, len(x))
+		for i := range x {
+			v, err := normalize(x[i], opts)
+			if err != nil {
+				return nil, err
+			}
+			if opts.Missing == MissingIgnore && isMissing(v) {
+				continue
+			}
+			tmp = append(tmp, v)
+		}
+		in = tmp
+	case map[string]any:
+		tmp := make(map[string]any)
+		for k := range x {
+			v, err := normalize(x[k], opts)
+			if err != nil {
+				return nil, err
+			}
+			tmp[k] = v
+		}
+		in = tmp
+	default:
+	}
+	return in, nil
 }
 
 func materialize(arr []any, opts *Options) (any, error) {
@@ -42,6 +87,9 @@ func materialize(arr []any, opts *Options) (any, error) {
 			flat bool
 		)
 		for j := range arr {
+			if isDiscard(arr[j]) {
+				continue
+			}
 			switch a := arr[j].(type) {
 			case []any:
 				if i < len(a) {

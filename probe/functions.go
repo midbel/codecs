@@ -156,14 +156,11 @@ func runEqual(val any, args []Expr) (any, error) {
 	if len(args) != 1 {
 		return nil, invalidArgs("eq takes only one argument", len(args))
 	}
-	if isMissing(val) {
-		return discarded, nil
-	}
 	ok := isEqual(val, args[0])
-	if !ok {
+	if !ok || isMissing(val) {
 		return discarded, nil
 	}
-	return ok, nil
+	return val, nil
 }
 
 // :ne()
@@ -178,7 +175,7 @@ func runNotEqual(val any, args []Expr) (any, error) {
 	if !ok {
 		return discarded, nil
 	}
-	return ok, nil
+	return val, nil
 }
 
 // :lt
@@ -193,7 +190,7 @@ func runLesserThan(val any, args []Expr) (any, error) {
 	if !ok {
 		return discarded, nil
 	}
-	return ok, nil
+	return val, nil
 }
 
 // :le
@@ -208,7 +205,7 @@ func runLesserEq(val any, args []Expr) (any, error) {
 	if !ok {
 		return discarded, nil
 	}
-	return ok, nil
+	return val, nil
 }
 
 // :gt
@@ -223,7 +220,7 @@ func runGreaterThan(val any, args []Expr) (any, error) {
 	if !ok {
 		return discarded, nil
 	}
-	return ok, nil
+	return val, nil
 }
 
 // :ge
@@ -234,11 +231,11 @@ func runGreaterEq(val any, args []Expr) (any, error) {
 	if isMissing(val) {
 		return discarded, nil
 	}
-	ok := !isLess(val, args[0]) || isEqual(val, args[0])
+	ok := isEqual(val, args[0]) || !isLess(val, args[0])
 	if !ok {
 		return discarded, nil
 	}
-	return ok, nil
+	return val, nil
 }
 
 // :between
@@ -250,10 +247,10 @@ func runBetween(val any, args []Expr) (any, error) {
 		return discarded, nil
 	}
 	if isEqual(val, args[0]) || isEqual(val, args[1]) {
-		return true, nil
+		return val, nil
 	}
 	if isLess(val, args[1]) || !isLess(val, args[0]) {
-		return true, nil
+		return val, nil
 	}
 	return discarded, nil
 }
@@ -268,7 +265,7 @@ func runIn(val any, args []Expr) (any, error) {
 	}
 	for i := range args {
 		if isEqual(val, args[i]) {
-			return true, nil
+			return val, nil
 		}
 	}
 	return discarded, nil

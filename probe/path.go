@@ -7,10 +7,10 @@ import (
 )
 
 var (
-	ErrType    = errors.New("invalid type")
-	ErrEnd     = errors.New("unexpected end of path")
-	ErrProp    = errors.New("property not found")
-	ErrIndex   = errors.New("index out of range")
+	ErrType  = errors.New("invalid type")
+	ErrEnd   = errors.New("unexpected end of path")
+	ErrProp  = errors.New("property not found")
+	ErrIndex = errors.New("index out of range")
 )
 
 type (
@@ -201,7 +201,11 @@ func isDefined(val any) bool {
 }
 
 func isEqual(fst, snd any) bool {
+	if other, ok := snd.(literal); ok {
+		return isEqual(fst, other.value)
+	}
 	switch f := fst.(type) {
+
 	case bool:
 		other, ok := snd.(bool)
 		if ok {
@@ -228,6 +232,9 @@ func isEqual(fst, snd any) bool {
 }
 
 func isLess(fst, snd any) bool {
+	if other, ok := snd.(literal); ok {
+		return isLess(fst, other.value)
+	}
 	switch f := fst.(type) {
 	case string:
 		other, ok := snd.(string)
