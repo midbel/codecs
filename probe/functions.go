@@ -361,13 +361,19 @@ func runEmpty(val any, args []Expr) (any, error) {
 	}
 	switch arr := val.(type) {
 	case []any:
-		return len(arr) == 0, nil
+		if len(arr) == 0 {
+			return arr, nil
+		}
+		return discarded, nil
 	case map[string]any:
-		return len(arr) == 0, nil
+		if len(arr) == 0 {
+			return arr, nil
+		}
+		return discarded, nil
 	case nil:
-		return true, nil
+		return nil, nil
 	default:
-		return nil, compositeExpected("empty")
+		return discarded, nil
 	}
 }
 
@@ -376,5 +382,8 @@ func runNull(val any, args []Expr) (any, error) {
 	if len(args) != 0 {
 		return nil, invalidArgs("null takes not argument(s)", len(args))
 	}
-	return val == nil, nil
+	if val == nil {
+		return val, nil
+	}
+	return discarded, nil
 }

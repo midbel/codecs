@@ -8,9 +8,12 @@ func TestTraverse(t *testing.T) {
 	body := map[string]any{
 		"protected": false,
 		"owner": map[string]any{
-			"name": "midbel",
-			"repo": "https://github.com/midbel",
+			"name":    "midbel",
+			"repo":    "https://github.com/midbel",
+			"sponsor": nil,
 		},
+		"tags":       []any{},
+		"repository": map[string]any{},
 		"languages": []any{
 			map[string]any{
 				"name":  "go",
@@ -182,6 +185,45 @@ func TestTraverse(t *testing.T) {
 		{
 			Query: "$.owner.name:ifne(\"midbel\", 100, 0)",
 			Want:  0.0,
+		},
+		{
+			Query: "$.languages.name, $.languages.usage",
+			Want: []any{
+				createArray("go", "cli"),
+				createArray("go", "daemon"),
+				createArray("rust", "?"),
+				createArray("js", "cli"),
+				createArray("js", "browser"),
+				createArray("ts", "cli"),
+				createArray("ts", "browser"),
+				createArray("java", "cli"),
+				createArray("java", "daemon"),
+				createArray("java", "data"),
+			},
+			Opts: &Options{
+				Missing:      MissingReplace,
+				MissingValue: "?",
+			},
+		},
+		{
+			Query: "$.languages:at(1).name",
+			Want:  "rust",
+		},
+		{
+			Query: "$.languages:at(1000).name",
+			Want:  nil,
+		},
+		{
+			Query: "$.tags:empty()",
+			Want:  []any{createArray()},
+		},
+		{
+			Query: "$.owner.sponsor:null()",
+			Want:  nil,
+		},
+		{
+			Query: "$.owner.name:null()",
+			Want:  map[string]any{},
 		},
 	}
 	for _, c := range tests {
