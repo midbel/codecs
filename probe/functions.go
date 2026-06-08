@@ -249,7 +249,7 @@ func runBetween(val any, args []Expr) (any, error) {
 	if isEqual(val, args[0]) || isEqual(val, args[1]) {
 		return val, nil
 	}
-	if isLess(val, args[1]) || !isLess(val, args[0]) {
+	if isLess(val, args[1]) && !isLess(val, args[0]) {
 		return val, nil
 	}
 	return discarded, nil
@@ -277,9 +277,9 @@ func runIfEqual(val any, args []Expr) (any, error) {
 		return nil, invalidArgs("ifeq takes exactly three arguments", len(args))
 	}
 	if isEqual(val, args[0]) {
-		return args[1], nil
+		return getAnyFromExpr(args[1])
 	}
-	return args[2], nil
+	return getAnyFromExpr(args[2])
 }
 
 // :ifne
@@ -288,9 +288,9 @@ func runIfNotEqual(val any, args []Expr) (any, error) {
 		return nil, invalidArgs("ifne takes exactly three arguments", len(args))
 	}
 	if !isEqual(val, args[0]) {
-		return args[1], nil
+		return getAnyFromExpr(args[1])
 	}
-	return args[2], nil
+	return getAnyFromExpr(args[2])
 }
 
 // :ifexists
@@ -300,9 +300,9 @@ func runIfExists(val any, args []Expr) (any, error) {
 	}
 	if len(args) == 2 {
 		if isDefined(val) {
-			return args[0], nil
+			return getAnyFromExpr(args[0])
 		}
-		return args[1], nil
+		return getAnyFromExpr(args[1])
 	}
 	var ok bool
 	switch arr := val.(type) {
@@ -322,9 +322,9 @@ func runIfExists(val any, args []Expr) (any, error) {
 		return nil, compositeExpected("ifexists")
 	}
 	if ok {
-		return args[1], nil
+		return getAnyFromExpr(args[1])
 	}
-	return args[2], nil
+	return getAnyFromExpr(args[2])
 }
 
 // :exists

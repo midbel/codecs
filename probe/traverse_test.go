@@ -146,17 +146,42 @@ func TestTraverse(t *testing.T) {
 			},
 		},
 		{
-			Query: "$.languages.star:ge(7)",
+			Query: "$.languages.meta.year:between(2000, 2020)",
 			Want: []any{
-				createArray(10.0, 8.0, 8.0),
+				createArray(2009.0, 2012.0, 2012.0),
 			},
 			Opts: &Options{
 				Missing: MissingIgnore,
 			},
 		},
 		{
+			Query: "$.languages.name:in(\"java\", \"go\")",
+			Want: []any{
+				createArray("go", "java"),
+			},
+		},
+		{
+			Query: "$.languages.star:ge(7), $.languages.star:gt(7)",
+			Want: []any{
+				createArray(10.0, 8.0, 8.0),
+				createArray(10.0, 8.0, 8.0),
+			},
+			Opts: &Options{
+				Missing: MissingIgnore,
+				Zip:     NoZip,
+			},
+		},
+		{
 			Query: "$.owner:len()",
 			Want:  2.0,
+		},
+		{
+			Query: "$.owner.name:ifeq(\"midbel\", 100, 0)",
+			Want:  100.0,
+		},
+		{
+			Query: "$.owner.name:ifne(\"midbel\", 100, 0)",
+			Want:  0.0,
 		},
 	}
 	for _, c := range tests {

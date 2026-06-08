@@ -28,9 +28,37 @@ func Traverse(path string, in any, opts *Options) (any, error) {
 		return nil, err
 	}
 	if a, ok := res.([]any); ok && opts.Zip != NoZip {
-		return materialize(a, opts)
+		res, err = materialize(a, opts)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return res, nil
+	return clean(res), nil
+}
+
+func clean(in any) any {
+	switch in := in.(type) {
+	case []any:
+		tmp := make([]any, 0, len(in))
+		for i := range in {
+			if isDiscard(in[i]) {
+				continue
+			}
+			tmp = append(tmp, clean(in[i]))
+		}
+		return tmp
+	case map[string]any:
+		tmp := make(map[string]any)
+		for k := range in {
+			if isDiscard(in[k]) {
+				continue
+			}
+			in[k] = clean(in[k])
+		}
+		return tmp
+	default:
+		return in
+	}
 }
 
 func normalize(in any, opts *Options) (any, error) {
@@ -87,9 +115,6 @@ func materialize(arr []any, opts *Options) (any, error) {
 			flat bool
 		)
 		for j := range arr {
-			if isDiscard(arr[j]) {
-				continue
-			}
 			switch a := arr[j].(type) {
 			case []any:
 				if i < len(a) {
