@@ -274,7 +274,7 @@ func (c *compiler) isLiteral() bool {
 }
 
 func (c *compiler) aheadLiteral() bool {
-	return c.aheadIs(String) || c.aheadIs(Number) || c.aheadIs(Boolean)  || c.is(Null)
+	return c.aheadIs(String) || c.aheadIs(Number) || c.aheadIs(Boolean) || c.is(Null)
 }
 
 func (c *compiler) aheadIs(kind rune) bool {

@@ -31,6 +31,13 @@ func main() {
 		}
 		return err
 	})
+	flag.Func("m", "missing mode", func(str string) error {
+		m, err := probe.ParseMissingMode(str)
+		if err == nil {
+			opts.Missing = m
+		}
+		return err
+	})
 	flag.Func("i", "input format", func(str string) error {
 		switch str {
 		case "json", "":

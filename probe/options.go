@@ -45,6 +45,23 @@ const (
 	MissingError
 )
 
+func ParseMissingMode(str string) (MissingMode, error) {
+	var mode MissingMode
+	switch str {
+	case "replace":
+		mode = MissingReplace
+	case "null":
+		mode = MissingNull
+	case "ignore":
+		mode = MissingIgnore
+	case "error":
+		mode = MissingError
+	default:
+		return mode, fmt.Errorf("unsupported missing mode given: %s", str)
+	}
+	return mode, nil
+}
+
 func ParseExpandMode(str string) (ExpandMode, error) {
 	var mode ExpandMode
 	switch str {
