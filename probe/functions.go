@@ -341,14 +341,20 @@ func runExists(val any, args []Expr) (any, error) {
 		if err != nil {
 			return nil, err
 		}
-		return ix >= 0 && ix <= len(arr), nil
+		if ix >= 0 && ix < len(arr) {
+			return arr[ix], nil
+		}
+		return discarded, nil
 	case map[string]any:
 		key, err := getStrFromExpr(args[0])
 		if err != nil {
 			return nil, err
 		}
-		_, ok := arr[key]
-		return ok, nil
+		val, ok := arr[key]
+		if ok {
+			return val, nil
+		}
+		return discarded, nil
 	default:
 		return nil, compositeExpected("exists")
 	}
