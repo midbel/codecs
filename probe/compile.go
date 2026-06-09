@@ -119,6 +119,7 @@ func (c *compiler) compileAlternative() (Path, error) {
 func (c *compiler) compileValue() (Path, error) {
 	var value any
 	switch {
+	case c.is(Null):
 	case c.is(String):
 		value = c.currentLiteral()
 	case c.is(Number):

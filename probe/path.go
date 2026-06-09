@@ -286,6 +286,9 @@ func getIntFromExpr(expr Expr) (int, error) {
 }
 
 func castToString(val any) (any, error) {
+	if val == nil {
+		return "null", nil
+	}
 	return fmt.Sprint(val), nil
 }
 
@@ -297,6 +300,8 @@ func castToBool(val any) (any, error) {
 		return v != "", nil
 	case float64:
 		return v != 0, nil
+	case nil:
+		return false, nil
 	default:
 		return false, ErrType
 	}
@@ -318,6 +323,8 @@ func castToNumber(val any) (any, error) {
 		return x, err
 	case float64:
 		return v, nil
+	case nil:
+		return 0, nil
 	default:
 		return 0, ErrType
 	}
