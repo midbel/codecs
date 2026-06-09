@@ -175,6 +175,32 @@ func TestTraverse(t *testing.T) {
 			},
 		},
 		{
+			Query: "$.languages.name, $.languages.meta.version",
+			Want: []any{
+				createArray("go", "1.26"),
+				createArray("rust", "1.26"),
+				createArray("js", "6"),
+			},
+			Opts: &Options{
+				Missing: MissingIgnore,
+				Zip:     ZipShort,
+			},
+		},
+		{
+			Query: "$.languages.name, $.languages.meta.version | \"?\"",
+			Want: []any{
+				createArray("go", "1.26"),
+				createArray("rust", "1.26"),
+				createArray("js", "?"),
+				createArray("ts", "6"),
+				createArray("java", "?"),
+			},
+			Opts: &Options{
+				Missing: MissingIgnore,
+				Zip:     ZipStrict,
+			},
+		},
+		{
 			Query: "$.owner:len()",
 			Want:  3.0,
 		},
