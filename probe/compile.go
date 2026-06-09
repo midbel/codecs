@@ -269,11 +269,11 @@ func (c *compiler) is(kind rune) bool {
 }
 
 func (c *compiler) isLiteral() bool {
-	return c.is(String) || c.is(Number) || c.is(Boolean)
+	return c.is(String) || c.is(Number) || c.is(Boolean) || c.is(Null)
 }
 
 func (c *compiler) aheadLiteral() bool {
-	return c.aheadIs(String) || c.aheadIs(Number) || c.aheadIs(Boolean)
+	return c.aheadIs(String) || c.aheadIs(Number) || c.aheadIs(Boolean)  || c.is(Null)
 }
 
 func (c *compiler) aheadIs(kind rune) bool {
@@ -294,6 +294,7 @@ const (
 	Number
 	String
 	Boolean
+	Null
 	Dot
 	Root
 	Call
@@ -417,6 +418,13 @@ func (s *scanner) scanIdent(tok *token) {
 	}
 	tok.Type = Ident
 	tok.Literal = s.literal()
+	switch tok.Literal {
+	case "true", "false":
+		tok.Type = Boolean
+	case "null":
+		tok.Type = Null
+	default:
+	}
 }
 
 func (s *scanner) done() bool {
