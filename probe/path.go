@@ -31,6 +31,14 @@ type Expr interface {
 	Eval(any, *Options) (any, error)
 }
 
+type set struct {
+	paths []Path
+}
+
+func (p set) Collect(in any, opts *Options) (any, error) {
+	return nil, nil
+}
+
 type single struct {
 	Anchored bool
 	Start    Expr

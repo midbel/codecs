@@ -5,6 +5,10 @@ import (
 	"slices"
 )
 
+type Result struct {
+	Sets any
+}
+
 func Traverse(path string, in any, opts *Options) (any, error) {
 	if opts == nil {
 		opts = &Options{

@@ -29,6 +29,8 @@ type compiler struct {
 	scan *scanner
 	curr token
 	peek token
+
+	atEnd rune
 }
 
 func CompilePath(str string) (Path, error) {
@@ -38,7 +40,8 @@ func CompilePath(str string) (Path, error) {
 
 func compile(str string) *compiler {
 	c := compiler{
-		scan: createScanner(str),
+		scan:  createScanner(str),
+		atEnd: Eof,
 	}
 	c.next()
 	c.next()
@@ -46,21 +49,63 @@ func compile(str string) *compiler {
 }
 
 func (c *compiler) Compile() (Path, error) {
-	return c.compile()
+	if !c.is(BegGrp) {
+		return c.compile()
+	}
+	return c.compileSet()
+}
+
+func (c *compiler) compileSet() (Path, error) {
+	c.atEnd = EndGrp
+
+	var paths []Path
+	for !c.done() {
+		c.next()
+		p, err := c.compile()
+		if err != nil {
+			return nil, err
+		}
+		paths = append(paths, p)
+		if !c.is(EndGrp) {
+			return nil, syntaxError("')' expected at end of path")
+		}
+		c.next()
+		switch {
+		case c.is(Comma):
+			c.next()
+			if !c.is(BegGrp) {
+				return nil, syntaxError("'(' expected at begining of path")
+			}
+		case c.done():
+		default:
+			return nil, syntaxError("unexpected character at end of path")
+		}
+	}
+	switch len(paths) {
+	case 0:
+		return nil, syntaxError("no path could be parsed from input string")
+	case 1:
+		return paths[0], nil
+	default:
+		ps := set{
+			paths: paths,
+		}
+		return ps, nil
+	}
 }
 
 func (c *compiler) compile() (Path, error) {
 	var paths []Path
-	for !c.done() {
+	for !c.eoq() {
 		pth, err := c.compileAlternative()
 		if err != nil {
 			return nil, err
 		}
 		switch {
-		case c.is(Eof):
+		case c.eoq():
 		case c.is(Comma):
 			c.next()
-			if c.is(Eof) {
+			if c.eoq() {
 				return nil, syntaxError("',' not allowed at end of path")
 			}
 		default:
@@ -84,7 +129,7 @@ func (c *compiler) compile() (Path, error) {
 
 func (c *compiler) compileAlternative() (Path, error) {
 	var paths []Path
-	for !c.done() {
+	for !c.eoq() {
 		var (
 			pth Path
 			err error
@@ -259,6 +304,10 @@ func (c *compiler) compileCall() (Expr, error) {
 func (c *compiler) next() {
 	c.curr = c.peek
 	c.peek = c.scan.Scan()
+}
+
+func (c *compiler) eoq() bool {
+	return c.is(c.atEnd)
 }
 
 func (c *compiler) done() bool {
