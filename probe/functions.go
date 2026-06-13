@@ -17,6 +17,7 @@ var builtins = map[string]func(any, []Expr) (any, error){
 	"at":       runAt,
 	"first":    runFirst,
 	"last":     runLast,
+	"range":    runRange,
 	"default":  runDefault,
 	"not":      runNot,
 	"eq":       runEqual,
@@ -26,6 +27,12 @@ var builtins = map[string]func(any, []Expr) (any, error){
 	"gt":       runGreaterThan,
 	"ge":       runGreaterEq,
 	"between":  runBetween,
+	"literal":  runLiteral,
+	"number":   runNumber,
+	"string":   runString,
+	"boolean":  runBoolean,
+	"object":   runObject,
+	"array":    runArray,
 	"in":       runIn,
 	"ifeq":     runIfEqual,
 	"ifne":     runIfNotEqual,
@@ -63,7 +70,7 @@ func runAs(val any, args []Expr) (any, error) {
 // :len, :length
 func runLen(val any, args []Expr) (any, error) {
 	if len(args) != 0 {
-		return nil, invalidArgs("length takes not argument(s)", len(args))
+		return nil, invalidArgs("length takes no argument(s)", len(args))
 	}
 	var x int
 	switch arr := val.(type) {
@@ -91,9 +98,34 @@ func runAt(val any, args []Expr) (any, error) {
 		return nil, err
 	}
 	if ix < 0 || ix >= len(arr) {
-		return missed, nil // nil, errIndex
+		return missed, nil
 	}
 	return arr[ix], nil
+}
+
+func runRange(val any, args []Expr) (any, error) {
+	if len(args) != 2 {
+		return nil, invalidArgs("range takes only two arguments", len(args))
+	}
+	arr, ok := val.([]any)
+	if !ok {
+		return nil, arrayExpected("at")
+	}
+	fix, err := getIntFromExpr(args[0])
+	if err != nil {
+		return nil, err
+	}
+	if fix < 0 || fix >= len(arr) {
+		return missed, nil
+	}
+	tix, err := getIntFromExpr(args[1])
+	if err != nil {
+		return nil, err
+	}
+	if tix < 0 || tix >= len(arr) || fix > tix {
+		return missed, nil
+	}
+	return arr[fix:tix], nil
 }
 
 // :first()
@@ -358,6 +390,69 @@ func runExists(val any, args []Expr) (any, error) {
 	default:
 		return nil, compositeExpected("exists")
 	}
+}
+
+func runLiteral(val any, args []Expr) (any, error) {
+	if len(args) != 0 {
+		return nil, invalidArgs("literal takes no argument(s)", len(args))
+	}
+	switch val.(type) {
+	case string:
+	case float64:
+	default:
+		return discarded, nil
+	}
+	return val, nil
+}
+
+func runNumber(val any, args []Expr) (any, error) {
+	if len(args) != 0 {
+		return nil, invalidArgs("number takes no argument(s)", len(args))
+	}
+	if _, ok := val.(float64); !ok {
+		return discarded, nil
+	}
+	return val, nil
+}
+
+func runString(val any, args []Expr) (any, error) {
+	if len(args) != 0 {
+		return nil, invalidArgs("string takes no argument(s)", len(args))
+	}
+	if _, ok := val.(string); !ok {
+		return discarded, nil
+	}
+	return val, nil
+}
+
+func runBoolean(val any, args []Expr) (any, error) {
+	if len(args) != 0 {
+		return nil, invalidArgs("boolean takes no argument(s)", len(args))
+	}
+	if _, ok := val.(bool); !ok {
+		return discarded, nil
+	}
+	return val, nil
+}
+
+func runObject(val any, args []Expr) (any, error) {
+	if len(args) != 0 {
+		return nil, invalidArgs("object takes no argument(s)", len(args))
+	}
+	if _, ok := val.(map[string]any); !ok {
+		return discarded, nil
+	}
+	return val, nil
+}
+
+func runArray(val any, args []Expr) (any, error) {
+	if len(args) != 0 {
+		return nil, invalidArgs("array takes no argument(s)", len(args))
+	}
+	if _, ok := val.([]any); !ok {
+		return discarded, nil
+	}
+	return val, nil
 }
 
 // :empty
