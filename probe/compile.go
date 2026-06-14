@@ -33,7 +33,7 @@ type compiler struct {
 	atEnd rune
 }
 
-func CompilePath(str string) (Path, error) {
+func CompilePath(str string) (*Query, error) {
 	c := compile(str)
 	return c.Compile()
 }
@@ -48,24 +48,31 @@ func compile(str string) *compiler {
 	return &c
 }
 
-func (c *compiler) Compile() (Path, error) {
+func (c *compiler) Compile() (*Query, error) {
 	if !c.is(BegGrp) {
-		return c.compile()
+		p, err := c.compile()
+		if err != nil {
+			return nil, err
+		}
+		q := Query{
+			paths: []Path{p},
+		}
+		return &q, nil
 	}
-	return c.compileSet()
+	return c.compileQuery()
 }
 
-func (c *compiler) compileSet() (Path, error) {
+func (c *compiler) compileQuery() (*Query, error) {
 	c.atEnd = EndGrp
 
-	var paths []Path
+	var q Query
 	for !c.done() {
 		c.next()
 		p, err := c.compile()
 		if err != nil {
 			return nil, err
 		}
-		paths = append(paths, p)
+		q.paths = append(q.paths, p)
 		if !c.is(EndGrp) {
 			return nil, syntaxError("')' expected at end of path")
 		}
@@ -81,16 +88,11 @@ func (c *compiler) compileSet() (Path, error) {
 			return nil, syntaxError("unexpected character at end of path")
 		}
 	}
-	switch len(paths) {
+	switch len(q.paths) {
 	case 0:
 		return nil, syntaxError("no path could be parsed from input string")
-	case 1:
-		return paths[0], nil
 	default:
-		ps := set{
-			paths: paths,
-		}
-		return ps, nil
+		return &q, nil
 	}
 }
 

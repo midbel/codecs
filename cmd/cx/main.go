@@ -14,7 +14,7 @@ import (
 func main() {
 	var (
 		decode func(io.Reader) (any, error) = json.Decode
-		encode func(any)                    = writeJSON
+		encode func(*probe.Result)          = writeJSON
 		opts   probe.Options
 	)
 	flag.Func("z", "zip mode", func(str string) error {
@@ -70,7 +70,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "decode: %s\n", err)
 		os.Exit(1)
 	}
-	res, err := probe.Traverse(flag.Arg(1), in, &opts)
+	res, err := probe.Execute(flag.Arg(1), in, &opts)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "traverse: %s\n", err)
 		os.Exit(1)
@@ -78,12 +78,12 @@ func main() {
 	encode(res)
 }
 
-func writeJSON(in any) {
+func writeJSON(in *probe.Result) {
 	ws := json.NewWriter(os.Stdout)
-	ws.Write(in)
+	ws.Write(in.Sets)
 }
 
-func writeXML(in any) {
+func writeXML(in *probe.Result) {
 	ws := xml.NewWriter(os.Stdout)
 	_ = ws
 }
