@@ -105,6 +105,16 @@ func (c *compiler) compile() (Path, error) {
 		}
 		switch {
 		case c.eoq():
+		case c.is(Arrow):
+			c.next()
+			r := root{
+				base: pth,
+			}
+			r.next, err = c.compile()
+			if err != nil {
+				return nil, err
+			}
+			return r, nil
 		case c.is(Comma):
 			c.next()
 			if c.eoq() {
@@ -348,6 +358,8 @@ const (
 	Boolean
 	Null
 	Dot
+	Deep
+	Arrow
 	Root
 	Call
 	Comma
@@ -394,9 +406,19 @@ func (s *scanner) scanDefault() token {
 	}
 	s.skipBlanks()
 	switch {
+	case s.char == '=':
+		s.read()
+		if s.char == '>' {
+			tok.Type = Arrow
+			s.read()
+		}
 	case s.char == '.':
 		tok.Type = Dot
 		s.read()
+		if s.char == '.' {
+			tok.Type = Deep
+			s.read()
+		}
 	case s.char == ',':
 		tok.Type = Comma
 		s.read()

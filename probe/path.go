@@ -40,6 +40,19 @@ func (p single) Collect(in any, opts *Options) (any, error) {
 	return p.Start.Eval(in, opts)
 }
 
+type root struct {
+	base Path
+	next Path
+}
+
+func (p root) Collect(in any, opts *Options) (any, error) {
+	res, err := p.base.Collect(in, opts)
+	if err != nil {
+		return nil, err
+	}
+	return p.next.Collect(res, opts)
+}
+
 type multi struct {
 	paths []Path
 }

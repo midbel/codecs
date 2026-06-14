@@ -10,6 +10,7 @@ type Result struct {
 }
 
 type Query struct {
+	root  Path
 	paths []Path
 }
 
@@ -32,6 +33,9 @@ func Execute(path string, in any, opts *Options) (*Result, error) {
 }
 
 func (q *Query) Execute(in any, opts *Options) (*Result, error) {
+	if q.root != nil {
+
+	}
 	var result Result
 	for _, a := range q.paths {
 		res, err := a.Collect(in, opts)

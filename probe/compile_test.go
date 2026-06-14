@@ -73,6 +73,15 @@ func TestCompile(t *testing.T) {
 		{
 			Input: "($.foo, $.bar), ($.foo, $.quz)",
 		},
+		{
+			Input: "$.quz => $.foo, $.bar | 0",
+		},
+		{
+			Input: "($.quz => $.foo, $.bar), ($.foo, $.bar)",
+		},
+		{
+			Input: "$.foo => ($.bar => $.foo, $.bar)",
+		},
 	}
 	for _, c := range tests {
 		_, err := CompilePath(c.Input)
