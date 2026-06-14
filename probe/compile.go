@@ -29,8 +29,6 @@ type compiler struct {
 	scan *scanner
 	curr token
 	peek token
-
-	atEnd rune
 }
 
 func CompilePath(str string) (*Query, error) {
@@ -40,8 +38,7 @@ func CompilePath(str string) (*Query, error) {
 
 func compile(str string) *compiler {
 	c := compiler{
-		scan:  createScanner(str),
-		atEnd: Eof,
+		scan: createScanner(str),
 	}
 	c.next()
 	c.next()
@@ -49,75 +46,28 @@ func compile(str string) *compiler {
 }
 
 func (c *compiler) Compile() (*Query, error) {
-	if !c.is(BegGrp) {
-		p, err := c.compile()
-		if err != nil {
-			return nil, err
-		}
-		q := Query{
-			paths: []Path{p},
-		}
-		return &q, nil
+	p, err := c.compileRoot()
+	if err != nil {
+		return nil, err
 	}
-	return c.compileQuery()
+	q := Query{
+		paths: []Path{p},
+	}
+	return &q, nil
 }
 
-func (c *compiler) compileQuery() (*Query, error) {
-	c.atEnd = EndGrp
-
-	var q Query
-	for !c.done() {
-		c.next()
-		p, err := c.compile()
-		if err != nil {
-			return nil, err
-		}
-		q.paths = append(q.paths, p)
-		if !c.is(EndGrp) {
-			return nil, syntaxError("')' expected at end of path")
-		}
-		c.next()
-		switch {
-		case c.is(Comma):
-			c.next()
-			if !c.is(BegGrp) {
-				return nil, syntaxError("'(' expected at begining of path")
-			}
-		case c.done():
-		default:
-			return nil, syntaxError("unexpected character at end of path")
-		}
-	}
-	switch len(q.paths) {
-	case 0:
-		return nil, syntaxError("no path could be parsed from input string")
-	default:
-		return &q, nil
-	}
-}
-
-func (c *compiler) compile() (Path, error) {
+func (c *compiler) compileRoot() (Path, error) {
 	var paths []Path
-	for !c.eoq() {
+	for !c.done() {
 		pth, err := c.compileAlternative()
 		if err != nil {
 			return nil, err
 		}
 		switch {
-		case c.eoq():
-		case c.is(Arrow):
-			c.next()
-			r := root{
-				base: pth,
-			}
-			r.next, err = c.compile()
-			if err != nil {
-				return nil, err
-			}
-			return r, nil
+		case c.done():
 		case c.is(Comma):
 			c.next()
-			if c.eoq() {
+			if c.done() {
 				return nil, syntaxError("',' not allowed at end of path")
 			}
 		default:
@@ -141,7 +91,7 @@ func (c *compiler) compile() (Path, error) {
 
 func (c *compiler) compileAlternative() (Path, error) {
 	var paths []Path
-	for !c.eoq() {
+	for !c.done() {
 		var (
 			pth Path
 			err error
@@ -316,10 +266,6 @@ func (c *compiler) compileCall() (Expr, error) {
 func (c *compiler) next() {
 	c.curr = c.peek
 	c.peek = c.scan.Scan()
-}
-
-func (c *compiler) eoq() bool {
-	return c.is(c.atEnd)
 }
 
 func (c *compiler) done() bool {
