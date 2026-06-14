@@ -46,28 +46,78 @@ func compile(str string) *compiler {
 }
 
 func (c *compiler) Compile() (*Query, error) {
-	p, err := c.compileRoot()
+	if c.is(BegGrp) {
+		ps, err := c.compilePaths()
+		if err != nil {
+			return nil, err
+		}
+		q := Query{
+			paths: ps,
+		}
+		return &q, nil
+	}
+	return c.compile()
+}
+
+func (c *compiler) compile() (*Query, error) {
+	base, err := c.compileRoot(Arrow)
 	if err != nil {
 		return nil, err
 	}
-	q := Query{
-		paths: []Path{p},
+	var q Query
+	if c.is(Arrow) {
+		c.next()
+		next, err := c.compileRoot(Eof)
+		if err != nil {
+			return nil, err
+		}
+		q.root = base
+		q.paths = []Path{next}
+	} else {
+		q.paths = []Path{base}
 	}
 	return &q, nil
 }
 
-func (c *compiler) compileRoot() (Path, error) {
-	var paths []Path
+func (c *compiler) compilePaths() ([]Path, error) {
+	var list []Path
 	for !c.done() {
+		c.next()
+		p, err := c.compileRoot(EndGrp)
+		if err != nil {
+			return nil, err
+		}
+		list = append(list, p)
+		if !c.at(EndGrp) {
+			return nil, syntaxError("')' expected at end of query")
+		}
+		c.next()
+		switch {
+		case c.is(Comma):
+			c.next()
+			if !c.is(BegGrp) {
+				return nil, syntaxError("'(' expected at begining of path")
+			}
+		case c.done():
+		default:
+			return nil, syntaxError("',' expected after query")
+		}
+	}
+	return list, nil
+}
+
+func (c *compiler) compileRoot(stop rune) (Path, error) {
+	var paths []Path
+	for !c.at(stop) {
 		pth, err := c.compileAlternative()
 		if err != nil {
 			return nil, err
 		}
 		switch {
-		case c.done():
+		case c.at(stop):
 		case c.is(Comma):
 			c.next()
-			if c.done() {
+			if c.at(stop) {
 				return nil, syntaxError("',' not allowed at end of path")
 			}
 		default:
@@ -270,6 +320,10 @@ func (c *compiler) next() {
 
 func (c *compiler) done() bool {
 	return c.is(Eof)
+}
+
+func (c *compiler) at(stop rune) bool {
+	return c.done() || c.is(stop)
 }
 
 func (c *compiler) is(kind rune) bool {
