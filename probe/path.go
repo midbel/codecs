@@ -25,8 +25,8 @@ var (
 )
 
 type Path interface {
-	Collect(any, *Options) (any, error)
 	All(any, *Options) iter.Seq2[any, error]
+	collect(any, *Options) (any, error)
 }
 
 type Expr interface {
@@ -38,13 +38,13 @@ type single struct {
 	Start    Expr
 }
 
-func (p single) Collect(in any, opts *Options) (any, error) {
+func (p single) collect(in any, opts *Options) (any, error) {
 	return p.Start.Eval(in, opts)
 }
 
 func (p single) All(in any, opts *Options) iter.Seq2[any, error] {
 	it := func(yield func(any, error) bool) {
-		d, err := p.Collect(in, opts)
+		d, err := p.collect(in, opts)
 		yield(d, err)
 	}
 	return it
@@ -62,7 +62,7 @@ func (p root) All(in any, opts *Options) iter.Seq2[any, error] {
 				return
 			}
 			for _, n := range p.next {
-				d, err := n.Collect(in, opts)
+				d, err := n.collect(in, opts)
 				if ok := yield(d, err); !ok {
 					return
 				}
@@ -72,7 +72,7 @@ func (p root) All(in any, opts *Options) iter.Seq2[any, error] {
 	return it
 }
 
-func (p root) Collect(in any, opts *Options) (any, error) {
+func (p root) collect(in any, opts *Options) (any, error) {
 	return nil, nil
 }
 
@@ -80,10 +80,10 @@ type multi struct {
 	paths []Path
 }
 
-func (p multi) Collect(in any, opts *Options) (any, error) {
+func (p multi) collect(in any, opts *Options) (any, error) {
 	var list []any
 	for _, i := range p.paths {
-		res, err := i.Collect(in, opts)
+		res, err := i.collect(in, opts)
 		if err != nil {
 			return nil, err
 		}
@@ -94,7 +94,7 @@ func (p multi) Collect(in any, opts *Options) (any, error) {
 
 func (p multi) All(in any, opts *Options) iter.Seq2[any, error] {
 	it := func(yield func(any, error) bool) {
-		d, err := p.Collect(in, opts)
+		d, err := p.collect(in, opts)
 		yield(d, err)
 	}
 	return it
@@ -104,10 +104,10 @@ type alternative struct {
 	paths []Path
 }
 
-func (p alternative) Collect(in any, opts *Options) (any, error) {
+func (p alternative) collect(in any, opts *Options) (any, error) {
 	var last any
 	for _, i := range p.paths {
-		a, err := i.Collect(in, opts)
+		a, err := i.collect(in, opts)
 		if err != nil {
 			continue
 		}
@@ -121,7 +121,7 @@ func (p alternative) Collect(in any, opts *Options) (any, error) {
 
 func (p alternative) All(in any, opts *Options) iter.Seq2[any, error] {
 	it := func(yield func(any, error) bool) {
-		d, err := p.Collect(in, opts)
+		d, err := p.collect(in, opts)
 		yield(d, err)
 	}
 	return it
@@ -162,7 +162,7 @@ func (s literal) All(_ any, _ *Options) iter.Seq2[any, error] {
 	return it
 }
 
-func (s literal) Collect(_ any, _ *Options) (any, error) {
+func (s literal) collect(_ any, _ *Options) (any, error) {
 	return s.value, nil
 }
 
