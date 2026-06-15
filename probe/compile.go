@@ -80,13 +80,11 @@ func (c *compiler) compileRootedPath(stop rune) (Path, error) {
 		if err != nil {
 			return nil, err
 		}
-		for i := range ps {
-			ps[i] = root{
-				base: base,
-				next: ps[i],
-			}
+		rs := root{
+			base: base,
+			next: ps,
 		}
-		return nil, nil
+		return rs, nil
 	}
 	next, err := c.compilePath(stop)
 	if err != nil {
@@ -94,7 +92,7 @@ func (c *compiler) compileRootedPath(stop rune) (Path, error) {
 	}
 	base = root{
 		base: base,
-		next: next,
+		next: []Path{next},
 	}
 	return base, nil
 }

@@ -3,6 +3,7 @@ package probe
 import (
 	"errors"
 	"fmt"
+	"iter"
 	"strconv"
 )
 
@@ -25,6 +26,7 @@ var (
 
 type Path interface {
 	Collect(any, *Options) (any, error)
+	All(any, *Options) iter.Seq2[any, error]
 }
 
 type Expr interface {
@@ -40,17 +42,38 @@ func (p single) Collect(in any, opts *Options) (any, error) {
 	return p.Start.Eval(in, opts)
 }
 
+func (p single) All(in any, opts *Options) iter.Seq2[any, error] {
+	it := func(yield func(any, error) bool) {
+		d, err := p.Collect(in, opts)
+		yield(d, err)
+	}
+	return it
+}
+
 type root struct {
 	base Path
-	next Path
+	next []Path
+}
+
+func (p root) All(in any, opts *Options) iter.Seq2[any, error] {
+	it := func(yield func(any, error) bool) {
+		for in, err := range p.base.All(in, opts) {
+			if err != nil {
+				return
+			}
+			for _, n := range p.next {
+				d, err := n.Collect(in, opts)
+				if ok := yield(d, err); !ok {
+					return
+				}
+			}
+		}
+	}
+	return it
 }
 
 func (p root) Collect(in any, opts *Options) (any, error) {
-	res, err := p.base.Collect(in, opts)
-	if err != nil {
-		return nil, err
-	}
-	return p.next.Collect(res, opts)
+	return nil, nil
 }
 
 type multi struct {
@@ -67,6 +90,14 @@ func (p multi) Collect(in any, opts *Options) (any, error) {
 		list = append(list, res)
 	}
 	return list, nil
+}
+
+func (p multi) All(in any, opts *Options) iter.Seq2[any, error] {
+	it := func(yield func(any, error) bool) {
+		d, err := p.Collect(in, opts)
+		yield(d, err)
+	}
+	return it
 }
 
 type alternative struct {
@@ -86,6 +117,14 @@ func (p alternative) Collect(in any, opts *Options) (any, error) {
 		}
 	}
 	return last, nil
+}
+
+func (p alternative) All(in any, opts *Options) iter.Seq2[any, error] {
+	it := func(yield func(any, error) bool) {
+		d, err := p.Collect(in, opts)
+		yield(d, err)
+	}
+	return it
 }
 
 type call struct {
@@ -114,6 +153,13 @@ func (s field) Eval(in any, opts *Options) (any, error) {
 
 type literal struct {
 	value any
+}
+
+func (s literal) All(_ any, _ *Options) iter.Seq2[any, error] {
+	it := func(yield func(any, error) bool) {
+		yield(s.value, nil)
+	}
+	return it
 }
 
 func (s literal) Collect(_ any, _ *Options) (any, error) {
