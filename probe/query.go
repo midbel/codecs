@@ -34,15 +34,16 @@ func Execute(path string, in any, opts *Options) (*Result, error) {
 func (q *Query) Execute(in any, opts *Options) (*Result, error) {
 	var result Result
 	for _, a := range q.paths {
-		res, err := a.Collect(in, opts)
-		if err != nil {
-			return nil, err
+		for res, err := range a.All(in, opts) {
+			if err != nil {
+				return nil, err
+			}
+			ds, err := q.prepare(res, opts)
+			if err != nil {
+				return nil, err
+			}
+			result.Sets = append(result.Sets, ds)
 		}
-		ds, err := q.prepare(res, opts)
-		if err != nil {
-			return nil, err
-		}
-		result.Sets = append(result.Sets, ds)
 	}
 	return &result, nil
 }
