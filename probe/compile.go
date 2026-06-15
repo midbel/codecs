@@ -47,43 +47,63 @@ func compile(str string) *compiler {
 
 func (c *compiler) Compile() (*Query, error) {
 	if c.is(BegGrp) {
-		ps, err := c.compilePaths()
+		ps, err := c.compileGroups()
 		if err != nil {
 			return nil, err
 		}
-		q := Query{
+		q := &Query{
 			paths: ps,
 		}
-		return &q, nil
+		return q, nil
 	}
-	return c.compile()
-}
-
-func (c *compiler) compile() (*Query, error) {
-	base, err := c.compileRoot(Arrow)
+	p, err := c.compileRootedPath(Eof)
 	if err != nil {
 		return nil, err
 	}
-	var q Query
-	if c.is(Arrow) {
-		c.next()
-		next, err := c.compileRoot(Eof)
+	q := &Query{
+		paths: []Path{p},
+	}
+	return q, nil
+}
+
+func (c *compiler) compileRootedPath(stop rune) (Path, error) {
+	base, err := c.compilePath(Arrow, stop)
+	if err != nil {
+		return nil, err
+	}
+	if !c.is(Arrow) {
+		return base, nil
+	}
+	c.next()
+	if c.is(BegGrp) {
+		ps, err := c.compileGroups()
 		if err != nil {
 			return nil, err
 		}
-		q.root = base
-		q.paths = []Path{next}
-	} else {
-		q.paths = []Path{base}
+		for i := range ps {
+			ps[i] = root{
+				base: base,
+				next: ps[i],
+			}
+		}
+		return nil, nil
 	}
-	return &q, nil
+	next, err := c.compilePath(stop)
+	if err != nil {
+		return nil, err
+	}
+	base = root{
+		base: base,
+		next: next,
+	}
+	return base, nil
 }
 
-func (c *compiler) compilePaths() ([]Path, error) {
+func (c *compiler) compileGroups() ([]Path, error) {
 	var list []Path
 	for !c.done() {
 		c.next()
-		p, err := c.compileRoot(EndGrp)
+		p, err := c.compileRootedPath(EndGrp)
 		if err != nil {
 			return nil, err
 		}
@@ -106,18 +126,18 @@ func (c *compiler) compilePaths() ([]Path, error) {
 	return list, nil
 }
 
-func (c *compiler) compileRoot(stop rune) (Path, error) {
+func (c *compiler) compilePath(stop ...rune) (Path, error) {
 	var paths []Path
-	for !c.at(stop) {
+	for !c.at(stop...) {
 		pth, err := c.compileAlternative()
 		if err != nil {
 			return nil, err
 		}
 		switch {
-		case c.at(stop):
+		case c.at(stop...):
 		case c.is(Comma):
 			c.next()
-			if c.at(stop) {
+			if c.at(stop...) {
 				return nil, syntaxError("',' not allowed at end of path")
 			}
 		default:
@@ -149,7 +169,7 @@ func (c *compiler) compileAlternative() (Path, error) {
 		if c.isLiteral() {
 			pth, err = c.compileValue()
 		} else {
-			pth, err = c.compilePath()
+			pth, err = c.compilePart()
 		}
 		if err != nil {
 			return nil, err
@@ -201,7 +221,7 @@ func (c *compiler) compileValue() (Path, error) {
 	return lit, nil
 }
 
-func (c *compiler) compilePath() (Path, error) {
+func (c *compiler) compilePart() (Path, error) {
 	var (
 		pth single
 		err error
@@ -322,8 +342,17 @@ func (c *compiler) done() bool {
 	return c.is(Eof)
 }
 
-func (c *compiler) at(stop rune) bool {
-	return c.done() || c.is(stop)
+func (c *compiler) at(stop ...rune) bool {
+	// return c.done() || c.is(stop)
+	if c.done() {
+		return true
+	}
+	for i := range stop {
+		if c.is(stop[i]) {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *compiler) is(kind rune) bool {
