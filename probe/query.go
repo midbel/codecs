@@ -34,7 +34,7 @@ func Execute(path string, in any, opts *Options) (*Result, error) {
 func (q *Query) Execute(in any, opts *Options) (*Result, error) {
 	var result Result
 	for _, a := range q.paths {
-		for res, err := range a.All(in, opts) {
+		for res, err := range a.All(in) {
 			if err != nil {
 				return nil, err
 			}

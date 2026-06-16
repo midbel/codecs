@@ -25,12 +25,12 @@ var (
 )
 
 type Path interface {
-	All(any, *Options) iter.Seq2[any, error]
-	collect(any, *Options) (any, error)
+	All(any) iter.Seq2[any, error]
+	collect(any) (any, error)
 }
 
 type Expr interface {
-	Eval(any, *Options) (any, error)
+	Eval(any) (any, error)
 }
 
 type single struct {
@@ -38,16 +38,28 @@ type single struct {
 	Start    Expr
 }
 
-func (p single) collect(in any, opts *Options) (any, error) {
-	return p.Start.Eval(in, opts)
-}
-
-func (p single) All(in any, opts *Options) iter.Seq2[any, error] {
+func (p single) All(in any) iter.Seq2[any, error] {
 	it := func(yield func(any, error) bool) {
-		d, err := p.collect(in, opts)
+		d, err := p.collect(in)
 		yield(d, err)
 	}
 	return it
+}
+
+func (p single) collect(in any) (any, error) {
+	return p.Start.Eval(in)
+}
+
+type deep struct {
+	Start Expr
+}
+
+func (p deep) All(in any) iter.Seq2[any, error] {
+	return nil
+}
+
+func (p deep) collect(in any) (any, error) {
+	return nil, nil
 }
 
 type root struct {
@@ -55,14 +67,14 @@ type root struct {
 	next []Path
 }
 
-func (p root) All(in any, opts *Options) iter.Seq2[any, error] {
+func (p root) All(in any) iter.Seq2[any, error] {
 	it := func(yield func(any, error) bool) {
-		for in, err := range p.base.All(in, opts) {
+		for in, err := range p.base.All(in) {
 			if err != nil {
 				return
 			}
 			for _, n := range p.next {
-				d, err := n.collect(in, opts)
+				d, err := n.collect(in)
 				if ok := yield(d, err); !ok {
 					return
 				}
@@ -72,7 +84,7 @@ func (p root) All(in any, opts *Options) iter.Seq2[any, error] {
 	return it
 }
 
-func (p root) collect(in any, opts *Options) (any, error) {
+func (p root) collect(in any) (any, error) {
 	return nil, nil
 }
 
@@ -80,10 +92,10 @@ type multi struct {
 	paths []Path
 }
 
-func (p multi) collect(in any, opts *Options) (any, error) {
+func (p multi) collect(in any) (any, error) {
 	var list []any
 	for _, i := range p.paths {
-		res, err := i.collect(in, opts)
+		res, err := i.collect(in)
 		if err != nil {
 			return nil, err
 		}
@@ -92,9 +104,9 @@ func (p multi) collect(in any, opts *Options) (any, error) {
 	return list, nil
 }
 
-func (p multi) All(in any, opts *Options) iter.Seq2[any, error] {
+func (p multi) All(in any) iter.Seq2[any, error] {
 	it := func(yield func(any, error) bool) {
-		d, err := p.collect(in, opts)
+		d, err := p.collect(in)
 		yield(d, err)
 	}
 	return it
@@ -104,10 +116,10 @@ type alternative struct {
 	paths []Path
 }
 
-func (p alternative) collect(in any, opts *Options) (any, error) {
+func (p alternative) collect(in any) (any, error) {
 	var last any
 	for _, i := range p.paths {
-		a, err := i.collect(in, opts)
+		a, err := i.collect(in)
 		if err != nil {
 			continue
 		}
@@ -119,9 +131,9 @@ func (p alternative) collect(in any, opts *Options) (any, error) {
 	return last, nil
 }
 
-func (p alternative) All(in any, opts *Options) iter.Seq2[any, error] {
+func (p alternative) All(in any) iter.Seq2[any, error] {
 	it := func(yield func(any, error) bool) {
-		d, err := p.collect(in, opts)
+		d, err := p.collect(in)
 		yield(d, err)
 	}
 	return it
@@ -132,7 +144,7 @@ type call struct {
 	Args  []Expr
 }
 
-func (c call) Eval(in any, _ *Options) (any, error) {
+func (c call) Eval(in any) (any, error) {
 	fn, ok := builtins[c.Ident]
 	if !ok {
 		return nil, nil
@@ -147,30 +159,30 @@ type field struct {
 	Next  Expr
 }
 
-func (s field) Eval(in any, opts *Options) (any, error) {
-	return traverse(s, in, opts)
+func (s field) Eval(in any) (any, error) {
+	return traverse(s, in)
 }
 
 type literal struct {
 	value any
 }
 
-func (s literal) All(_ any, _ *Options) iter.Seq2[any, error] {
+func (s literal) Eval(_ any) (any, error) {
+	return s.value, nil
+}
+
+func (s literal) All(_ any) iter.Seq2[any, error] {
 	it := func(yield func(any, error) bool) {
 		yield(s.value, nil)
 	}
 	return it
 }
 
-func (s literal) collect(_ any, _ *Options) (any, error) {
+func (s literal) collect(_ any) (any, error) {
 	return s.value, nil
 }
 
-func (s literal) Eval(_ any, _ *Options) (any, error) {
-	return s.value, nil
-}
-
-func traverse(e Expr, in any, opts *Options) (any, error) {
+func traverse(e Expr, in any) (any, error) {
 	if isMissing(in) {
 		return in, nil
 	}
@@ -179,18 +191,18 @@ func traverse(e Expr, in any, opts *Options) (any, error) {
 	}
 	switch in := in.(type) {
 	case []any:
-		return traverseArray(e, in, opts)
+		return traverseArray(e, in)
 	case map[string]any:
-		return traverseMap(e, in, opts)
+		return traverseMap(e, in)
 	default:
 		return nil, fmt.Errorf("%w: array or object expected", ErrType)
 	}
 }
 
-func traverseArray(e Expr, in []any, opts *Options) (any, error) {
+func traverseArray(e Expr, in []any) (any, error) {
 	var result []any
 	for i := range in {
-		tmp, err := traverse(e, in[i], opts)
+		tmp, err := traverse(e, in[i])
 		if err != nil {
 			return nil, err
 		}
@@ -199,7 +211,7 @@ func traverseArray(e Expr, in []any, opts *Options) (any, error) {
 	return result, nil
 }
 
-func traverseMap(e Expr, in map[string]any, opts *Options) (any, error) {
+func traverseMap(e Expr, in map[string]any) (any, error) {
 	if e == nil {
 		return nil, ErrEnd
 	}
@@ -212,11 +224,11 @@ func traverseMap(e Expr, in map[string]any, opts *Options) (any, error) {
 		if x.Alt == nil {
 			p = missed
 		} else {
-			p, _ = x.Alt.Eval(in, opts)
+			p, _ = x.Alt.Eval(in)
 		}
 	}
 	if x.Apply != nil {
-		r, err := x.Apply.Eval(p, opts)
+		r, err := x.Apply.Eval(p)
 		if err != nil {
 			return nil, err
 		}
@@ -225,7 +237,7 @@ func traverseMap(e Expr, in map[string]any, opts *Options) (any, error) {
 	if x.Next == nil {
 		return p, nil
 	}
-	return traverse(x.Next, p, opts)
+	return traverse(x.Next, p)
 }
 
 func isMissing(val any) bool {
