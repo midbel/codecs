@@ -285,7 +285,7 @@ func (c *compiler) compileExpr() (Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		if !c.is(Comma) && !c.is(Pipe) && !c.is(Eof) {
+		if !c.is(Comma) && !c.is(Pipe) && !c.is(Eof) && !c.is(EndGrp) {
 			return nil, syntaxError("alternative value only allow at end of path")
 		}
 		step.Alt = v.(Expr)

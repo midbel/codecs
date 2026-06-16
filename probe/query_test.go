@@ -140,6 +140,31 @@ func TestExecute(t *testing.T) {
 			},
 		},
 		{
+			Query: "$.languages => .name, .star | 0",
+			Want: []any{
+				createArray("go", 10.0),
+				createArray("rust", 0.0),
+				createArray("js", 8.0),
+				createArray("ts", 8.0),
+				createArray("java", 6.0),
+			},
+		},
+		{
+			Query: "($.languages => .name, .star | 0), ($.owner => .name)",
+			Want: &Result{
+				Sets: []any{
+					[]any{
+						createArray("go", 10.0),
+						createArray("rust", 0.0),
+						createArray("js", 8.0),
+						createArray("ts", 8.0),
+						createArray("java", 6.0),
+					},
+					"midbel",
+				},
+			},
+		},
+		{
 			Query: "$.languages.star:eq(10)",
 			Want: []any{
 				createArray(10.0),
@@ -258,10 +283,15 @@ func TestExecute(t *testing.T) {
 			t.Errorf("%s: unexpected error: %s", c.Query, err)
 			continue
 		}
-		want := Result{
-			Sets: []any{c.Want},
+		var want *Result
+		if w, ok := c.Want.(*Result); !ok {
+			want = &Result{
+				Sets: []any{c.Want},
+			}
+		} else {
+			want = w
 		}
-		if !compareResults(got, &want) {
+		if !compareResults(got, want) {
 			t.Errorf("%s: results mismatched! want %v, got %v", c.Query, want, got)
 		}
 	}
