@@ -18,6 +18,9 @@ var builtins = map[string]func(any, []Expr) (any, error){
 	"first":    runFirst,
 	"last":     runLast,
 	"range":    runRange,
+	"filter":   runFilter,
+	// "some":     runSome,
+	// "every":    runEvery,
 	"default":  runDefault,
 	"not":      runNot,
 	"eq":       runEqual,
@@ -126,6 +129,29 @@ func runRange(val any, args []Expr) (any, error) {
 		return missed, nil
 	}
 	return arr[fix:tix], nil
+}
+
+// arr:filter()
+func runFilter(val any, args []Expr) (any, error) {
+	if len(args) != 1 {
+		return nil, invalidArgs("filter takes one argument", len(args))
+	}
+	var keep func(any) bool
+	if len(args) == 0 {
+		keep = isDefined
+	}
+	arr, ok := val.([]any)
+	if !ok {
+		return nil, fmt.Errorf("array expected as argument of filter")
+	}
+	list := make([]any, 0, len(arr))
+	for i := range arr {
+		if !keep(arr[i]) {
+			continue
+		}
+		list = append(list, arr[i])
+	}
+	return list, nil
 }
 
 // :first()
