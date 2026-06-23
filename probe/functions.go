@@ -12,13 +12,13 @@ func invalidArgs(msg string, n int) error {
 }
 
 var builtins = map[string]func(any, []Expr) (any, error){
-	"as":       runAs,
-	"len":      runLen,
-	"at":       runAt,
-	"first":    runFirst,
-	"last":     runLast,
-	"range":    runRange,
-	"filter":   runFilter,
+	"as":     runAs,
+	"len":    runLen,
+	"at":     runAt,
+	"first":  runFirst,
+	"last":   runLast,
+	"range":  runRange,
+	"filter": runFilter,
 	// "some":     runSome,
 	// "every":    runEvery,
 	"default":  runDefault,
