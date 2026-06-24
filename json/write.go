@@ -119,7 +119,7 @@ func (w *Writer) writeLiteral(value any) error {
 	case string:
 		w.writeString(v)
 	default:
-		return fmt.Errorf("unsupported json type")
+		return fmt.Errorf("unsupported json type %T", value)
 	}
 	return nil
 }
